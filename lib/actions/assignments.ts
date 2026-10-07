@@ -26,6 +26,7 @@ import { canManageAssignment } from '@/lib/auth/assignment-access'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { loadAssignmentQuestionsByProvenance } from '@/lib/assignment-question-access.server'
 import { shouldClearExpiredEndAt } from '@/lib/assignment-status'
+import { completionAttemptSettings, completionChoiceFor, streakRandomSubsetError } from '@/lib/assignment-completion'
 
 const SHOW_RESULTS_MODES: ShowResultsMode[] = ['immediate', 'score_only', 'after_due', 'never']
 
@@ -301,7 +302,7 @@ export async function createAssignment(data: CreateAssignmentData) {
   // and more than one attempt to re-open it in. A printed sheet or a
   // single-attempt งาน can only mean the default, whatever a client sends.
   const retryScope: RetryScope = data.mode === 'online'
-    && data.max_attempts !== 1
+    && (data.completion_rule === 'streak' || data.passing_type != null || data.max_attempts !== 1)
     && data.retry_scope === 'wrong_only'
       ? 'wrong_only'
       : 'all'
@@ -315,6 +316,9 @@ export async function createAssignment(data: CreateAssignmentData) {
     && (data.random_question_count as number) < questionIds.length
       ? data.random_question_count
       : null
+
+  const streakDeliveryError = streakRandomSubsetError(data.completion_rule, randomQuestionCount)
+  if (streakDeliveryError) return { error: streakDeliveryError }
 
   // What "จบงาน" means for this งาน. A refused streak is reported rather than
   // stored as 'fixed': a งาน that ends a different way than the teacher chose
@@ -336,6 +340,13 @@ export async function createAssignment(data: CreateAssignmentData) {
   // choose — each is also a CHECK constraint or an invariant the ทำข้อสอบ loop
   // depends on. See streakForcedSettings() for why each one is fixed.
   const forced = completion.rule === 'streak' ? streakForcedSettings() : null
+  const attemptSettings = completionAttemptSettings({
+    completion_rule: completion.rule,
+    passing_type: forced ? null : data.passing_type,
+    passing_value: forced ? null : data.passing_value,
+    max_attempts: data.max_attempts === undefined ? 1 : data.max_attempts,
+  }, data.score_strategy)
+  if (attemptSettings.error) return { error: attemptSettings.error }
 
   // Only keep overrides for questions actually in this assignment, with a
   // valid positive point value — drops anything a tampered client might add.
@@ -373,15 +384,15 @@ export async function createAssignment(data: CreateAssignmentData) {
       mode: 'online',
       type: assignmentType,
       shuffle_questions: data.shuffle_questions ?? false,
-      shuffle_options: data.shuffle_options ?? false,
+      shuffle_options: data.shuffle_options ?? true,
       shared_random_seed: data.shared_random_values === true
         ? (copiedSharedRandomSeed ?? createSharedRandomSeed())
         : null,
       random_question_count: randomQuestionCount,
       show_results: showResults,
       show_solutions: data.show_solutions === true,
-      max_attempts: data.max_attempts || null,
-      score_strategy: forced?.score_strategy ?? data.score_strategy ?? 'best',
+      max_attempts: attemptSettings.max_attempts,
+      score_strategy: attemptSettings.score_strategy,
       retry_scope: forced?.retry_scope ?? retryScope,
       questions_per_page: forced?.questions_per_page
         ?? normalizeQuestionsPerPage(data.mode, data.questions_per_page),
@@ -389,7 +400,7 @@ export async function createAssignment(data: CreateAssignmentData) {
       // counted — so this is the one case where an exam gets instant_check.
       // Ordinary ข้อสอบ still keep their single ส่งคำตอบ at the end.
       instant_check: forced?.instant_check ?? (isOnlineExercise && data.instant_check !== false),
-      instant_check_answer_key: data.instant_check_answer_key !== false,
+      instant_check_answer_key: data.instant_check_answer_key === true,
       completion_rule: completion.rule,
       streak_target: completion.target,
       streak_question_cap: completion.questionCap,
@@ -596,7 +607,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   // has also made service-role reads safe for co-teacher submission checks.
   const { data: existing } = await supabase
     .from('assignments')
-    .select('created_by, org_id, question_ids, sections, type, mode, status, random_question_count, shared_random_seed, calculator_enabled, scratchpad_enabled, secure_browser_mode, android_exam_mode, completion_rule, streak_target, streak_question_cap, streak_recycle_pool')
+    .select('created_by, org_id, question_ids, sections, type, mode, status, random_question_count, shared_random_seed, calculator_enabled, scratchpad_enabled, secure_browser_mode, android_exam_mode, completion_rule, passing_type, passing_value, streak_target, streak_question_cap, streak_recycle_pool')
     .eq('id', id)
     .maybeSingle()
   if (!existing) return { error: 'ไม่พบชุดข้อสอบ' }
@@ -700,7 +711,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   // Same rule as createAssignment: only an online งาน that can be reopened
   // more than once can re-ask just the missed questions.
   const updatedRetryScope: RetryScope = existing.mode === 'online'
-    && data.max_attempts !== 1
+    && (existing.completion_rule === 'streak' || data.completion_rule === 'streak' || data.passing_type != null || data.max_attempts !== 1)
     && data.retry_scope === 'wrong_only'
       ? 'wrong_only'
       : 'all'
@@ -714,6 +725,14 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
     && data.random_question_count < nextIds.length
       ? data.random_question_count
       : null
+
+  const nextRequestedCompletionRule = data.completion_rule ?? existing.completion_rule
+  const preservesLegacyFixedPoolStreak = existing.completion_rule === 'streak'
+    && existing.random_question_count === null
+    && nextRequestedCompletionRule === 'streak'
+    && randomQuestionCount === null
+  const streakDeliveryError = streakRandomSubsetError(nextRequestedCompletionRule, randomQuestionCount)
+  if (streakDeliveryError && !preservesLegacyFixedPoolStreak) return { error: streakDeliveryError }
 
   // เงื่อนไขจบงาน, resolved the same way createAssignment does it. Omitting
   // `completion_rule` leaves the stored rule and all three streak settings
@@ -736,6 +755,14 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   const forced = (completion?.rule ?? existing.completion_rule) === 'streak'
     ? streakForcedSettings()
     : null
+  const nextCompletion = {
+    completion_rule: completion?.rule ?? existing.completion_rule,
+    passing_type: forced ? null : data.passing_type,
+    passing_value: forced ? null : data.passing_value,
+    max_attempts: data.max_attempts,
+  }
+  const attemptSettings = completionAttemptSettings(nextCompletion, data.score_strategy)
+  if (attemptSettings.error) return { error: attemptSettings.error }
 
   // Moving a งาน between "จบเมื่อทำครบ" and "จบเมื่อถูกติดกัน" after anyone has
   // started would leave two students' results measuring different things, the
@@ -743,8 +770,8 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   // the target are locked; the ceiling and pool recycling can still be relaxed
   // mid-way without changing what passing means.
   if (
-    completion
-    && (completion.rule !== existing.completion_rule || completion.target !== existing.streak_target)
+    (completion && (completion.rule !== existing.completion_rule || completion.target !== existing.streak_target))
+    || completionChoiceFor(nextCompletion) !== completionChoiceFor(existing)
   ) {
     const { data: startedCompletion, error: startedCompletionError } = await admin
       .from('submissions')
@@ -848,8 +875,8 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
       start_at: data.start_at || null,
       end_at: data.end_at || null,
       duration_minutes: data.duration_minutes || null,
-      max_attempts: data.max_attempts || null,
-      score_strategy: forced?.score_strategy ?? data.score_strategy,
+      max_attempts: attemptSettings.max_attempts,
+      score_strategy: attemptSettings.score_strategy,
       ...(data.retry_scope === undefined && !forced
         ? {}
         : { retry_scope: forced?.retry_scope ?? updatedRetryScope }),

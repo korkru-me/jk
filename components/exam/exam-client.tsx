@@ -3,7 +3,7 @@
 import { lazy, Suspense, useState, useEffect, useCallback, useMemo, useRef, type ReactNode, type RefObject } from 'react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
-import { checkAnswer, drawNextStreakQuestion, saveWorkImage, submitSubmission } from '@/lib/actions/submissions'
+import { checkAnswer, drawNextStreakQuestion, rerollCheckedRandomAnswer, saveWorkImage, submitSubmission } from '@/lib/actions/submissions'
 import { StreakEndScreen, StreakMeter, type StreakView } from '@/components/exam/streak-progress'
 import type { StreakEnding } from '@/lib/streak-run'
 // Type-only: `gradeAnswer` pulls in mathjs (~640 KB), which only a teacher's
@@ -46,7 +46,7 @@ import { partLabels } from '@/lib/part-labels'
 import { groupQuestionsBySection, sectionByQuestionId, type QuestionSetSection } from '@/lib/question-set-sections'
 import { getBlankType, splitFillBlankHtml, extractBlankNumbers } from '@/lib/fill-blank'
 import { splitAnswerBlankHtml, countAnswerBlanks, splitNumberedAnswerBlanks } from '@/lib/answer-blank'
-import type { AnswerPart, MatchingAnswerMode, MathInputMode, TrueFalseConfig, TrueFalseStatement, TrueFalseExplanationMode, FillBlankConfig, OrderingConfig, OrderingItem, RandomQuestionConfig, FileUploadConfig, SubmittedFile, CompositeConfig, ClassifyConfig, ImageLabelConfig } from '@/lib/types'
+import type { AnswerPart, MatchingAnswerMode, MathInputMode, TrueFalseConfig, TrueFalseStatement, TrueFalseExplanationMode, FillBlankConfig, OrderingConfig, OrderingItem, RandomQuestionConfig, FileUploadConfig, SubmittedFile, CompositeConfig, ClassifyConfig, ImageLabelConfig, LogicRule, Question } from '@/lib/types'
 import { CLASSIFY_UNSET, parseClassifyGrid } from '@/lib/classify'
 import { normalizeImageLabelMode, parseImageLabelAnswer } from '@/lib/image-label'
 import { ImageLabelInput } from './image-label-input'
@@ -129,6 +129,10 @@ interface AnswerRow extends Omit<SafeExamAnswer, 'questions'> {
     mcq_options: Array<{ text?: string; image_url?: string; index?: number; left_text?: string; left_image?: string }> | null
     matching_options?: Array<{ right_text: string; right_image?: string }> | null
     variables: Array<{ name: string; unit?: string; type?: string }>
+    // Preview-only ingredients for drawing the next random-number variant.
+    // Student DTOs omit them and the real retry is rebuilt server-side.
+    logic_rules?: LogicRule[]
+    answer_formula?: string
     answer_parts: SafeAnswerPart[] | AnswerPart[] | null
     extra_data: SafeExamAnswer['questions']['extra_data'] | TrueFalseConfig | FillBlankConfig | OrderingConfig | RandomQuestionConfig | CompositeConfig
     image_urls: string[] | null
@@ -269,7 +273,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   // ── Core state ──────────────────────────────────────────────────────────────
   const {
     localAnswers, localAnswersRef, localMathInputModes, localMathInputModesRef,
-    setAnswer, setMathInputMode, flushQueuedAnswers, retryPending, clearSavedAnswers,
+    setAnswer, setMathInputMode, replaceAnswerFromServer, flushQueuedAnswers, retryPending, clearSavedAnswers,
     saving, pendingCount,
   } = useAnswerAutosave({
     submissionId,
@@ -309,6 +313,8 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   // score — the final ส่งคำตอบ re-grades every ข้อ from what was last saved.
   const [checked, setChecked] = useState<Record<string, AnswerFeedback & { checkCount: number }>>({})
   const [checkingId, setCheckingId] = useState<string | null>(null)
+  const [randomValueOverrides, setRandomValueOverrides] = useState<Record<string, Record<string, number>>>({})
+  const [previewCorrectAnswerOverrides, setPreviewCorrectAnswerOverrides] = useState<Record<string, string>>({})
   const instantCheckOn = config.instantCheck === true
 
   // ── UX state ────────────────────────────────────────────────────────────────
@@ -551,6 +557,58 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
     })
   }, [])
 
+  const handleRetry = useCallback(async (answer: AnswerRow) => {
+    // Withheld answer keys and fixed questions retain the current problem.
+    // Only a checked random-number question whose key was revealed asks the
+    // server to freeze a new value set for the next try.
+    const shouldReroll = config.instantCheckAnswerKey === true
+      && Object.keys(randomValueOverrides[answer.id] ?? answer.random_values ?? {}).length > 0
+    if (!shouldReroll) {
+      clearCheck(answer.id)
+      return
+    }
+
+    if (checkingId) return
+    setCheckingId(answer.id)
+    try {
+      if (previewMode) {
+        const { buildFreshRandomQuestion } = await import('@/lib/assignment-attempt')
+        const next = buildFreshRandomQuestion({
+          id: answer.question_id,
+          ...answer.questions,
+        } as unknown as Question, randomValueOverrides[answer.id] ?? answer.random_values ?? {})
+        if (next) {
+          replaceAnswerFromServer(answer.id, '')
+          setRandomValueOverrides(previous => ({ ...previous, [answer.id]: next.random_values }))
+          setPreviewCorrectAnswerOverrides(previous => ({
+            ...previous,
+            [answer.id]: next.correct_answer,
+          }))
+        }
+        clearCheck(answer.id)
+        return
+      }
+
+      const result = await rerollCheckedRandomAnswer(answer.id)
+      if (!result || 'error' in result) {
+        toast.error(result?.error ?? 'สุ่มตัวเลขชุดใหม่ไม่สำเร็จ กรุณาลองใหม่')
+        return
+      }
+      if (result.rerolled) {
+        replaceAnswerFromServer(answer.id, '')
+        setRandomValueOverrides(previous => ({
+          ...previous,
+          [answer.id]: result.randomValues,
+        }))
+      }
+      clearCheck(answer.id)
+    } catch {
+      toast.error('สุ่มตัวเลขชุดใหม่ไม่สำเร็จ กรุณาลองใหม่')
+    } finally {
+      setCheckingId(null)
+    }
+  }, [checkingId, clearCheck, config.instantCheckAnswerKey, previewMode, randomValueOverrides, replaceAnswerFromServer])
+
   /**
    * ตรวจคำตอบข้อนี้ — the one thing a แบบฝึกหัด does that a ข้อสอบ does not.
    *
@@ -576,7 +634,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
         ])
         const gradable = {
           id: answer.id,
-          correct_answer: answer.correct_answer ?? '',
+          correct_answer: previewCorrectAnswerOverrides[answer.id] ?? answer.correct_answer ?? '',
           student_answer: localAnswersRef.current[answer.id] ?? null,
           math_input_modes: localMathInputModesRef.current[answer.id] ?? {},
           max_score: answer.max_score ?? 0,
@@ -603,7 +661,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
           isCorrect: graded.is_correct,
           score: graded.score,
           maxScore: gradable.max_score,
-          revealAnswerKey: config.instantCheckAnswerKey !== false,
+          revealAnswerKey: config.instantCheckAnswerKey === true,
         })
         setChecked(prev => ({
           ...prev,
@@ -643,7 +701,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
     } finally {
       setCheckingId(null)
     }
-  }, [answers, checkingId, config.instantCheckAnswerKey, flushQueuedAnswers, localAnswersRef, localMathInputModesRef, previewMode])
+  }, [answers, checkingId, config.instantCheckAnswerKey, flushQueuedAnswers, localAnswersRef, localMathInputModesRef, previewCorrectAnswerOverrides, previewMode])
 
   /**
    * Ask the server for the next ข้อ, or find out the attempt is over.
@@ -1270,7 +1328,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
           // generic standalone "คำตอบ" box(es).
           const currentQuestionText = interpolateValues(
             current.questions.question_text,
-            current.random_values,
+            randomValueOverrides[current.id] ?? current.random_values,
             current.questions.variables,
           )
           const mainInlineBlank = current.questions.question_type === 'written'
@@ -1282,6 +1340,8 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
               id={`exam-q-${questionIndex}`}
               role="region"
               aria-label={`ข้อ ${questionIndex + 1} จาก ${answers.length}`}
+              aria-busy={checkingId === current.id}
+              inert={checkingId === current.id ? true : undefined}
               tabIndex={-1}
               className="flex flex-col gap-3 rounded-2xl scroll-mt-2 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
             >
@@ -1504,7 +1564,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                 disabled={checkingId !== null && checkingId !== current.id}
                 answered={hasAnswered(current.id)}
                 onCheck={() => handleCheck(current.id)}
-                onRetry={() => clearCheck(current.id)}
+                onRetry={() => void handleRetry(current)}
                 allowRetry={!streakOn}
                 checkHint={streakOn
                   ? 'ตรวจได้ครั้งเดียว ผลนับเข้าจำนวนข้อที่ถูกติดต่อกันทันที'
@@ -2193,9 +2253,9 @@ function InstantCheckPanel({
           <span className="text-[11px] text-muted-foreground">ตรวจไปแล้ว {feedback.checkCount} ครั้ง</span>
         )}
         {allowRetry && (
-          <Button variant="outline" size="sm" onClick={onRetry} className="ml-auto">
+          <Button variant="outline" size="sm" onClick={onRetry} disabled={busy || disabled} className="ml-auto">
             <RotateCcw size={14} />
-            ทำใหม่
+            {busy ? 'กำลังสุ่ม...' : 'ทำใหม่'}
           </Button>
         )}
       </div>

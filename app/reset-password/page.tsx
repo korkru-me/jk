@@ -5,6 +5,7 @@ import { AlertCircle } from 'lucide-react'
 import { ResetPasswordForm } from '@/components/auth/reset-password-form'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { BrandLogo } from '@/components/brand-logo'
 import { createClient } from '@/lib/supabase/server'
 
 export const metadata: Metadata = { title: 'ตั้งรหัสผ่านใหม่ — KorKru' }
@@ -16,13 +17,7 @@ export default async function ResetPasswordPage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-muted p-4">
       <Link href="/" className="mb-8 flex items-center gap-2.5">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-base font-bold text-primary-foreground shadow-md">
-          K
-        </div>
-        <div>
-          <p className="text-lg font-bold leading-none text-foreground">KorKru</p>
-          <p className="text-xs text-muted-foreground">คลังข้อสอบอัจฉริยะ</p>
-        </div>
+        <BrandLogo subtitle="คลังข้อสอบอัจฉริยะ" />
       </Link>
 
       <Card padding="2xl" elevation="sm" className="w-full max-w-md">

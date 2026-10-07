@@ -16,6 +16,7 @@ import { firstSearchParam, resolveAssignmentTypePreset } from '@/lib/assignment-
 import { classroomNavigationPath } from '@/lib/classroom-navigation'
 import { filterSectionsToQuestions, parseSections, questionIdsForSections } from '@/lib/question-set-sections'
 import { AssignmentClassroomSidebar } from './_components/assignment-classroom-sidebar'
+import { ClearPendingSidebar } from '@/components/layout/sidebar-context'
 import { AssignmentStartChoice, AssignmentTypeChoice } from './_components/assignment-start-choice'
 import {
   ReuseAssignmentCard, type ReusableAssignmentOption,
@@ -23,6 +24,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { canManageAssignment } from '@/lib/auth/assignment-access'
 import { loadAssignmentQuestionsByProvenance } from '@/lib/assignment-question-access.server'
+import { loadAssignmentSettingPresets } from '@/lib/actions/assignment-setting-presets'
 
 interface Props {
   searchParams: Promise<{
@@ -305,7 +307,7 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
       studentCount={contextualStudentCount}
       isOwner={contextualClassroom.teacher_id === user.id}
     />
-  ) : null
+  ) : <ClearPendingSidebar />
 
   const hasReusableSource = preselectedClassroomId !== undefined
     && reusableAssignments.some(assignment => assignment.classroomId !== preselectedClassroomId)
@@ -357,12 +359,18 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
     )
   }
 
+  const presetResult = await loadAssignmentSettingPresets(preselectedAssignmentType)
+  const presetBootstrap = 'data' in presetResult ? presetResult.data : {
+    presets: [], defaultPresetId: null, error: presetResult.error,
+  }
+
   return (
     <>
       {assignmentSidebar}
 
-      <div className="max-w-2xl space-y-6">
+      <div className="assignment-create-stage max-w-2xl space-y-6">
         <CreateAssignmentForm
+          key={`${preselectedAssignmentType}:${copySource?.id ?? preselectedSet?.id ?? 'new'}`}
           classrooms={classrooms}
           groupsByClassroom={groupsByClassroom}
           questions={questions}
@@ -372,6 +380,7 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
           preselectedAssignmentType={preselectedAssignmentType}
           copySource={copySource}
           initialGroupTargets={initialGroupTargets}
+          presetBootstrap={presetBootstrap}
         />
       </div>
     </>

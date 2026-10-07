@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { moveOrderedItem, moveVisibleAssignmentColumn, reconcileAssignmentOrder } from './assignment-column-order'
+import {
+  moveOrderedItem,
+  moveVisibleAssignmentAfter,
+  moveVisibleAssignmentColumn,
+  reconcileAssignmentOrder,
+} from './assignment-column-order'
 
 describe('reconcileAssignmentOrder', () => {
   it('keeps the arranged order, removes stale ids, and appends new work', () => {
@@ -24,6 +29,22 @@ describe('moveVisibleAssignmentColumn', () => {
   it('returns the current order when the drop target is not visible', () => {
     const current = ['a', 'b', 'c']
     expect(moveVisibleAssignmentColumn(current, ['a', 'c'], 'a', 'b')).toBe(current)
+  })
+})
+
+describe('moveVisibleAssignmentAfter', () => {
+  it('appends a visible row after the target and preserves hidden slots', () => {
+    expect(moveVisibleAssignmentAfter(
+      ['a', 'hidden-1', 'b', 'hidden-2', 'c'],
+      ['a', 'b', 'c'],
+      'a',
+      'c',
+    )).toEqual(['b', 'hidden-1', 'c', 'hidden-2', 'a'])
+  })
+
+  it('keeps the original array when the row is already after the target', () => {
+    const current = ['a', 'b', 'c']
+    expect(moveVisibleAssignmentAfter(current, current, 'c', 'b')).toBe(current)
   })
 })
 

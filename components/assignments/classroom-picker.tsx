@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { BookOpen, Check, ChevronDown, Search } from 'lucide-react'
+import { Check, ChevronDown, Search } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import {
   Collapsible,
@@ -12,6 +12,8 @@ import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { coverOf, parseDescription, type CoverPreset } from '@/app/(app)/classrooms/_components/classroom-meta'
 import type { AssignmentClassroomOption } from '@/components/assignments/create-assignment-form'
+import { ClassroomIcon } from '@/components/classrooms/classroom-icon'
+import type { ClassroomIconKey } from '@/lib/classroom-icons'
 
 /** Past this many ห้องเรียน the list gets a search box. Below it, everything
  *  is on screen at once and a search field is one more thing to read past. */
@@ -29,6 +31,7 @@ interface Props {
 interface Row {
   classroom: AssignmentClassroomOption
   cover: CoverPreset | null
+  iconKey?: ClassroomIconKey
   /** The one line under the name: ระดับ · ภาคเรียน · what the teacher typed. */
   meta: string
   /** Everything a search should match, lowercased once. */
@@ -55,6 +58,7 @@ export function ClassroomPicker({ classrooms, selectedIds, onToggle, primaryClas
     return {
       classroom,
       cover: coverOf(meta),
+      iconKey: meta.iconKey,
       meta: [meta.gradeLevel, meta.academicTerm, meta.description.trim()].filter(Boolean).join(' · '),
       haystack: [classroom.name, meta.gradeLevel, meta.academicTerm, meta.tags.join(' '), meta.description]
         .join(' ')
@@ -132,7 +136,7 @@ export function ClassroomPicker({ classrooms, selectedIds, onToggle, primaryClas
           >
             <span className="flex min-w-0 flex-col items-start gap-0.5 whitespace-normal">
               <span className="font-medium text-foreground">มอบหมายให้ห้องเรียนอื่นด้วย</span>
-              <span className="text-xs font-normal text-muted-foreground">
+              <span data-assignment-description className="text-xs font-normal text-muted-foreground">
                 {selectedRows.length > 0
                   ? `เลือกเพิ่มแล้ว ${selectedRows.length} ห้องเรียน`
                   : 'หากไม่เลือกเพิ่ม งานจะอยู่ในห้องนี้เท่านั้น'}
@@ -171,7 +175,7 @@ function ClassroomRow({
           cover ? `${cover.surface} ${cover.text}` : 'bg-muted text-muted-foreground border-transparent',
         )}
       >
-        <BookOpen className="size-3.5" />
+        <ClassroomIcon iconKey={row.iconKey} className="size-3.5" />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-foreground truncate">{classroom.name}</p>
@@ -183,8 +187,8 @@ function ClassroomRow({
   const rowClassName = cn(
     'flex h-auto w-full items-center justify-start gap-2.5 rounded-xl border p-2.5 text-left font-normal',
     selected
-      ? 'border-primary bg-primary/10'
-      : 'border-border hover:border-ring',
+      ? 'border-border bg-primary/10 shadow-sm'
+      : 'border-border hover:bg-muted/50',
   )
 
   return (

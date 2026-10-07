@@ -10,6 +10,7 @@ import type { Classroom, ClassroomPost } from '@/lib/types'
 
 import { ClassroomSettingsDialog } from './classroom-settings-dialog'
 import { parseDescription, coverOf, displayDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
+import { ClassroomIcon } from '@/components/classrooms/classroom-icon'
 import type { SortKey as StudentSortKey } from './student-table'
 import type { CoTeacherRow, InviteRow } from './co-teachers'
 import type { ClassroomAssignmentRow } from './classroom-assignments-tab'
@@ -31,6 +32,7 @@ import { useContextualSidebar } from '@/components/layout/sidebar-context'
 import { nextStudentSortRules, type StudentSortRule } from '@/lib/student-sort'
 import type { PeopleView } from './classroom-people-tabs'
 import { ClassroomAccessPanel } from './classroom-access-panel'
+import { cn } from '@/lib/utils'
 
 function TabLoading() {
   return <div className="h-32 rounded-2xl bg-muted animate-pulse" aria-label="กำลังโหลดเนื้อหา" />
@@ -118,7 +120,8 @@ export function ClassroomDetailClient({
   )
   const [activeTab, setActiveTab] = useState<ClassroomNavigationKey>(initialNavigationItem)
   const [peopleView, setPeopleView] = useState<PeopleView>(initialPeopleView)
-  const savedCover = coverOf(parseDescription(classroom.description))
+  const classroomMeta = parseDescription(classroom.description)
+  const savedCover = coverOf(classroomMeta)
   // A chosen cover paints the banner as a tinted surface whose text is the same
   // colour at full strength; secondary lines just dim it. Without one the
   // banner keeps its original dark gradient and white text.
@@ -166,12 +169,16 @@ export function ClassroomDetailClient({
   }, [classroomAssignments])
 
   const navigateTo = useCallback((nextItem: ClassroomNavigationKey) => {
+    if (window.location.pathname !== `/classrooms/${classroom.id}`) {
+      router.push(classroomNavigationPath(classroom.id, nextItem))
+      return
+    }
     setActiveTab(nextItem)
 
     const nextUrl = classroomNavigationHref(window.location.href, nextItem)
     const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`
     if (nextUrl !== currentUrl) window.history.pushState(null, '', nextUrl)
-  }, [])
+  }, [classroom.id, router])
 
   const changePeopleView = useCallback((nextView: PeopleView) => {
     setPeopleView(nextView)
@@ -230,7 +237,7 @@ export function ClassroomDetailClient({
     />
   ), [activeTab, backHref, classroom, isOwner, navigateTo, navigationItems, students.length, switchableClassrooms, switchClassroom])
 
-  useContextualSidebar(`/classrooms/${classroom.id}`, renderContextualSidebar)
+  useContextualSidebar(`/classrooms/${classroom.id}`, renderContextualSidebar, classroom.id)
 
   function toggleStudentSort(key: StudentSortKey) {
     setStudentSortRules(current => nextStudentSortRules(current, key))
@@ -240,18 +247,24 @@ export function ClassroomDetailClient({
     <div className="flex min-w-0 max-w-[1200px] flex-col gap-6">
       {/* Header card */}
       <div
-        className={savedCover
-          ? `rounded-2xl p-6 border-2 ${savedCover.surface} ${savedCover.text}`
-          : `rounded-2xl p-6 text-white bg-gradient-to-br ${isHomeroom ? 'from-slate-800 via-slate-800 to-indigo-900' : 'from-gray-900 to-gray-800'}`}
+        className={cn(
+          'relative overflow-hidden rounded-2xl p-6',
+          savedCover
+            ? `border-2 ${savedCover.surface} ${savedCover.text}`
+            : `text-white bg-gradient-to-br ${isHomeroom ? 'from-slate-800 via-slate-800 to-indigo-900' : 'from-gray-900 to-gray-800'}`,
+        )}
       >
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex-1 min-w-0">
             {isHomeroom && (
               <p className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest mb-1.5 ${savedCover ? savedCover.textMuted : 'text-primary'}`}>
                 <Home className="w-3 h-3" /> ครูที่ปรึกษาประจำชั้น
               </p>
             )}
-            <h1 className="text-2xl font-bold leading-tight">{classroom.name}</h1>
+            <h1 className="flex items-center gap-3 text-2xl font-bold leading-tight">
+              <ClassroomIcon iconKey={classroomMeta.iconKey} className="size-7 shrink-0" />
+              <span className="min-w-0">{classroom.name}</span>
+            </h1>
             {shownDescription && (
               <p className={`text-sm mt-1 ${coverMuted}`}>{shownDescription}</p>
             )}
@@ -275,15 +288,15 @@ export function ClassroomDetailClient({
           <ClassroomAccessPanel
             classCode={classroom.class_code}
             canManage={canManage}
-            onCover={!!savedCover}
+            onCover={Boolean(savedCover)}
             mutedClassName={coverMuted}
           />
         </div>
 
         {/* Owner actions */}
         {isOwner && (
-          <div className="mt-5 flex items-center gap-2 border-t border-white/10 pt-4 lg:hidden">
-            <ClassroomSettingsDialog classroom={classroom} onCover={!!savedCover} />
+          <div className="relative z-10 mt-5 flex items-center gap-2 border-t border-white/10 pt-4 lg:hidden">
+            <ClassroomSettingsDialog classroom={classroom} onCover={Boolean(savedCover)} />
           </div>
         )}
       </div>

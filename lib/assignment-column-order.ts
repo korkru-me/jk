@@ -62,3 +62,29 @@ export function moveVisibleAssignmentColumn(
   let visibleIndex = 0
   return allIds.map(id => visible.has(id) ? movedVisible[visibleIndex++] : id)
 }
+
+/**
+ * Move a visible assignment directly after another visible assignment while
+ * leaving rows hidden by the current filter in their existing slots.
+ * Category drop zones use this to append an assignment to the visible end of
+ * a group without disturbing work the teacher cannot currently see.
+ */
+export function moveVisibleAssignmentAfter(
+  allIds: string[],
+  visibleIds: string[],
+  activeId: string,
+  afterId: string,
+): string[] {
+  if (activeId === afterId || !visibleIds.includes(activeId) || !visibleIds.includes(afterId)) return allIds
+
+  const movedVisible = visibleIds.filter(id => id !== activeId)
+  const target = movedVisible.indexOf(afterId)
+  if (target < 0) return allIds
+  movedVisible.splice(target + 1, 0, activeId)
+
+  if (movedVisible.every((id, index) => id === visibleIds[index])) return allIds
+
+  const visible = new Set(visibleIds)
+  let visibleIndex = 0
+  return allIds.map(id => visible.has(id) ? movedVisible[visibleIndex++] : id)
+}

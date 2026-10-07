@@ -1,7 +1,7 @@
 import type { Variable } from '@/lib/types'
 
 /**
- * A repeatable stand-in for Math.random, for "ให้นักเรียนทุกคนได้ตัวเลขชุดเดียวกัน"
+ * A repeatable stand-in for Math.random, for "ให้นักเรียนได้ตัวเลขชุดเดียวกัน"
  * (`assignments.shared_random_seed`).
  *
  * Sharing the numbers is done by sharing the *draw*, not by storing its

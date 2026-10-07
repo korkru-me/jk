@@ -3,7 +3,6 @@
 import { Fragment, useId, type ReactNode } from 'react'
 import Link from 'next/link'
 import {
-  BookOpen,
   ChevronLeft,
   ChevronsUpDown,
   LayoutDashboard,
@@ -17,6 +16,7 @@ import type {
 import { coverOf, parseDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { SidebarButton, useSidebarCompact } from '@/components/layout/sidebar-display'
 import { AssignmentCreationMenu } from '@/components/assignments/assignment-creation-menu'
 import {
   DropdownMenu,
@@ -30,6 +30,7 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import { CLASSROOM_NAVIGATION_ICONS } from './classroom-navigation-icons'
+import { ClassroomIcon } from '@/components/classrooms/classroom-icon'
 
 interface ClassroomContextSidebarProps {
   classroom: Pick<Classroom, 'id' | 'name' | 'description' | 'classroom_type'>
@@ -58,49 +59,67 @@ export function ClassroomContextNavigation({
   managementActions,
 }: ClassroomContextSidebarProps & { onClose?: () => void }) {
   const navigationHeadingId = useId()
+  const compact = useSidebarCompact()
   const managementHeadingId = useId()
   const meta = parseDescription(classroom.description)
   const cover = coverOf(meta)
   const subtitle = [meta.gradeLevel, meta.academicTerm].filter(Boolean).join(' • ')
   const otherClassrooms = switchableClassrooms.filter(option => option.id !== classroom.id)
+  const canSwitchClassroom = onSwitchClassroom && otherClassrooms.length > 0
+  const switcherId = useId()
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
-      <Button
+      <SidebarButton
+        label="ห้องเรียนทั้งหมด"
         variant="ghost"
         className="w-full justify-start"
         render={<Link href={backHref} onClick={onClose} />}
       >
         <ChevronLeft data-icon="inline-start" />
-        ห้องเรียนทั้งหมด
-      </Button>
+      </SidebarButton>
 
+      <DropdownMenu>
       <div className={cn(
-        'flex items-center gap-3 rounded-2xl border p-3',
+        'flex items-center gap-3 rounded-lg border p-3',
+        compact && 'md:flex-col md:gap-1 md:p-1',
         cover ? cn(cover.surface, cover.text) : 'border-primary/20 bg-primary/5',
-      )}>
+      )} title={classroom.name}>
         <div className={cn(
           'flex size-12 shrink-0 items-center justify-center rounded-xl shadow-sm',
+          compact && 'md:size-8',
+          compact && canSwitchClassroom && 'md:hidden',
           cover ? 'bg-current/10' : 'bg-primary text-primary-foreground',
         )}>
-          <BookOpen aria-hidden="true" className="size-6" />
+          <ClassroomIcon iconKey={meta.iconKey} className={cn('size-6', compact && 'md:size-5')} />
         </div>
-        <div className="min-w-0 flex-1">
+        {compact && canSwitchClassroom && (
+          <DropdownMenuTrigger
+            id={`${switcherId}-icon`}
+            render={<Button type="button" variant="ghost" size="icon" className="hidden transition-colors md:inline-flex" aria-label="สลับไปห้องเรียนอื่น" title="สลับไปห้องเรียนอื่น" />}
+          >
+            <ClassroomIcon iconKey={meta.iconKey} />
+          </DropdownMenuTrigger>
+        )}
+        <div className={cn('min-w-0 flex-1', compact && 'md:sr-only')}>
           <p className={cn('text-xs font-medium', cover ? cover.textMuted : 'text-primary')}>ห้องเรียนปัจจุบัน</p>
           <p className={cn('truncate text-lg font-bold leading-tight', cover ? cover.text : 'text-foreground')}>{classroom.name}</p>
           <p className={cn('truncate text-xs', cover ? cover.textMuted : 'text-muted-foreground')}>
             {subtitle || (classroom.classroom_type === 'homeroom' ? 'ห้องโฮมรูม' : 'ห้องเรียนวิชา')}
           </p>
         </div>
-        {onSwitchClassroom && otherClassrooms.length > 0 && (
-          <DropdownMenu>
+        {canSwitchClassroom && (
+          <>
             <DropdownMenuTrigger
+              id={`${switcherId}-arrows`}
               render={(
                 <Button
                   type="button"
                   variant="outline"
                   size="icon-sm"
+                  className={cn('transition-colors', compact && 'md:hidden')}
                   aria-label="สลับไปห้องเรียนอื่น"
+                  title="สลับไปห้องเรียนอื่น"
                 />
               )}
             >
@@ -121,7 +140,7 @@ export function ClassroomContextNavigation({
                       key={option.id}
                       className="py-2"
                       onClick={() => {
-                        onSwitchClassroom(option.id)
+                        onSwitchClassroom?.(option.id)
                         onClose?.()
                       }}
                     >
@@ -129,7 +148,7 @@ export function ClassroomContextNavigation({
                         'flex size-8 shrink-0 items-center justify-center rounded-lg border',
                         optionCover ? cn(optionCover.surface, optionCover.text) : 'bg-muted text-muted-foreground',
                       )}>
-                        <BookOpen aria-hidden="true" />
+                        <ClassroomIcon iconKey={optionMeta.iconKey} />
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-medium">{option.name}</span>
@@ -151,13 +170,14 @@ export function ClassroomContextNavigation({
                 </DropdownMenuItem>
               </DropdownMenuGroup>
             </DropdownMenuContent>
-          </DropdownMenu>
+          </>
         )}
       </div>
+      </DropdownMenu>
 
       <Separator />
 
-      <div id={navigationHeadingId} className="px-2 text-xs font-medium text-muted-foreground">
+      <div id={navigationHeadingId} className={cn('px-2 text-xs font-medium text-muted-foreground', compact && 'md:sr-only')}>
         เมนูห้องเรียน
       </div>
       <nav aria-labelledby={navigationHeadingId} className="flex flex-col gap-1">
@@ -167,24 +187,20 @@ export function ClassroomContextNavigation({
 
           return (
             <Fragment key={item.key}>
-              <Button
+              <SidebarButton
+                label={item.label}
                 type="button"
                 variant={selected ? 'navigation' : 'ghost'}
                 className="w-full justify-start"
                 aria-current={selected ? 'page' : undefined}
+                endAdornment={item.key === 'students' ? <Badge variant="secondary">{studentCount}</Badge> : undefined}
                 onClick={() => {
                   onNavigate(item.key)
                   onClose?.()
                 }}
               >
                 <Icon data-icon="inline-start" />
-                <span className="truncate">{item.label}</span>
-                {item.key === 'students' && (
-                  <Badge variant="secondary" className="ml-auto">
-                    {studentCount}
-                  </Badge>
-                )}
-              </Button>
+              </SidebarButton>
 
               {item.key === 'assignments' && (
                 <AssignmentCreationMenu
@@ -195,6 +211,7 @@ export function ClassroomContextNavigation({
                   align="start"
                   active={assignmentCreationActive}
                   onNavigate={onClose}
+                  compactOnDesktop={compact}
                 />
               )}
             </Fragment>
@@ -205,7 +222,7 @@ export function ClassroomContextNavigation({
       {managementActions && (
         <section aria-labelledby={managementHeadingId} className="flex flex-col gap-2">
           <Separator />
-          <div id={managementHeadingId} className="px-2 text-xs font-medium text-muted-foreground">
+          <div id={managementHeadingId} className={cn('px-2 text-xs font-medium text-muted-foreground', compact && 'md:sr-only')}>
             จัดการห้องเรียน
           </div>
           {managementActions}
@@ -213,14 +230,14 @@ export function ClassroomContextNavigation({
       )}
 
       <Separator />
-      <Button
+      <SidebarButton
+        label="เมนูหลัก"
         variant="ghost"
         className="w-full justify-start"
         render={<Link href="/dashboard" onClick={onClose} />}
       >
         <LayoutDashboard data-icon="inline-start" />
-        เมนูหลัก
-      </Button>
+      </SidebarButton>
     </div>
   )
 }

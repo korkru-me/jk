@@ -220,6 +220,37 @@ export function useAnswerAutosave({
     scheduleSave(answerId, currentPayload(answerId))
   }, [currentPayload, scheduleSave])
 
+  /**
+   * Accept a value the server has deliberately replaced (for example a fresh
+   * random-number variant). Unlike setAnswer this must not enqueue a second
+   * write that could race with, or undo, that server transition.
+   */
+  const replaceAnswerFromServer = useCallback((
+    answerId: string,
+    value: string,
+    mathInputModes: MathInputModes = {},
+  ) => {
+    const timer = saveTimersRef.current.get(answerId)
+    if (timer) clearTimeout(timer)
+    saveTimersRef.current.delete(answerId)
+    pendingRef.current.delete(answerId)
+    backupRef.current.delete(answerId)
+    removePendingSync(answerId)
+
+    localAnswersRef.current = { ...localAnswersRef.current, [answerId]: value }
+    localMathInputModesRef.current = {
+      ...localMathInputModesRef.current,
+      [answerId]: copyMathInputModes(mathInputModes),
+    }
+    setLocalAnswers(previous => ({ ...previous, [answerId]: value }))
+    setLocalMathInputModes(previous => ({
+      ...previous,
+      [answerId]: copyMathInputModes(mathInputModes),
+    }))
+    persistPendingBackup()
+    refreshSavingState()
+  }, [persistPendingBackup, refreshSavingState, removePendingSync])
+
   const retryPending = useCallback((): Promise<SaveOutcome> => retryFlight.run(async () => {
     const ids = [...pendingSyncRef.current]
     if (ids.length === 0) return SAVED
@@ -295,6 +326,7 @@ export function useAnswerAutosave({
     localMathInputModesRef,
     setAnswer,
     setMathInputMode,
+    replaceAnswerFromServer,
     flushAnswer,
     flushQueuedAnswers,
     retryPending,

@@ -41,15 +41,15 @@ interface Props {
   onToggleSort: (key: SortKey) => void
 }
 
-// The name column uses minmax(0,1fr) rather than a bare 1fr — with a bare
-// 1fr, each row's intrinsic width calc lets its own full_name+email length
-// push the track wider, so rows (and the header) end up different total
-// widths and the fixed columns after it drift out of alignment row to row.
+// Keep the plain list flexible because it has no roster fields competing for
+// room. In the roster layout, cap the name/email track so it cannot absorb all
+// spare width; the remaining space is shared by the four roster-data columns.
+// Both header and rows use the same literal template to stay aligned.
 const GRID_COLS_READ_ONLY = 'grid-cols-[auto_minmax(160px,1fr)]'
 const GRID_COLS_MANAGE = 'grid-cols-[auto_minmax(160px,1fr)_40px]'
 const GRID_COLS_MANAGE_SELECT = 'grid-cols-[32px_auto_minmax(160px,1fr)_40px]'
-const GRID_COLS_WITH_ROSTER = 'grid-cols-[56px_auto_minmax(160px,1fr)_90px_80px_70px_85px_40px]'
-const GRID_COLS_WITH_ROSTER_SELECT = 'grid-cols-[32px_56px_auto_minmax(160px,1fr)_90px_80px_70px_85px_40px]'
+const GRID_COLS_WITH_ROSTER = 'grid-cols-[56px_auto_minmax(180px,240px)_minmax(90px,1fr)_minmax(80px,1fr)_minmax(70px,1fr)_minmax(100px,1fr)_40px]'
+const GRID_COLS_WITH_ROSTER_SELECT = 'grid-cols-[32px_56px_auto_minmax(180px,240px)_minmax(90px,1fr)_minmax(80px,1fr)_minmax(70px,1fr)_minmax(100px,1fr)_40px]'
 
 export function StudentTable({
   classroomId, students, profiles = {}, canManage = false, showRoster = false, showProfiles = false,

@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition, type ComponentProps } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Plus, CheckSquare, X, Trash2, BookOpen, Users, GraduationCap, GripVertical } from 'lucide-react'
+import { Plus, CheckSquare, X, Trash2, BookOpen, School, Users, GraduationCap, GripVertical } from 'lucide-react'
 import {
   DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter,
   useSensor, useSensors, type DragEndEvent,
@@ -194,7 +194,7 @@ export function TeacherViewClient({
       {classrooms.length > 0 && !isSelecting && (
         <div className="grid grid-cols-3 gap-4">
           {[
-            { label: 'ห้องเรียน', value: classrooms.length, icon: BookOpen, color: 'bg-primary/10 text-primary' },
+            { label: 'ห้องเรียน', value: classrooms.length, icon: School, color: 'bg-primary/10 text-primary' },
             { label: 'นักเรียนรวม', value: totalStudents, icon: Users, color: 'bg-tint-1/10 text-tint-1' },
             { label: 'งานทั้งหมด', value: totalAssignments, icon: BookOpen, color: 'bg-warning/10 text-warning' },
           ].map(s => {
@@ -218,7 +218,7 @@ export function TeacherViewClient({
       {classrooms.length === 0 ? (
         <div className="text-center py-24 border-2 border-dashed border-border rounded-2xl bg-muted/50">
           <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <BookOpen className="w-8 h-8 text-primary" />
+            <School className="size-8 text-primary" aria-hidden="true" />
           </div>
           <h3 className="text-lg font-semibold text-foreground mb-1">ยังไม่มีห้องเรียน</h3>
           <p className="text-sm text-muted-foreground mb-6 max-w-xs mx-auto">สร้างห้องเรียนแรกของคุณเพื่อเริ่มมอบหมายงานให้นักเรียน</p>
@@ -255,7 +255,7 @@ export function TeacherViewClient({
           <div className="space-y-3">
             {homeroomClassrooms.length > 0 && (
               <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                <BookOpen className="w-3.5 h-3.5" /> ห้องเรียนวิชา
+                <School className="size-3.5" aria-hidden="true" /> ห้องเรียนวิชา
               </div>
             )}
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -277,10 +277,10 @@ export function TeacherViewClient({
                   {!isSelecting && (
                     <Link
                       href="/classrooms/new"
-                      className="group flex min-h-[200px] flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border p-8 transition-colors hover:border-primary/20 hover:bg-primary/10"
+                      className="group flex min-h-[120px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border p-5 transition-colors hover:border-primary/20 hover:bg-primary/10"
                     >
-                      <div className="flex size-10 items-center justify-center rounded-full bg-muted transition-colors group-hover:bg-primary/10">
-                        <Plus className="size-5 text-muted-foreground transition-colors group-hover:text-primary" />
+                      <div className="flex size-9 items-center justify-center rounded-full bg-muted transition-colors group-hover:bg-primary/10">
+                        <Plus className="size-4 text-muted-foreground transition-colors group-hover:text-primary" />
                       </div>
                       <p className="text-sm font-medium text-muted-foreground transition-colors group-hover:text-primary">สร้างห้องเรียนใหม่</p>
                     </Link>
@@ -333,11 +333,11 @@ function SortableClassroomCard(props: ComponentProps<typeof ClassroomCard>) {
             type="button"
             label={`ลากเพื่อเปลี่ยนลำดับ ${props.classroom.name}`}
             size="sm"
-            className="absolute left-2.5 top-2.5 z-20 flex size-8 cursor-grab touch-none items-center justify-center rounded-lg bg-card/85 text-muted-foreground transition-colors hover:bg-card hover:text-foreground active:cursor-grabbing"
+            className="absolute left-3 top-4 z-20 flex size-8 cursor-grab touch-none items-center justify-center rounded-lg bg-card/85 text-muted-foreground transition-colors hover:bg-card hover:text-foreground active:cursor-grabbing"
             {...attributes}
             {...listeners}
           >
-            <GripVertical className="size-4" aria-hidden="true" />
+            <GripVertical aria-hidden="true" />
           </IconButton>
         ) : undefined}
       />

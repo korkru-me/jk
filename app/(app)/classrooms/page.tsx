@@ -4,11 +4,12 @@ import { getAuthUser } from '@/lib/auth/server'
 import { JoinClassroomForm } from '@/components/classrooms/join-classroom-form'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Home, GraduationCap, ArrowRight } from 'lucide-react'
+import { School, GraduationCap, ArrowRight } from 'lucide-react'
 import type { Classroom } from '@/lib/types'
 import { TeacherViewClient } from './_components/teacher-view-client'
 import { Card } from '@/components/ui/card'
-import { displayDescription } from './_components/classroom-meta'
+import { displayDescription, parseDescription } from './_components/classroom-meta'
+import { ClassroomIcon } from '@/components/classrooms/classroom-icon'
 import { withBackHref } from '@/lib/back-link'
 import { linkReachesGroup } from '@/lib/classroom-groups'
 import { getStudentGroups } from '@/lib/classroom-groups-server'
@@ -160,7 +161,7 @@ function StudentView({
 
       {classrooms.length === 0 ? (
         <div className="text-center py-16 border-2 border-dashed rounded-2xl">
-          <p className="text-4xl mb-3">🏫</p>
+          <School className="mx-auto mb-3 size-10 text-primary" aria-hidden="true" />
           <p className="text-muted-foreground font-medium">ยังไม่ได้เข้าร่วมห้องเรียนใด</p>
           <p className="text-sm text-muted-foreground/70 mt-1">กรอกรหัสห้องเรียนจากครูเพื่อเริ่มต้น</p>
         </div>
@@ -179,7 +180,7 @@ function StudentView({
                     className="flex items-center gap-5 bg-surface-inverse rounded-2xl px-6 py-5 hover:opacity-90 transition-opacity"
                   >
                     <div className="w-12 h-12 rounded-2xl bg-card/10 flex items-center justify-center shrink-0">
-                      <Home className="w-6 h-6 text-white" />
+                      <ClassroomIcon iconKey={parseDescription(c.description).iconKey} className="size-6 text-surface-inverse-foreground" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[10px] font-bold uppercase tracking-widest text-primary">ครูที่ปรึกษาประจำชั้น</p>
@@ -200,7 +201,7 @@ function StudentView({
           <div className="space-y-3">
             {homeroomClassrooms.length > 0 && (
               <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                🏫 ห้องเรียนวิชา
+                <School className="size-3.5" aria-hidden="true" /> ห้องเรียนวิชา
               </div>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -214,7 +215,7 @@ function StudentView({
                   >
                     <div className="flex items-start justify-between gap-2">
                       <p className="font-semibold truncate">{c.name}</p>
-                      <span className="shrink-0 text-2xl">🏫</span>
+                      <ClassroomIcon iconKey={parseDescription(c.description).iconKey} className="size-6 shrink-0 text-primary" />
                     </div>
                     {displayDescription(c.description) && (
                       <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{displayDescription(c.description)}</p>

@@ -9,6 +9,8 @@ import {
 } from 'lucide-react'
 import { assignmentCreationHref, assignmentReuseHref } from '@/lib/assignment-creation'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
+import { useOptionalSidebarContext } from '@/components/layout/sidebar-context'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,6 +28,7 @@ interface AssignmentCreationMenuProps {
   className?: string
   align?: 'start' | 'center' | 'end'
   active?: boolean
+  compactOnDesktop?: boolean
   onNavigate?: () => void
 }
 
@@ -41,8 +44,14 @@ export function AssignmentCreationMenu({
   className,
   align = 'end',
   active = false,
+  compactOnDesktop = false,
   onNavigate,
 }: AssignmentCreationMenuProps) {
+  const sidebar = useOptionalSidebarContext()
+  function navigate(href: string) {
+    sidebar?.prepareSidebarNavigation(href, classroomId)
+    onNavigate?.()
+  }
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -51,13 +60,15 @@ export function AssignmentCreationMenu({
             type="button"
             variant={variant}
             size={size}
-            className={className}
+            className={cn('transition-colors', className, compactOnDesktop && 'md:h-11 md:justify-center md:px-0')}
+            aria-label={label}
+            title={compactOnDesktop ? label : undefined}
             aria-current={active ? 'page' : undefined}
           />
         )}
       >
         <Plus data-icon="inline-start" />
-        <span className="truncate">{label}</span>
+        <span className={cn('truncate', compactOnDesktop && 'md:sr-only')}>{label}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align={align} className="min-w-56">
         <DropdownMenuGroup>
@@ -65,7 +76,7 @@ export function AssignmentCreationMenu({
           <DropdownMenuItem
             variant="primary"
             className="py-2"
-            render={<Link href={assignmentReuseHref(classroomId)} onClick={onNavigate} />}
+            render={<Link href={assignmentReuseHref(classroomId)} onNavigate={() => navigate(assignmentReuseHref(classroomId))} />}
           >
             <Copy aria-hidden="true" />
             <span>นำงานเดิมมาใช้</span>
@@ -76,7 +87,7 @@ export function AssignmentCreationMenu({
             render={(
               <Link
                 href={assignmentCreationHref(classroomId, 'exercise')}
-                onClick={onNavigate}
+                onNavigate={() => navigate(assignmentCreationHref(classroomId, 'exercise'))}
               />
             )}
           >
@@ -89,7 +100,7 @@ export function AssignmentCreationMenu({
             render={(
               <Link
                 href={assignmentCreationHref(classroomId, 'exam')}
-                onClick={onNavigate}
+                onNavigate={() => navigate(assignmentCreationHref(classroomId, 'exam'))}
               />
             )}
           >

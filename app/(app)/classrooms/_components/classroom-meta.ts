@@ -7,12 +7,19 @@
 // back. Parsing then composing an untouched classroom must reproduce the
 // original string exactly, or editing one field would rewrite the others.
 
+import { DEFAULT_CLASSROOM_ICON, isClassroomIconKey, type ClassroomIconKey } from '@/lib/classroom-icons'
+import { isClassroomCoverUrl } from '@/lib/classroom-cover'
+
 export type AccessType = 'open' | 'request' | 'closed'
 
 export interface ClassroomMeta {
   description: string
   /** id of a COVER_PRESETS entry, or '' when the teacher never picked one. */
   cover: string
+  /** Public Storage URL for the optional classroom banner image. */
+  coverImageUrl: string
+  /** Optional so untouched legacy metadata round-trips without an added field. */
+  iconKey?: ClassroomIconKey
   gradeLevel: string
   academicTerm: string
   tags: string[]
@@ -95,6 +102,14 @@ export function coverOf(meta: ClassroomMeta): CoverPreset | null {
   return COVER_PRESETS.find(preset => preset.id === meta.cover) ?? null
 }
 
+/** A trusted cover picture URL, or null for old/invalid metadata. */
+export function coverImageOf(meta: ClassroomMeta): string | null {
+  if (!meta.coverImageUrl) return null
+  return isClassroomCoverUrl(meta.coverImageUrl, { allowBlob: process.env.NODE_ENV === 'development' })
+    ? meta.coverImageUrl
+    : null
+}
+
 export const ACCESS_LABEL: Record<AccessType, string> = {
   open: 'เปิดรับอิสระ', request: 'ต้องอนุมัติ', closed: 'ปิดรับ',
 }
@@ -125,7 +140,7 @@ export function getSmartTermDefault(): string {
 }
 
 export const EMPTY_META: ClassroomMeta = {
-  description: '', cover: '',
+  description: '', cover: '', coverImageUrl: '',
   gradeLevel: '', academicTerm: '', tags: [],
   accessType: 'open', capacityEnabled: false, maxCapacity: '30',
   startDate: '', endDate: '',
@@ -134,11 +149,13 @@ export const EMPTY_META: ClassroomMeta = {
 const SEPARATOR = ' · '
 
 // Field order here is also the order `composeDescription` writes them in.
-const META_KEYS = ['หน้าปก', 'ระดับ', 'ภาคเรียน', 'แท็ก', 'การเข้าร่วม', 'ที่นั่ง', 'เปิด', 'ปิด'] as const
+const META_KEYS = ['หน้าปก', 'รูปหน้าปก', 'ไอคอน', 'ระดับ', 'ภาคเรียน', 'แท็ก', 'การเข้าร่วม', 'ที่นั่ง', 'เปิด', 'ปิด'] as const
 
 export function composeDescription(meta: ClassroomMeta): string {
   const parts: string[] = []
   if (meta.cover) parts.push(`หน้าปก: ${meta.cover}`)
+  if (meta.coverImageUrl) parts.push(`รูปหน้าปก: ${meta.coverImageUrl}`)
+  if (isClassroomIconKey(meta.iconKey) && meta.iconKey !== DEFAULT_CLASSROOM_ICON) parts.push(`ไอคอน: ${meta.iconKey}`)
   if (meta.gradeLevel)   parts.push(`ระดับ: ${meta.gradeLevel}`)
   if (meta.academicTerm) parts.push(`ภาคเรียน: ${meta.academicTerm}`)
   if (meta.tags.length)  parts.push(`แท็ก: ${meta.tags.join(', ')}`)
@@ -187,6 +204,10 @@ export function parseDescription(raw: string | null): ClassroomMeta {
       case 'หน้าปก':
         meta.cover = COVER_PRESETS.some(preset => preset.id === value) ? value : ''
         break
+      case 'รูปหน้าปก': meta.coverImageUrl = value; break
+      case 'ไอคอน':
+        if (isClassroomIconKey(value)) meta.iconKey = value
+        break
       case 'ระดับ':      meta.gradeLevel = value; break
       case 'ภาคเรียน':   meta.academicTerm = value; break
       case 'แท็ก':       meta.tags = value.split(',').map(t => t.trim()).filter(Boolean); break
@@ -209,9 +230,16 @@ export function parseDescription(raw: string | null): ClassroomMeta {
 }
 
 // What a teacher should read on a card or header: everything they entered
-// except the cover, whose hex values are for rendering, not for display.
+// except presentation-only cover/icon keys. Strip even unknown keys so stale
+// or invalid metadata never leaks into the teacher's visible description.
 export function displayDescription(raw: string | null): string {
-  const meta = parseDescription(raw)
-  if (!meta.cover) return raw ?? ''
-  return composeDescription({ ...meta, cover: '' })
+  const text = raw ?? ''
+  const lines = text.split('\n')
+  const last = lines[lines.length - 1]
+  if (!isMetaLine(last)) return text
+  const visible = last.split(SEPARATOR).filter(segment => {
+    const pair = splitSegment(segment)
+    return pair?.[0] !== 'หน้าปก' && pair?.[0] !== 'รูปหน้าปก' && pair?.[0] !== 'ไอคอน'
+  }).join(SEPARATOR)
+  return [...lines.slice(0, -1), ...(visible ? [visible] : [])].join('\n')
 }

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   MoreVertical, Pin, PinOff, Pencil, Trash2, Send, MessageCircle, Link2, Megaphone,
-  Paperclip, Download, Eye, ChevronDown, ChevronUp, Users, ExternalLink, Globe2, Video, Plus,
+  Eye, ChevronDown, ChevronUp, Users, ExternalLink, Globe2, Video, Plus,
   RefreshCcw,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -21,15 +21,13 @@ import { linkify, shortenUrl } from '@/lib/linkify'
 import {
   announcementLinks, appendAnnouncementLink, normalizeAnnouncementUrl,
 } from '@/lib/announcement-links'
-import {
-  attachmentKindLabel, formatFileSize, isImageAttachment, shortenFileName,
-  type PostAttachment,
-} from '@/lib/attachment-display'
+import type { PostAttachment } from '@/lib/attachment-display'
 import type { ClassroomPost } from '@/lib/types'
 import { IconButton } from '@/components/ui/icon-button'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { Card } from '@/components/ui/card'
 import { PostAttach } from '@/components/classrooms/post-attach'
+import { PostAttachments } from '@/components/classrooms/post-attachments'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
@@ -529,63 +527,6 @@ function PostLinkPreviews({ body }: { body: string }) {
           <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" />
         </a>
       ))}
-    </div>
-  )
-}
-
-/**
- * Pictures show themselves; everything else is a file to take away.
- *
- * The `?download=` parameter is what makes Storage send the teacher's original
- * filename — a plain link hands the student "1788007637477_gv4hcdo5px4.pdf",
- * and the `download` attribute does nothing across origins.
- */
-function PostAttachments({ attachments }: { attachments: PostAttachment[] }) {
-  if (attachments.length === 0) return null
-  const images = attachments.filter(a => isImageAttachment(a.mime))
-  const files = attachments.filter(a => !isImageAttachment(a.mime))
-
-  return (
-    <div className="mt-2.5 space-y-2">
-      {images.length > 0 && (
-        <div className={cn('grid gap-2', images.length === 1 ? 'grid-cols-1 max-w-sm' : 'grid-cols-2 max-w-md')}>
-          {images.map(image => (
-            <a key={image.url} href={image.url} target="_blank" rel="noopener noreferrer" className="block">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={image.url}
-                alt={image.name}
-                loading="lazy"
-                className="w-full max-h-56 rounded-xl object-cover border border-border hover:opacity-90 transition-opacity"
-              />
-            </a>
-          ))}
-        </div>
-      )}
-
-      {files.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {files.map(file => (
-            <a
-              key={file.url}
-              href={`${file.url}?download=${encodeURIComponent(file.name)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 max-w-64 rounded-xl border border-border bg-muted px-3 py-2 hover:bg-accent transition-colors"
-            >
-              <Paperclip className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-              <span className="min-w-0">
-                <span className="block text-xs font-medium truncate">{shortenFileName(file.name, 28)}</span>
-                <span className="block text-[10px] text-muted-foreground">
-                  {attachmentKindLabel(file.mime, file.name)}
-                  {file.size > 0 ? ` · ${formatFileSize(file.size)}` : ''}
-                </span>
-              </span>
-              <Download className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-            </a>
-          ))}
-        </div>
-      )}
     </div>
   )
 }

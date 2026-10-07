@@ -15,15 +15,34 @@ import { GroupActionsProvider, type GroupActions } from '@/app/(app)/classrooms/
 import { AssignmentCreationMenu } from '@/components/assignments/assignment-creation-menu'
 import { AssignmentReviewSummary } from '@/components/assignments/assignment-review-summary'
 import { GroupTargetPicker, type GroupTargets } from '@/components/assignments/group-target-picker'
-import { groupPreset } from '@/app/(app)/classrooms/_components/group-colors'
 import { GROUP_COLOR_IDS, type ClassroomGroup } from '@/lib/classroom-groups'
 import { nextStudentSortRules, type StudentSortRule } from '@/lib/student-sort'
 import { ClassroomAccessPanel } from '@/app/(app)/classrooms/[id]/_components/classroom-access-panel'
 import { JoinClassroomForm } from '@/components/classrooms/join-classroom-form'
+import type { AssignmentCategory } from '@/lib/assignment-categories'
 
 export type GroupsLabScenario = 'default' | 'many' | 'empty'
 
 const CLASSROOM_ID = '00000000-0000-4000-8000-000000000001'
+const CATEGORY_ONE_ID = '00000000-0000-4000-c000-000000000001'
+const CATEGORY_TWO_ID = '00000000-0000-4000-c000-000000000002'
+
+const LAB_CATEGORIES: AssignmentCategory[] = [
+  {
+    id: CATEGORY_ONE_ID,
+    classroom_id: CLASSROOM_ID,
+    name: 'ฟิสิกส์ง่าย',
+    color: 'purple',
+    position: 0,
+  },
+  {
+    id: CATEGORY_TWO_ID,
+    classroom_id: CLASSROOM_ID,
+    name: 'กลศาสตร์',
+    color: 'blue',
+    position: 1,
+  },
+]
 
 const LAB_ASSIGNMENTS: ClassroomAssignmentRow[] = [
   {
@@ -44,7 +63,7 @@ const LAB_ASSIGNMENTS: ClassroomAssignmentRow[] = [
     max_attempts: null,
     score_strategy: 'best',
     display_order: 1,
-    category_id: null,
+    category_id: CATEGORY_ONE_ID,
     group_ids: null,
   },
   {
@@ -236,12 +255,12 @@ export function ClassroomGroupsLabClient({ scenario, fail }: { scenario: GroupsL
         </p>
       </div>
 
-      <div className="flex justify-start rounded-2xl bg-gradient-to-br from-gray-900 to-gray-800 p-6 text-white sm:justify-end">
+      <div className="flex justify-start rounded-2xl bg-foreground p-6 text-background sm:justify-end">
         <ClassroomAccessPanel
           classCode="ABC123"
           canManage
           onCover={false}
-          mutedClassName="text-white/60"
+          mutedClassName="text-background/60"
         />
       </div>
 
@@ -300,7 +319,7 @@ export function ClassroomGroupsLabClient({ scenario, fail }: { scenario: GroupsL
         <ClassroomAssignmentsTab
           classroomId={CLASSROOM_ID}
           assignments={LAB_ASSIGNMENTS}
-          categories={[]}
+          categories={LAB_CATEGORIES}
           submissions={[]}
           studentCount={32}
           pendingReviewByAssignment={{}}
@@ -310,13 +329,18 @@ export function ClassroomGroupsLabClient({ scenario, fail }: { scenario: GroupsL
               ? { error: '(ห้องทดลอง) บันทึกลำดับไม่สำเร็จ — รายการควรย้อนกลับเป็นแบบเดิม' }
               : {}
           }}
+          onSetAssignmentCategory={async () => {
+            await wait()
+            return fail
+              ? { ok: false, error: '(ห้องทดลอง) ย้ายกลุ่มไม่สำเร็จ — งานควรกลับไปอยู่กลุ่มเดิม' }
+              : { ok: true }
+          }}
         />
       </section>
 
       <div className="max-w-2xl">
         <AssignmentReviewSummary
           mode="copy"
-          theme={groupPreset('blue')}
           rows={[
             { label: 'ชื่อ', value: 'ทดสอบระบบตรวจกลับไปให้คะแนนเอง (สำเนา)' },
             { label: 'ห้องเรียน', value: 'ทดสอบ สอบแก้กลางภาค' },

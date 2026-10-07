@@ -1,4 +1,4 @@
-import { computePassed } from '@/lib/grading'
+import { completionChoiceFor, findPassingCompletion } from '@/lib/assignment-completion'
 
 export interface StudentAssignmentRow {
   id: string
@@ -11,6 +11,7 @@ export interface StudentAssignmentRow {
   duration_minutes: number | null
   type: string
   max_attempts: number | null
+  completion_reached?: boolean
   retry_scope: 'all' | 'wrong_only'
   passing_type: 'score' | 'percent' | null
   passing_value: number | null
@@ -21,13 +22,12 @@ export interface StudentAssignmentRow {
   // separate from `submission` (which reflects the best/official-strategy
   // attempt for score display) since those can be two different attempts.
   has_in_progress: boolean
-  submission: { id: string; status: string; total_score: number | null; max_score: number } | null
+  submission: { id: string; status: string; total_score: number | null; max_score: number; streak_reached?: boolean } | null
 }
 
-// A submitted exercise that hasn't cleared its passing threshold isn't
-// "done" yet — the student is expected to retry until they pass. Exams can
-// also be multi-attempt now (max_attempts), so a submitted exam always
-// counts regardless of score.
+// Mastery assignments (exercises and exams alike) are complete only after a
+// passing finished run. The server flag includes all runs, independently of
+// score visibility/strategy; the fallback serves older local fixtures only.
 // Plain function, deliberately kept out of any 'use client' file so both the
 // server-rendered classroom page and the client-side filter tabs can call it
 // directly (a function exported from a client module can't be invoked from
@@ -35,9 +35,7 @@ export interface StudentAssignmentRow {
 export function isCompleted(a: StudentAssignmentRow): boolean {
   const submitted = a.submission?.status === 'submitted' || a.submission?.status === 'graded'
   if (!submitted) return false
-  if (a.type === 'exercise') {
-    const passed = computePassed(a.submission?.total_score ?? null, a.submission?.max_score ?? 0, a.passing_type, a.passing_value)
-    if (passed === false) return false
-  }
+  if (completionChoiceFor(a) !== 'complete') return a.completion_reached
+    ?? findPassingCompletion({ ...a, type: a.type === 'exam' ? 'exam' : 'exercise' }, a.submission ? [a.submission] : []) != null
   return true
 }

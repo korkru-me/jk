@@ -8,8 +8,8 @@ export interface AssignmentMathToolSettings {
 /**
  * Approved defaults for a newly-created assignment.
  *
- * แบบฝึกหัด start with both practice tools on; ข้อสอบ start off but honor an
- * explicit teacher choice.
+ * The calculator is opt-in for both types. แบบฝึกหัด keep the scratchpad on;
+ * ข้อสอบ start with it off. Explicit teacher choices always take precedence.
  */
 export function resolveNewAssignmentMathTools(input: {
   type: AssignmentType
@@ -18,7 +18,7 @@ export function resolveNewAssignmentMathTools(input: {
 }): AssignmentMathToolSettings {
   const defaultEnabled = input.type === 'exercise'
   return {
-    calculatorEnabled: input.calculatorEnabled ?? defaultEnabled,
+    calculatorEnabled: input.calculatorEnabled ?? false,
     scratchpadEnabled: input.scratchpadEnabled ?? defaultEnabled,
   }
 }

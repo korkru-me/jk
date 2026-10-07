@@ -106,6 +106,7 @@ export function MathAnswerField({
   className,
   inputClassName,
 }: MathAnswerFieldProps) {
+  const rootRef = useRef<HTMLSpanElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const toggleButtonRef = useRef<HTMLButtonElement>(null)
@@ -117,6 +118,22 @@ export function MathAnswerField({
     onDeactivate()
     requestAnimationFrame(() => toggleButtonRef.current?.focus({ preventScroll: true }))
   }, [onDeactivate])
+
+  useEffect(() => {
+    if (!active) return
+    const closeOnOutsidePointerDown = (event: PointerEvent) => {
+      const target = event.target
+      if (!(target instanceof Node)) return
+      if (rootRef.current?.contains(target) || panelRef.current?.contains(target)) return
+
+      // An outside interaction should keep its own focus. The explicit close
+      // button and Escape return focus to the keypad toggle, but doing that
+      // here would steal focus back from the control the student just chose.
+      onDeactivate()
+    }
+    document.addEventListener('pointerdown', closeOnOutsidePointerDown, true)
+    return () => document.removeEventListener('pointerdown', closeOnOutsidePointerDown, true)
+  }, [active, onDeactivate])
 
   useEffect(() => {
     if (!active) return
@@ -199,7 +216,7 @@ export function MathAnswerField({
   }
 
   return (
-    <span className={cn('inline-flex min-w-0 flex-col gap-1.5 align-middle', className)}>
+    <span ref={rootRef} className={cn('inline-flex min-w-0 flex-col gap-1.5 align-middle', className)}>
       <span className="flex min-w-0 items-center gap-1.5">
         <Input
           ref={inputRef}

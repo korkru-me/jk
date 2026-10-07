@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { Calendar, Clock, Layers, Target, FileText, Scale, Eye, ShieldCheck, Maximize, Fingerprint, ListFilter, ChevronUp, ChevronDown, X, Plus, Lock, Camera, LockKeyhole, Smartphone, RotateCcw, Dices, CircleCheck, Calculator, NotebookPen, Hash } from 'lucide-react'
+import { Calendar, Clock, Layers, Target, FileText, Scale, Eye, ShieldCheck, Maximize, Fingerprint, ListFilter, ChevronUp, ChevronDown, X, Plus, Lock, Camera, LockKeyhole, Smartphone, RotateCcw, Dices, CircleCheck, Calculator, NotebookPen, Hash, CircleHelp } from 'lucide-react'
 import { SolutionReleaseSetting } from '@/components/assignments/solution-release-setting'
 import {
   moveQuestionInSet, moveQuestionToIndex, normalizeSetSections, parseSections, removeQuestionsFromSet,
@@ -14,13 +14,19 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { updateAssignment } from '@/lib/actions/assignments'
-import { SCORE_STRATEGY_LABELS } from '@/lib/scoring'
+import { CompletionAttemptSettings } from '@/components/assignments/completion-attempt-settings'
+import {
+  CompletionRuleCard,
+  completionRuleInputClassName,
+} from '@/components/assignments/completion-rule-card'
+import { CompletionThresholdUnitMenu } from '@/components/assignments/completion-threshold-unit-menu'
 import type { Assignment, CompletionRule, Question, RetryScope, ScoreStrategy, ShowResultsMode } from '@/lib/types'
 import {
   STREAK_TARGET_DEFAULT, STREAK_TARGET_MAX, STREAK_TARGET_MIN, STREAK_CAP_MAX, STREAK_CAP_MIN,
   decideCompletion, defaultQuestionCap, streakEligibleCount, streakExcludedCount, streakPoolAdvice,
 } from '@/lib/streak-completion'
 import { Card } from '@/components/ui/card'
+import { Separator } from '@/components/ui/separator'
 import { IconButton } from '@/components/ui/icon-button'
 import {
   Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -31,6 +37,24 @@ import type { BankQuestion } from '@/lib/question-bank'
 import { questionExcerpt } from '@/lib/question-display'
 import { SebQuitPasswordSettings } from '@/components/assignments/seb-quit-password-settings'
 import type { SebQuitPasswordSetupState } from '@/lib/seb-quit-password-service.server'
+import {
+  InstantCheckAnswerKeySettingLabel,
+  InstantCheckSettingLabel,
+} from '@/components/assignments/instant-check-setting-label'
+import { AssignmentSettingHoverLabel } from '@/components/assignments/assignment-setting-hover-label'
+import {
+  RESULT_VISIBILITY_OPTIONS,
+  ResultVisibilityOptionHoverCard,
+} from '@/components/assignments/result-visibility-options'
+
+const CALCULATOR_SETTING_DESCRIPTION =
+  'เปิดให้นักเรียนใช้เครื่องคิดเลขวิทยาศาสตร์ภายในเว็บไซต์ระหว่างทำแบบฝึกหัดหรือข้อสอบ'
+const SCRATCHPAD_SETTING_DESCRIPTION =
+  'เปิดให้นักเรียนใช้กระดาษทดภายในเว็บไซต์เพื่อเขียนหรือวาดวิธีคิดระหว่างทำโจทย์'
+const WORK_IMAGE_SETTING_DESCRIPTION =
+  'สำหรับโจทย์เติมคำตอบตัวเลข นักเรียนต้องแนบรูปแสดงวิธีทำก่อนจึงจะส่งคำตอบได้ โดยผู้สอนต้องตรวจวิธีทำจากรูปที่แนบด้วยตนเอง'
+const SHARED_RANDOM_VALUES_SETTING_DESCRIPTION =
+  'กำหนดให้โจทย์ประเภทสุ่มตัวเลขใช้ตัวเลขชุดเดียวกันสำหรับนักเรียนทุกคน'
 
 function toLocalInputValue(iso: string | null): string {
   if (!iso) return ''
@@ -104,6 +128,8 @@ export type EditableAssignmentQuestion = Pick<Question, 'id' | 'title' | 'questi
 export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissions, sebQuitPasswordSetup }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+  const assignmentNoun = a.type === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'
+  const completionSectionLabel = `เงื่อนไขการทำ${assignmentNoun}เสร็จ`
 
   const assignmentSections = parseSections(a.sections)
 
@@ -123,7 +149,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
   // before seeing anything, and turning that on under a running งาน is the
   // teacher's call, not a side effect of opening the edit page.
   const [instantCheck, setInstantCheck] = useState(a.instant_check === true)
-  const [instantCheckAnswerKey, setInstantCheckAnswerKey] = useState(a.instant_check_answer_key !== false)
+  const [instantCheckAnswerKey, setInstantCheckAnswerKey] = useState(a.instant_check_answer_key === true)
   const [showResults, setShowResults] = useState<ShowResultsMode>(a.show_results)
   // Changeable at any time, even after everyone has finished — it decides only
   // whether a เฉลยวิธีทำ opens. Ticking it late is the way to hold a ข้อสอบ's
@@ -133,8 +159,9 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
   const [proctoringEnabled, setProctoringEnabled] = useState(a.proctoring_enabled)
   const [fullscreenRequired, setFullscreenRequired] = useState(a.fullscreen_required)
   const [blockClipboard, setBlockClipboard] = useState(a.block_clipboard)
+  const initialRandomQuestionCount = a.random_question_count
   const [randomQuestionCount, setRandomQuestionCount] = useState(
-    a.random_question_count != null ? String(a.random_question_count) : ''
+    initialRandomQuestionCount != null ? String(initialRandomQuestionCount) : ''
   )
   const [sharedRandomValues, setSharedRandomValues] = useState(a.shared_random_seed != null)
   const [examWatermarkEnabled, setExamWatermarkEnabled] = useState(a.exam_watermark_enabled)
@@ -143,7 +170,12 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
   const [requireWorkImage, setRequireWorkImage] = useState(a.require_work_image ?? false)
   const [calculatorEnabled, setCalculatorEnabled] = useState(a.calculator_enabled ?? false)
   const [scratchpadEnabled, setScratchpadEnabled] = useState(a.scratchpad_enabled ?? false)
-  const [completionRule, setCompletionRule] = useState<CompletionRule>(a.completion_rule ?? 'fixed')
+  const requestedInitialCompletionRule = a.completion_rule ?? 'fixed'
+  const [completionRule, setCompletionRule] = useState<CompletionRule>(
+    requestedInitialCompletionRule === 'streak' && initialRandomQuestionCount == null && !hasSubmissions
+      ? 'fixed'
+      : requestedInitialCompletionRule,
+  )
   const [streakTarget, setStreakTarget] = useState(
     a.streak_target != null ? String(a.streak_target) : String(STREAK_TARGET_DEFAULT)
   )
@@ -172,6 +204,11 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
   const orderedQuestions = questionIds.map(
     id => questionsById.get(id) ?? { id, title: 'โจทย์ที่ไม่พบ', question_text: '' }
   )
+  const parsedRandomQuestionCount = Number(randomQuestionCount)
+  const randomDrawOn = randomQuestionCount.trim() !== ''
+    && Number.isInteger(parsedRandomQuestionCount)
+    && parsedRandomQuestionCount > 0
+    && parsedRandomQuestionCount < questionIds.length
 
   // Only เติมคำตอบตัวเลข has working to photograph, so the ask appears exactly
   // when this งาน holds one — and follows the list as the teacher edits it.
@@ -199,6 +236,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
   const streakBlocked = streakDecision.refusedReason
   const streakAdvice = streakBlocked ? null : streakPoolAdvice(poolQuestionTypes, streakDecision.target as number)
   const streakOffered = a.mode === 'online'
+  const streakAvailable = streakOffered && randomDrawOn
   const streakOn = completionRule === 'streak'
   // The rule and the target are what passing means, so both freeze the moment
   // anyone starts — otherwise two students' results measure different things.
@@ -210,6 +248,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
 
   function chooseCompletion(choice: 'complete' | 'threshold' | 'streak') {
     if (!canEditCompletion) return
+    if (choice === 'streak' && !streakAvailable) return
     if (choice === 'streak') {
       setCompletionRule('streak')
       setPassingEnabled(false)
@@ -291,6 +330,10 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
       ? parsedDisplayMax
       : null
 
+    if (completionChoice === 'threshold' && (passingValue.trim() === '' || !Number.isFinite(Number(passingValue)) || Number(passingValue) < 0 || (passingType === 'percent' && Number(passingValue) > 100))) {
+      toast.error('กรุณากรอกเกณฑ์ผ่านให้ถูกต้อง')
+      return
+    }
     startTransition(async () => {
       const res = await updateAssignment(a.id, {
         title: title.trim(),
@@ -298,8 +341,8 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
         start_at: startAt || null,
         end_at: endAt || null,
         duration_minutes: durationMinutes ? Number(durationMinutes) : null,
-        max_attempts: maxAttempts ? Number(maxAttempts) : null,
-        score_strategy: scoreStrategy,
+        max_attempts: completionChoice === 'complete' && maxAttempts ? Number(maxAttempts) : null,
+        score_strategy: completionChoice === 'complete' ? scoreStrategy : 'best',
         retry_scope: retryScope,
         questions_per_page: Number(questionsPerPage) || 1,
         instant_check: instantCheck,
@@ -424,43 +467,6 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
         </Card>
       )}
 
-      {a.mode === 'online' && a.question_ids.length >= 2 && (
-        <Card padding="xl" className="space-y-3">
-          <div className="flex items-start gap-3">
-            <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-              <Dices className="w-4 h-4 text-muted-foreground" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-foreground">ชุดโจทย์ที่นักเรียนได้รับ</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                สุ่มจากคลัง {a.question_ids.length} ข้อ แล้วตรึงชุดที่ได้ไว้ตลอดรอบนั้น รวมถึงหลังปิดหน้าจอแล้วกลับมาทำต่อ
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 pl-11">
-            <Input
-              id="edit-random-question-count"
-              type="number"
-              min={1}
-              max={Math.max(1, a.question_ids.length - 1)}
-              value={randomQuestionCount}
-              onChange={event => setRandomQuestionCount(event.target.value)}
-              placeholder={`ครบทั้ง ${a.question_ids.length} ข้อ`}
-              disabled={hasSubmissions}
-              className="max-w-[150px]"
-            />
-            <Label htmlFor="edit-random-question-count" className="text-sm text-muted-foreground">
-              ข้อต่อคน
-            </Label>
-          </div>
-          <p className="text-xs text-muted-foreground pl-11">
-            {hasSubmissions
-              ? 'ล็อกค่านี้แล้วเพราะมีนักเรียนเริ่มทำแล้ว — ชุดที่แต่ละคนได้ถูกตรึงไว้ตั้งแต่ตอนเริ่ม'
-              : 'เว้นว่างเพื่อใช้ครบทุกข้อ และจะเปลี่ยนจำนวนนี้ไม่ได้หลังมีนักเรียนเริ่มทำแล้ว'}
-          </p>
-        </Card>
-      )}
-
       {a.mode === 'online' && a.type === 'exam' && (
         <Card padding="xl" className="space-y-3">
           <label className="flex items-center justify-between gap-4 cursor-pointer">
@@ -543,13 +549,14 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
         </Card>
       )}
 
-      <Card padding="xl" className="space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="font-semibold text-foreground">โจทย์และคะแนน</h2>
+      <Card padding="xl" className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-semibold text-foreground">ตั้งค่าคะแนน</h2>
           <span className="text-sm font-semibold text-primary shrink-0">
             {questionIds.length} ข้อ · รวม {pointsSum} คะแนน
           </span>
         </div>
+        <h3 className="text-sm font-semibold text-foreground">คะแนนแต่ละข้อ</h3>
         {canEditQuestions ? (
           <p className="text-xs text-muted-foreground">
             เพิ่ม เอาออก และสลับลำดับข้อได้ เพราะยังไม่มีนักเรียนเริ่มทำชุดนี้ —
@@ -569,47 +576,50 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
 
         <div className="space-y-1.5 max-h-[420px] overflow-y-auto pr-1">
           {orderedQuestions.map((q, i) => (
-            <div key={q.id} className="flex items-center gap-2 p-2.5 rounded-xl border border-border">
-              {canEditQuestions ? (
-                <OrderNumberInput
-                  position={i + 1}
-                  total={questionIds.length}
-                  onMove={(to: number) => applyQuestionChange(moveQuestionToIndex(sections, questionIds, q.id, to - 1))}
-                />
-              ) : (
-                <span className="text-xs font-semibold text-muted-foreground w-10 shrink-0">ข้อ {i + 1}</span>
-              )}
-              {canEditQuestions && (
-                <div className="flex flex-col shrink-0">
-                  <IconButton
-                    label="ย้ายขึ้น"
-                    size="2xs"
-                    disabled={i === 0}
-                    onClick={() => applyQuestionChange(moveQuestionInSet(sections, questionIds, q.id, -1))}
-                  >
-                    <ChevronUp className="w-3.5 h-3.5" />
-                  </IconButton>
-                  <IconButton
-                    label="ย้ายลง"
-                    size="2xs"
-                    disabled={i === questionIds.length - 1}
-                    onClick={() => applyQuestionChange(moveQuestionInSet(sections, questionIds, q.id, 1))}
-                  >
-                    <ChevronDown className="w-3.5 h-3.5" />
-                  </IconButton>
+            <div key={q.id} className="flex flex-wrap items-center gap-2 p-2.5 rounded-xl border border-border sm:flex-nowrap">
+              <div className="flex min-w-0 flex-1 basis-full items-center gap-2 sm:basis-auto">
+                {canEditQuestions ? (
+                  <OrderNumberInput
+                    position={i + 1}
+                    total={questionIds.length}
+                    onMove={(to: number) => applyQuestionChange(moveQuestionToIndex(sections, questionIds, q.id, to - 1))}
+                  />
+                ) : (
+                  <span className="text-xs font-semibold text-muted-foreground w-10 shrink-0">ข้อ {i + 1}</span>
+                )}
+                {canEditQuestions && (
+                  <div className="flex flex-col shrink-0">
+                    <IconButton
+                      label="ย้ายขึ้น"
+                      size="2xs"
+                      disabled={i === 0}
+                      onClick={() => applyQuestionChange(moveQuestionInSet(sections, questionIds, q.id, -1))}
+                    >
+                      <ChevronUp className="w-3.5 h-3.5" />
+                    </IconButton>
+                    <IconButton
+                      label="ย้ายลง"
+                      size="2xs"
+                      disabled={i === questionIds.length - 1}
+                      onClick={() => applyQuestionChange(moveQuestionInSet(sections, questionIds, q.id, 1))}
+                    >
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </IconButton>
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{q.title}</p>
+                  <p className="text-xs text-muted-foreground truncate">{questionExcerpt(q.question_text)}</p>
                 </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">{q.title}</p>
-                <p className="text-xs text-muted-foreground truncate">{questionExcerpt(q.question_text)}</p>
               </div>
               <Input
                 type="number"
                 min={0}
                 step="any"
                 value={pointsDraft(q.id)}
+                aria-label={`คะแนนข้อ ${i + 1}`}
                 onChange={e => setQuestionPointDrafts(d => ({ ...d, [q.id]: e.target.value }))}
-                className="w-20 text-center shrink-0"
+                className="w-16 text-center shrink-0 sm:w-20"
               />
               <span className="text-xs text-muted-foreground shrink-0">คะแนน</span>
               {canEditQuestions && (
@@ -632,35 +642,118 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
             <Plus /> เพิ่มโจทย์จากคลัง
           </Button>
         )}
+        <Separator />
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+              <Scale className="w-4 h-4 text-muted-foreground" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-foreground">คะแนนเต็มที่แสดงผล</h3>
+              <p className="text-xs text-muted-foreground">
+                ปรับแยกจากคะแนนแต่ละข้อด้านบน — ใช้ตอนอยากให้คะแนนที่บันทึก/แสดงในสมุดคะแนนไม่เท่ากับผลรวมคะแนนจริง
+                เช่น โจทย์รวม {pointsSum} คะแนน แต่อยากเก็บแค่ 10 คะแนน ระบบจะคูณสัดส่วนคะแนนของนักเรียนแต่ละคนให้อัตโนมัติ
+                ปรับได้ตลอด แม้นักเรียนจะทำเสร็จไปแล้วก็ตาม (คะแนนดิบที่ทำจริงไม่ถูกแก้ไข)
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 pl-11">
+            <Input
+              type="number"
+              min={0}
+              step="any"
+              value={displayMaxScore}
+              aria-label="คะแนนเต็มที่แสดงผล"
+              onChange={e => setDisplayMaxScore(e.target.value)}
+              placeholder={`ไม่ปรับ (เท่ากับ ${pointsSum})`}
+              className="max-w-[160px]"
+            />
+            <span className="text-sm text-muted-foreground">คะแนน</span>
+          </div>
+        </div>
+        {a.mode === 'online' && (
+          <>
+            <Separator />
+            <div className="flex flex-col gap-4">
+              {streakOn && (
+                <p className="text-xs text-muted-foreground rounded-lg bg-muted px-3 py-2">
+                  {completionSectionLabel}เป็น “ทำถูกติดต่อกัน {streakTarget} ข้อ” — หน้าทำโจทย์แสดงทีละ 1 ข้อ และเปิดการตรวจทีละข้อให้เสมอ
+                  ปรับสองอย่างนี้ที่นี่ไม่ได้
+                </p>
+              )}
+
+              {!streakOn && (
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="edit-per-page" className="flex items-center gap-1.5">
+                    <ListFilter className="w-4 h-4 text-muted-foreground" /> จำนวนข้อต่อหนึ่งหน้า
+                  </Label>
+                  <Input
+                    id="edit-per-page"
+                    type="number"
+                    min={1}
+                    max={50}
+                    value={questionsPerPage}
+                    onChange={e => setQuestionsPerPage(e.target.value)}
+                    className="max-w-[200px]"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    1 = แสดงทีละข้อเหมือนเดิม · เป็นการจัดหน้าจออย่างเดียว ไม่กระทบคะแนน และมีผลทันทีแม้กับคนที่กำลังทำอยู่
+                  </p>
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </Card>
 
-      <Card padding="xl" className="space-y-3">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-            <Scale className="w-4 h-4 text-muted-foreground" />
+      {a.mode === 'online' && a.question_ids.length >= 2 && (
+        <Card padding="xl" className="space-y-3">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+              <Dices className="w-4 h-4 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground">ชุดโจทย์ที่นักเรียนได้รับ</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                สุ่มจากคลัง {a.question_ids.length} ข้อ แล้วตรึงชุดที่ได้ไว้ตลอดรอบนั้น รวมถึงหลังปิดหน้าจอแล้วกลับมาทำต่อ
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="font-semibold text-foreground">คะแนนเต็มที่แสดงผล</h2>
-            <p className="text-xs text-muted-foreground">
-              ปรับแยกจากคะแนนแต่ละข้อด้านบน — ใช้ตอนอยากให้คะแนนที่บันทึก/แสดงในสมุดคะแนนไม่เท่ากับผลรวมคะแนนจริง
-              เช่น โจทย์รวม {pointsSum} คะแนน แต่อยากเก็บแค่ 10 คะแนน ระบบจะคูณสัดส่วนคะแนนของนักเรียนแต่ละคนให้อัตโนมัติ
-              ปรับได้ตลอด แม้นักเรียนจะทำเสร็จไปแล้วก็ตาม (คะแนนดิบที่ทำจริงไม่ถูกแก้ไข)
-            </p>
+          <div className="flex items-center gap-2 pl-11">
+            <Input
+              id="edit-random-question-count"
+              type="number"
+              min={1}
+              max={Math.max(1, a.question_ids.length - 1)}
+              value={randomQuestionCount}
+              onChange={event => {
+                const nextValue = event.target.value
+                setRandomQuestionCount(nextValue)
+                const parsedNextValue = Number(nextValue)
+                const keepsRandomSubset = nextValue.trim() !== ''
+                  && Number.isInteger(parsedNextValue)
+                  && parsedNextValue > 0
+                  && parsedNextValue < questionIds.length
+                if (!keepsRandomSubset && completionRule === 'streak' && canEditCompletion) {
+                  setCompletionRule('fixed')
+                  setPassingEnabled(false)
+                }
+              }}
+              placeholder={`ครบทั้ง ${a.question_ids.length} ข้อ`}
+              disabled={hasSubmissions}
+              className="max-w-[150px]"
+            />
+            <Label htmlFor="edit-random-question-count" className="text-sm text-muted-foreground">
+              ข้อต่อคน
+            </Label>
           </div>
-        </div>
-        <div className="flex items-center gap-2 pl-11">
-          <Input
-            type="number"
-            min={0}
-            step="any"
-            value={displayMaxScore}
-            onChange={e => setDisplayMaxScore(e.target.value)}
-            placeholder={`ไม่ปรับ (เท่ากับ ${pointsSum})`}
-            className="max-w-[160px]"
-          />
-          <span className="text-sm text-muted-foreground">คะแนน</span>
-        </div>
-      </Card>
+          <p className="text-xs text-muted-foreground pl-11">
+            {hasSubmissions
+              ? 'ล็อกค่านี้แล้วเพราะมีนักเรียนเริ่มทำแล้ว — ชุดที่แต่ละคนได้ถูกตรึงไว้ตั้งแต่ตอนเริ่ม'
+              : 'เว้นว่างเพื่อใช้ครบทุกข้อ และจะเปลี่ยนจำนวนนี้ไม่ได้หลังมีนักเรียนเริ่มทำแล้ว'}
+          </p>
+        </Card>
+      )}
 
       <Card padding="xl" className="space-y-4">
         <div className="flex items-start gap-3">
@@ -668,7 +761,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
             <Target className="w-4 h-4 text-muted-foreground" />
           </div>
           <div>
-            <h2 className="font-semibold text-foreground">เงื่อนไขจบงาน</h2>
+            <h2 className="font-semibold text-foreground">{completionSectionLabel}</h2>
             <p className="text-xs text-muted-foreground">
               {canEditCompletion
                 ? 'นักเรียนทำถึงตรงไหนถือว่าเสร็จ และครูวัดว่าผ่านจากอะไร'
@@ -677,79 +770,106 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
           </div>
         </div>
 
-        <div className={`grid grid-cols-1 gap-3 ${streakOffered ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
-          {([
-            { key: 'complete' as const, label: 'ทำครบแล้วจบ', desc: 'ได้เท่าไหร่ก็เท่านั้น ไม่มีป้ายผ่าน/ไม่ผ่าน' },
-            { key: 'threshold' as const, label: 'ต้องผ่านเกณฑ์', desc: 'ดูว่าถึงเปอร์เซ็นต์หรือคะแนนที่ตั้งไว้ไหม' },
-            ...(streakOffered ? [{
-              key: 'streak' as const, label: 'ถูกติดกันจึงจบ', desc: 'ทำไปเรื่อย ๆ จนตอบถูกติดต่อกันครบ',
-            }] : []),
-          ]).map(opt => (
-            <button
-              key={opt.key}
-              type="button"
-              onClick={() => chooseCompletion(opt.key)}
-              disabled={!canEditCompletion}
-              className={`p-3 rounded-xl border-2 text-left transition-all ${
-                completionChoice === opt.key ? 'border-primary bg-primary/10' : 'border-border'
-              } ${canEditCompletion ? 'hover:border-ring' : 'opacity-60 cursor-not-allowed'}`}
+        <div data-completion-rules role="group" aria-label={completionSectionLabel} className={`grid grid-cols-1 gap-3 ${streakOffered ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+          <CompletionRuleCard
+            selected={completionChoice === 'complete'}
+            disabled={!canEditCompletion}
+            label="อนุญาตให้ทำ"
+            description={`นักเรียนทำ${assignmentNoun}ได้ไม่เกินจำนวนครั้งที่กำหนด`}
+            onSelect={() => chooseCompletion('complete')}
+          >
+            <div className="flex flex-wrap items-center gap-1 text-sm font-medium text-foreground">
+              <span>อนุญาตให้ทำ</span>
+              <Input
+                id="edit-attempts"
+                type="number"
+                min={1}
+                step={1}
+                value={maxAttempts}
+                onFocus={() => chooseCompletion('complete')}
+                onChange={event => {
+                  const value = event.target.value
+                  setMaxAttempts(value)
+                  if (value === '1') setRetryScope('all')
+                }}
+                placeholder="ไม่จำกัด"
+                disabled={!canEditCompletion}
+                aria-label="จำนวนครั้งที่อนุญาตให้ทำ"
+                className={completionRuleInputClassName}
+              />
+              <span>ครั้ง</span>
+            </div>
+          </CompletionRuleCard>
+
+          <CompletionRuleCard
+            selected={completionChoice === 'threshold'}
+            disabled={!canEditCompletion}
+            label="ผ่านเกณฑ์"
+            description={`นักเรียนทำ${assignmentNoun}ซ้ำได้โดยไม่จำกัดจำนวนครั้ง จนได้คะแนนถึงเกณฑ์ที่กำหนด จึงถือว่าทำ${assignmentNoun}เสร็จ`}
+            onSelect={() => chooseCompletion('threshold')}
+          >
+            <div className="flex flex-nowrap items-center gap-1 text-sm font-medium text-foreground">
+              <span className="whitespace-nowrap">ผ่านเกณฑ์</span>
+              <Input
+                type="number"
+                min={0}
+                max={passingType === 'percent' ? 100 : undefined}
+                value={passingValue}
+                onFocus={() => chooseCompletion('threshold')}
+                onChange={event => setPassingValue(event.target.value)}
+                placeholder={passingType === 'percent' ? '70' : '7'}
+                disabled={!canEditCompletion}
+                aria-label="ค่าเกณฑ์ผ่าน"
+                className={completionRuleInputClassName}
+              />
+              <CompletionThresholdUnitMenu
+                value={passingType}
+                disabled={!canEditCompletion}
+                onValueChange={value => {
+                  chooseCompletion('threshold')
+                  setPassingType(value)
+                }}
+              />
+            </div>
+          </CompletionRuleCard>
+
+          {streakOffered && (
+            <CompletionRuleCard
+              selected={completionChoice === 'streak'}
+              disabled={!canEditCompletion || !streakAvailable}
+              label="ทำถูกติดต่อกัน"
+              description={`${!streakAvailable ? 'ใช้ได้เมื่อเลือก “สุ่มจากโจทย์ที่เลือกข้างต้น” ' : ''}นักเรียนต้องตอบถูกติดต่อกันครบตามจำนวนที่กำหนด จึงถือว่าทำ${assignmentNoun}เสร็จ`}
+              onSelect={() => chooseCompletion('streak')}
             >
-              <p className="font-medium text-sm text-foreground">{opt.label}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{opt.desc}</p>
-            </button>
-          ))}
+              <div className="flex flex-wrap items-center gap-1 text-sm font-medium text-foreground">
+                <span>ทำถูกติดต่อกัน</span>
+                <Input
+                  type="number"
+                  min={STREAK_TARGET_MIN}
+                  max={STREAK_TARGET_MAX}
+                  value={streakTarget}
+                  onFocus={() => chooseCompletion('streak')}
+                  onChange={event => setStreakTarget(event.target.value)}
+                  disabled={!canEditCompletion || !streakAvailable}
+                  aria-label="จำนวนข้อที่ต้องทำถูกติดต่อกัน"
+                  className={completionRuleInputClassName}
+                />
+                <span>ข้อ</span>
+              </div>
+            </CompletionRuleCard>
+          )}
         </div>
 
-        {completionChoice === 'threshold' && (
-          <div className="flex items-center gap-2 p-3 rounded-xl border border-border flex-wrap">
-            <div className="flex rounded-lg border border-border overflow-hidden shrink-0">
-              {(['percent', 'score'] as const).map(t => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setPassingType(t)}
-                  className={`px-3 py-2 text-xs font-medium transition-all ${
-                    passingType === t ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-muted'
-                  }`}
-                >
-                  {t === 'percent' ? 'เปอร์เซ็นต์' : 'คะแนน'}
-                </button>
-              ))}
-            </div>
-            <Input
-              type="number"
-              min={0}
-              max={passingType === 'percent' ? 100 : undefined}
-              value={passingValue}
-              onChange={e => setPassingValue(e.target.value)}
-              placeholder={passingType === 'percent' ? 'เช่น 70' : 'เช่น 7'}
-              className="max-w-[120px]"
-            />
-            <span className="text-sm text-muted-foreground shrink-0">
-              {passingType === 'percent' ? '% ของคะแนนเต็ม' : 'คะแนน'}
-            </span>
-          </div>
+        {completionChoice === 'complete' && (
+          <CompletionAttemptSettings id="edit-attempts" maxAttempts={maxAttempts}
+            scoreStrategy={scoreStrategy} onScoreStrategyChange={setScoreStrategy} />
+        )}
+        {completionChoice !== 'complete' && (
+          <p className="text-xs text-muted-foreground">ทำรอบใหม่ได้จนกว่าจะผ่าน เมื่อผ่านแล้วจะเริ่มรอบใหม่ไม่ได้ · เก็บคะแนนจากรอบที่ดีที่สุด</p>
         )}
 
         {completionChoice === 'streak' && (
           <div className="space-y-3 p-4 rounded-xl border border-border">
-            <div className="flex items-center gap-2 flex-wrap">
-              <Label htmlFor="edit-streak-target" className="text-sm text-muted-foreground">
-                ต้องตอบถูกติดต่อกัน
-              </Label>
-              <Input
-                id="edit-streak-target"
-                type="number"
-                min={STREAK_TARGET_MIN}
-                max={STREAK_TARGET_MAX}
-                value={streakTarget}
-                onChange={event => setStreakTarget(event.target.value)}
-                disabled={!canEditCompletion}
-                className="max-w-[100px]"
-              />
-              <span className="text-sm text-muted-foreground">ข้อ จึงจะจบ · ตอบผิด 1 ข้อ เริ่มนับใหม่จาก 0</span>
-            </div>
-
             {/* The ceiling and pool recycling stay editable after students
                 start: neither changes what passing means. */}
             <div className="space-y-1.5">
@@ -769,6 +889,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
                 <div className="flex items-center gap-2 pl-3">
                   <Input
                     type="number"
+                    aria-label="จำนวนข้อสูงสุดก่อนหยุด"
                     min={STREAK_CAP_MIN}
                     max={STREAK_CAP_MAX}
                     value={streakCap}
@@ -810,16 +931,11 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
             {/* Same reason as in the create wizard: this mode hides the
                 ตรวจทีละข้อ switch because it is forced on, but whether the
                 check reveals the เฉลย is still the teacher's to choose. */}
-            <div className="border-t border-border pt-3 space-y-1.5">
+            <div className="border-t border-border pt-3">
               <label className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
-                <div>
-                  <p className="text-sm font-medium text-foreground">บอกคำตอบที่ถูกตอนกดตรวจ</p>
-                  <p className="text-xs text-muted-foreground">
-                    {instantCheckAnswerKey
-                      ? 'นักเรียนเห็นคำตอบที่ถูกทันที'
-                      : 'บอกแค่ถูก/ผิด ไม่บอกคำตอบ'}
-                  </p>
-                </div>
+                <p className="text-sm font-medium text-foreground">
+                  <InstantCheckAnswerKeySettingLabel />
+                </p>
                 <input
                   type="checkbox"
                   checked={instantCheckAnswerKey}
@@ -827,11 +943,6 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
                   className="accent-primary w-4 h-4 shrink-0"
                 />
               </label>
-              {a.type === 'exam' && instantCheckAnswerKey && (
-                <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
-                  งานนี้เป็นข้อสอบ — เปิดไว้แปลว่านักเรียนที่จบก่อนถือคำตอบที่ถูกออกไปจากห้องได้ แนะนำให้ปิด
-                </p>
-              )}
             </div>
 
             <p className="text-xs text-muted-foreground">
@@ -874,10 +985,15 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
                   <Calculator className="w-4 h-4 text-muted-foreground" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-foreground">ให้นักเรียนใช้เครื่องคิดเลขวิทยาศาสตร์</p>
-                  <p className="text-xs text-muted-foreground">
-                    {hasSubmissions ? 'ล็อกค่าแล้ว เพราะมีนักเรียนเริ่มทำงานนี้' : 'เปิดปุ่มเครื่องคิดเลขในหน้าทำโจทย์ และใช้ DEG/RAD ตามช่องคำตอบที่กำลังเลือก'}
+                  <p className="text-sm font-medium text-foreground">
+                    <AssignmentSettingHoverLabel
+                      label="เครื่องคิดเลขวิทยาศาสตร์"
+                      description={CALCULATOR_SETTING_DESCRIPTION}
+                    />
                   </p>
+                  {hasSubmissions && (
+                    <p className="text-xs text-muted-foreground">ล็อกค่าแล้ว เพราะมีนักเรียนเริ่มทำงานนี้</p>
+                  )}
                 </div>
               </div>
               <input
@@ -895,10 +1011,15 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
                   <NotebookPen className="w-4 h-4 text-muted-foreground" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-foreground">เปิดกระดาษทด</p>
-                  <p className="text-xs text-muted-foreground">
-                    {hasSubmissions ? 'ล็อกค่าแล้ว เพราะมีนักเรียนเริ่มทำงานนี้' : 'สิ่งที่นักเรียนยังไม่แนบจะอยู่เฉพาะอุปกรณ์ ไม่ถูกอัปโหลดขึ้นพื้นที่เก็บไฟล์'}
+                  <p className="text-sm font-medium text-foreground">
+                    <AssignmentSettingHoverLabel
+                      label="กระดาษทด"
+                      description={SCRATCHPAD_SETTING_DESCRIPTION}
+                    />
                   </p>
+                  {hasSubmissions && (
+                    <p className="text-xs text-muted-foreground">ล็อกค่าแล้ว เพราะมีนักเรียนเริ่มทำงานนี้</p>
+                  )}
                 </div>
               </div>
               <input
@@ -919,9 +1040,11 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
                 <Camera className="w-4 h-4 text-muted-foreground" />
               </div>
               <div>
-                <p className="text-sm font-medium text-foreground">ให้นักเรียนแนบรูปแสดงวิธีทำ</p>
-                <p className="text-xs text-muted-foreground">
-                  งานนี้มีข้อเติมคำตอบตัวเลข — เปิดไว้จะต้องแนบรูปวิธีทำทุกข้อจึงจะส่งคำตอบได้ (ข้อที่มีข้อย่อย แนบข้อย่อยละ 1 รูป)
+                <p className="text-sm font-medium text-foreground">
+                  <AssignmentSettingHoverLabel
+                    label="ให้นักเรียนแนบรูปแสดงวิธีทำ"
+                    description={WORK_IMAGE_SETTING_DESCRIPTION}
+                  />
                 </p>
               </div>
             </div>
@@ -941,12 +1064,15 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
                 <Hash className="w-4 h-4 text-muted-foreground" />
               </div>
               <div>
-                <p className="text-sm font-medium text-foreground">ให้นักเรียนทุกคนได้ตัวเลขชุดเดียวกัน</p>
-                <p className="text-xs text-muted-foreground">
-                  {hasSubmissions
-                    ? 'ล็อกค่าแล้ว เพราะมีนักเรียนเริ่มทำงานนี้'
-                    : `มีโจทย์สุ่มตัวเลข ${randomValueQuestionCount} ข้อ — เปิดไว้ระบบจะสุ่มข้อละชุดเดียวแล้วให้ทุกคนทำตัวเลขชุดนั้น ทำรอบใหม่ก็ได้ชุดเดิม`}
+                <p className="text-sm font-medium text-foreground">
+                  <AssignmentSettingHoverLabel
+                    label="ให้นักเรียนได้ตัวเลขชุดเดียวกัน"
+                    description={SHARED_RANDOM_VALUES_SETTING_DESCRIPTION}
+                  />
                 </p>
+                {hasSubmissions && (
+                  <p className="text-xs text-muted-foreground">ล็อกค่าแล้ว เพราะมีนักเรียนเริ่มทำงานนี้</p>
+                )}
               </div>
             </div>
             <input
@@ -989,33 +1115,6 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
             className="max-w-[200px]"
           />
         </div>
-
-        {a.mode === 'online' && streakOn && (
-          <p className="text-xs text-muted-foreground rounded-lg bg-muted px-3 py-2">
-            เงื่อนไขจบงานเป็น “ถูกติดกันจึงจบ” — หน้าทำโจทย์แสดงทีละ 1 ข้อ และเปิดการตรวจทีละข้อให้เสมอ
-            ปรับสองอย่างนี้ที่นี่ไม่ได้
-          </p>
-        )}
-
-        {a.mode === 'online' && !streakOn && (
-          <div className="space-y-1.5">
-            <Label htmlFor="edit-per-page" className="flex items-center gap-1.5">
-              <ListFilter className="w-4 h-4 text-muted-foreground" /> จำนวนข้อต่อหนึ่งหน้า
-            </Label>
-            <Input
-              id="edit-per-page"
-              type="number"
-              min={1}
-              max={50}
-              value={questionsPerPage}
-              onChange={e => setQuestionsPerPage(e.target.value)}
-              className="max-w-[200px]"
-            />
-            <p className="text-xs text-muted-foreground">
-              1 = แสดงทีละข้อเหมือนเดิม · เป็นการจัดหน้าจออย่างเดียว ไม่กระทบคะแนน และมีผลทันทีแม้กับคนที่กำลังทำอยู่
-            </p>
-          </div>
-        )}
       </Card>
 
       <Card padding="xl" className="space-y-4">
@@ -1024,25 +1123,23 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
             <Eye className="w-4 h-4 text-muted-foreground" /> แสดงผลลัพธ์
           </Label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {([
-              { key: 'immediate', label: 'ทันทีหลังส่ง', desc: 'เห็นคะแนนและคำตอบที่ถูกทันที' },
-              { key: 'score_only', label: 'แสดงคะแนน แต่ไม่แสดงคำตอบ', desc: 'เห็นคะแนนรวม แต่ซ่อนคำตอบรายข้อ' },
-              { key: 'after_due', label: 'หลังพ้นกำหนดส่ง', desc: 'ซ่อนคำตอบที่ถูกจนกว่าจะหมดเขต' },
-              { key: 'never', label: 'ไม่แสดงผลลัพธ์', desc: 'เห็นเพียงว่าส่งสำเร็จ' },
-            ] as const).map(option => (
-              <button
+            {RESULT_VISIBILITY_OPTIONS.map(option => (
+              <ResultVisibilityOptionHoverCard
                 key={option.key}
-                type="button"
-                onClick={() => setShowResults(option.key)}
-                className={`p-3 rounded-xl border-2 text-left transition-all ${
-                  showResults === option.key
-                    ? 'border-primary bg-primary/10'
-                    : 'border-border hover:border-ring'
-                }`}
-              >
-                <p className="font-medium text-sm text-foreground">{option.label}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{option.desc}</p>
-              </button>
+                description={option.description}
+                trigger={<button
+                  type="button"
+                  onClick={() => setShowResults(option.key)}
+                  className={`flex items-center gap-1.5 p-3 rounded-xl border-2 text-left transition-all ${
+                    showResults === option.key
+                      ? 'border-primary bg-primary/10'
+                      : 'border-border hover:border-ring'
+                  }`}
+                >
+                  <span className="font-medium text-sm text-foreground">{option.label}</span>
+                  <CircleHelp aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+                </button>}
+              />
             ))}
           </div>
         </div>
@@ -1052,47 +1149,8 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
           onChange={setShowSolutions}
           assignmentType={a.type}
           maxAttempts={maxAttempts}
+          untilPassed={completionChoice !== 'complete'}
         />
-
-        <div className="space-y-1.5">
-          <Label htmlFor="edit-attempts" className="flex items-center gap-1.5">
-            <Layers className="w-4 h-4 text-muted-foreground" /> จำกัดจำนวนครั้งที่ทำได้
-          </Label>
-          <Input
-            id="edit-attempts"
-            type="number"
-            min={1}
-            value={maxAttempts}
-            onChange={e => {
-              setMaxAttempts(e.target.value)
-              if (e.target.value === '1') setRetryScope('all')
-            }}
-            placeholder="ไม่จำกัด (เว้นว่าง)"
-            className="max-w-[200px]"
-          />
-        </div>
-
-        {maxAttempts !== '1' && !streakOn && (
-          <div className="space-y-1.5">
-            <Label className="flex items-center gap-1.5">
-              <Target className="w-4 h-4 text-muted-foreground" /> เลือกคะแนนของนักเรียนจาก
-            </Label>
-            <div className="flex rounded-lg border border-border overflow-hidden w-fit">
-              {(Object.keys(SCORE_STRATEGY_LABELS) as ScoreStrategy[]).map(s => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => setScoreStrategy(s)}
-                  className={`px-3 py-2 text-xs font-medium transition-all ${
-                    scoreStrategy === s ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-muted'
-                  }`}
-                >
-                  {SCORE_STRATEGY_LABELS[s]}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
 
         {a.mode === 'online' && a.type === 'exercise' && !streakOn && (
           <div className="space-y-3 rounded-xl border border-border p-4">
@@ -1102,11 +1160,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
                   <CircleCheck className="w-4 h-4 text-primary" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-foreground">ให้นักเรียนกดตรวจทีละข้อ</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    ทำข้อไหนเสร็จก็กดส่งเฉพาะข้อนั้น รู้ผลทันทีว่าถูกหรือผิด แล้วแก้ตรงนั้นได้เลย
-                    คะแนนยังคิดจากคำตอบสุดท้ายตอนกดส่งงาน · มีผลกับการทำครั้งใหม่และครั้งที่กำลังทำอยู่
-                  </p>
+                  <p className="text-sm font-medium text-foreground"><InstantCheckSettingLabel /></p>
                 </div>
               </div>
               <input
@@ -1118,14 +1172,9 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
             </label>
             {instantCheck && (
               <label className="ml-11 flex items-center justify-between gap-4 rounded-xl border border-border p-3 cursor-pointer">
-                <div>
-                  <p className="text-sm font-medium text-foreground">บอกคำตอบที่ถูกตอนกดตรวจ</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {instantCheckAnswerKey
-                      ? 'นักเรียนเห็นคำตอบที่ถูกทันที แล้วแก้ให้ถูกได้ — ระบบบันทึกจำนวนครั้งที่กดตรวจไว้ให้ครูดู · เฉลยวิธีทำที่แนบไว้ดูได้หลังจบงานตามติ๊ก "ให้นักเรียนดูเฉลยวิธีทำ"'
-                      : 'บอกแค่ถูก/ผิด ไม่บอกคำตอบ นักเรียนต้องคิดใหม่เอง'}
-                  </p>
-                </div>
+                <p className="text-sm font-medium text-foreground">
+                  <InstantCheckAnswerKeySettingLabel />
+                </p>
                 <input
                   type="checkbox"
                   checked={instantCheckAnswerKey}
@@ -1137,7 +1186,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
           </div>
         )}
 
-        {a.mode === 'online' && maxAttempts !== '1' && !streakOn && (
+        {a.mode === 'online' && (completionChoice !== 'complete' || maxAttempts !== '1') && !streakOn && (
           <div className="space-y-3 rounded-xl border border-border p-4">
             <label className="flex items-center justify-between gap-4 cursor-pointer">
               <div className="flex items-start gap-3">

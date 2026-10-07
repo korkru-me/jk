@@ -1,8 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { BrandLogo } from '@/components/brand-logo'
 import { useTheme } from 'next-themes'
-import { Moon, Sun, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { Menu, Moon, Sun } from 'lucide-react'
+import { IconButton } from '@/components/ui/icon-button'
+import { cn } from '@/lib/utils'
 import { logout } from '@/lib/actions/auth'
 import {
   DropdownMenu,
@@ -19,10 +23,13 @@ interface TopbarProps {
   initialUnreadCount: number
   onMenuToggle?: () => void
   sidebarCollapsed?: boolean
+  sidebarOpen?: boolean
+  notificationsEnabled?: boolean
   onSidebarCollapseToggle?: () => void
+  onLogoNavigate?: () => void
 }
 
-export function Topbar({ user, initialUnreadCount, onMenuToggle, sidebarCollapsed = false, onSidebarCollapseToggle }: TopbarProps) {
+export function Topbar({ user, initialUnreadCount, onMenuToggle, sidebarCollapsed = false, sidebarOpen = false, notificationsEnabled = true, onSidebarCollapseToggle, onLogoNavigate }: TopbarProps) {
   const { resolvedTheme, setTheme } = useTheme()
   const [themeMounted, setThemeMounted] = useState(false)
   const isDark = resolvedTheme === 'dark'
@@ -30,35 +37,42 @@ export function Topbar({ user, initialUnreadCount, onMenuToggle, sidebarCollapse
   useEffect(() => setThemeMounted(true), [])
 
   return (
-    <header className="h-16 border-b bg-card flex items-center justify-between px-4 sm:px-6 shrink-0">
-      <button
-        className="md:hidden p-1.5 rounded-lg text-muted-foreground hover:bg-muted transition-colors"
-        onClick={onMenuToggle}
-        aria-label="เปิดเมนู"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <line x1="3" y1="6" x2="21" y2="6" />
-          <line x1="3" y1="12" x2="21" y2="12" />
-          <line x1="3" y1="18" x2="21" y2="18" />
-        </svg>
-      </button>
-      <button
-        className="hidden md:flex p-1.5 rounded-lg text-muted-foreground hover:bg-muted transition-colors"
-        onClick={onSidebarCollapseToggle}
-        aria-label={sidebarCollapsed ? 'แสดงแถบด้านข้าง' : 'ซ่อนแถบด้านข้าง'}
-        title={sidebarCollapsed ? 'แสดงแถบด้านข้าง' : 'ซ่อนแถบด้านข้าง'}
-      >
-        {sidebarCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
-      </button>
+    <header className="h-16 border-b bg-card flex items-center justify-between gap-2 pl-3 pr-2 sm:pr-6 shrink-0">
+      <div className="flex shrink-0 items-center gap-2">
+        <IconButton
+          className="size-11 md:hidden"
+          onClick={onMenuToggle}
+          label={sidebarOpen ? 'ปิดเมนูด้านข้าง' : 'เปิดเมนูด้านข้าง'}
+          aria-expanded={sidebarOpen}
+          aria-controls="app-sidebar"
+        >
+          <Menu />
+        </IconButton>
+        <IconButton
+          className="hidden size-11 md:inline-flex"
+          onClick={onSidebarCollapseToggle}
+          label={sidebarCollapsed ? 'ขยายเมนูด้านข้าง' : 'ย่อเมนูด้านข้าง'}
+          aria-expanded={!sidebarCollapsed}
+          aria-controls="app-sidebar"
+        >
+          <Menu />
+        </IconButton>
 
-      <div className="flex items-center gap-3">
+        <Link href="/dashboard" onClick={onLogoNavigate} title="KorKru · หน้าหลัก" className="shrink-0">
+          <BrandLogo layout="stacked" />
+        </Link>
+      </div>
+
+      <div className="flex items-center gap-1.5 sm:gap-3">
         {/* Notifications */}
-        <NotificationsBell initialUnreadCount={initialUnreadCount} />
+        <span data-notification-anchor className="flex size-9 shrink-0 items-center justify-center">
+          {notificationsEnabled && <NotificationsBell initialUnreadCount={initialUnreadCount} />}
+        </span>
 
         {/* Dark / Light toggle switch */}
         {themeMounted ? (
           <div className="flex items-center gap-1.5">
-            <Sun size={13} className={isDark ? 'text-muted-foreground' : 'text-warning'} />
+            <Sun size={13} className={cn('hidden sm:block', isDark ? 'text-muted-foreground' : 'text-warning')} />
             <button
               onClick={() => setTheme(isDark ? 'light' : 'dark')}
               aria-label="สลับโหมดสี"
@@ -76,7 +90,7 @@ export function Topbar({ user, initialUnreadCount, onMenuToggle, sidebarCollapse
                   : <Sun size={10} className="text-warning" />}
               </span>
             </button>
-            <Moon size={13} className={isDark ? 'text-primary' : 'text-muted-foreground'} />
+            <Moon size={13} className={cn('hidden sm:block', isDark ? 'text-primary' : 'text-muted-foreground')} />
           </div>
         ) : <div className="h-6 w-[81px]" aria-hidden="true" />}
 

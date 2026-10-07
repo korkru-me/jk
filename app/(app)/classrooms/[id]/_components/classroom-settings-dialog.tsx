@@ -2,11 +2,12 @@
 
 import { useState, useTransition } from 'react'
 import {
-  Settings, Users, CalendarDays, Clock, Tag, BookOpen, Home, Info, Palette, Check, Ban,
+  Settings, Users, CalendarDays, Clock, School, Home, Info, Palette, Check, Ban,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { useSidebarCompact } from '@/components/layout/sidebar-display'
 import { Card } from '@/components/ui/card'
 import { IconButton } from '@/components/ui/icon-button'
 import { Input } from '@/components/ui/input'
@@ -23,10 +24,10 @@ import {
   COVER_PRESETS, coverOf,
   type ClassroomMeta,
 } from '@/app/(app)/classrooms/_components/classroom-meta'
-import {
-  AccessTypePicker, TagInput, CreatableCombobox,
-} from '@/app/(app)/classrooms/_components/classroom-meta-fields'
+import { AccessTypePicker, CreatableCombobox } from '@/app/(app)/classrooms/_components/classroom-meta-fields'
 import { DeleteClassroomButton } from '@/components/classrooms/delete-classroom-button'
+import { ClassroomIcon } from '@/components/classrooms/classroom-icon'
+import { ClassroomIconPicker } from '@/components/classrooms/classroom-icon-picker'
 
 export function ClassroomSettingsDialog({
   classroom, onCover = false, placement = 'banner',
@@ -39,6 +40,7 @@ export function ClassroomSettingsDialog({
   /** The contextual sidebar uses a quieter, full-width navigation treatment. */
   placement?: 'banner' | 'sidebar'
 }) {
+  const compact = useSidebarCompact() && placement === 'sidebar'
   const [open, setOpen] = useState(false)
   const [name, setName] = useState(classroom.name)
   const [meta, setMeta] = useState<ClassroomMeta>(() => parseDescription(classroom.description))
@@ -50,8 +52,8 @@ export function ClassroomSettingsDialog({
     setMeta(prev => ({ ...prev, [key]: value }))
   }
 
-  // Classrooms created before covers were persisted have none saved; the
-  // preview stays on the neutral surface until a teacher picks one.
+  // Classrooms created before cover colours were persisted have none saved;
+  // the preview stays on the neutral surface until a teacher picks one.
   const cover = coverOf(meta)
 
   function clearCover() {
@@ -82,7 +84,7 @@ export function ClassroomSettingsDialog({
         name: name.trim(),
         description: composeDescription(meta),
       })
-      if (res?.error) toast.error(res.error)
+      if ('error' in res) toast.error(res.error)
       else { toast.success('บันทึกการตั้งค่าแล้ว'); setOpen(false) }
     })
   }
@@ -94,20 +96,24 @@ export function ClassroomSettingsDialog({
           <Button
             size="sm"
             variant={placement === 'sidebar' ? 'ghost' : 'outline'}
+            aria-label="ตั้งค่าห้องเรียน"
+            title={compact ? 'ตั้งค่าห้องเรียน' : undefined}
             className={cn(
               placement === 'sidebar'
-                ? 'w-full justify-start'
+                ? 'w-full justify-start transition-colors'
                 : 'gap-1.5 bg-transparent',
               placement === 'banner' && (
                 onCover
                   ? 'border-current text-current hover:bg-current/10 hover:text-current'
                   : 'border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground'
               ),
+              compact && 'md:h-11 md:justify-center md:px-0',
             )}
           />
         }
       >
-        <Settings className="w-3.5 h-3.5" /> ตั้งค่าห้องเรียน
+        <Settings data-icon="inline-start" />
+        <span className={cn(compact && 'md:sr-only')}>ตั้งค่าห้องเรียน</span>
       </DialogTrigger>
 
       <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
@@ -125,11 +131,11 @@ export function ClassroomSettingsDialog({
               <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center shrink-0">
                 {isHomeroom
                   ? <Home className="w-4 h-4 text-muted-foreground" />
-                  : <BookOpen className="w-4 h-4 text-muted-foreground" />}
+                  : <School className="size-4 text-muted-foreground" aria-hidden="true" />}
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">ประเภทห้องเรียน</p>
-                <p className="text-sm font-medium">{isHomeroom ? 'ห้อง Homeroom' : 'ห้องเรียนวิชา'}</p>
+                <p className="text-sm font-medium">{isHomeroom ? 'ห้อง Homeroom' : 'ห้องเรียน'}</p>
               </div>
             </div>
             <div>
@@ -153,11 +159,12 @@ export function ClassroomSettingsDialog({
             </Label>
             <div
               className={cn(
-                'h-20 rounded-2xl border-2 flex items-center px-5 transition-colors',
+                'relative h-20 overflow-hidden rounded-2xl border-2 flex items-center px-5 transition-colors',
                 cover ? `${cover.surface} ${cover.text}` : 'bg-muted border-border text-muted-foreground',
               )}
             >
-              <p className="font-bold text-lg truncate">{name || 'ชื่อห้องเรียน'}</p>
+              <ClassroomIcon iconKey={meta.iconKey} className="relative z-10 mr-3 size-7 shrink-0" />
+              <p className="relative z-10 font-bold text-lg truncate">{name || 'ชื่อห้องเรียน'}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <IconButton
@@ -194,6 +201,8 @@ export function ClassroomSettingsDialog({
               })}
             </div>
           </div>
+
+          <ClassroomIconPicker value={meta.iconKey} onValueChange={key => set('iconKey', key)} disabled={isPending} />
 
           {/* ── Basics ── */}
           <div className="space-y-5">
@@ -244,14 +253,6 @@ export function ClassroomSettingsDialog({
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <Label className="flex items-center gap-1.5">
-                <Tag className="w-3.5 h-3.5 text-muted-foreground" />
-                แท็กรายวิชา
-                <span className="text-xs text-muted-foreground font-normal">(ไม่บังคับ)</span>
-              </Label>
-              <TagInput tags={meta.tags} onChange={t => set('tags', t)} />
-            </div>
           </div>
 
           {/* ── Enrollment ── */}
@@ -261,17 +262,18 @@ export function ClassroomSettingsDialog({
           </div>
 
           <Card padding="lg" className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                  <Users className="w-4 h-4 text-primary" />
-                </div>
-                <div>
-                  <p className="font-medium text-sm text-foreground">จำกัดจำนวนที่นั่ง</p>
-                  <p className="text-xs text-muted-foreground">ล็อกอัตโนมัติเมื่อนักเรียนเต็มจำนวน</p>
-                </div>
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                <Users className="w-4 h-4 text-primary" />
               </div>
-              <ToggleSwitch checked={meta.capacityEnabled} onChange={v => set('capacityEnabled', v)} />
+              <div className="flex items-center gap-2">
+                <p id="settings-capacity-label" className="font-medium text-sm text-foreground">จำกัดจำนวนที่นั่ง</p>
+                <ToggleSwitch
+                  checked={meta.capacityEnabled}
+                  onChange={v => set('capacityEnabled', v)}
+                  aria-labelledby="settings-capacity-label"
+                />
+              </div>
             </div>
             {meta.capacityEnabled && (
               <div className="pt-1 space-y-1.5 border-t border-border">

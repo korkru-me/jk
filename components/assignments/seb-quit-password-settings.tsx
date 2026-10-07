@@ -32,6 +32,7 @@ interface FieldsProps {
   onConfirmationChange: (value: string) => void
   disabled?: boolean
   showValidation?: boolean
+  compact?: boolean
 }
 
 export function SebQuitPasswordFields({
@@ -42,6 +43,7 @@ export function SebQuitPasswordFields({
   onConfirmationChange,
   disabled = false,
   showValidation = true,
+  compact = false,
 }: FieldsProps) {
   const [visible, setVisible] = useState(false)
   const error = showValidation && (password || confirmation)
@@ -51,7 +53,7 @@ export function SebQuitPasswordFields({
 
   return (
     <div
-      className="space-y-3"
+      className={compact ? 'space-y-2' : 'space-y-3'}
       data-testid="seb-quit-password-fields"
       onKeyDown={event => {
         // The edit screen's general settings use an outer form. Enter in a
@@ -61,10 +63,10 @@ export function SebQuitPasswordFields({
       }}
     >
       <div className="flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
-        <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+        {!compact && <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />}
         <div className="space-y-1">
           <p className="text-sm font-medium text-foreground">รหัสสำหรับออกจาก Safe Exam Browser</p>
-          <p className="text-xs leading-5 text-foreground/80">
+          <p data-assignment-description className="text-xs leading-5 text-foreground/80">
             นักเรียนไม่ต้องกรอกรหัสนี้ก่อนเริ่มสอบ รหัสนี้ใช้เมื่อจำเป็นต้องออกหรือปลดล็อกก่อนส่งข้อสอบเท่านั้น
             หลังส่งเสร็จให้ออกจากระบบด้วยลิงก์ออกที่หน้าเสร็จสิ้น
           </p>
@@ -212,7 +214,7 @@ export function SebQuitPasswordSettings({ assignmentId, initialState }: Settings
       </div>
 
       {revision && !artifactReady ? (
-        <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/5 p-3 text-xs leading-5 text-foreground">
+        <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/5 p-3 text-xs leading-5 text-warning">
           <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning-foreground" aria-hidden="true" />
           <p>
             บันทึกรหัสออกแล้ว แต่ข้อสอบจะยังเป็นร่างจนกว่าไฟล์ SEB รุ่นนี้จะผ่านการเตรียมและตรวจสอบครบ
@@ -222,7 +224,7 @@ export function SebQuitPasswordSettings({ assignmentId, initialState }: Settings
       ) : null}
 
       {!initialState.canManage ? (
-        <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/5 p-3 text-xs leading-5 text-warning">
+        <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/5 p-3 text-xs leading-5 text-foreground">
           <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <p>{BLOCKED_MESSAGES[initialState.blockedReason ?? 'owner_only']}</p>
         </div>

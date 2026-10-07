@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import {
+  extractStoragePaths,
   ORPHAN_GRACE_MS,
   partitionOrphans,
   totalBytes,
@@ -86,6 +87,9 @@ async function listFolder(
  */
 async function stillReferenced(
   supabase: Awaited<ReturnType<typeof createClient>>,
+  admin: ReturnType<typeof createAdminClient>,
+  bucket: CleanableBucket,
+  ownerId: string,
   paths: string[],
 ): Promise<Set<string>> {
   const referenced = new Set<string>()
@@ -95,6 +99,30 @@ async function stillReferenced(
     const { data, error } = await supabase.rpc('storage_paths_still_referenced', { paths: batch })
     if (error) throw new Error(error.message)
     for (const path of (data ?? []) as string[]) referenced.add(path)
+  }
+
+  // Classroom covers deliberately reuse the teacher-owned question-images
+  // bucket, but their URLs live in classrooms.description rather than a
+  // question column understood by the legacy RPC. Scan the owner's complete
+  // classroom set as a second, fail-closed source of truth before sweeping.
+  if (bucket === 'question-images') {
+    const wanted = new Set(paths)
+    const pageSize = 1000
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await admin
+        .from('classrooms')
+        .select('description')
+        .eq('teacher_id', ownerId)
+        .like('description', `%question-images/${ownerId}/%`)
+        .range(from, from + pageSize - 1)
+      if (error) throw new Error(error.message)
+      for (const row of data ?? []) {
+        for (const path of extractStoragePaths(row.description ?? '', bucket)) {
+          if (wanted.has(path)) referenced.add(path)
+        }
+      }
+      if ((data?.length ?? 0) < pageSize) break
+    }
   }
   return referenced
 }
@@ -119,7 +147,7 @@ export async function findOrphanFiles(): Promise<FindOrphansResult> {
         continue
       }
 
-      const referenced = await stillReferenced(supabase, files.map(f => f.path))
+      const referenced = await stillReferenced(supabase, admin, bucket, user.id, files.map(f => f.path))
       const split = partitionOrphans(files, referenced, { now: Date.now() })
       reports.push({
         bucket,
@@ -165,7 +193,7 @@ export async function deleteOrphanFiles(
     // teacher may have saved a โจทย์ using one of these files since they
     // pressed ตรวจสอบ.
     onDisk = await listFolder(admin, bucket, user.id)
-    stillUsed = await stillReferenced(supabase, own)
+    stillUsed = await stillReferenced(supabase, admin, bucket, user.id, own)
   } catch (e) {
     return { error: `ตรวจสอบก่อนลบไม่สำเร็จ จึงไม่ได้ลบอะไรเลย: ${(e as Error).message}` }
   }

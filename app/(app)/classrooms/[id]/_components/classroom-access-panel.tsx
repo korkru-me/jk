@@ -17,7 +17,6 @@ interface ClassroomAccessPanelProps {
 export function ClassroomAccessPanel({
   classCode,
   canManage,
-  onCover,
   mutedClassName,
 }: ClassroomAccessPanelProps) {
   const [codeCopied, setCodeCopied] = useState(false)
@@ -63,10 +62,7 @@ export function ClassroomAccessPanel({
         </div>
         <div className="flex min-h-8 items-center gap-2" aria-live="polite">
           <p
-            className={cn(
-              'font-mono text-2xl font-black tracking-[0.3em]',
-              !onCover && 'text-white',
-            )}
+            className="font-mono text-2xl font-black tracking-[0.3em]"
             aria-label={classCodeVisible ? `รหัสห้องเรียน ${classCode}` : 'รหัสห้องเรียนถูกซ่อน'}
           >
             {classCodeVisible ? classCode : '••••••'}
@@ -82,7 +78,7 @@ export function ClassroomAccessPanel({
       {canManage && (
         <div className={cn(
           'flex items-center justify-between gap-3 border-t pt-3',
-          onCover ? 'border-current/15' : 'border-white/10',
+          'border-current/15',
         )}>
           <div className="min-w-0">
             <p className="text-sm font-semibold">ลิงก์เชิญนักเรียน</p>

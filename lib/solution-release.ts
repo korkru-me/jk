@@ -1,4 +1,5 @@
 import type { AssignmentStatus, AssignmentType, SubmissionStatus } from '@/lib/types'
+import { completionAttemptLimit, findPassingCompletion, type CompletionAssignment, type CompletionAttempt } from '@/lib/assignment-completion'
 
 /**
  * When a student may open the เฉลยวิธีทำ their teacher attached to each ข้อ —
@@ -27,7 +28,7 @@ import type { AssignmentStatus, AssignmentType, SubmissionStatus } from '@/lib/t
  * same question the same way — the action re-asks it on every read.
  */
 
-export interface SolutionReleaseAttempt {
+export interface SolutionReleaseAttempt extends CompletionAttempt {
   id: string
   status: SubmissionStatus
   /** Rows written before attempts were numbered read as the first. */
@@ -45,6 +46,10 @@ export interface SolutionReleaseInput {
   extendedEndAt: string | null
   maxAttempts: number | null
   durationMinutes: number | null
+  completionRule?: string | null
+  passingType?: CompletionAssignment['passing_type']
+  passingValue?: number | null
+  displayMaxScore?: number | null
   /** Every attempt this student has at the งาน, whatever its status. */
   attempts: readonly SolutionReleaseAttempt[]
   now?: number
@@ -104,11 +109,16 @@ export function resolveSolutionRelease(input: SolutionReleaseInput): SolutionRel
   const attemptsUsed = input.attempts
     .filter(attempt => !isLive(attempt))
     .reduce((highest, attempt) => Math.max(highest, attempt.attempt_number ?? 1), 0)
-  const attemptLimit = attemptLimitFor(input.type, input.maxAttempts)
+  const completion = {
+    type: input.type, max_attempts: input.maxAttempts,
+    completion_rule: input.completionRule, passing_type: input.passingType,
+    passing_value: input.passingValue, display_max_score: input.displayMaxScore,
+  }
+  const attemptLimit = completionAttemptLimit(completion)
 
   if (!live) {
     const outOfAttempts = attemptLimit != null && attemptsUsed >= attemptLimit
-    if (input.status === 'closed' || pastDeadline || outOfAttempts) return { state: 'open' }
+    if (input.status === 'closed' || pastDeadline || outOfAttempts || findPassingCompletion(completion, input.attempts)) return { state: 'open' }
   }
 
   return {

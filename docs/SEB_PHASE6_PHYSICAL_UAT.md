@@ -1,6 +1,6 @@
 # SEB Phase S6 — Physical platform UAT
 
-อัปเดต: 30 กันยายน 2026 · **กำลังดำเนินการ — candidate r1 ไม่ผ่าน Windows launch และต้องออก revision/candidate ใหม่ก่อนทดสอบต่อ**
+อัปเดต: 7 ตุลาคม 2026 · **กำลังดำเนินการ — r2 เก็บ native keys ครบแล้ว; รอยืนยัน dedicated UAT deployment ก่อนลงทะเบียนและทดสอบ Windows ต่อ**
 
 เฟสนี้พิสูจน์ assignment-specific `.seb` artifact เดียวกันบน Windows, macOS,
 iPadOS และ iPhone/iOS จริง หลัง authenticated Staging mock ของ S5 ผ่านแล้ว
@@ -28,7 +28,42 @@ iPadOS และ iPhone/iOS จริง หลัง authenticated Staging mock
 - deployment contract ยอมรับ production target ของ Vercel เฉพาะ exact UAT origin + exact
   system project URL + `SEB_UAT_ISOLATED_PROJECT=true`; ค่าอื่น fail closed
 
-## Candidate ปัจจุบัน
+## จุดทำต่อรอบ r2 — 7 ตุลาคม 2026
+
+- ครูตั้ง Quit/Unlock Password ของ revision 2 ผ่านเว็บแล้ว; assignment ยังเป็น draft,
+  `seb_required`, ยังไม่มี release r2 และยังไม่มี attempt ข้อมูลนี้ตรวจเฉพาะ synthetic fixture บน Staging
+- ไฟล์ `korkru-s6-assignment-r2-final.seb` ขนาด 52,606 bytes ตรวจผ่าน passwordless
+  plaintext policy, Start/Quit URL, `sendBrowserExamKey` และ quit hash ของ exact revision;
+  bytes ต่างจากทั้ง seed r2 และ final r1 ห้ามแก้หรือบันทึก final ซ้ำ
+- เก็บ native evidence ครบ Windows 3.10.2 build 920, macOS 3.7 build 1591F,
+  iPadOS และ iPhone/iOS 3.7.1 build 15753 โดย CK ตรงกันและ iPad/iPhone มี BEK เดียวกัน
+  operator ตรวจครบ 4 targets และ deduplicate ได้ 3 exact native build entries
+- build 15753 ของ iOS 3.7.1 ยืนยันจาก [official release tag](https://github.com/SafeExamBrowser/seb-mac/blob/3.7.1/SafeExamBrowser.xcodeproj/project.pbxproj#L5204)
+  ไม่ใช่การอ่าน build จากเครื่องจริง; ต้องตรวจ exact runtime build อีกครั้งใน system check
+- ช่อง BEK ในไฟล์ข้อความ iPad กลับมาว่างหลังการตรวจคู่คีย์สำเร็จ จึงประกอบ evidence จาก
+  iPhone key ที่เก็บจริงและเคยตรวจตรงกับ iPad แล้ว เฉพาะเมื่อ CK/version/build ตรงกัน;
+  ไม่สร้างหรือเดาคีย์ใหม่ และไม่แก้ไฟล์ข้อความต้นทาง
+- evidence และ wrapper ของ r2 อยู่ใน `.local/seb-s6/` นอก Git และไม่แสดง raw keys
+  `build-r2-native-evidence.mjs` ตรวจไฟล์ owner-only; `run-r2-enrollment.mjs dry-run` ผ่าน
+  แบบไม่ mutate แต่ **ยังไม่ได้รัน apply หรือ publish r2**
+- รวม `origin/master` ถึง `c677d8e` เพื่อให้ migration history ตรงกับ Staging 140 รายการ
+  ถึง `20261006102054`; SQL สองรายการใหม่เป็น assignment presets ที่ apply ไว้แล้ว
+  รอบนี้ไม่ได้ apply/repair migration และไม่ได้เปลี่ยน Production
+- หลังรวม master: 209 files / 2,839 tests, TypeScript, token lint และ production build ผ่าน
+  ผลนี้ไม่แทน browser/native UAT และไม่เปลี่ยน frozen dedicated UAT deployment
+- deployment ที่ต้องตรวจซ้ำก่อน enrollment คือ `dpl_BfjRy3mrTfv8hnvd7oNxRrWc7iM1`
+  จาก source `a5c417afe238c00d815d1ee233c93c5ef3311055` บน project `korkru-seb-uat`;
+  saved CLI credential อ่าน API ได้ 403 และ Chrome เปิดหน้าล็อกอิน จึงยังยืนยัน live alias
+  ไม่ได้ ห้ามลงทะเบียน/publish เพียงเพราะ source ใน local ตรวจผ่าน
+- หลังเจ้าของล็อกอิน Vercel: ตรวจ exact project/alias/deployment/source + READY + public
+  Staging badge, ตรวจ migration parity/fixture/final ซ้ำ แล้วรัน immutable multi-platform
+  enrollment ครั้งเดียว → publish ผ่าน UI ครู → ออก release lock r2 และ reset manifest
+  เป็น pending ก่อนทดสอบ Windows ทั้ง 8 cases แล้วค่อย Mac → iPad → iPhone
+
+ผลใน manifest ปัจจุบันยังเป็น **ประวัติ candidate r1 ที่ failed** ไม่ใช่ผลรอบ r2;
+ยังไม่มี platform ใดผ่าน S6 ครบและห้ามเริ่ม S7
+
+## Candidate r1 — ประวัติที่ไม่ผ่าน ห้ามใช้ล็อกรอบ r2
 
 - candidate metadata: `seb-s6-20260927b`
 - source ถูกล็อกที่ `47c35d69ef21571401f02dca529f5f4024297f1d` และ dedicated UAT
@@ -57,7 +92,7 @@ iPadOS และ iPhone/iOS จริง หลัง authenticated Staging mock
   ป้องกัน stale origin แล้วให้ครูตั้งรหัสใหม่เพื่อสร้าง revision 2; หลัง native Final Save ต้องเก็บ CK/BEK
   ของ artifact ใหม่ครบทุก exact build และลงทะเบียน candidate r2 ก่อนเริ่ม Windows ใหม่
 
-### Synthetic fixture รอบปัจจุบัน
+### Synthetic fixture รอบ r1
 
 - สร้างบัญชีครู/นักเรียน, personal workspace, ห้องเรียน, สมาชิกห้อง และโจทย์สังเคราะห์
   ผ่าน UAT UI จริงแล้ว; credential และ resource ID อยู่ใน local owner-only state นอก Git เท่านั้น
@@ -68,7 +103,7 @@ iPadOS และ iPhone/iOS จริง หลัง authenticated Staging mock
 - ลงทะเบียน immutable release บน Supabase Staging สำเร็จและเผยแพร่ข้อสอบผ่าน UI ครูจริงแล้ว;
   ฐานยังเก็บ Quit/Unlock Password เฉพาะ SHA-256 และยังไม่มี attempt ก่อนเริ่ม physical UAT
 
-## ช่องว่างที่ต้องปิดก่อนทดสอบอุปกรณ์
+## ขั้นตอนเตรียม candidate (รายการสำเร็จด้านล่างเป็นรอบ r1)
 
 release ของ assignment เป็น immutable และ S5 ลงทะเบียน Windows BEK เท่านั้น จึงนำ release
 นั้นไปอ้างว่า Mac/iPad/iPhone ผ่านไม่ได้ สำหรับ S6 ต้องสร้าง synthetic assignment revision ใหม่
@@ -155,8 +190,9 @@ npm run next:seb-physical-uat
 ```
 
 คำสั่งแรกตรวจ fixed schema, candidate lock, exact platform และ 8 cases ต่อระบบแบบ fail closed
-คำสั่งที่สองบอกงานถัดไปเพียงหนึ่งข้อ Evidence ปัจจุบันล็อก source/deployment/release เดียวกันแล้ว
-และ `NOT READY` เหลือเฉพาะ OS metadata กับผลเครื่องจริงที่ยังจงใจเป็น `pending`
+คำสั่งที่สองบอกงานถัดไปเพียงหนึ่งข้อ Manifest ปัจจุบันยังเก็บ lock/ผล failed ของ r1;
+r2 ต้องยืนยัน deployment, enrollment และ publish ให้ครบก่อนแทนที่ lock/reset cases
+ตัวตรวจจึงยังเป็น `NOT READY` ตามจริง
 
 หลัง physical evidence ผ่านครบ Agent จึงอัปเดต aggregate
 `config/seb-platform-evidence.json`, รัน regression + `check:seb-platforms` และปิด S6

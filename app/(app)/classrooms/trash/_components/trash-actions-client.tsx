@@ -2,7 +2,7 @@
 
 import { useTransition } from 'react'
 import { toast } from 'sonner'
-import { RotateCcw, Trash2, BookOpen, Clock } from 'lucide-react'
+import { RotateCcw, Trash2, School, Clock } from 'lucide-react'
 import { restoreClassroom, permanentDeleteClassroom } from '@/lib/actions/classrooms'
 import type { Classroom } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -46,7 +46,7 @@ export function TrashActionsClient({ classroom, daysLeft }: Props) {
   return (
     <div className="flex items-center gap-4 p-4 hover:bg-muted transition-colors">
       <div className="w-9 h-9 rounded-xl bg-destructive/10 flex items-center justify-center shrink-0">
-        <BookOpen className="w-4 h-4 text-destructive" />
+        <School className="size-4 text-destructive" aria-hidden="true" />
       </div>
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-foreground truncate">{classroom.name}</p>
