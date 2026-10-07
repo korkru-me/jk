@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { Calendar, Clock, Layers, Target, FileText, Scale, Eye, ShieldCheck, Maximize, Fingerprint, ListFilter, ChevronUp, ChevronDown, X, Plus, Lock, Camera, LockKeyhole, Smartphone, RotateCcw, Dices, CircleCheck, Calculator, NotebookPen, Hash } from 'lucide-react'
+import { Calendar, Clock, Layers, Target, FileText, Scale, Eye, ShieldCheck, Maximize, Fingerprint, ListFilter, ChevronUp, ChevronDown, X, Plus, Lock, Camera, LockKeyhole, Smartphone, RotateCcw, Dices, CircleCheck, Calculator, NotebookPen, Hash, CircleHelp } from 'lucide-react'
 import { SolutionReleaseSetting } from '@/components/assignments/solution-release-setting'
 import {
   moveQuestionInSet, moveQuestionToIndex, normalizeSetSections, parseSections, removeQuestionsFromSet,
@@ -42,6 +42,10 @@ import {
   InstantCheckSettingLabel,
 } from '@/components/assignments/instant-check-setting-label'
 import { AssignmentSettingHoverLabel } from '@/components/assignments/assignment-setting-hover-label'
+import {
+  RESULT_VISIBILITY_OPTIONS,
+  ResultVisibilityOptionHoverCard,
+} from '@/components/assignments/result-visibility-options'
 
 const CALCULATOR_SETTING_DESCRIPTION =
   'เปิดให้นักเรียนใช้เครื่องคิดเลขวิทยาศาสตร์ภายในเว็บไซต์ระหว่างทำแบบฝึกหัดหรือข้อสอบ'
@@ -1119,25 +1123,23 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
             <Eye className="w-4 h-4 text-muted-foreground" /> แสดงผลลัพธ์
           </Label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {([
-              { key: 'immediate', label: 'ทันทีหลังส่ง', desc: 'เห็นคะแนนและคำตอบที่ถูกทันที' },
-              { key: 'score_only', label: 'แสดงคะแนน แต่ไม่แสดงคำตอบ', desc: 'เห็นคะแนนรวม แต่ซ่อนคำตอบรายข้อ' },
-              { key: 'after_due', label: 'หลังพ้นกำหนดส่ง', desc: 'ซ่อนคำตอบที่ถูกจนกว่าจะหมดเขต' },
-              { key: 'never', label: 'ไม่แสดงผลลัพธ์', desc: 'เห็นเพียงว่าส่งสำเร็จ' },
-            ] as const).map(option => (
-              <button
+            {RESULT_VISIBILITY_OPTIONS.map(option => (
+              <ResultVisibilityOptionHoverCard
                 key={option.key}
-                type="button"
-                onClick={() => setShowResults(option.key)}
-                className={`p-3 rounded-xl border-2 text-left transition-all ${
-                  showResults === option.key
-                    ? 'border-primary bg-primary/10'
-                    : 'border-border hover:border-ring'
-                }`}
-              >
-                <p className="font-medium text-sm text-foreground">{option.label}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{option.desc}</p>
-              </button>
+                description={option.description}
+                trigger={<button
+                  type="button"
+                  onClick={() => setShowResults(option.key)}
+                  className={`flex items-center gap-1.5 p-3 rounded-xl border-2 text-left transition-all ${
+                    showResults === option.key
+                      ? 'border-primary bg-primary/10'
+                      : 'border-border hover:border-ring'
+                  }`}
+                >
+                  <span className="font-medium text-sm text-foreground">{option.label}</span>
+                  <CircleHelp aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+                </button>}
+              />
             ))}
           </div>
         </div>

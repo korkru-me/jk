@@ -33,7 +33,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
-  Check, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Eye,
+  Check, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Eye, CircleHelp,
   X, Save, FileText,
 } from 'lucide-react'
 import {
@@ -87,6 +87,10 @@ import {
   INSTANT_CHECK_SETTING_LABEL,
 } from '@/components/assignments/instant-check-setting-label'
 import { AssignmentSettingHoverLabel } from '@/components/assignments/assignment-setting-hover-label'
+import {
+  RESULT_VISIBILITY_OPTIONS,
+  ResultVisibilityOptionHoverCard,
+} from '@/components/assignments/result-visibility-options'
 
 const QuestionPicker = dynamic(
   () => import('@/components/assignments/question-picker').then(mod => mod.QuestionPicker),
@@ -1836,25 +1840,23 @@ export function CreateAssignmentForm({
               spacing={2}
               className="w-full items-stretch"
             >
-              {([
-                { key: 'immediate', label: 'ทันทีหลังส่ง', desc: 'เห็นคะแนนและคำตอบที่ถูกทันที' },
-                { key: 'score_only', label: 'แสดงคะแนน แต่ไม่แสดงคำตอบ', desc: 'เห็นคะแนนรวม แต่ซ่อนคำตอบรายข้อ' },
-                { key: 'after_due', label: 'หลังพ้นกำหนดส่ง', desc: 'ซ่อนคำตอบที่ถูกจนกว่าจะหมดเขต' },
-                { key: 'never', label: 'ไม่แสดงผลลัพธ์', desc: 'เห็นเพียงว่าส่งสำเร็จ' },
-              ] as const).map(o => (
-                <ToggleGroupItem
-                  key={o.key}
-                  value={o.key}
-                  className="min-h-10 w-full min-w-0 justify-start whitespace-normal rounded-lg border border-border px-3 py-2 aria-pressed:bg-primary/10 aria-pressed:text-foreground data-[state=on]:bg-primary/10 data-[state=on]:text-foreground"
-                >
-                  <span className="flex w-full items-center gap-3">
-                    <span className="flex min-w-0 flex-1 flex-col gap-0.5 text-left sm:flex-row sm:items-center sm:gap-4">
-                      <span className="text-sm font-medium text-foreground sm:w-64 sm:shrink-0">{o.label}</span>
-                      <span data-assignment-description className="text-xs text-muted-foreground">{o.desc}</span>
+              {RESULT_VISIBILITY_OPTIONS.map(option => (
+                <ResultVisibilityOptionHoverCard
+                  key={option.key}
+                  description={option.description}
+                  trigger={<ToggleGroupItem
+                    value={option.key}
+                    className="min-h-10 w-full min-w-0 justify-start whitespace-normal rounded-lg border border-border px-3 py-2 aria-pressed:bg-primary/10 aria-pressed:text-foreground data-[state=on]:bg-primary/10 data-[state=on]:text-foreground"
+                  >
+                    <span className="flex w-full items-center gap-3">
+                      <span className="flex min-w-0 flex-1 items-center gap-1.5 text-left">
+                        <span className="text-sm font-medium text-foreground">{option.label}</span>
+                        <CircleHelp aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+                      </span>
+                      {showResults === option.key && <Check className="mt-0.5 shrink-0 text-primary" aria-hidden="true" />}
                     </span>
-                    {showResults === o.key && <Check className="mt-0.5 shrink-0 text-primary" aria-hidden="true" />}
-                  </span>
-                </ToggleGroupItem>
+                  </ToggleGroupItem>}
+                />
               ))}
             </ToggleGroup>
           </Card>
@@ -1919,7 +1921,7 @@ export function CreateAssignmentForm({
                 ? [{ label: 'Android', value: 'ครูอนุมัติรายคน · monitored' }]
                 : []),
               ...(hasWorkImageQuestions
-                ? [{ label: 'รูปวิธีทำ', value: requireWorkImage ? 'บังคับแนบทุกข้อตัวเลข' : 'ไม่บังคับ' }]
+                ? [{ label: 'แนบรูปวิธีทำ', value: requireWorkImage ? 'บังคับแนบทุกข้อตัวเลข' : 'ไม่บังคับ' }]
                 : []),
               ...(randomValueQuestionCount > 0
                 ? [{ label: 'ตัวเลขในโจทย์สุ่ม', value: sharedRandomOn ? 'ทุกคนได้ชุดเดียวกัน' : 'แต่ละคนได้ต่างกัน' }]
