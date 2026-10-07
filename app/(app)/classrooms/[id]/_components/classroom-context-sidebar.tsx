@@ -81,7 +81,7 @@ export function ClassroomContextNavigation({
 
       <DropdownMenu>
       <div className={cn(
-        'flex items-center gap-3 rounded-2xl border p-3',
+        'flex items-center gap-3 rounded-lg border p-3',
         compact && 'md:flex-col md:gap-1 md:p-1',
         cover ? cn(cover.surface, cover.text) : 'border-primary/20 bg-primary/5',
       )} title={classroom.name}>
