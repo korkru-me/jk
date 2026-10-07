@@ -323,36 +323,42 @@ function ClassroomFormContent({
       </div>
 
       <Card padding="md" className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
+        <div className="space-y-1.5">
+          <div className="flex min-h-8 items-center gap-2">
             <p id="capacity-label" className="text-sm font-semibold text-foreground">จำกัดจำนวนที่นั่ง</p>
             <ToggleSwitch checked={values.capacityEnabled} onChange={onToggleCapacity} aria-labelledby="capacity-label" />
           </div>
           {values.capacityEnabled && (
-            <div className="flex items-end gap-2">
-              <div className="min-w-0 flex-1 space-y-1.5">
-                <Label htmlFor="max-cap" className="text-sm">จำนวนที่นั่งสูงสุด</Label>
-                <Controller
-                  control={control}
-                  name="maxCapacity"
-                  render={({ field }) => (
-                    <Input {...field} id="max-cap" type="number" min={1} max={500} className="h-10 text-center font-semibold" placeholder="30" />
-                  )}
-                />
-              </div>
-              <span className="pb-2.5 text-sm text-muted-foreground">คน</span>
+            <div className="flex items-center gap-2">
+              <Controller
+                control={control}
+                name="maxCapacity"
+                render={({ field }) => (
+                  <Input
+                    {...field}
+                    id="max-cap"
+                    aria-label="จำนวนที่นั่งสูงสุด"
+                    type="number"
+                    min={1}
+                    max={500}
+                    className="h-10 min-w-0 flex-1 text-center font-semibold"
+                    placeholder="30"
+                  />
+                )}
+              />
+              <span className="text-sm text-muted-foreground">คน</span>
             </div>
           )}
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="start-date" className="text-sm">วันเปิดคอร์ส</Label>
+          <Label htmlFor="start-date" className="flex min-h-8 items-center text-sm">วันเปิดคอร์ส</Label>
           <Controller control={control} name="startDate" render={({ field }) => (
             <Input {...field} id="start-date" type="date" className="h-10" />
           )} />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="end-date" className="text-sm">วันปิดคอร์ส</Label>
+          <Label htmlFor="end-date" className="flex min-h-8 items-center text-sm">วันปิดคอร์ส</Label>
           <Controller control={control} name="endDate" render={({ field }) => (
             <Input {...field} id="end-date" type="date" className="h-10" />
           )} />
