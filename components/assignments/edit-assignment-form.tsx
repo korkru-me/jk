@@ -134,8 +134,9 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
   const [proctoringEnabled, setProctoringEnabled] = useState(a.proctoring_enabled)
   const [fullscreenRequired, setFullscreenRequired] = useState(a.fullscreen_required)
   const [blockClipboard, setBlockClipboard] = useState(a.block_clipboard)
+  const initialRandomQuestionCount = a.random_question_count
   const [randomQuestionCount, setRandomQuestionCount] = useState(
-    a.random_question_count != null ? String(a.random_question_count) : ''
+    initialRandomQuestionCount != null ? String(initialRandomQuestionCount) : ''
   )
   const [sharedRandomValues, setSharedRandomValues] = useState(a.shared_random_seed != null)
   const [examWatermarkEnabled, setExamWatermarkEnabled] = useState(a.exam_watermark_enabled)
@@ -144,7 +145,12 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
   const [requireWorkImage, setRequireWorkImage] = useState(a.require_work_image ?? false)
   const [calculatorEnabled, setCalculatorEnabled] = useState(a.calculator_enabled ?? false)
   const [scratchpadEnabled, setScratchpadEnabled] = useState(a.scratchpad_enabled ?? false)
-  const [completionRule, setCompletionRule] = useState<CompletionRule>(a.completion_rule ?? 'fixed')
+  const requestedInitialCompletionRule = a.completion_rule ?? 'fixed'
+  const [completionRule, setCompletionRule] = useState<CompletionRule>(
+    requestedInitialCompletionRule === 'streak' && initialRandomQuestionCount == null && !hasSubmissions
+      ? 'fixed'
+      : requestedInitialCompletionRule,
+  )
   const [streakTarget, setStreakTarget] = useState(
     a.streak_target != null ? String(a.streak_target) : String(STREAK_TARGET_DEFAULT)
   )
@@ -173,6 +179,11 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
   const orderedQuestions = questionIds.map(
     id => questionsById.get(id) ?? { id, title: 'โจทย์ที่ไม่พบ', question_text: '' }
   )
+  const parsedRandomQuestionCount = Number(randomQuestionCount)
+  const randomDrawOn = randomQuestionCount.trim() !== ''
+    && Number.isInteger(parsedRandomQuestionCount)
+    && parsedRandomQuestionCount > 0
+    && parsedRandomQuestionCount < questionIds.length
 
   // Only เติมคำตอบตัวเลข has working to photograph, so the ask appears exactly
   // when this งาน holds one — and follows the list as the teacher edits it.
@@ -200,6 +211,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
   const streakBlocked = streakDecision.refusedReason
   const streakAdvice = streakBlocked ? null : streakPoolAdvice(poolQuestionTypes, streakDecision.target as number)
   const streakOffered = a.mode === 'online'
+  const streakAvailable = streakOffered && randomDrawOn
   const streakOn = completionRule === 'streak'
   // The rule and the target are what passing means, so both freeze the moment
   // anyone starts — otherwise two students' results measure different things.
@@ -211,6 +223,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
 
   function chooseCompletion(choice: 'complete' | 'threshold' | 'streak') {
     if (!canEditCompletion) return
+    if (choice === 'streak' && !streakAvailable) return
     if (choice === 'streak') {
       setCompletionRule('streak')
       setPassingEnabled(false)
@@ -688,7 +701,19 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
               min={1}
               max={Math.max(1, a.question_ids.length - 1)}
               value={randomQuestionCount}
-              onChange={event => setRandomQuestionCount(event.target.value)}
+              onChange={event => {
+                const nextValue = event.target.value
+                setRandomQuestionCount(nextValue)
+                const parsedNextValue = Number(nextValue)
+                const keepsRandomSubset = nextValue.trim() !== ''
+                  && Number.isInteger(parsedNextValue)
+                  && parsedNextValue > 0
+                  && parsedNextValue < questionIds.length
+                if (!keepsRandomSubset && completionRule === 'streak' && canEditCompletion) {
+                  setCompletionRule('fixed')
+                  setPassingEnabled(false)
+                }
+              }}
               placeholder={`ครบทั้ง ${a.question_ids.length} ข้อ`}
               disabled={hasSubmissions}
               className="max-w-[150px]"
@@ -727,20 +752,26 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
             ...(streakOffered ? [{
               key: 'streak' as const, label: 'ถูกติดกันจึงจบ', desc: 'ทำจนตอบถูกติดต่อกันครบตามที่ตั้ง ผ่านแล้วไม่เริ่มรอบใหม่',
             }] : []),
-          ]).map(opt => (
-            <button
-              key={opt.key}
-              type="button"
-              onClick={() => chooseCompletion(opt.key)}
-              disabled={!canEditCompletion}
-              className={`p-3 rounded-xl border-2 text-left transition-all ${
-                completionChoice === opt.key ? 'border-primary bg-primary/10' : 'border-border'
-              } ${canEditCompletion ? 'hover:border-ring' : 'opacity-60 cursor-not-allowed'}`}
-            >
-              <p className="font-medium text-sm text-foreground">{opt.label}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{opt.desc}</p>
-            </button>
-          ))}
+          ]).map(opt => {
+            const streakUnavailable = canEditCompletion && opt.key === 'streak' && !streakAvailable
+            const disabled = !canEditCompletion || streakUnavailable
+            return (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => chooseCompletion(opt.key)}
+                disabled={disabled}
+                className={`rounded-xl border-2 p-3 text-left transition-all ${
+                  completionChoice === opt.key ? 'border-primary bg-primary/10' : 'border-border'
+                } ${disabled ? 'cursor-not-allowed opacity-60' : 'hover:border-ring'}`}
+              >
+                <p className="text-sm font-medium text-foreground">{opt.label}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {streakUnavailable ? 'ใช้ได้เมื่อเลือกสุ่มโจทย์' : opt.desc}
+                </p>
+              </button>
+            )
+          })}
         </div>
 
         {completionChoice === 'complete' && (
@@ -823,6 +854,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
                 <div className="flex items-center gap-2 pl-3">
                   <Input
                     type="number"
+                    aria-label="จำนวนข้อสูงสุดก่อนหยุด"
                     min={STREAK_CAP_MIN}
                     max={STREAK_CAP_MAX}
                     value={streakCap}

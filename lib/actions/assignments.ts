@@ -26,7 +26,7 @@ import { canManageAssignment } from '@/lib/auth/assignment-access'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { loadAssignmentQuestionsByProvenance } from '@/lib/assignment-question-access.server'
 import { shouldClearExpiredEndAt } from '@/lib/assignment-status'
-import { completionAttemptSettings, completionChoiceFor } from '@/lib/assignment-completion'
+import { completionAttemptSettings, completionChoiceFor, streakRandomSubsetError } from '@/lib/assignment-completion'
 
 const SHOW_RESULTS_MODES: ShowResultsMode[] = ['immediate', 'score_only', 'after_due', 'never']
 
@@ -316,6 +316,9 @@ export async function createAssignment(data: CreateAssignmentData) {
     && (data.random_question_count as number) < questionIds.length
       ? data.random_question_count
       : null
+
+  const streakDeliveryError = streakRandomSubsetError(data.completion_rule, randomQuestionCount)
+  if (streakDeliveryError) return { error: streakDeliveryError }
 
   // What "จบงาน" means for this งาน. A refused streak is reported rather than
   // stored as 'fixed': a งาน that ends a different way than the teacher chose
@@ -722,6 +725,14 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
     && data.random_question_count < nextIds.length
       ? data.random_question_count
       : null
+
+  const nextRequestedCompletionRule = data.completion_rule ?? existing.completion_rule
+  const preservesLegacyFixedPoolStreak = existing.completion_rule === 'streak'
+    && existing.random_question_count === null
+    && nextRequestedCompletionRule === 'streak'
+    && randomQuestionCount === null
+  const streakDeliveryError = streakRandomSubsetError(nextRequestedCompletionRule, randomQuestionCount)
+  if (streakDeliveryError && !preservesLegacyFixedPoolStreak) return { error: streakDeliveryError }
 
   // เงื่อนไขจบงาน, resolved the same way createAssignment does it. Omitting
   // `completion_rule` leaves the stored rule and all three streak settings

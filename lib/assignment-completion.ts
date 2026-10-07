@@ -17,6 +17,20 @@ export interface CompletionAttempt {
   streak_reached?: boolean | null
 }
 
+export const STREAK_RANDOM_SUBSET_REQUIRED_ERROR = 'ถูกติดกันจึงจบใช้ได้เมื่อเลือกสุ่มโจทย์จากคลังเท่านั้น'
+
+/** Product rule: a streak is the variable-length practice flow and is offered
+ * only after the teacher chooses a random subset. Doing every selected
+ * question is the fixed-set flow and cannot be combined with a streak. */
+export function streakRandomSubsetError(
+  completionRule: string | null | undefined,
+  randomQuestionCount: number | null | undefined,
+): string | null {
+  return completionRule === 'streak' && randomQuestionCount == null
+    ? STREAK_RANDOM_SUBSET_REQUIRED_ERROR
+    : null
+}
+
 export function completionChoiceFor(assignment: Pick<CompletionAssignment, 'completion_rule' | 'passing_type' | 'passing_value'>) {
   if (assignment.completion_rule === 'streak') return 'streak'
   return assignment.passing_type && assignment.passing_value != null ? 'threshold' : 'complete'

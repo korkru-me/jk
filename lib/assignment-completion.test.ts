@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { completionAttemptLimit, completionAttemptSettings, findPassingCompletion } from './assignment-completion'
+import {
+  completionAttemptLimit,
+  completionAttemptSettings,
+  findPassingCompletion,
+  streakRandomSubsetError,
+} from './assignment-completion'
 
 const assignment = { type: 'exercise' as const, completion_rule: 'fixed', passing_type: null, passing_value: null, max_attempts: 1 }
 const failed = { status: 'graded', total_score: 6, max_score: 10, streak_reached: false }
@@ -41,5 +46,10 @@ describe('assignment completion retry policy', () => {
   it('refuses a missing or invalid passing threshold instead of silently saving complete mode', () => {
     for (const passing_value of [null, -1, 101, NaN]) expect(completionAttemptSettings({ ...threshold, passing_value }).error).not.toBeNull()
     expect(completionAttemptSettings({ ...threshold, passing_value: 0 }).error).toBeNull()
+  })
+  it('offers streak completion only for a random subset', () => {
+    expect(streakRandomSubsetError('streak', null)).toContain('สุ่มโจทย์')
+    expect(streakRandomSubsetError('streak', 5)).toBeNull()
+    expect(streakRandomSubsetError('fixed', null)).toBeNull()
   })
 })

@@ -258,9 +258,11 @@ export function CreateAssignmentForm({
   // it, which is what every งาน did before this setting existed. It lives here
   // rather than in ตั้งค่า because "ให้เด็กทำกี่ข้อ" is the thought that comes
   // immediately after ticking the last โจทย์, not three steps later.
+  const initialRandomQuestionCount = copySource
+    ? copySource.random_question_count
+    : initialSettings.random_question_count
   const [randomQuestionCount, setRandomQuestionCount] = useState(
-    (copySource ? copySource.random_question_count : initialSettings.random_question_count) != null
-      ? String(copySource ? copySource.random_question_count : initialSettings.random_question_count) : '',
+    initialRandomQuestionCount != null ? String(initialRandomQuestionCount) : '',
   )
 
   // Step 1 (คะแนน) — a question starts at the point value its own structure
@@ -332,7 +334,12 @@ export function CreateAssignmentForm({
   // values — 'fixed' + no threshold, 'fixed' + a threshold, or 'streak' — so
   // that turning a threshold on and choosing to end on a run are visibly the
   // same decision rather than two switches that can disagree.
-  const [completionRule, setCompletionRule] = useState<CompletionRule>(copySource?.completion_rule ?? initialSettings.completion_rule)
+  const requestedInitialCompletionRule = copySource?.completion_rule ?? initialSettings.completion_rule
+  const [completionRule, setCompletionRule] = useState<CompletionRule>(
+    requestedInitialCompletionRule === 'streak' && initialRandomQuestionCount == null
+      ? 'fixed'
+      : requestedInitialCompletionRule,
+  )
   const [streakTarget, setStreakTarget] = useState(
     String(copySource?.streak_target ?? initialSettings.streak_target),
   )
@@ -381,6 +388,9 @@ export function CreateAssignmentForm({
 
   function applyPreset(settings: AssignmentPresetSettings) {
     const numberDraft = (value: number | null) => value === null ? '' : String(value)
+    const presetCompletionRule = settings.completion_rule === 'streak' && settings.random_question_count === null
+      ? 'fixed'
+      : settings.completion_rule
     setDuration(numberDraft(settings.duration_minutes))
     setShuffleQ(settings.shuffle_questions)
     setShuffleA(settings.shuffle_options)
@@ -401,12 +411,12 @@ export function CreateAssignmentForm({
     setExamWatermarkEnabled(settings.exam_watermark_enabled)
     setSecureBrowserMode(settings.secure_browser_mode)
     setAndroidExamMode(settings.android_exam_mode)
-    setCompletionRule(settings.completion_rule)
+    setCompletionRule(presetCompletionRule)
     setStreakTarget(String(settings.streak_target))
     setStreakCapEnabled(settings.streak_question_cap !== null)
     setStreakCap(String(settings.streak_question_cap ?? defaultQuestionCap(settings.streak_target)))
     setStreakRecycle(settings.streak_recycle_pool)
-    setPassingEnabled(settings.passing_type !== null && settings.passing_value !== null)
+    setPassingEnabled(presetCompletionRule !== 'streak' && settings.passing_type !== null && settings.passing_value !== null)
     setPassingType(settings.passing_type ?? 'percent')
     setPassingValue(numberDraft(settings.passing_value))
     setRandomQuestionCount(numberDraft(settings.random_question_count))
@@ -525,6 +535,7 @@ export function CreateAssignmentForm({
     !Number.isInteger(Number(randomQuestionCount)) || Number(randomQuestionCount) < 1
     || Number(randomQuestionCount) >= selectedIds.length
   )
+  const streakAvailable = randomDrawOn && !randomDrawInvalid
 
   const previewQuestions = selectedIds
     .map(id => questions.find(q => q.id === id))
@@ -574,6 +585,7 @@ export function CreateAssignmentForm({
   const canRepeat = completionChoice !== 'complete' || maxAttempts !== '1'
 
   function chooseCompletion(choice: 'complete' | 'threshold' | 'streak') {
+    if (choice === 'streak' && !streakAvailable) return
     if (choice === 'streak') {
       setCompletionRule('streak')
       setPassingEnabled(false)
@@ -581,6 +593,14 @@ export function CreateAssignmentForm({
     }
     setCompletionRule('fixed')
     setPassingEnabled(choice === 'threshold')
+  }
+
+  function chooseAllQuestions() {
+    setRandomQuestionCount('')
+    if (completionRule === 'streak') {
+      setCompletionRule('fixed')
+      setPassingEnabled(false)
+    }
   }
 
   const pointValues = previewQuestions.map(q => Number.parseFloat(pointsDraft(q.id)) || 0)
@@ -592,7 +612,7 @@ export function CreateAssignmentForm({
       return title.trim().length > 0 && classroomIds.length > 0 && classrooms.length > 0
         && groupTargetsComplete(groupTargets, preselectedClassroomId ? [preselectedClassroomId] : classroomIds)
         && selectedIds.length > 0 && (!saveAsSet || questionSetTitle.trim().length > 0)
-        && !(streakOn && streakBlocked)
+        && !(streakOn && (!streakAvailable || streakBlocked))
         && !randomDrawInvalid
     }
     if (step === 1) {
@@ -1130,7 +1150,7 @@ export function CreateAssignmentForm({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
                   type="button"
-                  onClick={() => setRandomQuestionCount('')}
+                  onClick={chooseAllQuestions}
                   className={`p-3 rounded-xl border-2 text-left transition-all ${
                     !randomDrawOn ? 'border-primary bg-primary/10' : 'border-border hover:border-ring'
                   }`}
@@ -1168,7 +1188,14 @@ export function CreateAssignmentForm({
                       min={1}
                       max={maxRandomDraw}
                       value={randomQuestionCount}
-                      onChange={event => setRandomQuestionCount(event.target.value)}
+                      onChange={event => {
+                        const nextValue = event.target.value
+                        setRandomQuestionCount(nextValue)
+                        if (nextValue.trim() === '' && completionRule === 'streak') {
+                          setCompletionRule('fixed')
+                          setPassingEnabled(false)
+                        }
+                      }}
                       className="max-w-[110px]"
                     />
                     <span className="text-sm text-muted-foreground">
@@ -1225,24 +1252,28 @@ export function CreateAssignmentForm({
                   label: 'ถูกติดกันจึงจบ',
                   desc: 'ทำจนตอบถูกติดต่อกันครบตามที่ตั้ง ผ่านแล้วไม่เริ่มรอบใหม่',
                 },
-              ]).map(opt => (
-                <button
-                  key={opt.key}
-                  type="button"
-                  onClick={() => chooseCompletion(opt.key)}
-                  className={`p-3 rounded-xl border-2 text-left transition-all ${
-                    completionChoice === opt.key ? 'border-primary bg-primary/10' : 'border-border hover:border-ring'
-                  }`}
-                >
-                  <p className="font-medium text-sm text-foreground">{opt.label}</p>
-                  <p data-assignment-description className={cn(
-                    'mt-0.5 text-xs',
-                    completionChoice === opt.key ? 'text-foreground' : 'text-muted-foreground',
-                  )}>
-                    {opt.desc}
-                  </p>
-                </button>
-              ))}
+              ]).map(opt => {
+                const disabled = opt.key === 'streak' && !streakAvailable
+                return (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    onClick={() => chooseCompletion(opt.key)}
+                    disabled={disabled}
+                    className={`rounded-xl border-2 p-3 text-left transition-all ${
+                      completionChoice === opt.key ? 'border-primary bg-primary/10' : 'border-border'
+                    } ${disabled ? 'cursor-not-allowed opacity-50' : 'hover:border-ring'}`}
+                  >
+                    <p className="text-sm font-medium text-foreground">{opt.label}</p>
+                    <p data-assignment-description={disabled ? undefined : ''} className={cn(
+                      'mt-0.5 text-xs',
+                      completionChoice === opt.key ? 'text-foreground' : 'text-muted-foreground',
+                    )}>
+                      {disabled ? 'ใช้ได้เมื่อเลือกสุ่มโจทย์' : opt.desc}
+                    </p>
+                  </button>
+                )
+              })}
             </div>
 
             {completionChoice === 'complete' && (
@@ -1327,6 +1358,7 @@ export function CreateAssignmentForm({
                     <div className="flex items-center gap-2 pl-3">
                       <Input
                         type="number"
+                        aria-label="จำนวนข้อสูงสุดก่อนหยุด"
                         min={STREAK_CAP_MIN}
                         max={STREAK_CAP_MAX}
                         value={streakCap}
