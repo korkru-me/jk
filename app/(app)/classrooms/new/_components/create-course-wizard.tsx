@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useTransition, useRef, useEffect } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
 import {
-  Check, ChevronDown, ChevronRight, ChevronLeft, Clock, X, Upload, Info,
+  Check, ChevronDown, ChevronRight, ChevronLeft, Clock, Info,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -24,6 +24,7 @@ import type { ClassroomType } from '@/lib/types'
 import { Card } from '@/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ClassroomIconPicker } from '@/components/classrooms/classroom-icon-picker'
+import { ClassroomCoverUpload, type ClassroomCoverUploadHandler } from '@/components/classrooms/classroom-cover-upload'
 import { DEFAULT_CLASSROOM_ICON, classroomIconKey, isClassroomIconKey, type ClassroomIconKey } from '@/lib/classroom-icons'
 
 // ─── Static Data ──────────────────────────────────────────────────────────────
@@ -96,12 +97,13 @@ function FieldError({ message }: { message?: string }) {
 // ─── Cover Design Section ─────────────────────────────────────────────────────
 
 function CoverDesignSection({
-  cover, coverImageUrl, onCoverChange, onImageChange,
+  cover, coverImageUrl, onCoverChange, onImageChange, uploadCoverImage,
 }: {
   cover: string
   coverImageUrl: string
   onCoverChange: (id: string) => void
   onImageChange: (u: string) => void
+  uploadCoverImage?: ClassroomCoverUploadHandler
 }) {
   const [themePickerOpen, setThemePickerOpen] = useState(false)
   const selectedPreset = COVER_PRESETS.find(preset => preset.id === cover) ?? COVER_PRESETS[0]
@@ -151,77 +153,9 @@ function CoverDesignSection({
           รูปภาพหน้าปก
           <span className="ml-1 text-xs font-normal text-muted-foreground">(ไม่บังคับ)</span>
         </Label>
-        <ImageUploadZone value={coverImageUrl} onChange={onImageChange} />
+        <ClassroomCoverUpload value={coverImageUrl} onChange={onImageChange} uploadFile={uploadCoverImage} />
       </div>
     </div>
-  )
-}
-
-// ─── Image Upload Zone ────────────────────────────────────────────────────────
-
-function ImageUploadZone({ value, onChange }: { value: string; onChange: (u: string) => void }) {
-  const [isDragging, setIsDragging] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  function handleFile(file: File) {
-    if (!file.type.startsWith('image/')) { toast.error('กรุณาเลือกไฟล์รูปภาพ'); return }
-    if (file.size > 5 * 1024 * 1024) { toast.error('ไฟล์ต้องมีขนาดไม่เกิน 5MB'); return }
-    onChange(URL.createObjectURL(file))
-  }
-
-  function handleDrop(e: React.DragEvent) {
-    e.preventDefault()
-    setIsDragging(false)
-    const file = e.dataTransfer.files[0]
-    if (file) handleFile(file)
-  }
-
-  if (value) {
-    return (
-      <div className="group relative overflow-hidden rounded-lg">
-        <img src={value} alt="ภาพหน้าปกที่เลือก" className="h-16 w-full object-cover" />
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
-        <button
-          type="button"
-          onClick={() => onChange('')}
-          aria-label="นำรูปภาพหน้าปกออก"
-          className="absolute right-2 top-2 flex size-8 items-center justify-center rounded-full bg-overlay text-white transition-colors hover:bg-overlay"
-        >
-          <X className="size-4" />
-        </button>
-      </div>
-    )
-  }
-
-  return (
-    <>
-      <button
-        type="button"
-        onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
-        onDragLeave={() => setIsDragging(false)}
-        onDrop={handleDrop}
-        onClick={() => inputRef.current?.click()}
-        className={cn(
-          'flex min-h-16 w-full cursor-pointer items-center gap-3 rounded-lg border border-dashed px-3 py-2.5 transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
-          isDragging
-            ? 'border-primary bg-primary/10'
-            : 'border-border hover:border-muted-foreground/40 hover:bg-muted/30',
-        )}
-      >
-        <Upload className="size-4 shrink-0 text-muted-foreground" />
-        <span className="min-w-0 text-left">
-          <span className="block text-sm text-foreground">ลากวาง หรือ <span className="font-medium text-primary">เลือกไฟล์</span></span>
-          <span className="block text-xs text-muted-foreground">PNG, JPG, WebP · สูงสุด 5MB</span>
-        </span>
-      </button>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f) }}
-      />
-    </>
   )
 }
 
@@ -343,6 +277,7 @@ function Step0Content({
   onCoverChange,
   onIconChange,
   onCoverImageChange,
+  uploadCoverImage,
   classroomTypeLocked,
 }: {
   control: ReturnType<typeof useForm<WizardData>>['control']
@@ -352,6 +287,7 @@ function Step0Content({
   onCoverChange: (id: string) => void
   onIconChange: (key: ClassroomIconKey) => void
   onCoverImageChange: (u: string) => void
+  uploadCoverImage?: ClassroomCoverUploadHandler
   classroomTypeLocked?: boolean
 }) {
   return (
@@ -447,6 +383,7 @@ function Step0Content({
         coverImageUrl={values.coverImageUrl}
         onCoverChange={onCoverChange}
         onImageChange={onCoverImageChange}
+        uploadCoverImage={uploadCoverImage}
       />
     </div>
   )
@@ -536,6 +473,7 @@ function Step1Content({
 export interface CreateCourseWizardActions {
   createClassroom: typeof createClassroom
   duplicateClassroom: typeof duplicateClassroom
+  uploadCoverImage?: ClassroomCoverUploadHandler
   onCreated?: () => void
 }
 
@@ -596,6 +534,7 @@ export function CreateCourseWizard({
     const description = composeDescription({
       description:     data.description,
       cover:           data.cover,
+      coverImageUrl:   data.coverImageUrl,
       iconKey:         data.iconKey,
       gradeLevel:      data.gradeLevel,
       academicTerm:    data.academicTerm,
@@ -619,7 +558,7 @@ export function CreateCourseWizard({
               description,
               classroomType: data.classroomType,
             })
-        if (res?.error) {
+        if ('error' in res) {
           toast.error(res.error)
           return
         }
@@ -662,6 +601,7 @@ export function CreateCourseWizard({
             onCoverChange={(id) => setValue('cover', id)}
             onIconChange={(key) => setValue('iconKey', key, { shouldDirty: true })}
             onCoverImageChange={(u) => setValue('coverImageUrl', u)}
+            uploadCoverImage={actions?.uploadCoverImage}
             classroomTypeLocked={!!duplicateSourceId}
           />
         )}

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import {
-  Settings, Users, CalendarDays, Clock, Tag, School, Home, Info, Palette, Check, Ban,
+  Settings, Users, CalendarDays, Clock, School, Home, Info, Palette, Check, Ban,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -21,15 +21,15 @@ import { updateClassroom } from '@/lib/actions/classrooms'
 import type { Classroom } from '@/lib/types'
 import {
   composeDescription, parseDescription, GRADE_SUGGESTIONS, getTermSuggestions,
-  COVER_PRESETS, coverOf,
+  COVER_PRESETS, coverOf, coverImageOf,
   type ClassroomMeta,
 } from '@/app/(app)/classrooms/_components/classroom-meta'
-import {
-  AccessTypePicker, TagInput, CreatableCombobox,
-} from '@/app/(app)/classrooms/_components/classroom-meta-fields'
+import { AccessTypePicker, CreatableCombobox } from '@/app/(app)/classrooms/_components/classroom-meta-fields'
 import { DeleteClassroomButton } from '@/components/classrooms/delete-classroom-button'
 import { ClassroomIcon } from '@/components/classrooms/classroom-icon'
 import { ClassroomIconPicker } from '@/components/classrooms/classroom-icon-picker'
+import { ClassroomCoverUpload } from '@/components/classrooms/classroom-cover-upload'
+import { ClassroomCoverBackdrop } from '@/components/classrooms/classroom-cover-backdrop'
 
 export function ClassroomSettingsDialog({
   classroom, onCover = false, placement = 'banner',
@@ -57,6 +57,7 @@ export function ClassroomSettingsDialog({
   // Classrooms created before covers were persisted have none saved; the
   // preview stays on the neutral surface until a teacher picks one.
   const cover = coverOf(meta)
+  const coverImageUrl = coverImageOf(meta)
 
   function clearCover() {
     setMeta(prev => ({ ...prev, cover: '' }))
@@ -86,7 +87,7 @@ export function ClassroomSettingsDialog({
         name: name.trim(),
         description: composeDescription(meta),
       })
-      if (res?.error) toast.error(res.error)
+      if ('error' in res) toast.error(res.error)
       else { toast.success('บันทึกการตั้งค่าแล้ว'); setOpen(false) }
     })
   }
@@ -137,7 +138,7 @@ export function ClassroomSettingsDialog({
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">ประเภทห้องเรียน</p>
-                <p className="text-sm font-medium">{isHomeroom ? 'ห้อง Homeroom' : 'ห้องเรียนวิชา'}</p>
+                <p className="text-sm font-medium">{isHomeroom ? 'ห้อง Homeroom' : 'ห้องเรียน'}</p>
               </div>
             </div>
             <div>
@@ -161,12 +162,15 @@ export function ClassroomSettingsDialog({
             </Label>
             <div
               className={cn(
-                'h-20 rounded-2xl border-2 flex items-center px-5 transition-colors',
-                cover ? `${cover.surface} ${cover.text}` : 'bg-muted border-border text-muted-foreground',
+                'relative h-20 overflow-hidden rounded-2xl border-2 flex items-center px-5 transition-colors',
+                coverImageUrl
+                  ? 'border-surface-inverse-border bg-surface-inverse text-surface-inverse-foreground'
+                  : cover ? `${cover.surface} ${cover.text}` : 'bg-muted border-border text-muted-foreground',
               )}
             >
-              <ClassroomIcon iconKey={meta.iconKey} className="mr-3 size-7 shrink-0" />
-              <p className="font-bold text-lg truncate">{name || 'ชื่อห้องเรียน'}</p>
+              <ClassroomCoverBackdrop imageUrl={coverImageUrl} cover={cover} />
+              <ClassroomIcon iconKey={meta.iconKey} className="relative z-10 mr-3 size-7 shrink-0" />
+              <p className="relative z-10 font-bold text-lg truncate">{name || 'ชื่อห้องเรียน'}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <IconButton
@@ -201,6 +205,17 @@ export function ClassroomSettingsDialog({
                   </button>
                 )
               })}
+            </div>
+            <div className="space-y-1.5">
+              <Label>
+                รูปภาพหน้าปก
+                <span className="ml-1 text-xs font-normal text-muted-foreground">(ไม่บังคับ)</span>
+              </Label>
+              <ClassroomCoverUpload
+                value={meta.coverImageUrl}
+                onChange={url => set('coverImageUrl', url)}
+                disabled={isPending}
+              />
             </div>
           </div>
 
@@ -255,14 +270,6 @@ export function ClassroomSettingsDialog({
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <Label className="flex items-center gap-1.5">
-                <Tag className="w-3.5 h-3.5 text-muted-foreground" />
-                แท็กรายวิชา
-                <span className="text-xs text-muted-foreground font-normal">(ไม่บังคับ)</span>
-              </Label>
-              <TagInput tags={meta.tags} onChange={t => set('tags', t)} />
-            </div>
           </div>
 
           {/* ── Enrollment ── */}

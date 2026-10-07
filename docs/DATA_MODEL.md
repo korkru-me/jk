@@ -41,7 +41,7 @@ Invariant สำคัญ:
 
 ## ห้องเรียน
 
-- `classrooms` — owner teacher, type, class code และ lifecycle · `display_order` คือลำดับห้องรายวิชาที่เจ้าของลากจัดเอง; ห้องที่ `pinned_at` ไม่ว่างอยู่นอกลำดับนี้และต้องเลิกปักหมุดก่อนลาก · `reorder_my_classrooms(uuid[])` ตรวจเจ้าของ สถานะ active ชนิด subject รายการครบ และไม่รับห้องปักหมุด ก่อนอัปเดตทั้งลำดับใน transaction เดียว · archive ถูกเลิกใช้แล้ว migration `20260929054543` ย้ายแถว legacy ไป `deleted` โดยคงข้อมูลไว้ในถังขยะ · `purge_expired_classrooms()` ทำงานด้วย `pg_cron` ทุกวันและลบห้องที่อยู่ในถังขยะเกิน 30 วันพร้อมข้อมูลลูกแบบ cascade
+- `classrooms` — owner teacher, type, class code และ lifecycle · `description` เก็บ metadata การนำเสนอเดิม รวม `รูปหน้าปก: <public URL>` (UI-034) โดย codec กลาง parse/compose ให้ห้องเก่า round-trip ได้; object อยู่ใน `question-images/{teacher_id}/classroom-cover_*` ไม่เพิ่มคอลัมน์ใหม่ · `display_order` คือลำดับห้องรายวิชาที่เจ้าของลากจัดเอง; ห้องที่ `pinned_at` ไม่ว่างอยู่นอกลำดับนี้และต้องเลิกปักหมุดก่อนลาก · `reorder_my_classrooms(uuid[])` ตรวจเจ้าของ สถานะ active ชนิด subject รายการครบ และไม่รับห้องปักหมุด ก่อนอัปเดตทั้งลำดับใน transaction เดียว · archive ถูกเลิกใช้แล้ว migration `20260929054543` ย้ายแถว legacy ไป `deleted` โดยคงข้อมูลไว้ในถังขยะ · `purge_expired_classrooms()` ทำงานด้วย `pg_cron` ทุกวันและลบห้องที่อยู่ในถังขยะเกิน 30 วันพร้อมข้อมูลลูกแบบ cascade
 - `classroom_students` — roster · `roster_order` คือลำดับนักเรียนที่ครูลากจัดในตารางคะแนน ใช้ร่วมกันในห้องและยังคงอยู่หลังรีเฟรช; แถวที่ยังไม่มีค่าจะต่อท้ายตามชื่อ
 - `classroom_co_teachers` — ครูร่วมและ permission
 - `classroom_groups` — กลุ่มย่อยในห้อง (ชื่อไม่เกิน 60 ตัวอักษร, `color` เป็น id ของสีหน้าปกห้องเรียน, `position` คือลำดับที่ครูลากเรียง) · `classroom_group_members` — หนึ่งแถวต่อ (ห้อง, นักเรียน) → กลุ่ม **นักเรียนอยู่ได้ไม่เกินหนึ่งกลุ่มต่อห้อง** (PK `(classroom_id, student_id)`) · FK คู่ `(group_id, classroom_id)` บังคับให้กลุ่มเป็นของห้องเดียวกัน และ `(classroom_id, student_id)` → `classroom_students` ON DELETE CASCADE ออกจากห้อง = หลุดจากกลุ่ม · RLS: เจ้าของห้องและผู้ช่วยสอนทุกสิทธิ์อ่านได้ เขียนได้เฉพาะเจ้าของและ `admin`/`manage` · นักเรียนไม่อ่านสองตารางนี้ตรง (migration `20260926232639`)
@@ -189,7 +189,7 @@ Notification body ต้องไม่เปิดเผยข้อมูล�
 
 | bucket | ลิมิต | ชนิดที่รับ | ใครเขียน |
 | --- | --- | --- | --- |
-| `question-images` | 10 MB | PNG, JPEG, WebP, GIF, PDF | `question-image-upload.tsx` (รูปโจทย์), `question-file-upload.tsx` (ไฟล์อ้างอิงของโจทย์ส่งไฟล์งาน ซึ่งมัก **เป็น PDF** จึงตัดชนิดนี้ออกไม่ได้) และ `solution-attachments-field.tsx` (ไฟล์เฉลย: รูปไม่เกิน 2 MB หลังย่อ, PDF ไม่เกิน 5 MB, รูปจากกระดานเขียนเฉลย) |
+| `question-images` | 10 MB | PNG, JPEG, WebP, GIF, PDF | `question-image-upload.tsx` (รูปโจทย์), `question-file-upload.tsx` (ไฟล์อ้างอิงของโจทย์ส่งไฟล์งาน ซึ่งมัก **เป็น PDF** จึงตัดชนิดนี้ออกไม่ได้), `solution-attachments-field.tsx` (ไฟล์เฉลย: รูปไม่เกิน 2 MB หลังย่อ, PDF ไม่เกิน 5 MB, รูปจากกระดานเขียนเฉลย) และ `classroom-cover-upload.tsx` (รูปหน้าปก PNG/JPEG/WebP ไม่เกิน 5 MB) |
 | `work-images` | 5 MB | PNG, JPEG, WebP | `work-image-upload.tsx` — นักเรียนถ่ายรูปวิธีทำ 1 รูปต่อข้อย่อย ผ่าน signed target ที่ Server Action อนุญาต |
 | `submission-files` | 10 MB | PNG, JPEG, WebP, PDF | `file-submission-upload.tsx` — ไฟล์คำตอบของนักเรียน ผ่าน signed target ที่ Server Action อนุญาต |
 | `classroom-post-files` | 10 MB | รูป (PNG/JPEG/WebP/GIF), PDF, Word, Excel, PowerPoint, txt/csv, zip | `post-attach.tsx` — ไฟล์แนบในประกาศห้องเรียน |

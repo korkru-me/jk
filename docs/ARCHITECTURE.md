@@ -56,6 +56,8 @@ App shell มี contextual sidebar registry ฝั่ง client ที่ผู
 
 ตาม UI-028/UI-031 `ShellClient` วัดกึ่งกลาง element `data-notification-anchor` ใน Topbar ด้วย `ResizeObserver` แล้วเก็บระยะจากขอบขวาไว้ใน CSS custom property ของ shell; selector ที่จำกัดเฉพาะ direct child `.assignment-create-stage` และ `.classroom-create-stage` คำนวณ `max-width` จาก content box กับค่านี้ จึงตรึงขอบขวาไว้ที่กระดิ่งโดยอัตโนมัติเมื่อ sidebar/viewport/topbar actions เปลี่ยน และไม่กระทบหน้าชนิดอื่นหรือ mobile breakpoint
 
+ตาม UI-034 browser ย่อรูปหน้าปกแล้วอัปโหลดไป `question-images/{teacher_id}/classroom-cover_*` จากนั้น wizard/settings เขียน public URL ผ่าน codec `classroom-meta.ts` ลง `classrooms.description`; mutation ตรวจ origin, bucket, owner และรูปแบบ path ซ้ำฝั่ง server ก่อนบันทึก ส่วน card/detail/settings อ่านผ่าน validator เดียวกันและใช้ `ClassroomCoverBackdrop` ร่วมกัน สำเนาห้องอ้าง object เดิมโดยไม่คัดลอกไฟล์ และ orphan sweep จึงรวม reference จาก description ก่อนลบไฟล์
+
 ### Browser
 
 ใช้ `lib/supabase/client.ts` ซึ่งรับเฉพาะ public URL และ anon key ห้าม import service-role client เข้า Client Component

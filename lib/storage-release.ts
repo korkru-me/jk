@@ -22,7 +22,10 @@ export async function releaseQuestionFiles(
     const candidates = new Set<string>()
     for (const row of rows) {
       for (const path of extractStoragePaths(JSON.stringify(row) ?? '', 'question-images')) {
-        if (path.startsWith(prefix)) candidates.add(path)
+        // A classroom cover shares this bucket, but deleting a question must
+        // never opportunistically delete it. The scheduled sweep checks both
+        // questions and classroom descriptions before removing cover files.
+        if (path.startsWith(prefix) && !path.startsWith(`${prefix}classroom-cover_`)) candidates.add(path)
       }
     }
     if (candidates.size === 0) return

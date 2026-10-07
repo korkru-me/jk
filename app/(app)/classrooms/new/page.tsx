@@ -41,6 +41,7 @@ export default async function NewClassroomPage({
       name: `${source.name} (สำเนา)`,
       description: meta.description,
       cover: meta.cover,
+      coverImageUrl: meta.coverImageUrl,
       iconKey: meta.iconKey,
       gradeLevel: meta.gradeLevel,
       academicTerm: meta.academicTerm,

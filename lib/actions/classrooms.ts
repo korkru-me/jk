@@ -6,6 +6,8 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { getMyOrgId } from '@/lib/actions/org'
 import type { Assignment } from '@/lib/types'
+import { parseDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
+import { isClassroomCoverUrl } from '@/lib/classroom-cover'
 
 function generateClassCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -20,11 +22,23 @@ async function getAuthUser() {
   return user
 }
 
+function validateClassroomDescription(description: string, ownerId: string): { description: string } | { error: string } {
+  const normalized = description.trim()
+  const coverImageUrl = parseDescription(normalized).coverImageUrl
+  if (coverImageUrl && !isClassroomCoverUrl(coverImageUrl, { ownerId })) {
+    return { error: 'รูปหน้าปกไม่ถูกต้อง กรุณาอัปโหลดใหม่จากหน้าสร้างห้องเรียน' }
+  }
+  return { description: normalized }
+}
+
 // ── Create ─────────────────────────────────────────────────────────────────
 
 export async function createClassroom(data: { name: string; description: string; classroomType?: 'subject' | 'homeroom' }) {
   const user = await getAuthUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+
+  const checkedDescription = validateClassroomDescription(data.description, user.id)
+  if ('error' in checkedDescription) return checkedDescription
 
   const orgId = await getMyOrgId()
   if (!orgId) return { error: 'ไม่พบข้อมูลสถาบัน กรุณาติดต่อผู้ดูแล' }
@@ -43,7 +57,7 @@ export async function createClassroom(data: { name: string; description: string;
     org_id: orgId,
     teacher_id: user.id,
     name: data.name,
-    description: data.description || null,
+    description: checkedDescription.description || null,
     class_code: classCode,
     status: 'active',
     classroom_type: data.classroomType ?? 'subject',
@@ -132,6 +146,8 @@ export async function duplicateClassroom(
   const name = overrides?.name.trim() || `${source.name} (สำเนา)`
   if (name.length > 100) return { error: 'ชื่อห้องเรียนไม่เกิน 100 ตัวอักษร' }
   const description = overrides ? overrides.description.trim() : source.description
+  const checkedDescription = validateClassroomDescription(description ?? '', user.id)
+  if ('error' in checkedDescription) return checkedDescription
 
   let classCode = generateClassCode()
   for (let i = 0; i < 5; i++) {
@@ -158,7 +174,7 @@ export async function duplicateClassroom(
       org_id: source.org_id,
       teacher_id: user.id,
       name,
-      description: description || null,
+      description: checkedDescription.description || null,
       class_code: classCode,
       status: 'active',
       classroom_type: source.classroom_type,
@@ -233,13 +249,15 @@ export async function updateClassroom(id: string, data: { name: string; descript
 
   const name = data.name.trim()
   if (!name) return { error: 'กรุณากรอกชื่อห้องเรียน' }
+  const checkedDescription = validateClassroomDescription(data.description, user.id)
+  if ('error' in checkedDescription) return checkedDescription
 
   const admin = createAdminClient()
   // `.eq('teacher_id')` is the authorization check: a non-owner matches no row,
   // so `updated` comes back empty rather than the update silently succeeding.
   const { data: updated, error } = await admin
     .from('classrooms')
-    .update({ name, description: data.description.trim() || null })
+    .update({ name, description: checkedDescription.description || null })
     .eq('id', id)
     .eq('teacher_id', user.id)
     .select('id')

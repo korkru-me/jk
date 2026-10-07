@@ -6,11 +6,12 @@ import { Users, BookOpen, Check, Copy, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { withBackHref } from '@/lib/back-link'
 import type { Classroom } from '@/lib/types'
-import { parseDescription, coverOf } from './classroom-meta'
+import { parseDescription, coverOf, coverImageOf } from './classroom-meta'
 import { IconButton } from '@/components/ui/icon-button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { ClassroomIcon } from '@/components/classrooms/classroom-icon'
+import { ClassroomCoverBackdrop } from '@/components/classrooms/classroom-cover-backdrop'
 
 interface Props {
   classroom: Classroom
@@ -32,6 +33,7 @@ export function ClassroomCard({
   const isHomeroom = classroom.classroom_type === 'homeroom'
   const meta = parseDescription(classroom.description)
   const savedCover = coverOf(meta)
+  const coverImageUrl = coverImageOf(meta)
   const shownDescription = meta.description
   const gradeLevel = meta.gradeLevel
   const academicTerm = meta.academicTerm
@@ -42,11 +44,14 @@ export function ClassroomCard({
       <div
         className={cn(
           'relative flex h-16 items-center px-4',
-          savedCover
-            ? `border-b-2 ${savedCover.surface} ${savedCover.text}`
-            : 'border-b border-border bg-muted text-foreground',
+          coverImageUrl
+            ? 'border-b border-surface-inverse-border bg-surface-inverse text-surface-inverse-foreground'
+            : savedCover
+              ? `border-b-2 ${savedCover.surface} ${savedCover.text}`
+              : 'border-b border-border bg-muted text-foreground',
         )}
       >
+        <ClassroomCoverBackdrop imageUrl={coverImageUrl} cover={savedCover} />
         {/* Checkbox overlay in selection mode */}
         {isSelecting && (
           <div
@@ -59,7 +64,7 @@ export function ClassroomCard({
           </div>
         )}
         {dragHandle}
-        <div className={cn('min-w-0 flex-1', (isSelecting || dragHandle) && 'ml-10')}>
+        <div className={cn('relative z-10 min-w-0 flex-1', (isSelecting || dragHandle) && 'ml-10')}>
           <div className="flex min-w-0 items-center gap-2">
             <ClassroomIcon iconKey={meta.iconKey} className="size-5 shrink-0" />
             <p className="truncate text-base font-bold leading-tight">
@@ -70,7 +75,7 @@ export function ClassroomCard({
           {(gradeLevel || academicTerm || shownDescription) && <p
             className={cn(
               'mt-1 flex min-w-0 items-center gap-1.5 text-xs font-medium',
-              savedCover ? savedCover.textMuted : 'text-muted-foreground',
+              coverImageUrl ? 'text-surface-inverse-muted' : savedCover ? savedCover.textMuted : 'text-muted-foreground',
             )}
           >
             {gradeLevel && <span className="shrink-0"><span className="sr-only">ระดับชั้น </span>{gradeLevel}</span>}
@@ -85,7 +90,7 @@ export function ClassroomCard({
           </p>}
         </div>
         <div className={cn(
-          'pointer-events-none absolute inset-0 transition-colors',
+          'pointer-events-none absolute inset-0 z-20 transition-colors',
           isSelecting && isSelected ? 'bg-primary/15' : 'bg-foreground/0 group-hover:bg-foreground/5'
         )} />
       </div>

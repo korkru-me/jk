@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { CLASSROOM_ICON_OPTIONS, classroomIconKey } from './classroom-icons'
-import { composeDescription, displayDescription, EMPTY_META, parseDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
+import { composeDescription, coverImageOf, displayDescription, EMPTY_META, parseDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
 
 describe('optional classroom icon metadata', () => {
   const legacy = 'เรียนรู้ร่วมกัน\nหน้าปก: blue · ระดับ: ม.4 · ภาคเรียน: 1/2569 · แท็ก: วิชา, เสริม · การเข้าร่วม: ต้องอนุมัติ · ที่นั่ง: 40 คน · เปิด: 2026-05-01 · ปิด: 2026-10-01'
@@ -55,5 +55,17 @@ describe('optional classroom icon metadata', () => {
       expect(classroomIconKey(parseDescription(raw).iconKey)).toBe('school')
       expect(displayDescription(raw)).toBe('')
     }
+  })
+
+  it('round-trips the optional cover image without showing its URL as classroom copy', () => {
+    const coverImageUrl = 'https://school.supabase.co/storage/v1/object/public/question-images/teacher-1/classroom-cover_123_abcd.webp'
+    const raw = composeDescription({ ...EMPTY_META, description: 'ห้องทดลอง', coverImageUrl })
+
+    expect(parseDescription(raw).coverImageUrl).toBe(coverImageUrl)
+    expect(displayDescription(raw)).toBe('ห้องทดลอง\nการเข้าร่วม: เปิดรับอิสระ')
+  })
+
+  it('does not expose an untrusted cover image for rendering', () => {
+    expect(coverImageOf({ ...EMPTY_META, coverImageUrl: 'https://attacker.example/cover.webp' })).toBeNull()
   })
 })
