@@ -44,16 +44,24 @@ export const ACCESS_TYPES = [
 ]
 
 export function AccessTypePicker({
-  value, onChange, columns = 3, compact = false,
+  value, onChange, columns = 3, compact = false, includeClosed = true,
 }: {
   value: AccessType
   onChange: (v: AccessType) => void
-  columns?: 1 | 3
+  columns?: 1 | 2 | 3
   compact?: boolean
+  includeClosed?: boolean
 }) {
+  const options = includeClosed ? ACCESS_TYPES : ACCESS_TYPES.filter(type => type.value !== 'closed')
+
   return (
-    <div className={cn('grid grid-cols-1', compact ? 'gap-2' : 'gap-3', columns === 3 && 'sm:grid-cols-3')}>
-      {ACCESS_TYPES.map((type) => {
+    <div className={cn(
+      'grid grid-cols-1',
+      compact ? 'gap-2' : 'gap-3',
+      columns === 2 && 'sm:grid-cols-2',
+      columns === 3 && 'sm:grid-cols-3',
+    )}>
+      {options.map((type) => {
         const isSelected = value === type.value
         const Icon = type.Icon
         return (

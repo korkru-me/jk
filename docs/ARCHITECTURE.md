@@ -58,6 +58,8 @@ App shell มี contextual sidebar registry ฝั่ง client ที่ผู
 
 ตาม UI-034 browser ย่อรูปหน้าปกแล้วอัปโหลดไป `question-images/{teacher_id}/classroom-cover_*` จากนั้น wizard/settings เขียน public URL ผ่าน codec `classroom-meta.ts` ลง `classrooms.description`; mutation ตรวจ origin, bucket, owner และรูปแบบ path ซ้ำฝั่ง server ก่อนบันทึก ส่วน card/detail/settings อ่านผ่าน validator เดียวกันและใช้ `ClassroomCoverBackdrop` ร่วมกัน สำเนาห้องอ้าง object เดิมโดยไม่คัดลอกไฟล์ และ orphan sweep จึงรวม reference จาก description ก่อนลบไฟล์
 
+ตาม UI-035 `CreateCourseWizard` ใช้ `react-hook-form` instance เดียวตลอดฟอร์มหน้าเดียวและตรวจ schema รวมกับเงื่อนไขจำนวนที่นั่ง/ลำดับวันก่อน mutation โดยไม่เปลี่ยน payload หรือ codec เดิม · `AccessTypePicker` รับ `includeClosed`; create/duplicate ส่ง `false` ขณะที่ settings ใช้ค่าเริ่มต้น `true` จึงยังแก้ห้องเดิมเป็น `closed` ได้ และ duplicate ที่รับ metadata `closed` จะ normalize เป็น `open` เฉพาะค่าเริ่มต้นของห้องใหม่
+
 ### Browser
 
 ใช้ `lib/supabase/client.ts` ซึ่งรับเฉพาะ public URL และ anon key ห้าม import service-role client เข้า Client Component

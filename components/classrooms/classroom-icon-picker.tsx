@@ -42,7 +42,7 @@ export function ClassroomIconPicker({ value, onValueChange, disabled = false, co
             aria-describedby={descriptionId}
             variant="primary"
             className={compact
-              ? 'mt-2 grid w-full grid-cols-5 items-stretch gap-x-0 gap-y-1 sm:grid-cols-7 md:grid-cols-9'
+              ? 'mt-2 grid w-full grid-cols-5 items-stretch gap-x-0 gap-y-1 sm:grid-cols-7 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-7'
               : 'mt-3 grid w-full grid-cols-5 items-stretch gap-x-0 gap-y-1 sm:grid-cols-7'}
           >
             {CLASSROOM_ICON_OPTIONS.map(option => (

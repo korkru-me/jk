@@ -1,13 +1,11 @@
 'use client'
 
-import { useState, useTransition, useEffect } from 'react'
+import { useState, useTransition } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
-import {
-  Check, ChevronDown, ChevronRight, ChevronLeft, Clock, Info,
-} from 'lucide-react'
+import { Check, ChevronDown, Clock, Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -67,21 +65,6 @@ const DEFAULT_VALUES: WizardData = {
   endDate:         '',
 }
 
-const STEPS = [
-  { id: 0, label: 'หน้าปกและข้อมูล' },
-  { id: 1, label: 'การเข้าร่วม' },
-]
-
-const STEP_FIELDS: Record<number, (keyof WizardData)[]> = {
-  0: ['name'],
-  1: [],
-}
-
-function canProceed(step: number, values: WizardData): boolean {
-  if (step === 0) return values.name.trim().length > 0
-  return true
-}
-
 // ─── Primitive Sub-components ─────────────────────────────────────────────────
 
 function FieldError({ message }: { message?: string }) {
@@ -97,10 +80,12 @@ function FieldError({ message }: { message?: string }) {
 // ─── Cover Design Section ─────────────────────────────────────────────────────
 
 function CoverDesignSection({
-  cover, coverImageUrl, onCoverChange, onImageChange, uploadCoverImage,
+  iconKey, cover, coverImageUrl, onIconChange, onCoverChange, onImageChange, uploadCoverImage,
 }: {
+  iconKey: ClassroomIconKey
   cover: string
   coverImageUrl: string
+  onIconChange: (key: ClassroomIconKey) => void
   onCoverChange: (id: string) => void
   onImageChange: (u: string) => void
   uploadCoverImage?: ClassroomCoverUploadHandler
@@ -109,7 +94,9 @@ function CoverDesignSection({
   const selectedPreset = COVER_PRESETS.find(preset => preset.id === cover) ?? COVER_PRESETS[0]
 
   return (
-    <div className="grid gap-4 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <ClassroomIconPicker value={iconKey} onValueChange={onIconChange} compact />
+
       <div className="space-y-1.5">
         <Label className="text-sm font-medium">ธีมสี</Label>
         <Collapsible open={themePickerOpen} onOpenChange={setThemePickerOpen}>
@@ -159,61 +146,7 @@ function CoverDesignSection({
   )
 }
 
-// ─── Step Indicator (clickable completed steps) ───────────────────────────────
-
-function StepIndicator({
-  current,
-  onStepClick,
-}: {
-  current: number
-  onStepClick: (step: number) => void
-}) {
-  return (
-    <div className="flex items-start justify-center">
-      {STEPS.map((step, idx) => {
-        const done = current > step.id
-        const active = current === step.id
-
-        return (
-          <div key={step.id} className="flex items-center">
-            <div className="flex flex-col items-center gap-1">
-              <button
-                type="button"
-                disabled={!done}
-                onClick={() => done && onStepClick(step.id)}
-                className={cn(
-                  'flex size-7 items-center justify-center rounded-full border-2 text-xs font-semibold transition-colors',
-                  done
-                    ? 'cursor-pointer border-primary bg-primary text-primary-foreground hover:bg-primary/90 dark:border-primary dark:bg-primary'
-                    : active
-                    ? 'border-primary text-primary bg-primary/10 dark:border-primary'
-                    : 'border-border text-muted-foreground bg-background cursor-default',
-                )}
-                title={done ? `กลับไปขั้นตอน: ${step.label}` : undefined}
-              >
-                {done ? <Check className="size-3.5" /> : String(step.id + 1)}
-              </button>
-              <span className={cn(
-                'hidden whitespace-nowrap text-[11px] font-medium sm:block',
-                active ? 'text-primary' : done ? 'text-primary/70 dark:text-primary/60' : 'text-muted-foreground',
-              )}>
-                {step.label}
-              </span>
-            </div>
-            {idx < STEPS.length - 1 && (
-              <div className={cn(
-                'mx-1.5 mb-4 h-px w-10 transition-colors sm:w-16',
-                current > step.id ? 'bg-primary dark:bg-primary' : 'bg-border',
-              )} />
-            )}
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-// ─── Step 0: Cover Design & Metadata ─────────────────────────────────────────
+// ─── Classroom form ──────────────────────────────────────────────────────────
 
 function ClassroomTypeSection({
   value, onChange, disabled = false,
@@ -269,7 +202,7 @@ function ClassroomTypeSection({
   )
 }
 
-function Step0Content({
+function ClassroomFormContent({
   control,
   errors,
   values,
@@ -278,6 +211,7 @@ function Step0Content({
   onIconChange,
   onCoverImageChange,
   uploadCoverImage,
+  onToggleCapacity,
   classroomTypeLocked,
 }: {
   control: ReturnType<typeof useForm<WizardData>>['control']
@@ -288,11 +222,12 @@ function Step0Content({
   onIconChange: (key: ClassroomIconKey) => void
   onCoverImageChange: (u: string) => void
   uploadCoverImage?: ClassroomCoverUploadHandler
+  onToggleCapacity: (v: boolean) => void
   classroomTypeLocked?: boolean
 }) {
   return (
     <div className="space-y-4">
-      <h2 className="text-sm font-semibold text-foreground">หน้าปกและข้อมูลห้องเรียน</h2>
+      <h2 className="text-sm font-semibold text-foreground">ข้อมูลห้องเรียน</h2>
 
       <ClassroomTypeSection
         value={values.classroomType}
@@ -376,33 +311,19 @@ function Step0Content({
         </div>
       </div>
 
-      <ClassroomIconPicker value={values.iconKey} onValueChange={onIconChange} compact />
-
       <CoverDesignSection
+        iconKey={values.iconKey}
         cover={values.cover}
         coverImageUrl={values.coverImageUrl}
+        onIconChange={onIconChange}
         onCoverChange={onCoverChange}
         onImageChange={onCoverImageChange}
         uploadCoverImage={uploadCoverImage}
       />
-    </div>
-  )
-}
 
-// ─── Step 1: Enrollment & Lifecycle ──────────────────────────────────────────
-
-function Step1Content({
-  control,
-  values,
-  onToggleCapacity,
-}: {
-  control: ReturnType<typeof useForm<WizardData>>['control']
-  values: WizardData
-  onToggleCapacity: (v: boolean) => void
-}) {
-  return (
-    <div className="space-y-4">
-      <h2 className="text-sm font-semibold text-foreground">การเข้าร่วมและระยะเวลา</h2>
+      <div className="border-t border-border pt-4">
+        <h2 className="text-sm font-semibold text-foreground">การเข้าร่วมและระยะเวลา</h2>
+      </div>
 
       <div className="space-y-1.5">
         <Label className="text-sm font-medium">ประเภทการเข้าร่วม</Label>
@@ -410,58 +331,62 @@ function Step1Content({
           control={control}
           name="accessType"
           render={({ field }) => (
-            <AccessTypePicker value={field.value} onChange={field.onChange} compact />
+            <AccessTypePicker
+              value={field.value}
+              onChange={field.onChange}
+              columns={2}
+              compact
+              includeClosed={false}
+            />
           )}
         />
       </div>
 
-      <Card padding="md" className="space-y-4">
-        <div className="flex items-center justify-between gap-4">
-          <div className="min-w-0">
-            <p id="capacity-label" className="text-sm font-semibold text-foreground">จำกัดจำนวนที่นั่ง</p>
-            <p className="text-xs text-muted-foreground">ปิดรับอัตโนมัติเมื่อครบจำนวน</p>
-          </div>
-          <ToggleSwitch checked={values.capacityEnabled} onChange={onToggleCapacity} aria-labelledby="capacity-label" />
-        </div>
-        {values.capacityEnabled && (
-          <div className="flex flex-wrap items-end gap-2 border-t border-border pt-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="max-cap" className="text-sm">จำนวนที่นั่งสูงสุด</Label>
-              <Controller
-                control={control}
-                name="maxCapacity"
-                render={({ field }) => (
-                  <Input {...field} id="max-cap" type="number" min={1} max={500} className="h-10 w-28 text-center font-semibold" placeholder="30" />
-                )}
-              />
+      <Card padding="md" className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p id="capacity-label" className="text-sm font-semibold text-foreground">จำกัดจำนวนที่นั่ง</p>
+              <p className="text-xs text-muted-foreground">ปิดรับอัตโนมัติเมื่อครบจำนวน</p>
             </div>
-            <span className="pb-2.5 text-sm text-muted-foreground">คน</span>
+            <ToggleSwitch checked={values.capacityEnabled} onChange={onToggleCapacity} aria-labelledby="capacity-label" />
           </div>
-        )}
-
-        <div className="space-y-3 border-t border-border pt-3">
-          <p className="text-sm font-semibold text-foreground">ระยะเวลาของห้องเรียน</p>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="start-date" className="text-sm">วันเปิดคอร์ส</Label>
-              <Controller control={control} name="startDate" render={({ field }) => (
-                <Input {...field} id="start-date" type="date" className="h-10" />
-              )} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="end-date" className="text-sm">วันปิดคอร์ส</Label>
-              <Controller control={control} name="endDate" render={({ field }) => (
-                <Input {...field} id="end-date" type="date" className="h-10" />
-              )} />
-            </div>
-          </div>
-          {(values.startDate || values.endDate) && (
-            <div className="flex items-start gap-2 rounded-lg border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
-              <Clock className="mt-0.5 size-3.5 shrink-0" />
-              <p>เมื่อถึงวันปิดคอร์ส ระบบจะเปลี่ยนเป็น <strong>Read-only</strong> — นักเรียนดูประวัติได้แต่ส่งคำตอบไม่ได้</p>
+          {values.capacityEnabled && (
+            <div className="flex items-end gap-2">
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <Label htmlFor="max-cap" className="text-sm">จำนวนที่นั่งสูงสุด</Label>
+                <Controller
+                  control={control}
+                  name="maxCapacity"
+                  render={({ field }) => (
+                    <Input {...field} id="max-cap" type="number" min={1} max={500} className="h-10 text-center font-semibold" placeholder="30" />
+                  )}
+                />
+              </div>
+              <span className="pb-2.5 text-sm text-muted-foreground">คน</span>
             </div>
           )}
         </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="start-date" className="text-sm">วันเปิดคอร์ส</Label>
+          <Controller control={control} name="startDate" render={({ field }) => (
+            <Input {...field} id="start-date" type="date" className="h-10" />
+          )} />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="end-date" className="text-sm">วันปิดคอร์ส</Label>
+          <Controller control={control} name="endDate" render={({ field }) => (
+            <Input {...field} id="end-date" type="date" className="h-10" />
+          )} />
+        </div>
+
+        {(values.startDate || values.endDate) && (
+          <div className="flex items-start gap-2 rounded-lg border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning lg:col-span-3">
+            <Clock className="mt-0.5 size-3.5 shrink-0" />
+            <p>เมื่อถึงวันปิดคอร์ส ระบบจะเปลี่ยนเป็น <strong>Read-only</strong> — นักเรียนดูประวัติได้แต่ส่งคำตอบไม่ได้</p>
+          </div>
+        )}
       </Card>
     </div>
   )
@@ -486,19 +411,27 @@ export function CreateCourseWizard({
   initialValues?: Partial<WizardData>
   actions?: CreateCourseWizardActions
 }) {
-  const [currentStep, setCurrentStep] = useState(0)
   const [isPending, startTransition] = useTransition()
+
+  const initialAccessType = initialValues?.accessType === 'closed'
+    ? DEFAULT_VALUES.accessType
+    : initialValues?.accessType
 
   const form = useForm<WizardData>({
     resolver: zodResolver(wizardSchema),
-    defaultValues: { ...DEFAULT_VALUES, ...initialValues, iconKey: classroomIconKey(initialValues?.iconKey) },
+    defaultValues: {
+      ...DEFAULT_VALUES,
+      ...initialValues,
+      accessType: initialAccessType ?? DEFAULT_VALUES.accessType,
+      iconKey: classroomIconKey(initialValues?.iconKey),
+    },
     mode: 'onTouched',
   })
 
   const { control, watch, setValue, formState: { errors } } = form
   const values = watch()
 
-  const isNextEnabled = canProceed(currentStep, values) && !isPending
+  const canSubmit = values.name.trim().length > 0 && !isPending
 
   function validateEnrollment() {
     if (values.capacityEnabled && (!values.maxCapacity || Number(values.maxCapacity) < 1)) {
@@ -512,20 +445,9 @@ export function CreateCourseWizard({
     return true
   }
 
-  async function handleNext() {
-    const valid = await form.trigger(STEP_FIELDS[currentStep])
+  async function handleSubmit() {
+    const valid = await form.trigger()
     if (!valid) return
-    if (currentStep === 1 && !validateEnrollment()) return
-    setCurrentStep((prev) => prev + 1)
-  }
-
-  function handleBack() { setCurrentStep((prev) => prev - 1) }
-
-  function handleStepClick(step: number) {
-    if (step < currentStep) setCurrentStep(step)
-  }
-
-  function handleSubmit() {
     if (!validateEnrollment()) return
     const data = values
 
@@ -579,76 +501,40 @@ export function CreateCourseWizard({
 
   return (
     <div data-classroom-create-wizard className="w-full">
-      <header className="flex flex-col gap-3 border-b border-border pb-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-lg font-bold text-foreground">
-            {duplicateSourceId ? 'ตรวจสอบข้อมูลสำเนาห้องเรียน' : 'สร้างห้องเรียนใหม่'}
-          </h1>
-          <p className="text-xs text-muted-foreground">ขั้นตอน {currentStep + 1} จาก {STEPS.length}</p>
-        </div>
-        <div className="self-center sm:self-auto">
-          <StepIndicator current={currentStep} onStepClick={handleStepClick} />
-        </div>
+      <header className="border-b border-border pb-3">
+        <h1 className="text-lg font-bold text-foreground">
+          {duplicateSourceId ? 'ตรวจสอบข้อมูลสำเนาห้องเรียน' : 'สร้างห้องเรียนใหม่'}
+        </h1>
       </header>
 
       <div className="py-4">
-        {currentStep === 0 && (
-          <Step0Content
-            control={control}
-            errors={errors}
-            values={values}
-            onClassroomTypeChange={(v) => setValue('classroomType', v)}
-            onCoverChange={(id) => setValue('cover', id)}
-            onIconChange={(key) => setValue('iconKey', key, { shouldDirty: true })}
-            onCoverImageChange={(u) => setValue('coverImageUrl', u)}
-            uploadCoverImage={actions?.uploadCoverImage}
-            classroomTypeLocked={!!duplicateSourceId}
-          />
-        )}
-        {currentStep === 1 && (
-          <Step1Content
-            control={control}
-            values={values}
-            onToggleCapacity={(v) => setValue('capacityEnabled', v)}
-          />
-        )}
+        <ClassroomFormContent
+          control={control}
+          errors={errors}
+          values={values}
+          onClassroomTypeChange={(v) => setValue('classroomType', v)}
+          onCoverChange={(id) => setValue('cover', id)}
+          onIconChange={(key) => setValue('iconKey', key, { shouldDirty: true })}
+          onCoverImageChange={(u) => setValue('coverImageUrl', u)}
+          uploadCoverImage={actions?.uploadCoverImage}
+          onToggleCapacity={(v) => setValue('capacityEnabled', v)}
+          classroomTypeLocked={!!duplicateSourceId}
+        />
       </div>
 
-      <footer className="flex items-center justify-between border-t border-border pt-4">
-        <div>
-          {currentStep > 0 && (
-            <Button type="button" variant="outline" onClick={handleBack} disabled={isPending}>
-              <ChevronLeft className="mr-1 size-4" />
-              ย้อนกลับ
-            </Button>
-          )}
-        </div>
-
-        <div className="flex items-center gap-3">
-          {currentStep < STEPS.length - 1 ? (
-            <Button
-              type="button"
-              onClick={handleNext}
-              disabled={!isNextEnabled}
-              title={!isNextEnabled ? 'กรุณากรอกข้อมูลที่จำเป็นให้ครบก่อน' : undefined}
-            >
-              ถัดไป
-              <ChevronRight className="ml-1 size-4" />
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              onClick={handleSubmit}
-              disabled={!isNextEnabled}
-              className="min-w-40 bg-success text-success-foreground hover:bg-success/90 disabled:bg-success/40"
-            >
-              <Check className="mr-1.5 size-4" />
-              {isPending
-                ? 'กำลังสร้างห้องเรียน...'
-                : duplicateSourceId ? 'ยืนยันสร้างสำเนา' : 'ยืนยันสร้างห้องเรียน'}
-            </Button>
-          )}
-        </div>
+      <footer className="flex justify-end border-t border-border pt-4">
+        <Button
+          type="button"
+          onClick={handleSubmit}
+          disabled={!canSubmit}
+          title={!canSubmit ? 'กรุณากรอกข้อมูลที่จำเป็นให้ครบก่อน' : undefined}
+          className="min-w-40 bg-success text-success-foreground hover:bg-success/90 disabled:bg-success/40"
+        >
+          <Check className="mr-1.5 size-4" />
+          {isPending
+            ? 'กำลังสร้างห้องเรียน...'
+            : duplicateSourceId ? 'ยืนยันสร้างสำเนา' : 'ยืนยันสร้างห้องเรียน'}
+        </Button>
       </footer>
     </div>
   )
