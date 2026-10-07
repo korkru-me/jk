@@ -59,7 +59,7 @@ export function ClassroomCard({
           </div>
         )}
         {dragHandle}
-        <div className={cn('relative z-10 min-w-0 flex-1', (isSelecting || dragHandle) && 'ml-10')}>
+        <div className={cn('pointer-events-none relative min-w-0 flex-1', (isSelecting || dragHandle) && 'ml-10')}>
           <div className="flex min-w-0 items-center gap-2">
             <ClassroomIcon iconKey={meta.iconKey} className="size-5 shrink-0" />
             <p className="truncate text-base font-bold leading-tight">
