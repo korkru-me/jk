@@ -19,6 +19,7 @@ import {
   CompletionRuleCard,
   completionRuleInputClassName,
 } from '@/components/assignments/completion-rule-card'
+import { CompletionThresholdUnitMenu } from '@/components/assignments/completion-threshold-unit-menu'
 import type { Assignment, CompletionRule, Question, RetryScope, ScoreStrategy, ShowResultsMode } from '@/lib/types'
 import {
   STREAK_TARGET_DEFAULT, STREAK_TARGET_MAX, STREAK_TARGET_MIN, STREAK_CAP_MAX, STREAK_CAP_MIN,
@@ -789,8 +790,8 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
             description={`นักเรียนทำ${assignmentNoun}ซ้ำได้โดยไม่จำกัดจำนวนครั้ง จนได้คะแนนถึงเกณฑ์ที่กำหนด จึงถือว่าทำ${assignmentNoun}เสร็จ`}
             onSelect={() => chooseCompletion('threshold')}
           >
-            <div className="flex flex-wrap items-center gap-1 text-sm font-medium text-foreground">
-              <span>ผ่านเกณฑ์</span>
+            <div className="flex flex-nowrap items-center gap-1 text-sm font-medium text-foreground">
+              <span className="whitespace-nowrap">ผ่านเกณฑ์</span>
               <Input
                 type="number"
                 min={0}
@@ -803,20 +804,14 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
                 aria-label="ค่าเกณฑ์ผ่าน"
                 className={completionRuleInputClassName}
               />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  chooseCompletion('threshold')
-                  setPassingType(passingType === 'percent' ? 'score' : 'percent')
-                }}
+              <CompletionThresholdUnitMenu
+                value={passingType}
                 disabled={!canEditCompletion}
-                aria-label={`เปลี่ยนหน่วยเกณฑ์ผ่าน ปัจจุบันเป็น${passingType === 'percent' ? 'เปอร์เซ็นต์' : 'คะแนน'}`}
-                className="pointer-events-auto h-8 min-w-8 px-2 text-xs"
-              >
-                {passingType === 'percent' ? '%' : 'คะแนน'}
-              </Button>
+                onValueChange={value => {
+                  chooseCompletion('threshold')
+                  setPassingType(value)
+                }}
+              />
             </div>
           </CompletionRuleCard>
 

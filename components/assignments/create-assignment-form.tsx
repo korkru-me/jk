@@ -21,6 +21,7 @@ import {
   CompletionRuleCard,
   completionRuleInputClassName,
 } from '@/components/assignments/completion-rule-card'
+import { CompletionThresholdUnitMenu } from '@/components/assignments/completion-threshold-unit-menu'
 import { Button, buttonVariants } from '@/components/ui/button'
 import {
   Collapsible,
@@ -1274,8 +1275,8 @@ export function CreateAssignmentForm({
                 description={`นักเรียนทำ${assignmentNoun}ซ้ำได้โดยไม่จำกัดจำนวนครั้ง จนได้คะแนนถึงเกณฑ์ที่กำหนด จึงถือว่าทำ${assignmentNoun}เสร็จ`}
                 onSelect={() => chooseCompletion('threshold')}
               >
-                <div className="flex flex-wrap items-center gap-1 text-sm font-medium text-foreground">
-                  <span>ผ่านเกณฑ์</span>
+                <div className="flex flex-nowrap items-center gap-1 text-sm font-medium text-foreground">
+                  <span className="whitespace-nowrap">ผ่านเกณฑ์</span>
                   <Input
                     type="number"
                     min={0}
@@ -1287,19 +1288,13 @@ export function CreateAssignmentForm({
                     aria-label="ค่าเกณฑ์ผ่าน"
                     className={completionRuleInputClassName}
                   />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
+                  <CompletionThresholdUnitMenu
+                    value={passingType}
+                    onValueChange={value => {
                       chooseCompletion('threshold')
-                      setPassingType(passingType === 'percent' ? 'score' : 'percent')
+                      setPassingType(value)
                     }}
-                    aria-label={`เปลี่ยนหน่วยเกณฑ์ผ่าน ปัจจุบันเป็น${passingType === 'percent' ? 'เปอร์เซ็นต์' : 'คะแนน'}`}
-                    className="pointer-events-auto h-8 min-w-8 px-2 text-xs"
-                  >
-                    {passingType === 'percent' ? '%' : 'คะแนน'}
-                  </Button>
+                  />
                 </div>
               </CompletionRuleCard>
 
