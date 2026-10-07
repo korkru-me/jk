@@ -81,6 +81,11 @@ import {
 } from '@/components/assignments/seb-quit-password-settings'
 import { cn } from '@/lib/utils'
 import { THAI_TIME_ZONE } from '@/lib/thai-time'
+import {
+  INSTANT_CHECK_SETTING_DESCRIPTION,
+  INSTANT_CHECK_SETTING_LABEL,
+  InstantCheckSettingLabel,
+} from '@/components/assignments/instant-check-setting-label'
 
 const QuestionPicker = dynamic(
   () => import('@/components/assignments/question-picker').then(mod => mod.QuestionPicker),
@@ -1440,8 +1445,9 @@ export function CreateAssignmentForm({
               // rest rather than among the shuffles. Never offered to a ข้อสอบ:
               // one ส่งคำตอบ at the end is what a ข้อสอบ is.
               ...(assignmentType === 'exercise' && !streakOn ? [{
-                label: 'ให้นักเรียนกดตรวจทีละข้อ',
-                desc: 'ทำข้อไหนเสร็จก็กดส่งเฉพาะข้อนั้น รู้ผลทันทีว่าถูกหรือผิด แล้วแก้ตรงนั้นได้เลย — คะแนนคิดจากคำตอบสุดท้ายตอนส่งงาน',
+                label: INSTANT_CHECK_SETTING_LABEL,
+                desc: INSTANT_CHECK_SETTING_DESCRIPTION,
+                descriptionOnHover: true,
                 value: instantCheck,
                 set: setInstantCheck,
                 footer: (instantCheck ? (
@@ -1546,8 +1552,14 @@ export function CreateAssignmentForm({
               <div key={opt.label} className="space-y-1.5">
                 <label className="flex min-h-10 items-center justify-between rounded-xl border border-border px-3 py-2 cursor-pointer transition-colors hover:border-ring">
                   <div>
-                    <p className="text-sm font-medium text-foreground">{opt.label}</p>
-                    <p data-assignment-description className="text-xs text-muted-foreground">{opt.desc}</p>
+                    <p className="text-sm font-medium text-foreground">
+                      {'descriptionOnHover' in opt && opt.descriptionOnHover
+                        ? <InstantCheckSettingLabel />
+                        : opt.label}
+                    </p>
+                    {!('descriptionOnHover' in opt && opt.descriptionOnHover) && (
+                      <p data-assignment-description className="text-xs text-muted-foreground">{opt.desc}</p>
+                    )}
                   </div>
                   <input
                     type="checkbox"

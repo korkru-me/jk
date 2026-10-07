@@ -37,6 +37,7 @@ import type { BankQuestion } from '@/lib/question-bank'
 import { questionExcerpt } from '@/lib/question-display'
 import { SebQuitPasswordSettings } from '@/components/assignments/seb-quit-password-settings'
 import type { SebQuitPasswordSetupState } from '@/lib/seb-quit-password-service.server'
+import { InstantCheckSettingLabel } from '@/components/assignments/instant-check-setting-label'
 
 function toLocalInputValue(iso: string | null): string {
   if (!iso) return ''
@@ -1127,11 +1128,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
                   <CircleCheck className="w-4 h-4 text-primary" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-foreground">ให้นักเรียนกดตรวจทีละข้อ</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    ทำข้อไหนเสร็จก็กดส่งเฉพาะข้อนั้น รู้ผลทันทีว่าถูกหรือผิด แล้วแก้ตรงนั้นได้เลย
-                    คะแนนยังคิดจากคำตอบสุดท้ายตอนกดส่งงาน · มีผลกับการทำครั้งใหม่และครั้งที่กำลังทำอยู่
-                  </p>
+                  <p className="text-sm font-medium text-foreground"><InstantCheckSettingLabel /></p>
                 </div>
               </div>
               <input
