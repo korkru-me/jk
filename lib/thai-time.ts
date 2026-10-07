@@ -14,6 +14,8 @@
 
 export const THAI_TIME_ZONE = 'Asia/Bangkok'
 
+const THAI_LOCAL_DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/
+
 type DateInput = Date | string | number
 
 /** The fields that name a day — no clock time can slip into a date-only label. */
@@ -66,4 +68,33 @@ export function thaiDateStamp(value: DateInput = new Date()): string {
  */
 export function startOfThaiDay(value: DateInput = new Date()): Date {
   return new Date(`${thaiDateStamp(value)}T00:00:00+07:00`)
+}
+
+/** Convert a datetime-local control value on the product's Thai clock into a
+ * real instant. Thailand has no daylight-saving transitions, so +07:00 is
+ * stable and avoids interpreting the value in the browser or server zone. */
+export function thaiLocalDateTimeToIso(value: string | null | undefined): string | null {
+  const local = value?.trim() ?? ''
+  if (!local) return null
+  if (!THAI_LOCAL_DATE_TIME.test(local)) return null
+  const date = new Date(`${local}:00+07:00`)
+  return Number.isFinite(date.getTime()) ? date.toISOString() : null
+}
+
+/** Format an instant for a datetime-local control on the Thai clock. */
+export function toThaiLocalDateTimeInput(value: DateInput | null | undefined): string {
+  if (value == null || value === '') return ''
+  const date = new Date(value)
+  if (!Number.isFinite(date.getTime())) return ''
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: THAI_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date)
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find(item => item.type === type)?.value
+  return `${part('year')}-${part('month')}-${part('day')}T${part('hour')}:${part('minute')}`
 }

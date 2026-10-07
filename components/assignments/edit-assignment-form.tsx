@@ -46,6 +46,11 @@ import {
   RESULT_VISIBILITY_OPTIONS,
   ResultVisibilityOptionHoverCard,
 } from '@/components/assignments/result-visibility-options'
+import {
+  LateSubmissionScheduleFields,
+  type LateBandDraft,
+} from '@/components/assignments/late-submission-schedule-fields'
+import { thaiLocalDateTimeToIso, toThaiLocalDateTimeInput } from '@/lib/thai-time'
 
 const CALCULATOR_SETTING_DESCRIPTION =
   'เปิดให้นักเรียนใช้เครื่องคิดเลขวิทยาศาสตร์ภายในเว็บไซต์ระหว่างทำแบบฝึกหัดหรือข้อสอบ'
@@ -55,13 +60,6 @@ const WORK_IMAGE_SETTING_DESCRIPTION =
   'สำหรับโจทย์เติมคำตอบตัวเลข นักเรียนต้องแนบรูปแสดงวิธีทำก่อนจึงจะส่งคำตอบได้ โดยผู้สอนต้องตรวจวิธีทำจากรูปที่แนบด้วยตนเอง'
 const SHARED_RANDOM_VALUES_SETTING_DESCRIPTION =
   'กำหนดให้โจทย์ประเภทสุ่มตัวเลขใช้ตัวเลขชุดเดียวกันสำหรับนักเรียนทุกคน'
-
-function toLocalInputValue(iso: string | null): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
 
 interface Props {
   assignment: EditableAssignment
@@ -85,6 +83,8 @@ export type EditableAssignment = Pick<
   | 'question_points'
   | 'display_max_score'
   | 'start_at'
+  | 'due_at'
+  | 'late_bands'
   | 'end_at'
   | 'duration_minutes'
   | 'max_attempts'
@@ -135,8 +135,15 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
 
   const [title, setTitle] = useState(a.title)
   const [description, setDescription] = useState(a.description ?? '')
-  const [startAt, setStartAt] = useState(toLocalInputValue(a.start_at))
-  const [endAt, setEndAt] = useState(toLocalInputValue(a.end_at))
+  const [startAt, setStartAt] = useState(toThaiLocalDateTimeInput(a.start_at))
+  const [dueAt, setDueAt] = useState(toThaiLocalDateTimeInput(a.due_at))
+  const [endAt, setEndAt] = useState(toThaiLocalDateTimeInput(a.end_at))
+  const [lateBands, setLateBands] = useState<LateBandDraft[]>(() => a.late_bands.map(band => ({
+    id: band.id,
+    startsAt: toThaiLocalDateTimeInput(band.starts_at),
+    label: band.label,
+    color: band.color,
+  })))
   const [durationMinutes, setDurationMinutes] = useState(a.duration_minutes ? String(a.duration_minutes) : '')
   const [maxAttempts, setMaxAttempts] = useState(
     a.max_attempts ? String(a.max_attempts) : a.type === 'exam' ? '1' : ''
@@ -338,8 +345,17 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
       const res = await updateAssignment(a.id, {
         title: title.trim(),
         description,
-        start_at: startAt || null,
-        end_at: endAt || null,
+        start_at: thaiLocalDateTimeToIso(startAt),
+        end_at: thaiLocalDateTimeToIso(endAt),
+        ...(!hasSubmissions ? {
+          due_at: thaiLocalDateTimeToIso(dueAt),
+          late_bands: lateBands.map(band => ({
+            id: band.id,
+            starts_at: thaiLocalDateTimeToIso(band.startsAt) ?? band.startsAt,
+            label: band.label,
+            color: band.color,
+          })),
+        } : {}),
         duration_minutes: durationMinutes ? Number(durationMinutes) : null,
         max_attempts: completionChoice === 'complete' && maxAttempts ? Number(maxAttempts) : null,
         score_strategy: completionChoice === 'complete' ? scoreStrategy : 'best',
@@ -1091,15 +1107,21 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
         <h2 className="font-semibold text-foreground flex items-center gap-2">
           <Calendar className="w-4 h-4 text-muted-foreground" /> กำหนดการ
         </h2>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1.5">
+        <div className="space-y-4">
+          <div className="max-w-md space-y-1.5">
             <Label htmlFor="edit-sat">เปิดรับตั้งแต่</Label>
             <Input id="edit-sat" type="datetime-local" value={startAt} onChange={e => setStartAt(e.target.value)} />
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="edit-eat">ปิดรับเมื่อ</Label>
-            <Input id="edit-eat" type="datetime-local" value={endAt} onChange={e => setEndAt(e.target.value)} />
-          </div>
+          <LateSubmissionScheduleFields
+            idPrefix="edit-schedule"
+            dueAt={dueAt}
+            endAt={endAt}
+            bands={lateBands}
+            disabled={hasSubmissions}
+            onDueAtChange={setDueAt}
+            onEndAtChange={setEndAt}
+            onBandsChange={setLateBands}
+          />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="edit-duration" className="flex items-center gap-1.5">

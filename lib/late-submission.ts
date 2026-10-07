@@ -155,6 +155,16 @@ export interface CompletedSubmissionTime {
   submitted_at: string | null
 }
 
+export interface StudentCompletedSubmissionTime extends CompletedSubmissionTime {
+  student_id: string
+}
+
+export interface StudentTimingExtension {
+  student_id: string
+  extended_due_at?: string | null
+  extended_end_at?: string | null
+}
+
 /** Later retries never move an on-time student into a late colour group. */
 export function firstCompletedSubmissionAt(
   submissions: readonly CompletedSubmissionTime[],
@@ -250,4 +260,50 @@ export function classifySubmissionTiming(input: SubmissionTimingInput): Submissi
   }
   if (!band) return { status: 'unclassified', submittedAt: submitted.iso }
   return { status: 'late', submittedAt: submitted.iso, effectiveDueAt: effectiveDue.iso, band }
+}
+
+interface ClassifySubmissionTimingsByStudentInput {
+  dueAt: string | null
+  endAt: string | null
+  bands: readonly AssignmentLateBand[]
+  submissions: readonly StudentCompletedSubmissionTime[]
+  extensions?: readonly StudentTimingExtension[]
+}
+
+/** One shared definition for the results filter and the mutation boundary.
+ * The first completed attempt fixes the student's colour, while a personal
+ * extension shifts the schedule without changing its labels or colours. */
+export function classifySubmissionTimingsByStudent(
+  input: ClassifySubmissionTimingsByStudentInput,
+): Map<string, SubmissionTiming> {
+  const byStudent = new Map<string, StudentCompletedSubmissionTime[]>()
+  for (const submission of input.submissions) {
+    const rows = byStudent.get(submission.student_id) ?? []
+    rows.push(submission)
+    byStudent.set(submission.student_id, rows)
+  }
+  const extensions = new Map((input.extensions ?? []).map(extension => [extension.student_id, extension]))
+  const result = new Map<string, SubmissionTiming>()
+  for (const [studentId, submissions] of byStudent) {
+    const extension = extensions.get(studentId)
+    result.set(studentId, classifySubmissionTiming({
+      dueAt: input.dueAt,
+      endAt: input.endAt,
+      bands: input.bands,
+      submittedAt: firstCompletedSubmissionAt(submissions),
+      extendedDueAt: extension?.extended_due_at,
+      extendedEndAt: extension?.extended_end_at,
+    }))
+  }
+  return result
+}
+
+export function studentIdsForLateColor(
+  timings: ReadonlyMap<string, SubmissionTiming>,
+  color: LateBandColorId,
+): string[] {
+  return Array.from(timings.entries())
+    .filter(([, timing]) => timing.status === 'late' && timing.band.color === color)
+    .map(([studentId]) => studentId)
+    .sort()
 }

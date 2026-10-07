@@ -5,7 +5,13 @@ import { canManageAssignment } from '@/lib/auth/assignment-access'
 import { notFound, redirect } from 'next/navigation'
 import type { Question } from '@/lib/types'
 import { officialSubmissionsByStudent, rescaleToDisplayMax } from '@/lib/scoring'
-import { ResultsClient, type SubmittedRow, type AnswerRow } from './_components/results-client'
+import { classifySubmissionTimingsByStudent, type AssignmentLateBand } from '@/lib/late-submission'
+import {
+  ResultsClient,
+  type SubmittedRow,
+  type AnswerRow,
+  type ScoreAdjustmentBatchRow,
+} from './_components/results-client'
 
 export const metadata = { title: 'ผลคะแนน — KorKru' }
 
@@ -27,7 +33,7 @@ export default async function ResultsPage({
   // assignments_co_teacher_all) already scopes this to owner or co-teacher.
   const assignmentQuery = supabase
     .from('assignments')
-    .select('title, question_ids, score_strategy, display_max_score, passing_type, passing_value, completion_rule, streak_target, classrooms(name)')
+    .select('title, org_id, question_ids, score_strategy, display_max_score, passing_type, passing_value, completion_rule, streak_target, due_at, late_bands, end_at, classrooms(name)')
     .eq('id', id)
     .maybeSingle()
 
@@ -52,7 +58,7 @@ export default async function ResultsPage({
   const [{ data: submissions }, { data: questionRows }] = await Promise.all([
     admin
       .from('submissions')
-      .select('id, student_id, status, total_score, max_score, submitted_at, started_at, attempt_number, current_streak, best_streak, streak_reached, users!submissions_student_id_fkey(full_name, email)')
+      .select('id, student_id, status, total_score, score_adjustment, max_score, submitted_at, started_at, attempt_number, current_streak, best_streak, streak_reached, users!submissions_student_id_fkey(full_name, email)')
       .eq('assignment_id', id),
     supabase
       .from('questions')
@@ -100,13 +106,61 @@ export default async function ResultsPage({
         .in('student_id', studentIds)
     : Promise.resolve({ data: [] })
 
+  const extensionRowsQuery = studentIds.length > 0
+    ? admin
+        .from('assignment_extensions')
+        .select('student_id, extended_due_at, extended_end_at')
+        .eq('assignment_id', id)
+        .in('student_id', studentIds)
+    : Promise.resolve({ data: [] })
+
+  const adjustmentBatchesQuery = admin
+    .from('assignment_score_adjustment_batches')
+    .select('id, color, adjustment, reason, affected_count, changed_by, created_at')
+    .eq('assignment_id', id)
+    .order('created_at', { ascending: false })
+    .limit(12)
+
   // Answer details and roster sort metadata are independent once the
   // official attempts are known, so do not make one wait for the other.
-  const [{ data: answerRows }, { data: profileRows }] = await Promise.all([
+  const [
+    { data: answerRows },
+    { data: profileRows },
+    { data: extensionRows },
+    { data: adjustmentBatchRows },
+  ] = await Promise.all([
     answerRowsQuery,
     profileRowsQuery,
+    extensionRowsQuery,
+    adjustmentBatchesQuery,
   ])
   const profiles = Object.fromEntries((profileRows ?? []).map((p: any) => [p.student_id, p]))
+
+  const actorIds = [...new Set((adjustmentBatchRows ?? []).map((batch: any) => batch.changed_by as string))]
+  const { data: actorRows } = actorIds.length > 0
+    ? await admin.from('users').select('id, full_name, email').in('id', actorIds)
+    : { data: [] }
+  const actors = new Map((actorRows ?? []).map((actor: any) => [actor.id, actor]))
+  const adjustmentBatches: ScoreAdjustmentBatchRow[] = (adjustmentBatchRows ?? []).map((batch: any) => ({
+    ...batch,
+    changed_by_name: actors.get(batch.changed_by)?.full_name ?? actors.get(batch.changed_by)?.email ?? 'ผู้สอน',
+  }))
+
+  const timingByStudent = classifySubmissionTimingsByStudent({
+    dueAt: assignment.due_at,
+    endAt: assignment.end_at,
+    bands: (assignment.late_bands ?? []) as AssignmentLateBand[],
+    submissions: (submissions ?? []) as Array<{
+      student_id: string
+      status: 'in_progress' | 'submitted' | 'graded'
+      submitted_at: string | null
+    }>,
+    extensions: extensionRows ?? [],
+  })
+  const submittedWithTiming = submitted.map(row => ({
+    ...row,
+    timing: timingByStudent.get(row.student_id) ?? { status: 'not_submitted' as const },
+  }))
 
   const inProgressCount = (submissions ?? []).filter((s: any) => s.status === 'in_progress').length
 
@@ -120,11 +174,12 @@ export default async function ResultsPage({
       completionRule={assignment.completion_rule === 'streak' ? 'streak' : 'fixed'}
       streakTarget={assignment.streak_target ?? null}
       questions={orderedQuestions}
-      submitted={submitted}
+      submitted={submittedWithTiming}
       answers={(answerRows ?? []) as AnswerRow[]}
       profiles={profiles}
       inProgressCount={inProgressCount}
       initialPendingOnly={pending === '1'}
+      adjustmentBatches={adjustmentBatches}
     />
   )
 }

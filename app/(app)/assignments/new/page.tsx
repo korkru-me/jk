@@ -106,7 +106,7 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
   const copySourceQuery = copyParam
     ? supabase
         .from('assignments')
-        .select('id, org_id, created_by, title, description, question_ids, question_points, display_max_score, sections, show_sections, start_at, end_at, duration_minutes, type, shuffle_questions, shuffle_options, shared_random_seed, random_question_count, show_results, show_solutions, max_attempts, score_strategy, retry_scope, questions_per_page, instant_check, instant_check_answer_key, completion_rule, streak_target, streak_question_cap, streak_recycle_pool, access_code, passing_type, passing_value, require_work_image, calculator_enabled, scratchpad_enabled, proctoring_enabled, fullscreen_required, block_clipboard, exam_watermark_enabled, secure_browser_mode, android_exam_mode')
+        .select('id, org_id, created_by, title, description, question_ids, question_points, display_max_score, sections, show_sections, start_at, due_at, late_bands, end_at, duration_minutes, type, shuffle_questions, shuffle_options, shared_random_seed, random_question_count, show_results, show_solutions, max_attempts, score_strategy, retry_scope, questions_per_page, instant_check, instant_check_answer_key, completion_rule, streak_target, streak_question_cap, streak_recycle_pool, access_code, passing_type, passing_value, require_work_image, calculator_enabled, scratchpad_enabled, proctoring_enabled, fullscreen_required, block_clipboard, exam_watermark_enabled, secure_browser_mode, android_exam_mode')
         .eq('id', copyParam)
         .maybeSingle()
     : Promise.resolve({ data: null })

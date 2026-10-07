@@ -65,7 +65,7 @@ export default async function AssignmentDetailPage({
     loadAssignmentQuestionsByProvenance(a),
     admin
       .from('submissions')
-      .select('id, student_id, status, total_score, max_score, submitted_at, started_at, attempt_number, users!submissions_student_id_fkey(full_name)')
+      .select('id, student_id, status, total_score, score_adjustment, max_score, submitted_at, started_at, attempt_number, users!submissions_student_id_fkey(full_name)')
       .eq('assignment_id', id)
       .order('submitted_at', { ascending: false }),
     admin

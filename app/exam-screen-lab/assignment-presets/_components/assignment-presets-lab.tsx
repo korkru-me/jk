@@ -46,7 +46,7 @@ function copiedAssignment(type: AssignmentType): AssignmentCopyPreset {
     title: 'งานต้นฉบับจำลอง', description: 'คำอธิบายจำลองที่ชุดการตั้งค่าห้ามทับ',
     question_ids: questions.map(question => question.id), question_points: { [questions[0].id]: 7 },
     display_max_score: 20, sections: [], show_sections: true,
-    start_at: '2026-10-08T02:00:00.000Z', end_at: '2026-10-10T09:00:00.000Z',
+    start_at: '2026-10-08T02:00:00.000Z', due_at: null, late_bands: [], end_at: '2026-10-10T09:00:00.000Z',
     duration_minutes: 7, type, shared_random_seed: null, random_question_count: null,
     streak_target: null, streak_question_cap: null, access_code: 'LAB-ONLY',
   }

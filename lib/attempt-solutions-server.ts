@@ -59,7 +59,7 @@ export async function loadSolutionRelease(
       .maybeSingle(),
     fetchAllRows((from, to) => admin
       .from('submissions')
-      .select('id, status, attempt_number, started_at, total_score, max_score, streak_reached')
+      .select('id, status, attempt_number, started_at, total_score, score_adjustment, max_score, streak_reached')
       .eq('assignment_id', assignment.id)
       .eq('student_id', studentId)
       .order('attempt_number').range(from, to)),

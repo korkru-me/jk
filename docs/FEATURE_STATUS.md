@@ -1,13 +1,18 @@
 # Feature status
 
-### สถานะส่งช้าตามช่วงสี — เฟส 0–1 (7 ตุลาคม 2026)
+### สถานะส่งช้าตามช่วงสี — โค้ดครบเฟส 0–4 (7 ตุลาคม 2026)
 
 - **เฟส 0 ตรวจ migration แล้ว:** ฐานหลักยังขาด local-only SEB 12 เวอร์ชันเดิมตามที่บันทึกเมื่อ 6 ตุลาคม ไม่พบ mismatch ชุดใหม่ ทั้ง 12 ตัวเป็น rollout เฉพาะ Staging/QA และไม่ควร apply หรือ repair เข้า Production แบบเหมารวม เจ้าของอนุมัติให้เฟส 1 สร้าง migration อิสระโดยไม่แตะรายการเหล่านี้และยังไม่ apply Production
-- **เฟส 1 ทำฐานข้อมูลและกติกากลางแล้ว แต่ยังไม่มี UI:** เพิ่ม `assignments.due_at` เป็นเส้นแบ่งตรงเวลา, `late_bands` สูงสุด 8 ช่วงพร้อม id/เวลา/label/สี และ `assignment_extensions.extended_due_at` แบบ optional ส่วน `end_at` ยังคงเป็นเวลาปิดรับจริง งานเก่า default เป็นไม่มี policy จึงไม่เกิดป้ายย้อนหลัง
+- **เฟส 1 ทำฐานข้อมูลและกติกากลางแล้ว:** เพิ่ม `assignments.due_at` เป็นเส้นแบ่งตรงเวลา, `late_bands` สูงสุด 8 ช่วงพร้อม id/เวลา/label/สี และ `assignment_extensions.extended_due_at` แบบ optional ส่วน `end_at` ยังคงเป็นเวลาปิดรับจริง งานเก่า default เป็นไม่มี policy จึงไม่เกิดป้ายย้อนหลัง
 - ช่วงแรกเริ่มตรงวันส่ง สีซ้ำหลายช่วงได้เพื่อรองรับตัวกรองสีเดียวและการปรับคะแนนกลุ่มในเฟสถัดไป การส่งตรงขอบวันส่งยังตรงเวลา ส่วนขอบช่วงถัดไปยังอยู่สีเดิมเพราะความหมายคือ “เกินเวลานี้” ระบบใช้เวลาส่งสำเร็จครั้งแรกของนักเรียนเพื่อไม่ให้ retry เปลี่ยนกลุ่ม และเลื่อนทุกช่วงตาม personal due extension; extension รุ่นเก่าที่มี timestamp เดียวยังถือว่าตรงเวลาจนถึงกำหนดส่วนตัว
 - CHECK ของฐานปฏิเสธ shape/สี/id/ลำดับ/ขอบเวลาที่ผิด และ trigger ล็อก due/ช่วงสีหลัง attempt แรกโดยยังให้ขยาย hard close ได้ Server Action ตรวจค่าซ้ำและคืนข้อความไทยก่อนเขียน ส่วน helper จำแนก `not_submitted`, `unclassified`, `on_time`, `late` และ `after_close` โดยยังไม่แตะคะแนนหรือสร้างการหักคะแนนอัตโนมัติ
-- ตรวจ focused domain/SQL 23 เคส, unit test ทั้งระบบ 210 ไฟล์ / 2,848 เคส และ design-token lint ผ่าน; webpack production compile ผ่าน แต่ repo-wide `npx tsc --noEmit` และขั้น type-check ของ build ยังหยุดที่ TypeScript errors เดิมใน `create-classroom-modal.tsx` กับ `create-classroom-form.tsx` ซึ่งไม่เกี่ยวกับเฟสนี้ โดยไม่อ่านหรือเขียนฐานข้อมูลที่ deploy แล้ว
-- Migration `20261007145225_assignment_late_submission_bands.sql` ยัง **ไม่ apply บน Staging หรือ Production** และต้อง rollout แบบระบุไฟล์หลังตรวจ project/ledger เดิม ไม่ใช้ `db push` ที่จะพา SEB 12 ตัวตามไปด้วย เฟส 2 จึงค่อยเพิ่มเส้นเวลาและตัวเลือกสีในหน้าสร้าง/แก้ไขงาน
+- ตรวจ focused domain/SQL/action 43 เคส, unit test ทั้งระบบ 213 ไฟล์ / 2,859 เคส, design-token lint, Next compilation issues และ webpack production build ผ่าน; repo-wide `npx tsc --noEmit` ยังรายงาน TypeScript errors เดิม 4 จุดใน `create-classroom-modal.tsx` กับ `create-classroom-form.tsx` ซึ่งไม่เกี่ยวกับเฟสนี้ โดยไม่อ่านหรือเขียนฐานข้อมูลที่ deploy แล้ว
+- **เฟส 2–4 เสร็จในโค้ด:** หน้าสร้าง/แก้ไขแยก “ส่งตรงเวลาภายใน” ออกจาก “ปิดรับเมื่อ”, เพิ่ม/ลบช่วง เปลี่ยน label/เวลา/สี และใช้สีซ้ำเพื่อรวมหลายช่วงได้ หน้าผลคะแนนแสดงป้ายสถานะต่อคน มีตัวกรองสี และเมื่อกรองสีแล้วครูตั้งค่าปรับคะแนนทั้งกลุ่มพร้อมเหตุผลและหน้าต่างยืนยันได้ งานแบบ streak แสดงสถานะเวลาแต่ไม่เปิดปรับคะแนนรวม
+- ค่าปรับเก็บแยกใน `submissions.score_adjustment` และนำไปใช้หลัง `display_max_score` rescaling พร้อม clamp 0–คะแนนเต็ม จึงใช้ค่าเดียวกันในผลรายคน ตารางห้อง export analytics และ gate ทำจนผ่าน โดยไม่แก้คะแนนดิบรายข้อ; ทุก attempt ของนักเรียนคนเดียวกันถูกตั้งค่าเหมือนกันและ retry ใหม่ inherit ค่าเดิม
+- Server Action ไม่รับ student ids จาก browser แต่คำนวณสมาชิกสีซ้ำจาก first completed attempt + extension ใหม่หลังตรวจ owner/co-teacher `admin/manage`; service-role-only RPC เขียน current state, ทุก attempt และ batch/item audit แบบ transaction เดียว ค่าใหม่เป็นการแทนค่าเดิม (0 = ล้าง) จึงกดซ้ำไม่หักสะสมโดยไม่ตั้งใจ
+- มี lab แบบไม่เขียนฐานข้อมูลที่ `/exam-screen-lab/late-submission` พร้อมตัวอย่างสองช่วงที่ใช้สีเดียวกัน ตัวกรองสี ฟอร์ม -2 และ dialog ยืนยัน
+- Browser QA ของ lab ผ่านการกรองสีซ้ำสองช่วง, กรอก -2, dialog ยืนยัน, toast สำเร็จ, console/runtime ไม่มี error และ viewport 390px ไม่มี document-level horizontal overflow (ตารางกว้างเลื่อนภายใน card); axe รายงาน 0 violations ส่วนสี status/summary บางจุดยังอยู่ในรายการ contrast ที่เครื่องมือขอ manual review
+- Migrations `20261007145225_assignment_late_submission_bands.sql` และ `20261007151705_late_submission_score_adjustments.sql` ยัง **ไม่ apply บน Staging หรือ Production** และต้อง rollout แบบระบุไฟล์ตามลำดับหลังตรวจ project/ledger เดิม ไม่ใช้ `db push` ที่จะพา SEB 12 ตัวตามไปด้วย
 
 ### เลือกหน่วยเกณฑ์ผ่านจากดรอปดาว (7 ตุลาคม 2026)
 

@@ -33,6 +33,12 @@ describe('assignment completion retry policy', () => {
     expect(findPassingCompletion({ ...threshold, passing_type: 'score', passing_value: 7, display_max_score: 10 }, [{ ...passed, total_score: 4, max_score: 5 }])).not.toBeNull()
     expect(findPassingCompletion({ ...threshold, passing_value: 0 }, [failed])).toBe(failed)
   })
+  it('uses the teacher adjustment after display scaling and clamps it', () => {
+    const scored = { ...threshold, passing_type: 'score' as const, passing_value: 7, display_max_score: 10 }
+    expect(findPassingCompletion(scored, [{ ...passed, total_score: 8, max_score: 10, score_adjustment: -2 }])).toBeNull()
+    expect(findPassingCompletion(scored, [{ ...passed, total_score: 8, max_score: 10, score_adjustment: -1 }])).not.toBeNull()
+    expect(findPassingCompletion({ ...scored, passing_value: 0 }, [{ ...failed, total_score: 1, score_adjustment: -20 }])).not.toBeNull()
+  })
   it('requires the server streak verdict, not a full numeric score', () => {
     const streak = { ...assignment, completion_rule: 'streak' }
     expect(findPassingCompletion(streak, [{ ...passed, total_score: 10 }])).toBeNull()

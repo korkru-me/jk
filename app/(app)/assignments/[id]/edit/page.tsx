@@ -36,7 +36,7 @@ export default async function EditAssignmentPage({
   // unauthorized and is handled by notFound() below.
   const assignmentQuery = supabase
     .from('assignments')
-    .select('id, org_id, classroom_id, created_by, status, title, description, question_ids, question_points, display_max_score, start_at, end_at, duration_minutes, max_attempts, mode, type, score_strategy, retry_scope, questions_per_page, instant_check, instant_check_answer_key, completion_rule, streak_target, streak_question_cap, streak_recycle_pool, passing_type, passing_value, show_results, show_solutions, sections, show_sections, proctoring_enabled, fullscreen_required, block_clipboard, random_question_count, shared_random_seed, exam_watermark_enabled, require_work_image, calculator_enabled, scratchpad_enabled, secure_browser_mode, android_exam_mode, classrooms(name)')
+    .select('id, org_id, classroom_id, created_by, status, title, description, question_ids, question_points, display_max_score, start_at, due_at, late_bands, end_at, duration_minutes, max_attempts, mode, type, score_strategy, retry_scope, questions_per_page, instant_check, instant_check_answer_key, completion_rule, streak_target, streak_question_cap, streak_recycle_pool, passing_type, passing_value, show_results, show_solutions, sections, show_sections, proctoring_enabled, fullscreen_required, block_clipboard, random_question_count, shared_random_seed, exam_watermark_enabled, require_work_image, calculator_enabled, scratchpad_enabled, secure_browser_mode, android_exam_mode, classrooms(name)')
     .eq('id', id)
     .maybeSingle()
 

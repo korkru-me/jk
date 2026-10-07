@@ -1,6 +1,6 @@
 # Security และ privacy guardrails
 
-อัปเดตล่าสุด: 27 กันยายน 2026
+อัปเดตล่าสุด: 7 ตุลาคม 2026
 
 KorKru จัดการข้อมูลนักเรียนและอาจเกี่ยวข้องกับผู้เยาว์ ความปลอดภัยและความเป็นส่วนตัวเป็นเงื่อนไขของความถูกต้อง ไม่ใช่งานเก็บรายละเอียดภายหลัง
 
@@ -77,6 +77,8 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 - random values และ correct answer ต้องตรึงต่อ attempt
 - server ต้องบังคับเวลา attempts และ access code ไม่พึ่ง client
 - การแก้คะแนนต้องตรวจสิทธิ์ เก็บผู้แก้ และเวลา
+- การปรับคะแนนกลุ่มส่งช้าต้องไม่รับ student ids จาก browser: Server Action ตรวจ `canManageAssignment` แล้วคำนวณสมาชิกจาก first completed submission, policy สี และ extension ในฐานข้อมูลใหม่ทุกครั้ง ก่อนเรียก RPC ที่ grant เฉพาะ `service_role`; current/audit tables เปิด RLS โดยไม่มี browser policy หรือ direct grant
+- ค่าปรับแบบกลุ่มต้องเก็บแยกจากผลรวมคำตอบ ใช้ replacement semantics พร้อม batch/item audit และทำให้ attempt เดิมกับ retry ใหม่ของ student เดียวกันตรงกัน เพื่อไม่ให้การตรวจรายข้อซ้ำลบค่าปรับหรือการกดซ้ำหักสะสมโดยไม่ตั้งใจ
 - score rescaling และ attempt strategy ต้องให้ผลเหมือนกันทุกหน้าที่อ่านคะแนน
 - ห้ามให้นักเรียนอ่านเฉลยก่อนนโยบาย `show_results` อนุญาต
 

@@ -69,6 +69,10 @@ import { QuestionSetImport } from '@/components/assignments/question-set-import'
 import { ClassroomPicker } from '@/components/assignments/classroom-picker'
 import { AssignmentReviewSummary } from '@/components/assignments/assignment-review-summary'
 import {
+  LateSubmissionScheduleFields,
+  type LateBandDraft,
+} from '@/components/assignments/late-submission-schedule-fields'
+import {
   GroupTargetPicker, groupTargetsComplete, groupTargetsFor,
   type AssignmentGroupOption, type GroupTargets,
 } from '@/components/assignments/group-target-picker'
@@ -80,7 +84,7 @@ import {
   getSebQuitPasswordClientError,
 } from '@/components/assignments/seb-quit-password-settings'
 import { cn } from '@/lib/utils'
-import { THAI_TIME_ZONE } from '@/lib/thai-time'
+import { thaiLocalDateTimeToIso, toThaiLocalDateTimeInput } from '@/lib/thai-time'
 import {
   InstantCheckAnswerKeySettingLabel,
   INSTANT_CHECK_SETTING_DESCRIPTION,
@@ -126,6 +130,8 @@ export type AssignmentCopyPreset = Pick<
   | 'sections'
   | 'show_sections'
   | 'start_at'
+  | 'due_at'
+  | 'late_bands'
   | 'end_at'
   | 'duration_minutes'
   | 'type'
@@ -158,21 +164,6 @@ export type AssignmentCopyPreset = Pick<
   | 'secure_browser_mode'
   | 'android_exam_mode'
 >
-
-function toLocalInputValue(iso: string | null): string {
-  if (!iso) return ''
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: THAI_TIME_ZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(new Date(iso))
-  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find(item => item.type === type)?.value
-  return `${part('year')}-${part('month')}-${part('day')}T${part('hour')}:${part('minute')}`
-}
 
 interface Props {
   classrooms: AssignmentClassroomOption[]
@@ -445,8 +436,17 @@ export function CreateAssignmentForm({
   }
 
   // Step 3 (กำหนดการสอบ)
-  const [startAt, setStartAt] = useState(toLocalInputValue(copySource?.start_at ?? null))
-  const [endAt, setEndAt] = useState(toLocalInputValue(copySource?.end_at ?? null))
+  const [startAt, setStartAt] = useState(toThaiLocalDateTimeInput(copySource?.start_at ?? null))
+  const [dueAt, setDueAt] = useState(toThaiLocalDateTimeInput(copySource?.due_at ?? null))
+  const [endAt, setEndAt] = useState(toThaiLocalDateTimeInput(copySource?.end_at ?? null))
+  const [lateBands, setLateBands] = useState<LateBandDraft[]>(() =>
+    (copySource?.late_bands ?? []).map(band => ({
+      id: band.id,
+      startsAt: toThaiLocalDateTimeInput(band.starts_at),
+      label: band.label,
+      color: band.color,
+    })),
+  )
 
   // Every โจทย์ this teacher can actually assign. Kept as a set because both
   // the แฟ้ม shortcut and importSet ask "is this id real?" once per ข้อ in a
@@ -748,8 +748,15 @@ export function CreateAssignmentForm({
         question_points: questionPoints,
         display_max_score: displayMax,
         set_id: setId,
-        start_at: effectiveStartAt || null,
-        end_at: endAt || null,
+        start_at: thaiLocalDateTimeToIso(effectiveStartAt),
+        due_at: thaiLocalDateTimeToIso(dueAt),
+        late_bands: lateBands.map(band => ({
+          id: band.id,
+          starts_at: thaiLocalDateTimeToIso(band.startsAt) ?? band.startsAt,
+          label: band.label,
+          color: band.color,
+        })),
+        end_at: thaiLocalDateTimeToIso(endAt),
         duration_minutes: duration ? Number(duration) : null,
         mode: 'online' as const,
         type: assignmentType,
@@ -1754,13 +1761,13 @@ export function CreateAssignmentForm({
       {step === 2 && (
         <div className="space-y-3">
           <Card padding="md">
-            <Collapsible defaultOpen={Boolean(startAt || endAt)}>
+            <Collapsible defaultOpen={Boolean(startAt || dueAt || endAt)}>
               <CollapsibleTrigger className="group flex w-full items-center justify-between gap-3 text-left">
                 <span className="flex min-w-0 flex-col gap-1">
                   <span className="text-sm font-semibold text-foreground">กำหนดวันทำ</span>
                   <span data-assignment-description className="text-sm font-normal text-muted-foreground">
-                    {startAt && endAt
-                      ? 'กำหนดเวลาเปิดและปิดรับแล้ว'
+                    {dueAt && endAt
+                      ? `กำหนดส่งและช่วงสี ${lateBands.length} ช่วง`
                       : startAt
                         ? 'กำหนดเวลาเปิดรับแล้ว'
                         : endAt
@@ -1771,15 +1778,20 @@ export function CreateAssignmentForm({
                 <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-data-panel-open:rotate-180" aria-hidden="true" />
               </CollapsibleTrigger>
               <CollapsibleContent className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 ease-out data-ending-style:h-0 data-starting-style:h-0">
-                <div className="grid gap-3 pt-3 sm:grid-cols-2">
+                <div className="space-y-4 pt-3">
                   <div className="flex flex-col gap-1.5">
                     <Label htmlFor="sat">เปิดรับตั้งแต่</Label>
                     <Input id="sat" type="datetime-local" value={startAt} onChange={e => setStartAt(e.target.value)} />
                   </div>
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="eat">ปิดรับเมื่อ</Label>
-                    <Input id="eat" type="datetime-local" value={endAt} onChange={e => setEndAt(e.target.value)} />
-                  </div>
+                  <LateSubmissionScheduleFields
+                    idPrefix="create-schedule"
+                    dueAt={dueAt}
+                    endAt={endAt}
+                    bands={lateBands}
+                    onDueAtChange={setDueAt}
+                    onEndAtChange={setEndAt}
+                    onBandsChange={setLateBands}
+                  />
                 </div>
               </CollapsibleContent>
             </Collapsible>
@@ -1886,6 +1898,9 @@ export function CreateAssignmentForm({
                   : `${pointsSum} คะแนน`,
               },
               ...(duration ? [{ label: 'เวลา', value: `${duration} นาที` }] : []),
+              ...(dueAt ? [{ label: 'ส่งตรงเวลา', value: new Date(thaiLocalDateTimeToIso(dueAt) ?? dueAt).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) }] : []),
+              ...(endAt ? [{ label: 'ปิดรับ', value: new Date(thaiLocalDateTimeToIso(endAt) ?? endAt).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) }] : []),
+              ...(lateBands.length > 0 ? [{ label: 'ช่วงสีส่งช้า', value: `${lateBands.length} ช่วง · ครูเป็นผู้ปรับคะแนนเอง` }] : []),
               {
                 label: completionSectionLabel,
                 value: streakOn

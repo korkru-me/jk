@@ -95,7 +95,7 @@ export default async function SubmissionResultPage({
   const { data: ownSubmission } = await admin
     .from('submissions')
     .select(`
-      id, assignment_id, student_id, status, total_score, max_score, attempt_number, submitted_at, secure_browser_verified_at,
+      id, assignment_id, student_id, status, total_score, score_adjustment, max_score, attempt_number, submitted_at, secure_browser_verified_at,
       users!submissions_student_id_fkey(full_name),
       assignments(id, title, show_results, show_solutions, end_at, duration_minutes, passing_type, passing_value, completion_rule, type, status, max_attempts, score_strategy, retry_scope, classroom_id, display_max_score, secure_browser_mode)
     `)
@@ -125,7 +125,7 @@ export default async function SubmissionResultPage({
     const { data: teacherVisibleSubmission } = await admin
       .from('submissions')
       .select(`
-        id, assignment_id, student_id, status, total_score, max_score, attempt_number, submitted_at, secure_browser_verified_at,
+        id, assignment_id, student_id, status, total_score, score_adjustment, max_score, attempt_number, submitted_at, secure_browser_verified_at,
         users!submissions_student_id_fkey(full_name),
         assignments(title, show_results, end_at, passing_type, passing_value, type, status, max_attempts, score_strategy, retry_scope, classroom_id, display_max_score, secure_browser_mode),
         submission_answers(id, correct_answer, is_correct)
@@ -163,7 +163,7 @@ export default async function SubmissionResultPage({
     // reached only after canManageAssignment already allowed this viewer.
     const { data: siblingSubs } = await admin
       .from('submissions')
-      .select('id, student_id, status, total_score, max_score, attempt_number, users!submissions_student_id_fkey(full_name)')
+      .select('id, student_id, status, total_score, score_adjustment, max_score, attempt_number, users!submissions_student_id_fkey(full_name)')
       .eq('assignment_id', submission.assignment_id)
 
     const normalized = (siblingSubs ?? []).map((s: any) => ({ ...s, attempt_number: s.attempt_number ?? 1 }))
@@ -194,7 +194,7 @@ export default async function SubmissionResultPage({
 
   const assignment = (submission as any).assignments
   const [{ total_score: displayScore, max_score: displayMax }] = rescaleToDisplayMax(
-    [submission as { total_score: number | null; max_score: number }],
+    [submission as { total_score: number | null; score_adjustment?: number; max_score: number }],
     () => assignment.display_max_score
   )
   const pct = displayMax > 0 ? Math.round(((displayScore ?? 0) / displayMax) * 100) : 0
@@ -221,7 +221,7 @@ export default async function SubmissionResultPage({
   const attemptLimit = completionAttemptLimit(assignment)
   const { data: ownAttempts, error: attemptsError } = isOwnSubmission
     ? await fetchAllRows((from, to) => admin.from('submissions')
-        .select('id, status, total_score, max_score, streak_reached, attempt_number')
+        .select('id, status, total_score, score_adjustment, max_score, streak_reached, attempt_number')
         .eq('assignment_id', submission.assignment_id).eq('student_id', user.id)
         .order('attempt_number').range(from, to)).then(({ rows, error }) => ({ data: rows, error }))
     : { data: [], error: null }

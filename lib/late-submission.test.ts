@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
   assignmentLateScheduleEquals,
+  classifySubmissionTimingsByStudent,
   classifySubmissionTiming,
   firstCompletedSubmissionAt,
   normalizeAssignmentLateSchedule,
+  studentIdsForLateColor,
   type AssignmentLateBand,
 } from './late-submission'
 
@@ -175,5 +177,40 @@ describe('classifySubmissionTiming', () => {
       bands: [],
       submittedAt: DUE,
     }).status).toBe('unclassified')
+  })
+})
+
+describe('classifySubmissionTimingsByStudent', () => {
+  it('groups every band that deliberately reuses the same colour', () => {
+    const repeated = bands.map(band => ({ ...band, color: 'amber' as const }))
+    const timings = classifySubmissionTimingsByStudent({
+      dueAt: DUE,
+      endAt: CLOSE,
+      bands: repeated,
+      submissions: [
+        { student_id: 'b', status: 'submitted', submitted_at: '2026-10-09T09:00:00.000Z' },
+        { student_id: 'a', status: 'submitted', submitted_at: '2026-10-07T10:00:00.000Z' },
+        { student_id: 'c', status: 'graded', submitted_at: '2026-10-07T08:00:00.000Z' },
+      ],
+    })
+    expect(studentIdsForLateColor(timings, 'amber')).toEqual(['a', 'b'])
+  })
+
+  it('uses the first completed retry and applies personal extensions', () => {
+    const timings = classifySubmissionTimingsByStudent({
+      dueAt: DUE,
+      endAt: CLOSE,
+      bands,
+      submissions: [
+        { student_id: 'student', status: 'submitted', submitted_at: '2026-10-08T08:30:00.000Z' },
+        { student_id: 'student', status: 'graded', submitted_at: '2026-10-09T12:00:00.000Z' },
+      ],
+      extensions: [{
+        student_id: 'student',
+        extended_due_at: '2026-10-08T09:00:00.000Z',
+        extended_end_at: '2026-10-11T09:00:00.000Z',
+      }],
+    })
+    expect(timings.get('student')?.status).toBe('on_time')
   })
 })

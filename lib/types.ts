@@ -973,6 +973,8 @@ export interface Submission {
   started_at: string
   submitted_at: string | null
   total_score: number | null
+  /** Teacher-set display points, applied after any display-max rescaling. */
+  score_adjustment: number
   max_score: number
   status: SubmissionStatus
   attempt_number: number

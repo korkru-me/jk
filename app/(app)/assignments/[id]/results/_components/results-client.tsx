@@ -1,7 +1,9 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { CheckCircle2, XCircle, Clock, ChevronLeft, ChevronRight, ArrowUpDown, ClipboardCheck } from 'lucide-react'
 import { ExportButton } from '@/components/assignments/export-button'
 import { ScoreEditor } from '@/components/assignments/score-editor'
@@ -16,12 +18,24 @@ import { Card } from '@/components/ui/card'
 import { NativeSelect } from '@/components/ui/native-select'
 import { containsMath } from '@/lib/math/latex'
 import { renderRichTextHtml } from '@/lib/rich-text-html'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
+import {
+  Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog'
+import { COVER_PRESETS } from '@/app/(app)/classrooms/_components/classroom-meta'
+import { groupPreset } from '@/app/(app)/classrooms/_components/group-colors'
+import type { LateBandColorId, SubmissionTiming } from '@/lib/late-submission'
+import { applyLateColorScoreAdjustment } from '@/lib/actions/late-submission-adjustments'
+import { cn } from '@/lib/utils'
 
 export interface SubmittedRow {
   id: string
   student_id: string
   status: string
   total_score: number | null
+  score_adjustment: number
   max_score: number
   submitted_at: string | null
   /** Needed only to report how long a streak attempt took. */
@@ -32,6 +46,18 @@ export interface SubmittedRow {
   best_streak?: number
   streak_reached?: boolean
   users: { full_name: string; email: string } | null
+  timing: SubmissionTiming
+}
+
+export interface ScoreAdjustmentBatchRow {
+  id: string
+  color: LateBandColorId
+  adjustment: number
+  reason: string | null
+  affected_count: number
+  changed_by: string
+  changed_by_name: string
+  created_at: string
 }
 
 export interface AnswerRow {
@@ -65,9 +91,38 @@ interface Props {
   inProgressCount: number
   /** Arrived from a ตรวจให้คะแนน button — start with the filter switched on. */
   initialPendingOnly: boolean
+  adjustmentBatches: ScoreAdjustmentBatchRow[]
+  /** Memory-only lab pages inject a no-write action. */
+  applyAdjustmentAction?: typeof applyLateColorScoreAdjustment
 }
 
 type ViewMode = 'individual' | 'question'
+
+function formatSigned(value: number): string {
+  if (!Number.isFinite(value)) return '—'
+  return value > 0 ? `+${value}` : String(value)
+}
+
+function LateColorChip({ color, label }: { color: LateBandColorId; label: string }) {
+  const preset = groupPreset(color)
+  return (
+    <span className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-medium', preset.surface, preset.text)}>
+      <span className={cn('size-2 rounded-full', preset.solid)} aria-hidden="true" />
+      {label}
+    </span>
+  )
+}
+
+function SubmissionTimingBadge({ timing }: { timing: SubmissionTiming }) {
+  if (timing.status === 'late') return <LateColorChip color={timing.band.color} label={timing.band.label} />
+  if (timing.status === 'on_time') {
+    return <span className="inline-flex rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success">ตรงเวลา</span>
+  }
+  if (timing.status === 'after_close') {
+    return <span className="inline-flex rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">หลังปิดรับ</span>
+  }
+  return <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">ยังไม่จัดกลุ่ม</span>
+}
 
 // Compact, single-line rendering of a student's answer for the per-question
 // grid — the full rich review (with option highlighting, per-part work
@@ -152,7 +207,10 @@ export function ResultsClient({
   assignmentId, assignmentTitle, classroomName, passingType, passingValue,
   completionRule, streakTarget,
   questions, submitted, answers, profiles, inProgressCount, initialPendingOnly,
+  adjustmentBatches, applyAdjustmentAction = applyLateColorScoreAdjustment,
 }: Props) {
+  const router = useRouter()
+  const [isAdjusting, startAdjusting] = useTransition()
   // ── What still needs a person ──────────────────────────────────────────────
   // Auto-grading leaves `is_correct` null exactly on the answers nothing can
   // decide for the teacher — ข้อเขียน, ช่องเติมคำที่ครูตรวจเอง, เหตุผลของ
@@ -179,6 +237,22 @@ export function ResultsClient({
   // Never starts on when there is nothing to show — a teacher who follows the
   // button after finishing should land on the ordinary table, not an empty one.
   const [pendingOnly, setPendingOnly] = useState(initialPendingOnly && pendingAnswerCount > 0)
+  const [timingFilter, setTimingFilter] = useState<'all' | 'on_time' | 'unclassified' | LateBandColorId>('all')
+  const [adjustmentDraft, setAdjustmentDraft] = useState('')
+  const [adjustmentReason, setAdjustmentReason] = useState('')
+  const [confirmAdjustment, setConfirmAdjustment] = useState(false)
+
+  const lateGroups = useMemo(() => {
+    const groups = new Map<LateBandColorId, { labels: Set<string>; count: number }>()
+    for (const row of submitted) {
+      if (row.timing.status !== 'late') continue
+      const existing = groups.get(row.timing.band.color) ?? { labels: new Set<string>(), count: 0 }
+      existing.labels.add(row.timing.band.label)
+      existing.count += 1
+      groups.set(row.timing.band.color, existing)
+    }
+    return Array.from(groups.entries())
+  }, [submitted])
 
   const sortedRows = useMemo(() => {
     const sortable = submitted.map(s => ({ id: s.student_id, full_name: s.users?.full_name ?? '', row: s }))
@@ -217,10 +291,40 @@ export function ResultsClient({
 
   // Rows the tables actually draw. Filtering here rather than inside each
   // table keeps every view — รายคน, รายข้อ, ถูกติดต่อกัน — on one definition.
-  const visibleRows = useMemo(
-    () => (pendingOnly ? sortedRows.filter(s => pendingBySubmission.has(s.id)) : sortedRows),
-    [pendingOnly, sortedRows, pendingBySubmission],
-  )
+  const visibleRows = useMemo(() => sortedRows.filter(row => {
+    if (pendingOnly && !pendingBySubmission.has(row.id)) return false
+    if (timingFilter === 'all') return true
+    if (timingFilter === 'on_time') return row.timing.status === 'on_time'
+    if (timingFilter === 'unclassified') return row.timing.status === 'unclassified' || row.timing.status === 'after_close'
+    return row.timing.status === 'late' && row.timing.band.color === timingFilter
+  }), [pendingOnly, sortedRows, pendingBySubmission, timingFilter])
+
+  const selectedColorGroup = lateGroups.find(([color]) => color === timingFilter)
+  const parsedAdjustment = Number(adjustmentDraft)
+  const canConfirmAdjustment = selectedColorGroup != null
+    && adjustmentDraft.trim() !== ''
+    && Number.isFinite(parsedAdjustment)
+    && parsedAdjustment >= -10000
+    && parsedAdjustment <= 10000
+
+  function submitAdjustment() {
+    if (!canConfirmAdjustment || selectedColorGroup == null) return
+    startAdjusting(async () => {
+      const result = await applyAdjustmentAction({
+        assignmentId,
+        color: selectedColorGroup[0],
+        adjustment: parsedAdjustment,
+        reason: adjustmentReason,
+      })
+      if ('error' in result) {
+        toast.error(result.error)
+        return
+      }
+      setConfirmAdjustment(false)
+      toast.success(`ปรับคะแนนนักเรียน ${result.affectedCount} คนแล้ว`)
+      router.refresh()
+    })
+  }
 
   // With the filter on, a ข้อ nobody is waiting on has nothing to grade, so
   // the stepper skips it. The index still counts against the full ชุด, so
@@ -241,7 +345,7 @@ export function ResultsClient({
   }
 
   return (
-    <div className="max-w-5xl space-y-6">
+    <div className="w-full min-w-0 max-w-5xl space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <Link href={`/assignments/${assignmentId}`} className="text-sm text-muted-foreground hover:text-primary">
@@ -305,7 +409,7 @@ export function ResultsClient({
           </Card>
         </div>
       ) : (
-      <div className={`grid gap-3 ${hasPassingThreshold ? 'grid-cols-4' : 'grid-cols-3'}`}>
+      <div className={`grid grid-cols-2 gap-3 ${hasPassingThreshold ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`}>
         <Card radius="md" padding="md" className="text-center">
           <p className="text-xs text-muted-foreground">ส่งแล้ว</p>
           <p className="text-2xl font-bold text-foreground mt-1">{submitted.length}</p>
@@ -366,6 +470,93 @@ export function ResultsClient({
         </div>
       ) : null}
 
+      {lateGroups.length > 0 && (
+        <Card radius="md" padding="md" className="space-y-4">
+          <div className="flex flex-wrap items-end gap-3">
+            <Field className="max-w-sm">
+              <FieldLabel htmlFor="timing-filter">กรองตามสถานะการส่ง</FieldLabel>
+              <NativeSelect
+                id="timing-filter"
+                value={timingFilter}
+                onChange={event => setTimingFilter(event.target.value as typeof timingFilter)}
+              >
+                <option value="all">ทุกสถานะ ({submitted.length})</option>
+                <option value="on_time">ส่งตรงเวลา</option>
+                {lateGroups.map(([color, group]) => {
+                  const colorLabel = COVER_PRESETS.find(preset => preset.id === color)?.label ?? color
+                  return <option key={color} value={color}>{colorLabel} · {Array.from(group.labels).join(', ')} ({group.count})</option>
+                })}
+                <option value="unclassified">ยังไม่จัดกลุ่ม / หลังปิดรับ</option>
+              </NativeSelect>
+              <FieldDescription>เลือกสีเพื่อดูและปรับคะแนนนักเรียนทั้งกลุ่มพร้อมกัน</FieldDescription>
+            </Field>
+            {timingFilter !== 'all' && (
+              <Button type="button" variant="ghost" onClick={() => setTimingFilter('all')}>ล้างตัวกรอง</Button>
+            )}
+          </div>
+
+          {!isStreakRun && selectedColorGroup && (
+            <div className={cn('rounded-xl border p-4', groupPreset(selectedColorGroup[0]).surface)}>
+              <div className="mb-3">
+                <p className="font-semibold text-foreground">ปรับคะแนนกลุ่มสีนี้เหมือนกันทั้งหมด</p>
+                <p className={cn('text-xs leading-5', groupPreset(selectedColorGroup[0]).textMuted)}>
+                  มีนักเรียน {selectedColorGroup[1].count} คน · ค่าที่กรอกจะแทนค่าปรับเดิมของทั้งกลุ่ม เช่น -2 คือหัก 2 คะแนน และ 0 คือล้างค่าปรับ
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-[minmax(9rem,12rem)_minmax(14rem,1fr)_auto] sm:items-end">
+                <Field>
+                  <FieldLabel htmlFor="score-adjustment">ปรับคะแนน</FieldLabel>
+                  <Input
+                    id="score-adjustment"
+                    type="number"
+                    step="0.01"
+                    min="-10000"
+                    max="10000"
+                    value={adjustmentDraft}
+                    onChange={event => setAdjustmentDraft(event.target.value)}
+                    placeholder="เช่น -2"
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="adjustment-reason">เหตุผล (ไม่บังคับ)</FieldLabel>
+                  <Textarea
+                    id="adjustment-reason"
+                    rows={1}
+                    maxLength={200}
+                    value={adjustmentReason}
+                    onChange={event => setAdjustmentReason(event.target.value)}
+                    placeholder="เช่น ส่งหลังช่วงผ่อนผัน"
+                    className="min-h-8"
+                  />
+                </Field>
+                <Button type="button" disabled={!canConfirmAdjustment} onClick={() => setConfirmAdjustment(true)}>
+                  ตั้งค่าให้ทั้งกลุ่ม
+                </Button>
+              </div>
+            </div>
+          )}
+        </Card>
+      )}
+
+      {adjustmentBatches.length > 0 && !isStreakRun && (
+        <Card radius="md" padding="md" className="space-y-3">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">ประวัติการปรับคะแนนล่าสุด</h2>
+            <p className="text-xs text-muted-foreground">เก็บผู้แก้ เวลา กลุ่มสี และค่าก่อน–หลังไว้ในฐานข้อมูลทุกครั้ง</p>
+          </div>
+          <div className="divide-y divide-border">
+            {adjustmentBatches.slice(0, 5).map(batch => (
+              <div key={batch.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-xs">
+                <LateColorChip color={batch.color} label={COVER_PRESETS.find(preset => preset.id === batch.color)?.label ?? batch.color} />
+                <span className="font-semibold text-foreground">{formatSigned(batch.adjustment)} คะแนน</span>
+                <span className="text-muted-foreground">{batch.affected_count} คน · {batch.changed_by_name} · {new Date(batch.created_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                {batch.reason && <span className="w-full text-muted-foreground sm:w-auto">“{batch.reason}”</span>}
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       {/* Mode toggle + sort */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-1 bg-muted rounded-xl p-1">
@@ -381,7 +572,7 @@ export function ResultsClient({
               key={m.key}
               onClick={() => setViewMode(m.key)}
               className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                viewMode === m.key ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-muted-foreground'
+                viewMode === m.key ? 'bg-card text-foreground shadow-sm' : 'text-foreground hover:bg-card/60'
               }`}
             >
               {m.label}
@@ -392,6 +583,7 @@ export function ResultsClient({
         <div className="flex items-center gap-1.5">
           <ArrowUpDown className="w-3.5 h-3.5 text-muted-foreground" />
           <NativeSelect
+            aria-label="เรียงนักเรียนตาม"
             value={sortKey}
             onChange={e => toggleSort(e.target.value as StudentSortKey)}
           >
@@ -432,6 +624,23 @@ export function ResultsClient({
           pendingQuestionIds={pendingOnly ? pendingQuestionIds : null}
         />
       )}
+
+      <Dialog open={confirmAdjustment} onOpenChange={setConfirmAdjustment}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>ยืนยันการปรับคะแนนทั้งกลุ่ม</DialogTitle>
+            <DialogDescription>
+              ระบบจะตั้งค่าปรับเป็น {formatSigned(parsedAdjustment)} คะแนน ให้นักเรียน {selectedColorGroup?.[1].count ?? 0} คนในสีที่กรองอยู่ ค่านี้แทนค่าปรับเดิมและมีประวัติย้อนหลัง
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose render={<Button type="button" variant="outline" />}>ยกเลิก</DialogClose>
+            <Button type="button" disabled={isAdjusting} onClick={submitAdjustment}>
+              {isAdjusting ? 'กำลังบันทึก…' : 'ยืนยันปรับคะแนน'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -457,19 +666,20 @@ function StreakTable({ rows, stats, target }: {
       <table className="w-full text-sm">
         <thead className="bg-muted border-b border-border">
           <tr>
-            <th className="text-left px-4 py-3 font-medium text-muted-foreground">#</th>
-            <th className="text-left px-4 py-3 font-medium text-muted-foreground">ชื่อ</th>
-            <th className="text-center px-4 py-3 font-medium text-muted-foreground">ผล</th>
-            <th className="text-center px-4 py-3 font-medium text-muted-foreground">ทำไปกี่ข้อ</th>
-            <th className="text-center px-4 py-3 font-medium text-muted-foreground">ถูก</th>
-            <th className="text-center px-4 py-3 font-medium text-muted-foreground">ติดกันมากสุด</th>
-            <th className="text-center px-4 py-3 font-medium text-muted-foreground">เวลาที่ใช้</th>
+            <th className="text-left px-4 py-3 font-medium text-foreground">#</th>
+            <th className="text-left px-4 py-3 font-medium text-foreground">ชื่อ</th>
+            <th className="text-center px-4 py-3 font-medium text-foreground">ผล</th>
+            <th className="text-left px-4 py-3 font-medium text-foreground">สถานะส่ง</th>
+            <th className="text-center px-4 py-3 font-medium text-foreground">ทำไปกี่ข้อ</th>
+            <th className="text-center px-4 py-3 font-medium text-foreground">ถูก</th>
+            <th className="text-center px-4 py-3 font-medium text-foreground">ติดกันมากสุด</th>
+            <th className="text-center px-4 py-3 font-medium text-foreground">เวลาที่ใช้</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={7} className="text-center py-10 text-muted-foreground">
+              <td colSpan={8} className="text-center py-10 text-muted-foreground">
                 ยังไม่มีการส่งงาน
               </td>
             </tr>
@@ -493,6 +703,7 @@ function StreakTable({ rows, stats, target }: {
                       {stat?.reached ? 'ผ่าน' : 'ยังไม่ผ่าน'}
                     </span>
                   </td>
+                  <td className="px-4 py-3"><SubmissionTimingBadge timing={s.timing} /></td>
                   <td className="px-4 py-3 text-center text-foreground tabular-nums">{stat?.asked ?? '—'}</td>
                   <td className="px-4 py-3 text-center text-foreground tabular-nums">{stat?.correct ?? '—'}</td>
                   <td className="px-4 py-3 text-center tabular-nums">
@@ -530,20 +741,21 @@ function IndividualTable({ rows, hasPassingThreshold, passingType, passingValue,
       <table className="w-full text-sm">
         <thead className="bg-muted border-b border-border">
           <tr>
-            <th className="text-left px-4 py-3 font-medium text-muted-foreground">#</th>
-            <th className="text-left px-4 py-3 font-medium text-muted-foreground">ชื่อ</th>
-            <th className="text-center px-4 py-3 font-medium text-muted-foreground">คะแนน</th>
-            <th className="text-center px-4 py-3 font-medium text-muted-foreground">%</th>
+            <th className="text-left px-4 py-3 font-medium text-foreground">#</th>
+            <th className="text-left px-4 py-3 font-medium text-foreground">ชื่อ</th>
+            <th className="text-center px-4 py-3 font-medium text-foreground">คะแนน</th>
+            <th className="text-center px-4 py-3 font-medium text-foreground">%</th>
+            <th className="text-left px-4 py-3 font-medium text-foreground">สถานะส่ง</th>
             {hasPassingThreshold && (
-              <th className="text-center px-4 py-3 font-medium text-muted-foreground">ผลเกณฑ์</th>
+              <th className="text-center px-4 py-3 font-medium text-foreground">ผลเกณฑ์</th>
             )}
-            <th className="text-left px-4 py-3 font-medium text-muted-foreground">เวลาส่ง</th>
+            <th className="text-left px-4 py-3 font-medium text-foreground">เวลาส่ง</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={hasPassingThreshold ? 6 : 5} className="text-center py-10 text-muted-foreground">
+              <td colSpan={hasPassingThreshold ? 7 : 6} className="text-center py-10 text-muted-foreground">
                 {emptyMessage ?? 'ยังไม่มีการส่งงาน'}
               </td>
             </tr>
@@ -570,6 +782,11 @@ function IndividualTable({ rows, hasPassingThreshold, passingType, passingValue,
                         <Clock className="h-3 w-3" /> รอตรวจ {pendingCount} ข้อ
                       </span>
                     )}
+                    {s.score_adjustment !== 0 && (
+                      <span className="mt-1 block text-[10px] font-semibold text-primary">
+                        ครูปรับ {formatSigned(s.score_adjustment)}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-center">
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
@@ -580,6 +797,7 @@ function IndividualTable({ rows, hasPassingThreshold, passingType, passingValue,
                       {pct}%
                     </span>
                   </td>
+                  <td className="px-4 py-3"><SubmissionTimingBadge timing={s.timing} /></td>
                   {hasPassingThreshold && (
                     <td className="px-4 py-3 text-center">
                       <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
@@ -688,11 +906,11 @@ function QuestionGrid({ questions, activeQuestionIndex, activeQuestion, onChange
         <table className="w-full text-sm">
           <thead className="bg-muted border-b border-border">
             <tr>
-              <th className="text-left px-4 py-3 font-medium text-muted-foreground">#</th>
-              <th className="text-left px-4 py-3 font-medium text-muted-foreground">ชื่อ</th>
-              <th className="text-left px-4 py-3 font-medium text-muted-foreground">คำตอบนักเรียน</th>
-              <th className="text-center px-4 py-3 font-medium text-muted-foreground">ผล</th>
-              <th className="text-center px-4 py-3 font-medium text-muted-foreground">คะแนน</th>
+              <th className="text-left px-4 py-3 font-medium text-foreground">#</th>
+              <th className="text-left px-4 py-3 font-medium text-foreground">ชื่อ</th>
+              <th className="text-left px-4 py-3 font-medium text-foreground">คำตอบนักเรียน</th>
+              <th className="text-center px-4 py-3 font-medium text-foreground">ผล</th>
+              <th className="text-center px-4 py-3 font-medium text-foreground">คะแนน</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">

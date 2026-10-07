@@ -49,7 +49,7 @@ export default async function AssignmentsPage() {
       .eq('student_id', user.id),
     fetchAllRows((from, to) => admin
       .from('submissions')
-      .select('assignment_id, id, status, total_score, max_score, streak_reached, attempt_number, started_at, assignments!inner(status)')
+      .select('assignment_id, id, status, total_score, score_adjustment, max_score, streak_reached, attempt_number, started_at, assignments!inner(status)')
       .eq('student_id', user.id)
       .eq('assignments.status', 'published')
       .order('id').range(from, to)).then(({ rows, error }) => ({ data: rows, error })),

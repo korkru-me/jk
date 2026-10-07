@@ -14,6 +14,7 @@ export interface CompletionAttempt {
   status: string
   total_score?: number | null
   max_score?: number
+  score_adjustment?: number | null
   streak_reached?: boolean | null
 }
 
@@ -55,10 +56,14 @@ export function findPassingCompletion<T extends CompletionAttempt>(assignment: C
     const rawScore = attempt.total_score ?? null
     const rawMax = attempt.max_score ?? 0
     const displayMax = assignment.display_max_score
-    const score = rawScore != null && displayMax != null && rawMax > 0
+    const scaledScore = rawScore != null && displayMax != null && rawMax > 0
       ? Math.round(rawScore * displayMax / rawMax * 100) / 100
       : rawScore
-    return computePassed(score, displayMax ?? rawMax, assignment.passing_type ?? null, assignment.passing_value ?? null) === true
+    const max = displayMax ?? rawMax
+    const score = scaledScore == null
+      ? null
+      : Math.round(Math.min(max, Math.max(0, scaledScore + (attempt.score_adjustment ?? 0))) * 100) / 100
+    return computePassed(score, max, assignment.passing_type ?? null, assignment.passing_value ?? null) === true
   }) ?? null
 }
 

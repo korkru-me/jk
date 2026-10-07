@@ -129,7 +129,8 @@ Vercel รันโค้ดฝั่ง server ด้วยเขตเวล�
 10. `pg_cron` เรียก `purge_expired_exam_proctor_data()` วันละครั้งเพื่อลบ event, connection lease, session summary ของ attempt และ SEB preflight check-in ที่เกิน 90 วัน; ครูที่มีสิทธิ์จัดการกดล้างราย assignment ได้ผ่าน Server Action + service-role-only RPC ซึ่งตรวจ actor ซ้ำและไม่ยอมล้างขณะมี session สด คำตอบ คะแนน และ submission ไม่อยู่ในขอบเขตการล้างนี้
    - CSV ที่ดาวน์โหลดออกจาก KorKru เป็นสำเนาแยกและไม่ถูก job 90 วันหรือการล้างราย assignment ตามลบ ผู้ดาวน์โหลดต้องเก็บในพื้นที่จำกัดสิทธิ์และลบเองเมื่อหมดวัตถุประสงค์
 11. เมื่อส่ง ระบบตรวจชนิดที่รองรับ คงงานที่ต้องตรวจโดยครูไว้ และปิด presence ของห้องคุมสอบแบบ best-effort
-12. RLS คืนคะแนน/เฉลยให้นักเรียนตาม `show_results` เท่านั้น ส่วนการแสดงคะแนนอาจผ่าน per-question override, display rescaling และ attempt strategy
+12. RLS คืนคะแนน/เฉลยให้นักเรียนตาม `show_results` เท่านั้น ส่วนการแสดงคะแนนผ่าน per-question override, display rescaling, teacher score adjustment และ attempt strategy ตามลำดับเดียวกันทุกหน้า; adjustment เก็บแยกจาก raw answer total และ clamp 0–คะแนนเต็ม
+13. สถานะส่งช้าใช้ first completed attempt ต่อ student แล้วจัดเทียบ `due_at`/`late_bands` ที่เลื่อนด้วย extension ส่วนบุคคล สีซ้ำรวมเป็นกลุ่มเดียวกันได้ หน้าผลและ Server Action ใช้ pure helper เดียวกัน Action รับเพียง assignment+color+replacement adjustment ตรวจสิทธิ์ใหม่ แล้วให้ service-role-only RPC เขียนทุก attempt กับ append-only batch/item audit ใน transaction เดียว
 
 ### โฮมรูม
 

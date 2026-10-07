@@ -167,7 +167,7 @@ export default async function ClassroomDetailPage({
     const { data: rawSubRows } = publishedIds.length > 0
       ? await fetchAllRows((from, to) => admin
           .from('submissions')
-          .select('id, assignment_id, status, total_score, max_score, streak_reached, attempt_number, started_at')
+          .select('id, assignment_id, status, total_score, score_adjustment, max_score, streak_reached, attempt_number, started_at')
           .in('assignment_id', publishedIds)
           .eq('student_id', authUser!.id)
           .order('id').range(from, to)).then(({ rows, error }) => ({ data: rows, error }))
@@ -428,7 +428,7 @@ export default async function ClassroomDetailPage({
         .order('created_at', { ascending: false }),
       admin
         .from('submissions')
-        .select('id, assignment_id, student_id, status, total_score, max_score, submitted_at, attempt_number')
+        .select('id, assignment_id, student_id, status, total_score, score_adjustment, max_score, submitted_at, attempt_number')
         .in('assignment_id', linkedAssignmentIds),
       admin
         .from('assignment_extensions')

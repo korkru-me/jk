@@ -123,7 +123,7 @@ export default async function DashboardPage() {
       .eq('student_id', user.id),
     admin
       .from('submissions')
-      .select('id, total_score, max_score, status, assignment_id, created_at, assignments(display_max_score, show_results, end_at)')
+      .select('id, total_score, score_adjustment, max_score, status, assignment_id, created_at, assignments(display_max_score, show_results, end_at)')
       .eq('student_id', user.id),
   ])
 

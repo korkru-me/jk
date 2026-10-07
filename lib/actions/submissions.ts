@@ -206,7 +206,7 @@ export async function startSubmission(
     // legacy attempt cannot undo a previous pass, and never trust a UI flag.
     const { rows: completedRuns, error: completedError } = await fetchAllRows((from, to) => admin
       .from('submissions')
-      .select('id, status, total_score, max_score, streak_reached')
+      .select('id, status, total_score, score_adjustment, max_score, streak_reached')
       .eq('assignment_id', assignmentId)
       .eq('student_id', user.id)
       .in('status', ['submitted', 'graded'])
