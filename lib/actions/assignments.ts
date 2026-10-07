@@ -27,6 +27,12 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { loadAssignmentQuestionsByProvenance } from '@/lib/assignment-question-access.server'
 import { shouldClearExpiredEndAt } from '@/lib/assignment-status'
 import { completionAttemptSettings, completionChoiceFor, streakRandomSubsetError } from '@/lib/assignment-completion'
+import {
+  assignmentLateScheduleEquals,
+  normalizeAssignmentLateSchedule,
+  type AssignmentLateSchedule,
+  type AssignmentLateBandInput,
+} from '@/lib/late-submission'
 
 const SHOW_RESULTS_MODES: ShowResultsMode[] = ['immediate', 'score_only', 'after_due', 'never']
 
@@ -74,6 +80,10 @@ interface CreateAssignmentData {
   /** Whether those แฟ้มย่อย appear for students and on the printed sheet. */
   show_sections?: boolean
   start_at: string | null
+  /** Phase 1 data boundary; the create UI is added in phase 2. Both fields
+   * must travel together once the UI starts sending them. */
+  due_at?: string | null
+  late_bands?: AssignmentLateBandInput[]
   end_at: string | null
   duration_minutes: number | null
   mode: AssignmentMode
@@ -360,6 +370,13 @@ export async function createAssignment(data: CreateAssignmentData) {
   const displayMaxScore = Number.isFinite(data.display_max_score) && (data.display_max_score as number) > 0
     ? data.display_max_score
     : null
+  const lateSchedule = normalizeAssignmentLateSchedule({
+    dueAt: data.due_at,
+    endAt: data.end_at,
+    startAt: data.start_at,
+    bands: data.late_bands,
+  })
+  if ('error' in lateSchedule) return { error: lateSchedule.error }
 
   const { data: assignment, error } = await supabase
     .from('assignments')
@@ -376,6 +393,8 @@ export async function createAssignment(data: CreateAssignmentData) {
       sections: sections.length > 0 ? filterSectionsToQuestions(sections, questionIds) : null,
       show_sections: data.show_sections ?? true,
       start_at: data.start_at || null,
+      due_at: lateSchedule.value.dueAt,
+      late_bands: lateSchedule.value.bands,
       end_at: data.end_at || null,
       duration_minutes: data.duration_minutes || null,
       // Not `data.mode`: there is one mode left, and writing it here rather
@@ -540,6 +559,10 @@ interface UpdateAssignmentData {
   title: string
   description: string
   start_at: string | null
+  /** Omit both to leave the late policy unchanged. Supplying only one is
+   * refused so an older/stale form cannot silently erase half the policy. */
+  due_at?: string | null
+  late_bands?: AssignmentLateBandInput[]
   end_at: string | null
   duration_minutes: number | null
   max_attempts: number | null
@@ -607,10 +630,45 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   // has also made service-role reads safe for co-teacher submission checks.
   const { data: existing } = await supabase
     .from('assignments')
-    .select('created_by, org_id, question_ids, sections, type, mode, status, random_question_count, shared_random_seed, calculator_enabled, scratchpad_enabled, secure_browser_mode, android_exam_mode, completion_rule, passing_type, passing_value, streak_target, streak_question_cap, streak_recycle_pool')
+    .select('created_by, org_id, question_ids, sections, type, mode, status, start_at, due_at, late_bands, end_at, random_question_count, shared_random_seed, calculator_enabled, scratchpad_enabled, secure_browser_mode, android_exam_mode, completion_rule, passing_type, passing_value, streak_target, streak_question_cap, streak_recycle_pool')
     .eq('id', id)
     .maybeSingle()
   if (!existing) return { error: 'ไม่พบชุดข้อสอบ' }
+
+  const sendsDueAt = data.due_at !== undefined
+  const sendsLateBands = data.late_bands !== undefined
+  if (sendsDueAt !== sendsLateBands) {
+    return { error: 'กรุณาบันทึกวันส่งและช่วงสีส่งช้าพร้อมกัน' }
+  }
+  const scheduleRequested = sendsDueAt && sendsLateBands
+  const lateSchedule = normalizeAssignmentLateSchedule({
+    dueAt: scheduleRequested ? data.due_at : existing.due_at,
+    endAt: data.end_at,
+    startAt: data.start_at,
+    bands: scheduleRequested
+      ? data.late_bands
+      : existing.late_bands as AssignmentLateBandInput[],
+  }, { requireClose: (scheduleRequested ? data.due_at : existing.due_at) != null })
+  if ('error' in lateSchedule) return { error: lateSchedule.error }
+
+  const lateScheduleChanged = scheduleRequested && (
+    !assignmentLateScheduleEquals(lateSchedule.value, {
+      dueAt: existing.due_at,
+      bands: existing.late_bands,
+    } as AssignmentLateSchedule)
+  )
+  if (lateScheduleChanged) {
+    const { data: startedSubmission, error: startedSubmissionError } = await admin
+      .from('submissions')
+      .select('id')
+      .eq('assignment_id', id)
+      .limit(1)
+      .maybeSingle()
+    if (startedSubmissionError) return { error: 'ตรวจสอบสถานะผู้ส่งงานไม่สำเร็จ กรุณาลองใหม่' }
+    if (startedSubmission) {
+      return { error: 'เปลี่ยนวันส่งหรือช่วงสีไม่ได้หลังมีนักเรียนเริ่มทำแล้ว' }
+    }
+  }
 
   const existingIds = existing.question_ids as string[]
   // `sections` and `question_ids` are only ever written together, through
@@ -873,6 +931,9 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
       ...(data.show_sections === undefined ? {} : { show_sections: data.show_sections }),
       ...(questionSet ? { question_ids: questionSet.question_ids, sections: questionSet.sections } : {}),
       start_at: data.start_at || null,
+      ...(lateScheduleChanged
+        ? { due_at: lateSchedule.value.dueAt, late_bands: lateSchedule.value.bands }
+        : {}),
       end_at: data.end_at || null,
       duration_minutes: data.duration_minutes || null,
       max_attempts: attemptSettings.max_attempts,

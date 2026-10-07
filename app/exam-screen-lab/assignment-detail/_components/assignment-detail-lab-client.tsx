@@ -21,6 +21,8 @@ const assignment: Assignment & { classrooms: { name: string } } = {
   sections: null,
   show_sections: true,
   start_at: null,
+  due_at: null,
+  late_bands: [],
   end_at: null,
   duration_minutes: null,
   status: 'closed',

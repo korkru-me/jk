@@ -1,4 +1,5 @@
 import type { IocPercentRule } from './ioc'
+import type { AssignmentLateBand } from './late-submission'
 import type { PartLabelStyle } from './part-labels'
 import type { SubjectGroup } from './subject-groups'
 
@@ -831,6 +832,13 @@ export interface Assignment {
    *  teacher can group for their own sake and still hand out a plain list. */
   show_sections: boolean
   start_at: string | null
+  /** On-time boundary. `end_at` remains the hard close. NULL keeps historical
+   * assignments on their original, time-unclassified behavior. */
+  due_at: string | null
+  /** Ordered colour transitions. The first transition starts at `due_at`; the
+   * same colour may intentionally appear in more than one band so a teacher
+   * can filter and adjust those students together later. */
+  late_bands: AssignmentLateBand[]
   end_at: string | null
   duration_minutes: number | null
   status: AssignmentStatus
@@ -1019,6 +1027,9 @@ export interface AssignmentExtension {
   id: string
   assignment_id: string
   student_id: string
+  /** Optional personal on-time boundary. NULL means this is a legacy
+   * one-timestamp extension and everything through extended_end_at is on time. */
+  extended_due_at: string | null
   extended_end_at: string
   note: string | null
   granted_by: string
