@@ -1,6 +1,6 @@
 # SEB Phase S6 — Physical platform UAT
 
-อัปเดต: 8 ตุลาคม 2026 · **กำลังดำเนินการ — r2 Windows system check ไม่ผ่าน; พบ version parser incompatibility ฝั่งเว็บ**
+อัปเดต: 8 ตุลาคม 2026 · **กำลังดำเนินการ — แก้ Windows version parser และ deploy เฉพาะ dedicated UAT แล้ว; รอทดสอบเครื่องจริงซ้ำ**
 
 เฟสนี้พิสูจน์ assignment-specific `.seb` artifact เดียวกันบน Windows, macOS,
 iPadOS และ iPhone/iOS จริง หลัง authenticated Staging mock ของ S5 ผ่านแล้ว
@@ -28,19 +28,54 @@ iPadOS และ iPhone/iOS จริง หลัง authenticated Staging mock
 - deployment contract ยอมรับ production target ของ Vercel เฉพาะ exact UAT origin + exact
   system project URL + `SEB_UAT_ISOLATED_PROJECT=true`; ค่าอื่น fail closed
 
-## Candidate r2 และจุดทำต่อ — 8 ตุลาคม 2026
+## Candidate r2-winfix และจุดทำต่อ — 8 ตุลาคม 2026
+
+- เจ้าของอนุมัติแก้ compatibility และ deploy เฉพาะ dedicated SEB UAT; source
+  `9390ab91d14a4a7649becc89b65e14a692ed7218` มาจาก frozen deployment parent
+  `a5c417afe238c00d815d1ee233c93c5ef3311055` และเปลี่ยนเพียง parser/test กับเอกสารสองไฟล์
+  ไม่รวมงานอื่นจาก main integration branch ไม่ merge master และไม่ deploy Production
+- `parseSebVersion` รับ native Windows `SEB_Windows_3.10.2.920` เพิ่มด้วย strict full-string
+  grammar จำกัด Windows; format เดิมยังผ่าน และ exact platform/version/build + CK/BEK
+  request hashes ทั้งคู่ยังบังคับเหมือนเดิม ไม่มี user-agent/version-only authorization
+- สำเนา frozen source ผ่าน 182 files / 2,504 tests, TypeScript, token lint และ production
+  build; authenticated Vercel API ตรวจ deployment `dpl_CDU2Yk9HWLGTj1C5YMNGwwguLFyD`
+  เป็น READY ใน exact project, source metadata ตรงและ alias target ตรง หน้า login 200
+  บน exact UAT origin พร้อม Staging badge และไม่มี Vercel auth page
+- เพิ่ม regression ของ real verification action บน main branch โดย mock เฉพาะ external
+  dependencies: native/legacy formats ผ่านเมื่อ hashes ตรง, wrong build/version/CK/BEK,
+  URL binding/revision mismatch และ check-in persistence failure ไม่ออก session;
+  ไม่ปลอม native pass บนเว็บ deploy Main regression รวมผ่าน 210 files / 2,864 tests
+  และ TypeScript ผ่าน Local running fixture ผ่าน compile/runtime checks และ browser
+  ธรรมดายังคงถูกระบุว่าอยู่นอก SEB ไม่ใช่ผลผ่านของ native device
+- main integration build compile ผ่านแต่ type-check ติดข้อผิดพลาดเดิมนอก scope ใน
+  `create-classroom-modal.tsx` และ `create-classroom-form.tsx` เรื่อง `.error` บน union;
+  ไม่แก้ฟอร์มห้องเรียนรอบนี้ สำเนาที่ deploy ผ่าน build ครบแล้ว
+- post-deploy read-only release attestation ยืนยัน revision 2 ยัง published, final ขนาด
+  52,606 bytes/digest/CK/สาม exact native entries ตรงเดิม ไม่มี artifact re-save,
+  enrollment ใหม่, password rotation, migration apply/repair หรือ Production mutation
+- candidate ปัจจุบัน `seb-s6-20261008-r2-winfix` ล็อก source/deployment ข้างต้น ณ
+  `2026-10-08T10:17:24.000Z` และคง release commitment
+  `1d94096a600395ad9208f79576ebe60624b09b9f9441bf0957814a12193b3536` เดิม
+  ทั้ง 32 cases เป็น pending ของ source/deployment ใหม่; ผล failed ก่อนแพตช์เก็บในประวัติ
+  ด้านล่างและ Git ไม่ยกมาเป็น pass หรือรวมข้าม candidate ยังห้ามเริ่ม S7
+- เจ้าของอยู่หน้า Windows system check แล้ว: กด **ลองตรวจใหม่** โดยยังไม่เริ่มข้อสอบ
+  แล้วแจ้งผลทั้งสี่แถว ถ้าหน้าเก่าหรือ action ของ deployment เก่าค้าง ให้เปิดไฟล์
+  `korkru-s6-assignment-r2-final.seb` เดิมด้วยตัวสอบและกลับหน้าตรวจเครื่อง
+  ไม่เปิด Configuration Tool/ไม่เปลี่ยนรหัส/ไม่เก็บคีย์ใหม่ จากนั้นยืนยัน launch ว่าไม่ถาม
+  Exam/Settings Password และทำ Windows cases ที่เหลือก่อน Mac → iPad → iPhone
+
+## Candidate r2 ก่อนแพตช์ — ประวัติที่ไม่ผ่าน ห้ามใช้ล็อก deployment ใหม่
 
 - physical Windows system check จากภาพเจ้าของไม่ผ่าน: แถวตรวจว่าเปิดใน SEB ผ่าน แต่ server
   ตอบ `ไม่พบเวอร์ชัน Safe Exam Browser ที่รองรับ` บันทึกเคส `system-check` เป็น `failed`
-  โดย `testedAt` คือเวลา Agent รับรองผลจากภาพ ไม่ใช่เวลาที่อ่านจากเครื่อง Windows;
+  โดย `testedAt=2026-10-08T09:44:22.000Z` คือเวลา Agent รับรองผลจากภาพ ไม่ใช่เวลาที่อ่านจากเครื่อง Windows;
   เคส launch ยัง pending เพราะยังไม่ได้ยืนยันชัดเจนว่าไม่มี prompt ก่อนเปิด
 - ตรวจ frozen source และซอร์สทางการ SEB Windows `v3.10.2` แล้ว: [Api.js](https://github.com/SafeExamBrowser/seb-win-refactoring/blob/v3.10.2/SafeExamBrowser.Browser/Content/Api.js)
   ใช้ `SEB_Windows_` ตามด้วย `ProgramBuildVersion` ผ่าน [RenderProcessMessageHandler](https://github.com/SafeExamBrowser/seb-win-refactoring/blob/v3.10.2/SafeExamBrowser.Browser/Handlers/RenderProcessMessageHandler.cs)
-  จึงเป็นรูปแบบ `SEB_Windows_3.10.2.920` ต่างจาก five-part format ที่ parser ปัจจุบันรับ
-  diagnostic เรียก parser ปัจจุบันกับ native format แล้วได้ `null`; ไม่ใช่หลักฐานว่าคีย์ผิด
-- ยังไม่ได้แก้ application/deploy หรือเปลี่ยน final artifact รออนุมัติแก้ parser พร้อม regression
-  แล้วอัปเดตเฉพาะ dedicated UAT, ล็อก candidate/source/deployment ใหม่และ reset suite ที่กระทบ
-  โดยคง immutable release/artifact เดิมหาก bytes และคีย์ไม่เปลี่ยน ไม่หมุนรหัสออกหรือเก็บคีย์ใหม่
+  จึงเป็นรูปแบบ `SEB_Windows_3.10.2.920` ต่างจาก five-part format ที่ parser ก่อนแพตช์รับ
+  diagnostic เรียก parser ก่อนแพตช์กับ native format แล้วได้ `null`; ไม่ใช่หลักฐานว่าคีย์ผิด
+- ขณะบันทึกผล failed ยังไม่ได้แก้ application/deploy; รอบแพตช์ที่ได้รับอนุมัติและล็อกใหม่
+  อยู่หัวข้อ r2-winfix ด้านบน โดยคง immutable release/artifact เดิม
 - เจ้าของขอให้บัญชีนักเรียนสังเคราะห์พิมพ์ข้ามเครื่องได้ง่าย จึงเปลี่ยนเฉพาะอีเมลและ
   รหัสบัญชี `student-primary` บน Staging เป็นข้อมูลสั้นสำหรับ UAT โดยคง user identity,
   role และ roster เดิม ตรวจ password login ใหม่ผ่านและ global sign-out session ตรวจสอบแล้ว
@@ -87,8 +122,8 @@ iPadOS และ iPhone/iOS จริง หลัง authenticated Staging mock
   Windows (ไม่ใช่ Configuration Tool); ต้องถึง KorKru login โดยไม่ถาม Exam/Settings Password
   แล้วทำ system check และเคสที่เหลือตามลำดับ Windows → Mac → iPad → iPhone
 
-Manifest เปลี่ยนเป็น lock r2 และเริ่มจากทั้ง 32 cases เป็น `pending`; ล่าสุด Windows system check
-เป็น `failed` อีก 31 cases ยัง pending ไม่ยกผลของ r1 หรือ preflight ก่อน enrollment มาปิดเคสใหม่
+Manifest ของ candidate ก่อนแพตช์เริ่มจากทั้ง 32 cases เป็น `pending` แล้ว Windows system check
+เป็น `failed` อีก 31 cases pending; manifest ปัจจุบัน reset เป็น r2-winfix ด้านบนแล้ว
 ยังไม่มี platform ใดผ่าน S6 ครบและห้ามเริ่ม S7
 
 การตรวจรอบ enrollment นี้: focused artifact/evidence tests ผ่าน 2 files / 23 tests,

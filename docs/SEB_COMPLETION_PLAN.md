@@ -311,8 +311,15 @@ system check ตาม runbook S6 ด้านบน
 
 ผล Windows รอบ r2 วันที่ 8 ตุลาคม: ภาพ system check ยืนยัน `failed` ที่ version parsing
 ก่อนตรวจ CK/BEK; native Windows ใช้ `SEB_Windows_3.10.2.920` แต่ parser รองรับเฉพาะ
-five-part format ยังไม่แก้/deploy รออนุมัติแก้ parser แล้วล็อก source/deployment candidate ใหม่
-โดยไม่แก้ final bytes หรือเก็บ native keys ใหม่หาก immutable release เดิมไม่เปลี่ยน
+five-part format รอบก่อนแพตช์ หลังอนุมัติแก้ strict Windows grammar พร้อม regression แล้ว
+deploy เฉพาะ dedicated UAT จาก frozen parent โดยไม่รวมงานอื่น: source `9390ab91d14a4a7649becc89b65e14a692ed7218`,
+deployment `dpl_CDU2Yk9HWLGTj1C5YMNGwwguLFyD`, candidate `seb-s6-20261008-r2-winfix`
+ตรวจ authenticated source/alias/READY/login badge และ immutable r2 release เดิมผ่าน
+reset 32 cases เป็น pending ของ deployment ใหม่; ไม่แก้ final bytes ไม่เก็บ native keys ใหม่
+ไม่หมุนรหัสออก ไม่ apply migration และไม่แตะ Production สำเนาที่ deploy ผ่าน 2,504 tests,
+TypeScript/lint/build; main ผ่าน 2,864 tests และ TypeScript แต่ build ติด preexisting union
+type errors ในฟอร์มห้องเรียนที่ไม่อยู่ scope ขั้นถัดไปกด **ลองตรวจใหม่** บน Windows
+system check โดยยังไม่เริ่มข้อสอบ ผลเครื่องจริงยัง pending ดู runbook สำหรับ source lock
 
 **Agent ทำ:** เตรียม checklist ทีละขั้น, ตรวจผลที่ไม่เป็นความลับ, แก้บั๊ก, reset เฉพาะ suite ที่
 ได้รับผลกระทบ และรัน regression ก่อนออก candidate ใหม่

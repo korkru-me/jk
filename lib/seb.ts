@@ -413,7 +413,20 @@ export function parseSebVersion(value: unknown): SebVersionInfo | null {
   ) return null
 
   const versionMatch = value.match(/_(Windows|macOS|iOS)_([A-Za-z0-9.+-]+)_([A-Za-z0-9.+-]+)_[^\s]+$/)
-  if (!versionMatch) return null
+  if (!versionMatch) {
+    // SEB Windows 3.10.2 injects its four-part file version, without the
+    // separate build/bundle fields described by the cross-platform API docs.
+    // Keep this alternate grammar Windows-only and fully anchored. Version
+    // metadata only selects exact registered BEKs; it never grants access.
+    const windowsMatch = value.match(/^SEB_Windows_(\d+\.\d+\.\d+)\.(\d+)$/)
+    if (!windowsMatch) return null
+    return {
+      platform: 'windows',
+      version: value,
+      versionString: windowsMatch[1],
+      buildNumber: windowsMatch[2],
+    }
+  }
 
   const platform: SebPlatform = versionMatch[1] === 'Windows'
     ? 'windows'
