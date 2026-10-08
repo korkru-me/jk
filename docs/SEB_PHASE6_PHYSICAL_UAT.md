@@ -1,6 +1,6 @@
 # SEB Phase S6 — Physical platform UAT
 
-อัปเดต: 8 ตุลาคม 2026 · **กำลังดำเนินการ — Windows passwordless launch และ system check ผ่านแล้ว; รอเคสสอบ/ออกที่เหลือ**
+อัปเดต: 8 ตุลาคม 2026 · **กำลังดำเนินการ — Windows launch/system check ผ่าน แต่เริ่มสอบติด URL-bound hash verification; หยุดเคสสอบก่อน**
 
 เฟสนี้พิสูจน์ assignment-specific `.seb` artifact เดียวกันบน Windows, macOS,
 iPadOS และ iPhone/iOS จริง หลัง authenticated Staging mock ของ S5 ผ่านแล้ว
@@ -75,6 +75,25 @@ iPadOS และ iPhone/iOS จริง หลัง authenticated Staging mock
   schema/candidate lock checks ผ่าน, next-step ชี้ Windows autosave/reconnect/upload/submit และ aggregate
   ยัง NOT READY ตาม pending ไม่มี application change จึงไม่รัน full tests/TypeScript/lint/build
   ใหม่ ไม่ deploy และไม่มี migration/data mutation
+- ภาพขั้นเริ่มสอบถัดมาขึ้น “การตั้งค่า Safe Exam Browser หรือเวอร์ชันไม่ตรงกับที่โรงเรียนอนุญาต”
+  ใน launch gate ยังไม่ถึงโจทย์ จึงบันทึก `windows/autosave-reconnect-upload-submit=failed`
+  ที่ `2026-10-08T10:36:27.000Z` (เวลา Agent รับรองภาพ) โดย substeps autosave/network/upload/
+  submit ยังไม่ได้ทดสอบ ไม่ลบสองผลผ่านเดิมเพราะ source/deployment/artifact ยังไม่เปลี่ยน
+- ตรวจ exact deployed source แล้วข้อความนี้มาจาก `verifySebRequestHashes` หลังผ่าน challenge,
+  release/version และ URL shape; ไม่ใช่ parser error เดิมและไม่ใช่หลักฐานว่ารหัสออกผิด
+  authenticated Vercel read ยืนยัน source/deployment/alias ยังตรง r2-winfix lock
+- พบเส้นทางที่อาจใช้ hash เก่า: dashboard ใช้ Next `Link` ไป take และ launch gate ใช้ค่า API
+  ที่มีอยู่ทันที โดยไม่สร้าง document context ใหม่; [Windows v3.10.2 Api.js](https://github.com/SafeExamBrowser/seb-win-refactoring/blob/v3.10.2/SafeExamBrowser.Browser/Content/Api.js)
+  มี `updateKeys` ที่เพียงเรียก callback และ [RenderProcessMessageHandler](https://github.com/SafeExamBrowser/seb-win-refactoring/blob/v3.10.2/SafeExamBrowser.Browser/Handlers/RenderProcessMessageHandler.cs)
+  คำนวณ hashes ของ `frame.Url` ใน `OnContextCreated` จึงอนุมาน SPA URL change อาจคง hashes
+  ของ document เดิม Synthetic-only diagnostic ยืนยัน old URL hashes ไม่ตรง new URL
+  และ fresh context matches; ยังไม่อ่าน native request hashes จากอุปกรณ์ จึงยังไม่ยืนยันสาเหตุจริง
+- ขั้นวินิจฉัยบนเครื่องเดิม: กด **ขอรหัสตรวจสอบใหม่** เพียงครั้งเดียว ปุ่มนี้ใช้
+  `window.location.assign('/assignments/.../take')` เพื่อ full navigation ไม่ใช่ถามรหัสผ่าน
+  ให้รายงานหน้าโจทย์หรือ error โดยยังไม่ submit และไม่เปลี่ยนไฟล์/รหัส/คีย์ ไม่ให้กดซ้ำวน
+- รอบวินิจฉัยนี้ parser/verification regressions 2 files / 43 tests ผ่าน บันทึกเฉพาะ
+  manifest/docs ไม่มี application implementation, deploy หรือ migration/data mutation
+  full tests/TypeScript/lint/build ไม่รันใหม่; ต้องพิสูจน์ทางแก้ก่อนออก candidate ใหม่
 
 ## Candidate r2 ก่อนแพตช์ — ประวัติที่ไม่ผ่าน ห้ามใช้ล็อก deployment ใหม่
 
@@ -273,8 +292,8 @@ npm run next:seb-physical-uat
 คำสั่งแรกตรวจ fixed schema, candidate lock, exact platform และ 8 cases ต่อระบบแบบ fail closed
 คำสั่งที่สองบอกงานถัดไปเพียงหนึ่งข้อ Manifest ปัจจุบันล็อก source/deployment/release ของ r2
 ครบแล้ว ตัวตรวจยังเป็น `NOT READY` เพราะผ่านเฉพาะ Windows passwordless launch กับ system
-check ของ r2-winfix, OS metadata ของ iPad/iPhone และอีก 30 cases ยัง pending
-งานถัดไป Windows autosave/reconnect/upload/submit ทีละขั้น ยังไม่สรุปผ่านทั้งเคสจากการเปิดหน้าโจทย์
+check ของ r2-winfix, เคสเริ่มสอบของ Windows failed และอีก 29 cases/OS metadata iPad/iPhone
+ยัง pending งานถัดไปวินิจฉัย full navigation ผ่านปุ่มขอรหัสตรวจสอบใหม่เพียงครั้งเดียวก่อนเคสสอบ
 
 หลัง physical evidence ผ่านครบ Agent จึงอัปเดต aggregate
 `config/seb-platform-evidence.json`, รัน regression + `check:seb-platforms` และปิด S6

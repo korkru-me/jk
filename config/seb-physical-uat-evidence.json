@@ -17,7 +17,7 @@
       "cases": [
         { "id": "opens-without-entry-password", "status": "passed", "testedAt": "2026-10-08T10:32:14.000Z" },
         { "id": "system-check", "status": "passed", "testedAt": "2026-10-08T10:27:58.000Z" },
-        { "id": "autosave-reconnect-upload-submit", "status": "pending", "testedAt": null },
+        { "id": "autosave-reconnect-upload-submit", "status": "failed", "testedAt": "2026-10-08T10:36:27.000Z" },
         { "id": "quit-link-after-submit", "status": "pending", "testedAt": null },
         { "id": "wrong-config-rejected", "status": "pending", "testedAt": null },
         { "id": "modified-config-rejected", "status": "pending", "testedAt": null },

@@ -324,6 +324,13 @@ system check โดยยังไม่เริ่มข้อสอบ ล่
 อีก 30 cases pending ขั้นถัดไปเริ่มเคส autosave/reconnect/upload/submit โดยเข้าโจทย์ก่อน
 และตรวจทีละขั้น ไม่ต้องตั้งค่า/เก็บคีย์ใหม่ ดู runbook สำหรับ source lock
 
+ผลขั้นเริ่มสอบ Windows ถัดมาถูกปฏิเสธที่ URL-bound CK/BEK hash verification ก่อนเห็นโจทย์
+จึงบันทึกเคสสอบรวม failed (substeps ยังไม่เริ่ม) source/alias ยังตรง lock สงสัย Next SPA
+navigation คง native Windows API hashes ของ document URL เดิม เพราะ official updateKeys
+เป็น callback-only และฉีด hashes ใน OnContextCreated ขั้นวินิจฉัยคือปุ่ม **ขอรหัสตรวจสอบใหม่**
+ซึ่ง full-navigate เพียงครั้งเดียว ไม่ต้องเปลี่ยนไฟล์/รหัส/คีย์ ยังไม่ได้แก้ application/deploy
+และยังไม่ยืนยันสาเหตุจาก native request hashes ดู runbook สำหรับหลักฐานและข้อจำกัด
+
 **Agent ทำ:** เตรียม checklist ทีละขั้น, ตรวจผลที่ไม่เป็นความลับ, แก้บั๊ก, reset เฉพาะ suite ที่
 ได้รับผลกระทบ และรัน regression ก่อนออก candidate ใหม่
 
