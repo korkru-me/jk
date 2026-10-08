@@ -296,16 +296,18 @@ BEK ของ macOS/iPadOS/iOS ต้องสร้าง synthetic assignment 
 ทุกระบบ เก็บ BEK ของ exact build ทั้งหมดผ่าน local secret channel **ก่อน** registration ครั้งเดียว
 และห้าม re-save candidate ระหว่างเก็บ BEK
 
-อัปเดต 7 ตุลาคม 2026: r1 ไม่ผ่าน Windows launch จาก URL-filter origin เก่า; materializer
+อัปเดต 8 ตุลาคม 2026: r1 ไม่ผ่าน Windows launch จาก URL-filter origin เก่า; materializer
 แก้แล้วและรอบ r2 เก็บ native evidence ครบสี่ targets (สาม unique builds) จาก final bytes
-ชุดเดียว แบบ passwordless พร้อม teacher-owned quit revision 2 Local enrollment dry-run ผ่าน
-แต่ยังไม่ apply/publish เพราะต้องยืนยัน live dedicated UAT alias/deployment หลัง saved
-Vercel credential อ่าน API ได้ 403 และ Chrome ต้องล็อกอินใหม่ ห้ามนับการเก็บคีย์เป็น physical
-UAT ผ่าน Manifest ยังคงประวัติ failed ของ r1 จน r2 enrollment/publish/lock สำเร็จ
-รวม master ถึง `c677d8e` แล้ว local/Staging migration history ตรงกัน 140 รายการ;
-ไม่มี migration apply/repair หรือ Production mutation รอบนี้ Regression หลังรวมผ่าน
-209 files / 2,839 tests, TypeScript, token lint และ production build จุดทำต่อแบบละเอียด
-อยู่ใน runbook S6 ด้านบน
+ชุดเดียวแบบ passwordless พร้อม teacher-owned quit revision 2 ยืนยัน authenticated Vercel
+metadata หลังล็อกอิน CLI ใหม่แล้ว ลงทะเบียน immutable release r2 และอ่าน file digest/size
+และ native keys กลับมาตรวจตรงครบ จากนั้น publish ผ่าน UI ครูสังเคราะห์และตรวจ status ในฐาน
+เป็น published Candidate `seb-s6-20261008-r2` ล็อก source/deployment/release ใหม่และ reset
+ทั้ง 32 cases เป็น pending ห้ามนับ enrollment/การเก็บคีย์เป็น physical UAT ผ่าน
+local/Staging migration history ตรงกัน 140 รายการถึง `20261006102054`; งาน late-submission
+ใหม่บน master ยังไม่อยู่ Staging จึงไม่ merge/apply งานนั้นในรอบนี้ ไม่มี migration apply/repair,
+deploy หรือ Production mutation Regression ของ integration commit เดิมผ่าน 209 files /
+2,839 tests, TypeScript, token lint และ production build จุดทำต่อคือ Windows launch แล้ว
+system check ตาม runbook S6 ด้านบน
 
 **Agent ทำ:** เตรียม checklist ทีละขั้น, ตรวจผลที่ไม่เป็นความลับ, แก้บั๊ก, reset เฉพาะ suite ที่
 ได้รับผลกระทบ และรัน regression ก่อนออก candidate ใหม่

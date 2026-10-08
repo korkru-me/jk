@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "candidate": {
-    "candidateId": "seb-s6-20260927b",
-    "sourceRevision": "47c35d69ef21571401f02dca529f5f4024297f1d",
-    "stagingDeploymentId": "dpl_4VGLadkUHsvCsU9e6b48vYvs5baR",
-    "releaseCommitmentSha256": "75f394c7e505caa6a8ecb40f7c99e42f27fd2f8c9d605e8c010131adcb0e16aa",
-    "lockedAt": "2026-09-27T15:27:43.670Z"
+    "candidateId": "seb-s6-20261008-r2",
+    "sourceRevision": "a5c417afe238c00d815d1ee233c93c5ef3311055",
+    "stagingDeploymentId": "dpl_BfjRy3mrTfv8hnvd7oNxRrWc7iM1",
+    "releaseCommitmentSha256": "1d94096a600395ad9208f79576ebe60624b09b9f9441bf0957814a12193b3536",
+    "lockedAt": "2026-10-08T03:30:18.709Z"
   },
   "platforms": [
     {
@@ -15,7 +15,7 @@
       "buildNumber": "920",
       "osVersion": "Windows 11 Home Single Language 25H2 (OS Build 26200.9550)",
       "cases": [
-        { "id": "opens-without-entry-password", "status": "failed", "testedAt": "2026-09-30T06:43:10.000Z" },
+        { "id": "opens-without-entry-password", "status": "pending", "testedAt": null },
         { "id": "system-check", "status": "pending", "testedAt": null },
         { "id": "autosave-reconnect-upload-submit", "status": "pending", "testedAt": null },
         { "id": "quit-link-after-submit", "status": "pending", "testedAt": null },
