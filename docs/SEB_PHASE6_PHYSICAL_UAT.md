@@ -30,6 +30,11 @@ iPadOS และ iPhone/iOS จริง หลัง authenticated Staging mock
 
 ## Candidate r2 และจุดทำต่อ — 8 ตุลาคม 2026
 
+- เจ้าของขอให้บัญชีนักเรียนสังเคราะห์พิมพ์ข้ามเครื่องได้ง่าย จึงเปลี่ยนเฉพาะอีเมลและ
+  รหัสบัญชี `student-primary` บน Staging เป็นข้อมูลสั้นสำหรับ UAT โดยคง user identity,
+  role และ roster เดิม ตรวจ password login ใหม่ผ่านและ global sign-out session ตรวจสอบแล้ว
+  ข้อมูลใหม่อยู่ใน owner-only fixture/handoff นอก Git; ไม่เปลี่ยนบัญชีครู รหัสออก SEB,
+  artifact, source/deployment หรือ policy ของบัญชีจริง และยังไม่ใช่ผลผ่าน native system check
 - ครูตั้ง Quit/Unlock Password ของ revision 2 ผ่านเว็บแล้ว; ลงทะเบียน immutable release r2
   และเผยแพร่ assignment `seb_required` ผ่าน UI ครูสังเคราะห์แล้ว ก่อนเผยแพร่ยังไม่มี attempt
   ข้อมูลและ mutation รอบนี้จำกัดเฉพาะ synthetic fixture บน Staging
