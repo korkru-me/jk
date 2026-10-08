@@ -12,6 +12,7 @@ import {
   signSebClaims,
   verifySebClaims,
   verifySebRequestHashes,
+  type SebBrowserExamKeyEntry,
 } from '@/lib/seb'
 
 const CONFIG_KEY = 'a'.repeat(64)
@@ -23,7 +24,7 @@ const ASSIGNMENT_ID = '22222222-2222-4222-8222-222222222222'
 const ASSIGNMENT_CONFIG_REVISION = 7
 const REQUEST_URL = `https://exam.example/assignments/${ASSIGNMENT_ID}/take?sebChallenge=token#ignored`
 const WINDOWS_VERSION = 'SEB_Windows_3.10.2_920_org.safeexambrowser.SafeExamBrowser'
-const ALL_KEY_ENTRIES = [
+const ALL_KEY_ENTRIES: SebBrowserExamKeyEntry[] = [
   { platform: 'windows', versionString: '3.10.2', buildNumber: '920', key: BROWSER_KEY },
   { platform: 'macos', versionString: '3.7', buildNumber: '100', key: 'c'.repeat(64) },
   { platform: 'ios', versionString: '3.6.2', buildNumber: '101', key: 'd'.repeat(64) },
@@ -219,6 +220,56 @@ describe('SEB environment and version validation', () => {
 
   it('does not treat a browser user agent as an SEB version', () => {
     expect(parseSebVersion('Mozilla/5.0 Safari')).toBeNull()
+  })
+
+  it('parses the compact native Windows JavaScript API version without losing its build', () => {
+    expect(parseSebVersion('SEB_Windows_3.10.2.920')).toEqual({
+      platform: 'windows',
+      version: 'SEB_Windows_3.10.2.920',
+      versionString: '3.10.2',
+      buildNumber: '920',
+    })
+    expect(selectSebBrowserExamKeys(ALL_KEY_ENTRIES, parseSebVersion('SEB_Windows_3.10.2.920')!))
+      .toEqual([BROWSER_KEY])
+  })
+
+  it.each([
+    'SEB_Windows_3.10.2.921',
+    'SEB_Windows_3.10.3.920',
+    'SEB_Windows_3.11.2.920',
+  ])('does not allow a different compact version or build: %s', value => {
+    expect(selectSebBrowserExamKeys(ALL_KEY_ENTRIES, parseSebVersion(value)!)).toEqual([])
+  })
+
+  it.each([
+    'SEB_Windows_3.10.2',
+    'SEB_Windows_3.10.2.920.extra',
+    'SEB_Windows_3.10.2.920_org.safeexambrowser.SafeExamBrowser',
+    'SEB_Windows_3.10.2.920 ',
+    ' SEB_Windows_3.10.2.920',
+    'prefix_SEB_Windows_3.10.2.920',
+    'SEB_windows_3.10.2.920',
+    'SEB_macOS_3.10.2.920',
+    'SEB_iOS_3.10.2.920',
+    'SEB_Windows_3.10.2.x',
+    'SEB_Windows_3.10.2.920\n',
+  ])('rejects malformed or non-Windows compact API versions: %s', value => {
+    expect(parseSebVersion(value)).toBeNull()
+  })
+
+  it('still requires both correct key hashes for a compact Windows version', () => {
+    const version = parseSebVersion('SEB_Windows_3.10.2.920')!
+    const browserExamKeys = selectSebBrowserExamKeys(ALL_KEY_ENTRIES, version)
+    const input = {
+      requestUrl: REQUEST_URL,
+      configKey: CONFIG_KEY,
+      browserExamKeys,
+      configKeyHash: createSebRequestHash(REQUEST_URL, CONFIG_KEY),
+      browserExamKeyHash: createSebRequestHash(REQUEST_URL, BROWSER_KEY),
+    }
+    expect(verifySebRequestHashes(input)).toBe(true)
+    expect(verifySebRequestHashes({ ...input, configKeyHash: '0'.repeat(64) })).toBe(false)
+    expect(verifySebRequestHashes({ ...input, browserExamKeyHash: '0'.repeat(64) })).toBe(false)
   })
 
   it('reports deployment readiness without returning secret values', () => {

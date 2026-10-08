@@ -1,5 +1,7 @@
 # Architecture
 
+SEB runtime compatibility (8 ตุลาคม 2026): `lib/seb.ts` รับทั้ง documented five-part JavaScript API version และ compact Windows `SEB_Windows_<major.minor.patch>.<build>` ที่ native 3.10.2 ส่งจริง compact grammar ไม่รับ macOS/iOS หรือ user-agent และไม่เปลี่ยน exact build registry/CK+BEK verification; version metadata ไม่ใช่ authorization
+
 อัปเดตล่าสุด: 25 กันยายน 2026
 
 เอกสารนี้อธิบายสถาปัตยกรรมที่พบใน repository ปัจจุบัน ไม่ใช่การรับรองว่าทุกส่วนถูก deploy หรือผ่านการทดสอบ production แล้ว
