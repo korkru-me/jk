@@ -309,6 +309,11 @@ deploy หรือ Production mutation Regression ของ integration commit 
 2,839 tests, TypeScript, token lint และ production build จุดทำต่อคือ Windows launch แล้ว
 system check ตาม runbook S6 ด้านบน
 
+ผล Windows รอบ r2 วันที่ 8 ตุลาคม: ภาพ system check ยืนยัน `failed` ที่ version parsing
+ก่อนตรวจ CK/BEK; native Windows ใช้ `SEB_Windows_3.10.2.920` แต่ parser รองรับเฉพาะ
+five-part format ยังไม่แก้/deploy รออนุมัติแก้ parser แล้วล็อก source/deployment candidate ใหม่
+โดยไม่แก้ final bytes หรือเก็บ native keys ใหม่หาก immutable release เดิมไม่เปลี่ยน
+
 **Agent ทำ:** เตรียม checklist ทีละขั้น, ตรวจผลที่ไม่เป็นความลับ, แก้บั๊ก, reset เฉพาะ suite ที่
 ได้รับผลกระทบ และรัน regression ก่อนออก candidate ใหม่
 

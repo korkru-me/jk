@@ -1,6 +1,6 @@
 # SEB Phase S6 — Physical platform UAT
 
-อัปเดต: 8 ตุลาคม 2026 · **กำลังดำเนินการ — r2 ลงทะเบียนและเผยแพร่แล้ว; เริ่ม physical UAT บน Windows ได้**
+อัปเดต: 8 ตุลาคม 2026 · **กำลังดำเนินการ — r2 Windows system check ไม่ผ่าน; พบ version parser incompatibility ฝั่งเว็บ**
 
 เฟสนี้พิสูจน์ assignment-specific `.seb` artifact เดียวกันบน Windows, macOS,
 iPadOS และ iPhone/iOS จริง หลัง authenticated Staging mock ของ S5 ผ่านแล้ว
@@ -30,6 +30,17 @@ iPadOS และ iPhone/iOS จริง หลัง authenticated Staging mock
 
 ## Candidate r2 และจุดทำต่อ — 8 ตุลาคม 2026
 
+- physical Windows system check จากภาพเจ้าของไม่ผ่าน: แถวตรวจว่าเปิดใน SEB ผ่าน แต่ server
+  ตอบ `ไม่พบเวอร์ชัน Safe Exam Browser ที่รองรับ` บันทึกเคส `system-check` เป็น `failed`
+  โดย `testedAt` คือเวลา Agent รับรองผลจากภาพ ไม่ใช่เวลาที่อ่านจากเครื่อง Windows;
+  เคส launch ยัง pending เพราะยังไม่ได้ยืนยันชัดเจนว่าไม่มี prompt ก่อนเปิด
+- ตรวจ frozen source และซอร์สทางการ SEB Windows `v3.10.2` แล้ว: [Api.js](https://github.com/SafeExamBrowser/seb-win-refactoring/blob/v3.10.2/SafeExamBrowser.Browser/Content/Api.js)
+  ใช้ `SEB_Windows_` ตามด้วย `ProgramBuildVersion` ผ่าน [RenderProcessMessageHandler](https://github.com/SafeExamBrowser/seb-win-refactoring/blob/v3.10.2/SafeExamBrowser.Browser/Handlers/RenderProcessMessageHandler.cs)
+  จึงเป็นรูปแบบ `SEB_Windows_3.10.2.920` ต่างจาก five-part format ที่ parser ปัจจุบันรับ
+  diagnostic เรียก parser ปัจจุบันกับ native format แล้วได้ `null`; ไม่ใช่หลักฐานว่าคีย์ผิด
+- ยังไม่ได้แก้ application/deploy หรือเปลี่ยน final artifact รออนุมัติแก้ parser พร้อม regression
+  แล้วอัปเดตเฉพาะ dedicated UAT, ล็อก candidate/source/deployment ใหม่และ reset suite ที่กระทบ
+  โดยคง immutable release/artifact เดิมหาก bytes และคีย์ไม่เปลี่ยน ไม่หมุนรหัสออกหรือเก็บคีย์ใหม่
 - เจ้าของขอให้บัญชีนักเรียนสังเคราะห์พิมพ์ข้ามเครื่องได้ง่าย จึงเปลี่ยนเฉพาะอีเมลและ
   รหัสบัญชี `student-primary` บน Staging เป็นข้อมูลสั้นสำหรับ UAT โดยคง user identity,
   role และ roster เดิม ตรวจ password login ใหม่ผ่านและ global sign-out session ตรวจสอบแล้ว
@@ -76,8 +87,9 @@ iPadOS และ iPhone/iOS จริง หลัง authenticated Staging mock
   Windows (ไม่ใช่ Configuration Tool); ต้องถึง KorKru login โดยไม่ถาม Exam/Settings Password
   แล้วทำ system check และเคสที่เหลือตามลำดับ Windows → Mac → iPad → iPhone
 
-Manifest เปลี่ยนเป็น lock r2 แล้วและ reset ทั้ง 32 cases เป็น `pending`; ไม่ยกผลของ r1 หรือ
-Windows preflight ก่อน enrollment มาปิดเคสใหม่ ยังไม่มี platform ใดผ่าน S6 ครบและห้ามเริ่ม S7
+Manifest เปลี่ยนเป็น lock r2 และเริ่มจากทั้ง 32 cases เป็น `pending`; ล่าสุด Windows system check
+เป็น `failed` อีก 31 cases ยัง pending ไม่ยกผลของ r1 หรือ preflight ก่อน enrollment มาปิดเคสใหม่
+ยังไม่มี platform ใดผ่าน S6 ครบและห้ามเริ่ม S7
 
 การตรวจรอบ enrollment นี้: focused artifact/evidence tests ผ่าน 2 files / 23 tests,
 candidate/schema checks ผ่านและ next-step ชี้ Windows launch; physical release gate ยัง
@@ -213,8 +225,8 @@ npm run next:seb-physical-uat
 
 คำสั่งแรกตรวจ fixed schema, candidate lock, exact platform และ 8 cases ต่อระบบแบบ fail closed
 คำสั่งที่สองบอกงานถัดไปเพียงหนึ่งข้อ Manifest ปัจจุบันล็อก source/deployment/release ของ r2
-ครบแล้ว ตัวตรวจยังเป็น `NOT READY` เพราะ OS metadata ของ iPad/iPhone และทั้ง 32 physical
-cases ยัง pending ตามจริง งานแรกคือ Windows `opens-without-entry-password`
+ครบแล้ว ตัวตรวจยังเป็น `NOT READY` เพราะ Windows system check failed, OS metadata ของ
+iPad/iPhone และอีก 31 cases ยัง pending งานถัดไปต้องแก้ parser และล็อก candidate ใหม่ก่อนทดสอบต่อ
 
 หลัง physical evidence ผ่านครบ Agent จึงอัปเดต aggregate
 `config/seb-platform-evidence.json`, รัน regression + `check:seb-platforms` และปิด S6
