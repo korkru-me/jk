@@ -1,5 +1,10 @@
 # Feature status
 
+### ขยายเมนูด้านซ้ายแบบ overlay เมื่อชี้ icon rail (8 ตุลาคม 2026)
+
+- **UI-049** — เมื่อ sidebar อยู่ในสถานะย่อบน desktop การ hover ที่ icon rail จะเปิด label และ contextual action ทั้งแผงเป็น overlay `w-64` เหนือเนื้อหา โดย outer flex slot ยังคง `w-20` จึงไม่ดัน main content; เมื่อ pointer ออกจากแถบจะหุบทันที ส่วนการกด hamburger ยังเป็นวิธีเดียวที่ปักหมุดแถบเต็ม จำสถานะใน localStorage และขยาย layout จริง · mobile drawer, backdrop, Escape, contextual registry และสิทธิ์ไม่เปลี่ยน
+- local Chrome fixture ยืนยันที่ preset ปัจจุบันว่า rail และจุดเริ่ม main อยู่ `96px`; ระหว่าง hover panel ขยายเป็นประมาณ `307px` แต่ main ยังอยู่ `96px`, เมื่อออกกลับเป็น `96px` และเมื่อกด hamburger ทั้ง panel กับ main เปลี่ยนเป็นประมาณ `307px` · mobile viewport 390px ยืนยัน drawer เต็ม, backdrop และ Escape ตามเดิม · TypeScript, design-token lint, Next.js compilation/runtime และ webpack production build ผ่าน; axe ของ icon rail ไม่พบ violation ส่วน panel เต็มทั้งแบบ overlay และ pinned พบ contrast เดิม 1 จุดที่ subtitle ของการ์ดห้องเรียน ไม่ได้เกิดจากกลไก overlay รอบนี้
+
 ### สถานะส่งช้าตามช่วงสี — โค้ดครบเฟส 0–4 (7 ตุลาคม 2026)
 
 - **เฟส 0 ตรวจ migration แล้ว:** ฐานหลักยังขาด local-only SEB 12 เวอร์ชันเดิมตามที่บันทึกเมื่อ 6 ตุลาคม ไม่พบ mismatch ชุดใหม่ ทั้ง 12 ตัวเป็น rollout เฉพาะ Staging/QA และไม่ควร apply หรือ repair เข้า Production แบบเหมารวม เจ้าของอนุมัติให้เฟส 1 สร้าง migration อิสระโดยไม่แตะรายการเหล่านี้และยังไม่ apply Production

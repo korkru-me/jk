@@ -268,6 +268,7 @@ interface SidebarProps {
 
 export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = false }: SidebarProps) {
   const [desktop, setDesktop] = useState(false)
+  const [desktopPreviewOpen, setDesktopPreviewOpen] = useState(false)
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const search = sidebarSearchKey(searchParams.toString())
@@ -293,28 +294,52 @@ export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = f
   }, [])
 
   useEffect(() => {
+    if (!desktop || !collapsed) setDesktopPreviewOpen(false)
+  }, [collapsed, desktop])
+
+  useEffect(() => {
     if (pendingSidebar && pathname !== pendingSidebar.sourcePathname && !pendingMatches) {
       clearPendingSidebar()
     }
   }, [clearPendingSidebar, pathname, pendingMatches, pendingSidebar])
 
+  const compactOnDesktop = collapsed && !desktopPreviewOpen
+
   return (
-    <SidebarDisplayProvider compactOnDesktop={collapsed}>
-    <aside id="app-sidebar" aria-label="เมนูด้านข้าง" inert={!desktop && !isOpen} className={cn(
-      'flex-shrink-0 border-r bg-card overflow-hidden',
-      'fixed bottom-0 left-0 top-16 z-30 w-64 transition-none',
-      'md:static',
-      isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
-      collapsed ? 'md:w-20' : 'md:w-64',
-    )}>
-      <div className="w-full h-full flex flex-col">
+    <SidebarDisplayProvider compactOnDesktop={compactOnDesktop}>
+    <aside
+      id="app-sidebar"
+      aria-label="เมนูด้านข้าง"
+      inert={!desktop && !isOpen}
+      data-collapsed={collapsed ? 'true' : 'false'}
+      data-preview-open={desktopPreviewOpen ? 'true' : 'false'}
+      onMouseEnter={() => {
+        if (desktop && collapsed) setDesktopPreviewOpen(true)
+      }}
+      onMouseLeave={() => setDesktopPreviewOpen(false)}
+      className={cn(
+        'fixed bottom-0 left-0 top-16 z-30 w-64 flex-shrink-0 transition-none',
+        'md:static md:overflow-visible',
+        isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+        collapsed ? 'md:w-20' : 'md:w-64',
+      )}
+    >
+      <div
+        data-sidebar-panel
+        className={cn(
+          'flex h-full w-64 flex-col overflow-hidden border-r bg-card transition-none',
+          collapsed && 'md:absolute md:inset-y-0 md:left-0',
+          compactOnDesktop ? 'md:w-20' : 'md:w-64',
+          desktopPreviewOpen && 'md:shadow-lg',
+        )}
+      >
         {/* Nav */}
         {contextualContent || usesClassroomSidebar ? (
-          <div className={cn('flex-1 overflow-y-auto overflow-x-hidden p-3', collapsed && 'md:p-2')}>
+          <div className={cn('flex-1 overflow-y-auto overflow-x-hidden p-3', compactOnDesktop && 'md:p-2')}>
             {contextualContent ?? <ClassroomSectionNavigation pathname={pathname} onNavigate={onClose} />}
           </div>
         ) : (
-          <nav aria-label="เมนูหลัก" className={cn('flex flex-1 flex-col gap-1 overflow-y-auto overflow-x-hidden p-3', collapsed && 'md:p-2')}>
+          <nav aria-label="เมนูหลัก" className={cn('flex flex-1 flex-col gap-1 overflow-y-auto overflow-x-hidden p-3', compactOnDesktop && 'md:p-2')}>
             {navItems.map((entry) => (
               isGroup(entry)
                 ? (
@@ -323,7 +348,7 @@ export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = f
                     group={entry}
                     pathname={pathname}
                     onNavigate={onClose}
-                    compactOnDesktop={collapsed}
+                    compactOnDesktop={compactOnDesktop}
                   />
                 )
                 : (
@@ -331,14 +356,14 @@ export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = f
                     key={entry.href}
                     href={entry.href}
                     onClick={onClose}
-                    title={collapsed ? entry.label : undefined}
+                    title={compactOnDesktop ? entry.label : undefined}
                     aria-current={isNavActive(pathname, entry.href) ? 'page' : undefined}
                     className={cn(
                       'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
                       isNavActive(pathname, entry.href)
                         ? 'bg-primary/10 text-primary'
                         : 'text-foreground/70 hover:bg-muted hover:text-foreground',
-                      collapsed && 'md:justify-center md:px-2 md:min-h-11',
+                      compactOnDesktop && 'md:justify-center md:px-2 md:min-h-11',
                     )}
                   >
                     <NavItemIcon icon={entry.icon} />
@@ -351,12 +376,12 @@ export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = f
 
         {/* Admin link */}
         {role === 'admin' && !usesClassroomSidebar && !contextualContent && (
-          <div className={cn('px-3 pb-2', collapsed && 'md:px-2')}>
+          <div className={cn('px-3 pb-2', compactOnDesktop && 'md:px-2')}>
             <Link
               href="/admin"
               onClick={onClose}
-              title={collapsed ? 'Admin Panel' : undefined}
-              className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors bg-warning/10 text-warning hover:bg-warning/20 border border-warning/20', collapsed && 'md:justify-center md:px-2')}
+              title={compactOnDesktop ? 'Admin Panel' : undefined}
+              className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors bg-warning/10 text-warning hover:bg-warning/20 border border-warning/20', compactOnDesktop && 'md:justify-center md:px-2')}
             >
               <NavItemIcon icon={ShieldCheck} />
               <SidebarLabel>Admin Panel</SidebarLabel>
@@ -365,12 +390,12 @@ export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = f
         )}
 
         {/* User info */}
-        <div className={cn('p-4 border-t shrink-0', collapsed && 'md:px-2')} title={fullName}>
-          <div className={cn('flex items-center gap-3', collapsed && 'md:justify-center')}>
-            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-bold shrink-0">
+        <div className={cn('shrink-0 border-t p-4', compactOnDesktop && 'md:px-2')} title={fullName}>
+          <div className={cn('flex items-center gap-3', compactOnDesktop && 'md:justify-center')}>
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
               {fullName.charAt(0)}
             </div>
-            <div className={cn('flex-1 min-w-0', collapsed && 'md:sr-only')}>
+            <div className={cn('min-w-0 flex-1', compactOnDesktop && 'md:sr-only')}>
               <p className="text-sm font-medium truncate">{fullName}</p>
               <p className="text-xs text-muted-foreground">
                 {role === 'teacher' ? 'ครู' : role === 'student' ? 'นักเรียน' : 'Admin'}
