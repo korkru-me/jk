@@ -1,6 +1,6 @@
 # SEB Phase S6 — Physical platform UAT
 
-อัปเดต: 8 ตุลาคม 2026 · **กำลังดำเนินการ — Windows system check บนเครื่องจริงผ่านแล้ว; รอยืนยัน passwordless launch และเคสสอบ/ออกที่เหลือ**
+อัปเดต: 8 ตุลาคม 2026 · **กำลังดำเนินการ — Windows passwordless launch และ system check ผ่านแล้ว; รอเคสสอบ/ออกที่เหลือ**
 
 เฟสนี้พิสูจน์ assignment-specific `.seb` artifact เดียวกันบน Windows, macOS,
 iPadOS และ iPhone/iOS จริง หลัง authenticated Staging mock ของ S5 ผ่านแล้ว
@@ -63,12 +63,16 @@ iPadOS และ iPhone/iOS จริง หลัง authenticated Staging mock
   จึงบันทึกเฉพาะ `windows/system-check=passed` ที่ `2026-10-08T10:27:58.000Z`
   ซึ่งเป็นเวลา Agent รับรองภาพ ไม่ใช่เวลาของเครื่อง/เวลา expiry ภาพไม่มีรหัสหรือ raw key;
   ตรวจ Vercel metadata ซ้ำว่า source/deployment/alias ยังตรง lock ปัจจุบันก่อนบันทึก
-- ยังไม่อนุมานว่า launch ไม่มี Exam/Settings Password จากภาพหน้าตรวจเครื่อง:
-  ขอเจ้าของยืนยันจากการเปิดไฟล์รอบนี้ก่อน แล้วจึงเริ่มเคส autosave/reconnect/upload/submit
+- เจ้าของยืนยันต่อว่าเปิดไฟล์รอบนี้ไม่ถามรหัสใดก่อนถึงเว็บ จึงบันทึก
+  `windows/opens-without-entry-password=passed` ที่ `2026-10-08T10:32:14.000Z`
+  (เวลา Agent รับรองข้อความ ไม่ใช่เวลาที่เครื่องเปิดไฟล์) จากคำยืนยันโดยตรง ไม่ใช่อนุมานจากภาพ
+- ขั้นถัดไป Windows autosave/reconnect/upload/submit: เริ่มด้วยเลื่อนลงใต้กล่องผลตรวจ
+  กด **กลับรายการข้อสอบ** แล้วเริ่มชุด `SEB S6 Physical UAT Exam` ใน native SEB เดิม
+  ยืนยันหน้าโจทย์ก่อนค่อยทดสอบคำตอบ/เครือข่ายทีละขั้นและยังไม่ submit
   ใช้ `korkru-s6-assignment-r2-final.seb` เดิม ไม่ต้องเปิด Configuration Tool,
-  เปลี่ยนรหัสหรือเก็บคีย์ใหม่ อีก 31 cases pending และยังไม่มี platform ผ่านครบ
-- รอบบันทึกภาพนี้เปลี่ยนเฉพาะ manifest/docs: evidence regression 1 file / 8 tests ผ่าน,
-  schema/candidate lock checks ผ่าน, next-step ชี้ Windows passwordless launch และ aggregate
+  เปลี่ยนรหัสหรือเก็บคีย์ใหม่ อีก 30 cases pending และยังไม่มี platform ผ่านครบ
+- รอบบันทึกผลเครื่องนี้เปลี่ยนเฉพาะ manifest/docs: evidence regression 1 file / 8 tests ผ่าน,
+  schema/candidate lock checks ผ่าน, next-step ชี้ Windows autosave/reconnect/upload/submit และ aggregate
   ยัง NOT READY ตาม pending ไม่มี application change จึงไม่รัน full tests/TypeScript/lint/build
   ใหม่ ไม่ deploy และไม่มี migration/data mutation
 
@@ -268,9 +272,9 @@ npm run next:seb-physical-uat
 
 คำสั่งแรกตรวจ fixed schema, candidate lock, exact platform และ 8 cases ต่อระบบแบบ fail closed
 คำสั่งที่สองบอกงานถัดไปเพียงหนึ่งข้อ Manifest ปัจจุบันล็อก source/deployment/release ของ r2
-ครบแล้ว ตัวตรวจยังเป็น `NOT READY` เพราะผ่านเฉพาะ Windows system check ของ r2-winfix,
-OS metadata ของ iPad/iPhone และอีก 31 cases ยัง pending งานถัดไปยืนยันว่า Windows launch
-รอบนี้ไม่ถาม Exam/Settings Password โดยไม่บังคับเปิดซ้ำหากเจ้าของจำผลได้ แล้วทดสอบเคสสอบต่อ
+ครบแล้ว ตัวตรวจยังเป็น `NOT READY` เพราะผ่านเฉพาะ Windows passwordless launch กับ system
+check ของ r2-winfix, OS metadata ของ iPad/iPhone และอีก 30 cases ยัง pending
+งานถัดไป Windows autosave/reconnect/upload/submit ทีละขั้น ยังไม่สรุปผ่านทั้งเคสจากการเปิดหน้าโจทย์
 
 หลัง physical evidence ผ่านครบ Agent จึงอัปเดต aggregate
 `config/seb-platform-evidence.json`, รัน regression + `check:seb-platforms` และปิด S6
