@@ -5,6 +5,7 @@ import {
 } from 'node:crypto'
 import sebReleaseRegistry from '@/config/seb-release-registry.json'
 import { signSebClaimsCore, verifySebClaimsCore } from '@/lib/seb-claims-core.mjs'
+import { parseSebVersionCore } from '@/lib/seb-version-core.mjs'
 
 export type SebPlatform = 'windows' | 'macos' | 'ios'
 export type SebChallengePurpose = 'take' | 'system_check'
@@ -71,7 +72,6 @@ export interface SebReadiness {
 
 const SHA256_HEX_PATTERN = /^[0-9a-f]{64}$/i
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-const MAX_VERSION_LENGTH = 240
 const SAFE_METADATA_PATTERN = /^[A-Za-z0-9.+-]{1,40}$/
 const SAFE_REVISION_PATTERN = /^[A-Za-z0-9._-]{1,120}$/
 const MAX_ASSIGNMENT_CONFIG_REVISION = 2_147_483_646
@@ -405,41 +405,7 @@ export function verifySebRequestHashes(input: {
 }
 
 export function parseSebVersion(value: unknown): SebVersionInfo | null {
-  if (
-    typeof value !== 'string'
-    || value.length < 5
-    || value.length > MAX_VERSION_LENGTH
-    || /[\u0000-\u001f\u007f]/.test(value)
-  ) return null
-
-  const versionMatch = value.match(/_(Windows|macOS|iOS)_([A-Za-z0-9.+-]+)_([A-Za-z0-9.+-]+)_[^\s]+$/)
-  if (!versionMatch) {
-    // SEB Windows 3.10.2 injects its four-part file version, without the
-    // separate build/bundle fields described by the cross-platform API docs.
-    // Keep this alternate grammar Windows-only and fully anchored. Version
-    // metadata only selects exact registered BEKs; it never grants access.
-    const windowsMatch = value.match(/^SEB_Windows_(\d+\.\d+\.\d+)\.(\d+)$/)
-    if (!windowsMatch) return null
-    return {
-      platform: 'windows',
-      version: value,
-      versionString: windowsMatch[1],
-      buildNumber: windowsMatch[2],
-    }
-  }
-
-  const platform: SebPlatform = versionMatch[1] === 'Windows'
-    ? 'windows'
-    : versionMatch[1] === 'macOS'
-      ? 'macos'
-      : 'ios'
-
-  return {
-    platform,
-    version: value,
-    versionString: versionMatch[2],
-    buildNumber: versionMatch[3],
-  }
+  return parseSebVersionCore(value)
 }
 
 export function signSebClaims(claims: SebClaims, secret: string) {

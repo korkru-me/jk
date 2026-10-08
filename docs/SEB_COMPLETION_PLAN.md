@@ -331,6 +331,20 @@ navigation คง native Windows API hashes ของ document URL เดิม 
 ซึ่ง full-navigate เพียงครั้งเดียว ไม่ต้องเปลี่ยนไฟล์/รหัส/คีย์ ยังไม่ได้แก้ application/deploy
 และยังไม่ยืนยันสาเหตุจาก native request hashes ดู runbook สำหรับหลักฐานและข้อจำกัด
 
+รายงานถัดมาว่า “ยืนยันสำเร็จ” สีเขียวชั่วครู่แล้ววนแดง ทำให้ตรวจพบ root bug เพิ่มเติม:
+signed-session reader ยังใช้ five-part version grammar เก่า และ production primitive sign→read
+คืน null สำหรับ native compact Windows แม้ action ยืนยันผ่านแล้ว รวม grammar เป็น
+`lib/seb-version-core.mjs` และขยาย regressions ข้าม real verification/cookie/session/access/
+attempt resume (external dependencies mocked) โดยรักษา HMAC/expiry/context/platform gate
+สำเนา source `07209c7` เตรียมจาก frozen deployment parent โดยไม่รวมงานอื่น ผ่าน 2,536 tests,
+TypeScript/lint/build; main ผ่าน 2,887 tests แต่ type gate ยังติดฟอร์มห้องเรียนเดิม
+rollout dedicated UAT และ post-deploy attestation ผ่านแล้ว: deployment
+`dpl_4DRgqUQV1W7SmJYRsT7w2d6Y4yhE`, candidate `seb-s6-20261008-r2-sessionfix`
+ล็อก source/deployment กับ release commitment เดิมและ reset 32 cases pending โดยเก็บผลรอบเก่า
+ใน runbook จุดทำต่อคือ Windows หน้า launch gate เดิมกด **ขอรหัสตรวจสอบใหม่** หลังแพตช์
+อีกครั้งเพียงครั้งเดียวเพื่อ full navigation รับหน้าใหม่ แล้วแจ้งโจทย์/error โดยยังไม่ submit
+ไม่เปลี่ยน final r2/release/keys/passwords/schema/Production และไม่ยกผลจำลองเป็น physical pass
+
 **Agent ทำ:** เตรียม checklist ทีละขั้น, ตรวจผลที่ไม่เป็นความลับ, แก้บั๊ก, reset เฉพาะ suite ที่
 ได้รับผลกระทบ และรัน regression ก่อนออก candidate ใหม่
 

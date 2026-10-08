@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "candidate": {
-    "candidateId": "seb-s6-20261008-r2-winfix",
-    "sourceRevision": "9390ab91d14a4a7649becc89b65e14a692ed7218",
-    "stagingDeploymentId": "dpl_CDU2Yk9HWLGTj1C5YMNGwwguLFyD",
+    "candidateId": "seb-s6-20261008-r2-sessionfix",
+    "sourceRevision": "07209c7597d8aadc9bbaa5a3e11e0572dfd256ca",
+    "stagingDeploymentId": "dpl_4DRgqUQV1W7SmJYRsT7w2d6Y4yhE",
     "releaseCommitmentSha256": "1d94096a600395ad9208f79576ebe60624b09b9f9441bf0957814a12193b3536",
-    "lockedAt": "2026-10-08T10:17:24.000Z"
+    "lockedAt": "2026-10-08T13:29:29.000Z"
   },
   "platforms": [
     {
@@ -15,9 +15,9 @@
       "buildNumber": "920",
       "osVersion": "Windows 11 Home Single Language 25H2 (OS Build 26200.9550)",
       "cases": [
-        { "id": "opens-without-entry-password", "status": "passed", "testedAt": "2026-10-08T10:32:14.000Z" },
-        { "id": "system-check", "status": "passed", "testedAt": "2026-10-08T10:27:58.000Z" },
-        { "id": "autosave-reconnect-upload-submit", "status": "failed", "testedAt": "2026-10-08T10:36:27.000Z" },
+        { "id": "opens-without-entry-password", "status": "pending", "testedAt": null },
+        { "id": "system-check", "status": "pending", "testedAt": null },
+        { "id": "autosave-reconnect-upload-submit", "status": "pending", "testedAt": null },
         { "id": "quit-link-after-submit", "status": "pending", "testedAt": null },
         { "id": "wrong-config-rejected", "status": "pending", "testedAt": null },
         { "id": "modified-config-rejected", "status": "pending", "testedAt": null },

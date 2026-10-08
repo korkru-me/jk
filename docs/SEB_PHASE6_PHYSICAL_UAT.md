@@ -1,6 +1,6 @@
 # SEB Phase S6 — Physical platform UAT
 
-อัปเดต: 8 ตุลาคม 2026 · **กำลังดำเนินการ — Windows launch/system check ผ่าน แต่เริ่มสอบติด URL-bound hash verification; หยุดเคสสอบก่อน**
+อัปเดต: 8 ตุลาคม 2026 · **กำลังดำเนินการ — แก้ Windows signed-session grammar และ deploy dedicated UAT แล้ว; รอผลเครื่องจริง**
 
 เฟสนี้พิสูจน์ assignment-specific `.seb` artifact เดียวกันบน Windows, macOS,
 iPadOS และ iPhone/iOS จริง หลัง authenticated Staging mock ของ S5 ผ่านแล้ว
@@ -28,7 +28,53 @@ iPadOS และ iPhone/iOS จริง หลัง authenticated Staging mock
 - deployment contract ยอมรับ production target ของ Vercel เฉพาะ exact UAT origin + exact
   system project URL + `SEB_UAT_ISOLATED_PROJECT=true`; ค่าอื่น fail closed
 
-## Candidate r2-winfix และจุดทำต่อ — 8 ตุลาคม 2026
+## Candidate r2-sessionfix และจุดทำต่อ — 8 ตุลาคม 2026
+
+- เจ้าของรายงานว่าปุ่มขอรหัสตรวจสอบใหม่ขึ้น “ยืนยันสำเร็จ” สีเขียวชั่วครู่ แล้ววนกลับแดง
+  เพิ่มหลักฐานว่าขั้น verify ผ่านก่อนหน้าโจทย์ แต่ไม่ถือว่าถึง attempt หรือผ่านเคสสอบรวม
+- ตรวจ exact deployed `lib/seb-claims-core.mjs` พบ `validVersion` ยังรับเฉพาะ five-part
+  ต่างจาก `parseSebVersion` ที่รับ compact Windows แล้ว Synthetic sign→verify ของ production
+  primitive ยืนยัน legacy true / compact false; coupled test ของ real verification→cookie→
+  real session/access read ก่อนแก้ล้ม 3 cases ที่ session เป็น null นี่คือบั๊กที่ยืนยันได้จาก source
+  เรื่อง SPA/native stale hashes ที่วินิจฉัยก่อนหน้าอาจเป็นอีกเงื่อนไข แต่ยังไม่ยกเป็นสาเหตุหลัก
+- รวม version grammar ที่ `lib/seb-version-core.mjs` ให้ native parser กับ signed claim reader
+  ใช้ implementation เดียวกัน รองรับ Windows compact + legacy Windows/macOS/iOS โดยยังต้อง
+  exact platform match, bounded/control-free metadata, signed HMAC/expiry และ exact
+  user/assignment/release/revision เช่นเดิม CK+BEK challenge verification ไม่เปลี่ยน
+- ขยาย regression ให้ใช้ real verification action, signed cookie, real `getSebSession`,
+  real `getExamAccessSession` และ real `startSubmission` resume โดย mock เฉพาะ auth/DB/cookie
+  storage/external dependencies; ตรวจทั้ง take/system_check, tampering, exact bindings,
+  wrong key/build/version, expiry และ malformed/platform mismatch ไม่ใช้ server mocks เป็น
+  native pass ไม่สร้าง attempt หรือปลอม keys บน fixture จริงเพื่อให้ gate ดูผ่าน
+- main ผ่าน 211 files / 2,887 tests และ token lint; `npx tsc --noEmit` ติดเฉพาะ error เดิม
+  `.error` บน union ใน `create-classroom-modal.tsx` และ `create-classroom-form.tsx`
+  ไม่แก้สองฟอร์มนี้และไม่รัน main production build ซ้ำเมื่อ type gate เดิมยังไม่ผ่าน
+- สำเนาที่จะ deploy จาก frozen `9390ab91d14a4a7649becc89b65e14a692ed7218` เปลี่ยนเพียง
+  5 source/test files กับเอกสาร 2 files ไม่มีงานอื่น Source `07209c7597d8aadc9bbaa5a3e11e0572dfd256ca`
+  push บน `codex/seb-windows-version-fix` แล้ว ผ่าน 184 files / 2,536 tests, TypeScript,
+  token lint และ production build; compact session round-trip/signature/expiry diagnostic ผ่าน
+- skill `next-dev-loop` ตรวจ running local fixture และ compile route `/assignments/[id]/take`
+  ผ่าน ไม่มี compilation/runtime error; React state ของ Chrome ธรรมดายัง outside ไม่ปลอม
+  native verification Browser session ของงานปิดแล้ว โดยคง local dev server ไว้
+- ก่อน rollout read-only migration parity ตรง 140 รายการถึง `20261006102054`; r2 ยัง
+  revision 2/published และ 52,606-byte final/digest/CK/3 exact entries ตรงเดิม Vercel API
+  เริ่มตอบ 403 แต่ CLI refresh session สำเร็จ จากนั้น authenticated source/alias check ผ่าน
+  ไม่ให้เจ้าของ login ใหม่ ไม่แสดง credential และไม่เปลี่ยน fixture/password/artifact/schema
+- deploy เฉพาะ `korkru-seb-uat` สำเร็จเป็น `dpl_4DRgqUQV1W7SmJYRsT7w2d6Y4yhE`;
+  post-deploy authenticated read ยืนยัน exact project/source/alias/READY, login 200 ที่ UAT
+  origin มี Staging badge ไม่มี Vercel auth page และ post-deploy immutable release read ตรงเดิม
+- ล็อก candidate `seb-s6-20261008-r2-sessionfix` ที่ `2026-10-08T13:29:29.000Z` พร้อม source/
+  deployment ข้างต้นและ release commitment `1d94096a600395ad9208f79576ebe60624b09b9f9441bf0957814a12193b3536`
+  เดิม Shared session-reader change กระทบทุก platform จึง reset 32 cases เป็น pending
+  ของ source/deployment ใหม่ โดยเก็บสอง pass/หนึ่ง failed เดิมในประวัติด้านล่างและ Git
+  ไม่กล่าวว่า native ผ่านจากผลจำลอง ไม่มี platform ผ่านครบและห้ามเริ่ม S7
+- เจ้าของอยู่ Windows launch gate เดิม: หลังแจ้งว่า deploy/attest สำเร็จ ให้กด
+  **ขอรหัสตรวจสอบใหม่** อีกครั้งเพียงครั้งเดียวเพื่อ full navigation รับหน้า/action/challenge ใหม่
+  แล้วรายงานว่าเห็นโจทย์หรือ error โดยยังไม่ submit/ปิด SEB ถ้าเกิดข้อผิดพลาดให้หยุด ไม่วนกดซ้ำ
+  ใช้ final r2/credentials เดิม ไม่ต้องแก้/บันทึกไฟล์ เปลี่ยนรหัส หรือเก็บ native keys ใหม่
+  ผล launch/system-check และเคสสอบของ candidate ใหม่นับผ่านเฉพาะเมื่อยืนยันเครื่องจริงอีกครั้ง
+
+## Candidate r2-winfix — ประวัติก่อน signed-session fix
 
 - เจ้าของอนุมัติแก้ compatibility และ deploy เฉพาะ dedicated SEB UAT; source
   `9390ab91d14a4a7649becc89b65e14a692ed7218` มาจาก frozen deployment parent
@@ -290,10 +336,11 @@ npm run next:seb-physical-uat
 ```
 
 คำสั่งแรกตรวจ fixed schema, candidate lock, exact platform และ 8 cases ต่อระบบแบบ fail closed
-คำสั่งที่สองบอกงานถัดไปเพียงหนึ่งข้อ Manifest ปัจจุบันล็อก source/deployment/release ของ r2
-ครบแล้ว ตัวตรวจยังเป็น `NOT READY` เพราะผ่านเฉพาะ Windows passwordless launch กับ system
-check ของ r2-winfix, เคสเริ่มสอบของ Windows failed และอีก 29 cases/OS metadata iPad/iPhone
-ยัง pending งานถัดไปวินิจฉัย full navigation ผ่านปุ่มขอรหัสตรวจสอบใหม่เพียงครั้งเดียวก่อนเคสสอบ
+คำสั่งที่สองบอกงานถัดไปเพียงหนึ่งข้อ Manifest ปัจจุบันล็อก source/deployment/release ของ
+r2-sessionfix ครบแล้ว ตัวตรวจยังเป็น `NOT READY` เพราะทั้ง 32 cases ของ source/deployment ใหม่
+และ OS metadata iPad/iPhone pending ไม่ยกผลของ r2-winfix มาปิด suite นี้ งานขณะเจ้าของค้าง
+หน้า launch gate คือ full navigation ผ่านปุ่มขอรหัสตรวจสอบใหม่หลังแพตช์เพียงครั้งเดียว
+แล้วเก็บคำยืนยัน/ผลตรวจของ candidate ใหม่โดยไม่บังคับตั้งค่า/เก็บคีย์ซ้ำ
 
 หลัง physical evidence ผ่านครบ Agent จึงอัปเดต aggregate
 `config/seb-platform-evidence.json`, รัน regression + `check:seb-platforms` และปิด S6
