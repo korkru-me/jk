@@ -1,6 +1,6 @@
 # SEB Phase S6 — Physical platform UAT
 
-อัปเดต: 8 ตุลาคม 2026 · **กำลังดำเนินการ — แก้ Windows version parser และ deploy เฉพาะ dedicated UAT แล้ว; รอทดสอบเครื่องจริงซ้ำ**
+อัปเดต: 8 ตุลาคม 2026 · **กำลังดำเนินการ — Windows system check บนเครื่องจริงผ่านแล้ว; รอยืนยัน passwordless launch และเคสสอบ/ออกที่เหลือ**
 
 เฟสนี้พิสูจน์ assignment-specific `.seb` artifact เดียวกันบน Windows, macOS,
 iPadOS และ iPhone/iOS จริง หลัง authenticated Staging mock ของ S5 ผ่านแล้ว
@@ -56,13 +56,21 @@ iPadOS และ iPhone/iOS จริง หลัง authenticated Staging mock
 - candidate ปัจจุบัน `seb-s6-20261008-r2-winfix` ล็อก source/deployment ข้างต้น ณ
   `2026-10-08T10:17:24.000Z` และคง release commitment
   `1d94096a600395ad9208f79576ebe60624b09b9f9441bf0957814a12193b3536` เดิม
-  ทั้ง 32 cases เป็น pending ของ source/deployment ใหม่; ผล failed ก่อนแพตช์เก็บในประวัติ
+  เริ่มจากทั้ง 32 cases เป็น pending ของ source/deployment ใหม่; ผล failed ก่อนแพตช์เก็บในประวัติ
   ด้านล่างและ Git ไม่ยกมาเป็น pass หรือรวมข้าม candidate ยังห้ามเริ่ม S7
-- เจ้าของอยู่หน้า Windows system check แล้ว: กด **ลองตรวจใหม่** โดยยังไม่เริ่มข้อสอบ
-  แล้วแจ้งผลทั้งสี่แถว ถ้าหน้าเก่าหรือ action ของ deployment เก่าค้าง ให้เปิดไฟล์
-  `korkru-s6-assignment-r2-final.seb` เดิมด้วยตัวสอบและกลับหน้าตรวจเครื่อง
-  ไม่เปิด Configuration Tool/ไม่เปลี่ยนรหัส/ไม่เก็บคีย์ใหม่ จากนั้นยืนยัน launch ว่าไม่ถาม
-  Exam/Settings Password และทำ Windows cases ที่เหลือก่อน Mac → iPad → iPhone
+- ภาพล่าสุดจากเจ้าของยืนยัน Windows system check ผ่านครบสี่แถวและแสดง
+  “เครื่องนี้ผ่านการตรวจสอบ”, ระบบ Windows, พร้อมข้อความว่าบันทึกผลให้ครูแล้ว
+  จึงบันทึกเฉพาะ `windows/system-check=passed` ที่ `2026-10-08T10:27:58.000Z`
+  ซึ่งเป็นเวลา Agent รับรองภาพ ไม่ใช่เวลาของเครื่อง/เวลา expiry ภาพไม่มีรหัสหรือ raw key;
+  ตรวจ Vercel metadata ซ้ำว่า source/deployment/alias ยังตรง lock ปัจจุบันก่อนบันทึก
+- ยังไม่อนุมานว่า launch ไม่มี Exam/Settings Password จากภาพหน้าตรวจเครื่อง:
+  ขอเจ้าของยืนยันจากการเปิดไฟล์รอบนี้ก่อน แล้วจึงเริ่มเคส autosave/reconnect/upload/submit
+  ใช้ `korkru-s6-assignment-r2-final.seb` เดิม ไม่ต้องเปิด Configuration Tool,
+  เปลี่ยนรหัสหรือเก็บคีย์ใหม่ อีก 31 cases pending และยังไม่มี platform ผ่านครบ
+- รอบบันทึกภาพนี้เปลี่ยนเฉพาะ manifest/docs: evidence regression 1 file / 8 tests ผ่าน,
+  schema/candidate lock checks ผ่าน, next-step ชี้ Windows passwordless launch และ aggregate
+  ยัง NOT READY ตาม pending ไม่มี application change จึงไม่รัน full tests/TypeScript/lint/build
+  ใหม่ ไม่ deploy และไม่มี migration/data mutation
 
 ## Candidate r2 ก่อนแพตช์ — ประวัติที่ไม่ผ่าน ห้ามใช้ล็อก deployment ใหม่
 
@@ -260,8 +268,9 @@ npm run next:seb-physical-uat
 
 คำสั่งแรกตรวจ fixed schema, candidate lock, exact platform และ 8 cases ต่อระบบแบบ fail closed
 คำสั่งที่สองบอกงานถัดไปเพียงหนึ่งข้อ Manifest ปัจจุบันล็อก source/deployment/release ของ r2
-ครบแล้ว ตัวตรวจยังเป็น `NOT READY` เพราะ Windows system check failed, OS metadata ของ
-iPad/iPhone และอีก 31 cases ยัง pending งานถัดไปต้องแก้ parser และล็อก candidate ใหม่ก่อนทดสอบต่อ
+ครบแล้ว ตัวตรวจยังเป็น `NOT READY` เพราะผ่านเฉพาะ Windows system check ของ r2-winfix,
+OS metadata ของ iPad/iPhone และอีก 31 cases ยัง pending งานถัดไปยืนยันว่า Windows launch
+รอบนี้ไม่ถาม Exam/Settings Password โดยไม่บังคับเปิดซ้ำหากเจ้าของจำผลได้ แล้วทดสอบเคสสอบต่อ
 
 หลัง physical evidence ผ่านครบ Agent จึงอัปเดต aggregate
 `config/seb-platform-evidence.json`, รัน regression + `check:seb-platforms` และปิด S6

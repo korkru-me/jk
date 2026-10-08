@@ -319,7 +319,9 @@ reset 32 cases เป็น pending ของ deployment ใหม่; ไม่
 ไม่หมุนรหัสออก ไม่ apply migration และไม่แตะ Production สำเนาที่ deploy ผ่าน 2,504 tests,
 TypeScript/lint/build; main ผ่าน 2,864 tests และ TypeScript แต่ build ติด preexisting union
 type errors ในฟอร์มห้องเรียนที่ไม่อยู่ scope ขั้นถัดไปกด **ลองตรวจใหม่** บน Windows
-system check โดยยังไม่เริ่มข้อสอบ ผลเครื่องจริงยัง pending ดู runbook สำหรับ source lock
+system check โดยยังไม่เริ่มข้อสอบ ล่าสุดภาพจากเจ้าของยืนยัน Windows system check ผ่าน
+ทั้งสี่แถวแล้ว บันทึกเฉพาะเคสนี้; อีก 31 cases pending ขั้นถัดไปขอยืนยัน passwordless launch
+จากการเปิดรอบนี้ก่อนเริ่มเคสสอบ ไม่ต้องตั้งค่า/เก็บคีย์ใหม่ ดู runbook สำหรับ source lock
 
 **Agent ทำ:** เตรียม checklist ทีละขั้น, ตรวจผลที่ไม่เป็นความลับ, แก้บั๊ก, reset เฉพาะ suite ที่
 ได้รับผลกระทบ และรัน regression ก่อนออก candidate ใหม่

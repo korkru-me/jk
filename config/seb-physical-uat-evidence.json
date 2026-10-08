@@ -16,7 +16,7 @@
       "osVersion": "Windows 11 Home Single Language 25H2 (OS Build 26200.9550)",
       "cases": [
         { "id": "opens-without-entry-password", "status": "pending", "testedAt": null },
-        { "id": "system-check", "status": "pending", "testedAt": null },
+        { "id": "system-check", "status": "passed", "testedAt": "2026-10-08T10:27:58.000Z" },
         { "id": "autosave-reconnect-upload-submit", "status": "pending", "testedAt": null },
         { "id": "quit-link-after-submit", "status": "pending", "testedAt": null },
         { "id": "wrong-config-rejected", "status": "pending", "testedAt": null },

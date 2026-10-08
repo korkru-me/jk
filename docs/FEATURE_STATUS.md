@@ -2,6 +2,8 @@
 
 **SEB Windows compatibility patch — 8 ตุลาคม 2026:** `parseSebVersion` รองรับ native JavaScript API `SEB_Windows_3.10.2.920` เพิ่มจาก five-part format เดิม โดย alternate grammar จำกัดเฉพาะ Windows และต้องตรงทั้งสตริง ยังคัด BEK จาก exact platform/version/build และตรวจ CK+BEK hashes ทั้งคู่ ไม่ใช้ version หรือ user-agent เป็นสิทธิ์ เพิ่ม regression สำหรับ build/รุ่นที่ไม่ตรง รูปแบบผิด และคีย์ผิด Deploy เฉพาะ dedicated UAT แล้วจาก frozen source (`9390ab9`, deployment `dpl_CDU2Yk9HWLGTj1C5YMNGwwguLFyD`) โดยไม่รวมงานอื่น สำเนา deploy ผ่าน 2,504 tests/TypeScript/lint/build, main ผ่าน 2,864 tests/TypeScript รวม verification-action regressions แต่ main build ติด error เดิมของฟอร์มห้องเรียน ล็อก `seb-s6-20261008-r2-winfix` และ reset 32 cases เป็น pending; ยังไม่แทนผล physical system check และไม่เปลี่ยนไฟล์ final/release, รหัสออก, migration หรือ Production ขั้นถัดไป Windows กด “ลองตรวจใหม่” โดยยังไม่เริ่มข้อสอบ
 
+**ผลเครื่องจริงหลังแพตช์:** ภาพล่าสุดยืนยัน Windows system check ผ่านทั้งสี่แถวและบันทึกผลให้ครูแล้ว ตรวจ source/deployment/alias ซ้ำตรง lock ก่อนบันทึกเฉพาะ `windows/system-check=passed` อีก 31 cases pending ยังไม่ถือว่า Windows/S6 ผ่านครบ ขั้นถัดไปขอยืนยันว่าเปิด `r2-final` รอบนี้ไม่มี Exam/Settings Password ก่อนถึงเว็บ แล้วทดสอบเคสสอบต่อ ไม่ต้องตั้งค่าหรือเก็บคีย์ใหม่
+
 ### เลือกหน่วยเกณฑ์ผ่านจากดรอปดาว (7 ตุลาคม 2026)
 
 - **UI-048** — ปุ่มหน่วยหลังค่า “ผ่านเกณฑ์” แสดงหน่วยปัจจุบันพร้อมลูกศรลง; การกดครั้งแรกเปิดดรอปดาว `%` และ `คะแนน` โดยยังไม่เปลี่ยนค่า ผู้ใช้ต้องเลือกหน่วยจากรายการจึงบันทึกค่าที่เปลี่ยน ทั้งหน้าสร้างและแก้ไขแบบฝึกหัด/ข้อสอบ พร้อมตรึงข้อความ ค่า และปุ่มหน่วยให้อยู่บรรทัดเดียวแม้หน้าจอแคบ โดยคง payload และ validation เดิม
