@@ -1,6 +1,6 @@
 # SEB Phase S6 — Physical platform UAT
 
-อัปเดต: 8 ตุลาคม 2026 · **กำลังดำเนินการ — แก้ Windows signed-session grammar และ deploy dedicated UAT แล้ว; รอผลเครื่องจริง**
+อัปเดต: 8 ตุลาคม 2026 · **กำลังดำเนินการ — เจ้าของยืนยัน Windows เข้าโจทย์ได้หลัง signed-session fix; กำลังทดสอบบันทึกคำตอบ**
 
 เฟสนี้พิสูจน์ assignment-specific `.seb` artifact เดียวกันบน Windows, macOS,
 iPadOS และ iPhone/iOS จริง หลัง authenticated Staging mock ของ S5 ผ่านแล้ว
@@ -73,6 +73,19 @@ iPadOS และ iPhone/iOS จริง หลัง authenticated Staging mock
   แล้วรายงานว่าเห็นโจทย์หรือ error โดยยังไม่ submit/ปิด SEB ถ้าเกิดข้อผิดพลาดให้หยุด ไม่วนกดซ้ำ
   ใช้ final r2/credentials เดิม ไม่ต้องแก้/บันทึกไฟล์ เปลี่ยนรหัส หรือเก็บ native keys ใหม่
   ผล launch/system-check และเคสสอบของ candidate ใหม่นับผ่านเฉพาะเมื่อยืนยันเครื่องจริงอีกครั้ง
+- เจ้าของยืนยันว่า **เข้าทำข้อสอบได้แล้ว** หลัง retry รอบแพตช์ signed-session;
+  รับรองคำยืนยันที่ `2026-10-08T13:45:23.000Z` (เวลา Agent รับรอง ไม่ใช่เวลาเครื่อง Windows)
+  authenticated read-only Vercel check ซ้ำยืนยัน exact source/deployment/alias/READY และ
+  Staging badge ตรง candidate ปัจจุบัน ไม่มี deploy หรือข้อมูล fixture เปลี่ยนในรอบนี้
+  บันทึกเป็นความคืบหน้าเฉพาะถึงหน้าโจทย์ ไม่ใช่ผลผ่าน `autosave-reconnect-upload-submit`
+  และไม่อนุมานว่า launch/system-check ของ candidate ใหม่นับผ่านแล้ว ทั้ง 32 cases ยัง pending
+- ขั้นต่อไปบน Windows เดิม: ตอบข้อแรกหนึ่งข้อ แล้วรอข้อความ **บันทึก...** กลับเป็น
+  **บันทึกอัตโนมัติ** ให้เจ้าของรายงานสถานะก่อนทดสอบเครือข่ายต่อ ยังไม่ submit,
+  ปิด SEB, ปิด Wi-Fi หรือแก้ final r2/รหัส/คีย์; ถ้ายังรอซิงก์หรือมี error ให้รายงานตามจริง
+- รอบบันทึกความคืบหน้านี้แก้เฉพาะ runbook: evidence regression 1 file / 8 tests ผ่าน,
+  schema/candidate lock ผ่าน แต่ physical aggregate ยัง `NOT READY` ตาม pending;
+  next-step checker ยังชี้ launch เพราะไม่ได้ใช้การถึงโจทย์แทนหลักฐานทั้งเคส
+  ไม่รัน full tests/TypeScript/lint/build ใหม่ ไม่มี application change, migration หรือ deploy
 
 ## Candidate r2-winfix — ประวัติก่อน signed-session fix
 
@@ -338,9 +351,10 @@ npm run next:seb-physical-uat
 คำสั่งแรกตรวจ fixed schema, candidate lock, exact platform และ 8 cases ต่อระบบแบบ fail closed
 คำสั่งที่สองบอกงานถัดไปเพียงหนึ่งข้อ Manifest ปัจจุบันล็อก source/deployment/release ของ
 r2-sessionfix ครบแล้ว ตัวตรวจยังเป็น `NOT READY` เพราะทั้ง 32 cases ของ source/deployment ใหม่
-และ OS metadata iPad/iPhone pending ไม่ยกผลของ r2-winfix มาปิด suite นี้ งานขณะเจ้าของค้าง
-หน้า launch gate คือ full navigation ผ่านปุ่มขอรหัสตรวจสอบใหม่หลังแพตช์เพียงครั้งเดียว
-แล้วเก็บคำยืนยัน/ผลตรวจของ candidate ใหม่โดยไม่บังคับตั้งค่า/เก็บคีย์ซ้ำ
+และ OS metadata iPad/iPhone pending ไม่ยกผลของ r2-winfix มาปิด suite นี้ เจ้าของยืนยันเข้า
+หน้าโจทย์ Windows ได้หลังแพตช์แล้ว ขั้นต่อไปเก็บผล autosave ก่อนเครือข่าย/upload/submit
+และยืนยัน launch/system-check ของ candidate ใหม่เมื่อถึงจังหวะเหมาะสม โดยไม่บังคับตั้งค่า/
+เก็บคีย์ซ้ำหรือออกจาก attempt ที่กำลังทำเพียงเพื่อเรียง checklist
 
 หลัง physical evidence ผ่านครบ Agent จึงอัปเดต aggregate
 `config/seb-platform-evidence.json`, รัน regression + `check:seb-platforms` และปิด S6
