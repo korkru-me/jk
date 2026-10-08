@@ -447,6 +447,7 @@ export function CreateAssignmentForm({
       color: band.color,
     })),
   )
+  const [scheduleOpen, setScheduleOpen] = useState(Boolean(startAt || dueAt || endAt))
 
   // Every โจทย์ this teacher can actually assign. Kept as a set because both
   // the แฟ้ม shortcut and importSet ask "is this id real?" once per ข้อ in a
@@ -1761,7 +1762,7 @@ export function CreateAssignmentForm({
       {step === 2 && (
         <div className="space-y-3">
           <Card padding="md">
-            <Collapsible defaultOpen={Boolean(startAt || dueAt || endAt)}>
+            <Collapsible open={scheduleOpen} onOpenChange={setScheduleOpen}>
               <CollapsibleTrigger className="group flex w-full items-center justify-between gap-3 text-left">
                 <span className="flex min-w-0 flex-col gap-1">
                   <span className="text-sm font-semibold text-foreground">กำหนดวันทำ</span>
