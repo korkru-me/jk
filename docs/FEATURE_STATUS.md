@@ -1,5 +1,7 @@
 # Feature status
 
+**SEB Windows session round-trip fix — 8 ตุลาคม 2026:** พบ native verification รับ compact Windows version แล้วแต่ signed-session reader ยังปฏิเสธ จึงเกิด “ยืนยันสำเร็จ” แล้วกลับ launch gate รวม grammar เป็น `lib/seb-version-core.mjs` ที่ทั้งสองจุดใช้ร่วมกัน เพิ่ม regression ตั้งแต่ real verification action → cookie → real session/access reader → real attempt resume โดย mock เฉพาะ external dependencies, พร้อม negative signature/expiry/context/platform/version tests สำเนา dedicated UAT ผ่าน 184 files / 2,536 tests, TypeScript, token lint และ production build ยังต้องพิสูจน์บนเครื่องจริง ไม่เปลี่ยน final artifact/keys/passwords/schema/Production
+
 **SEB Windows compatibility patch — 8 ตุลาคม 2026:** `parseSebVersion` รองรับ native JavaScript API `SEB_Windows_3.10.2.920` เพิ่มจาก five-part format เดิม โดย alternate grammar จำกัดเฉพาะ Windows และต้องตรงทั้งสตริง ยังคัด BEK จาก exact platform/version/build และตรวจ CK+BEK hashes ทั้งคู่ ไม่ใช้ version หรือ user-agent เป็นสิทธิ์ เพิ่ม regression สำหรับ build/รุ่นที่ไม่ตรง รูปแบบผิด และคีย์ผิด แพตช์สำหรับ dedicated UAT เท่านั้น; ยังไม่แทนผล physical system check และไม่เปลี่ยนไฟล์ final/release หรือ Production
 
 ตรวจจาก repository และ isolated Staging: 27 กันยายน 2026

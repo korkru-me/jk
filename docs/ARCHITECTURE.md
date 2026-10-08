@@ -1,5 +1,7 @@
 # Architecture
 
+SEB signed-session handoff (8 ตุลาคม 2026): native metadata และ `verifySebClaimsCore` ใช้ `lib/seb-version-core.mjs` เป็น grammar เดียวกัน เพื่อให้ Windows compact version ที่ผ่าน CK+BEK แล้วอ่านกลับจาก signed HttpOnly session ได้เหมือน format เดิม Exact signature/expiry/user/assignment/release/revision/platform ยังบังคับเหมือนเดิม และ malformed/control-character versions ถูกปฏิเสธ
+
 SEB runtime compatibility (8 ตุลาคม 2026): `lib/seb.ts` รับทั้ง documented five-part JavaScript API version และ compact Windows `SEB_Windows_<major.minor.patch>.<build>` ที่ native 3.10.2 ส่งจริง compact grammar ไม่รับ macOS/iOS หรือ user-agent และไม่เปลี่ยน exact build registry/CK+BEK verification; version metadata ไม่ใช่ authorization
 
 อัปเดตล่าสุด: 25 กันยายน 2026
