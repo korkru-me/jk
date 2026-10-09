@@ -1,6 +1,6 @@
 # SEB Phase S6 — Physical platform UAT
 
-อัปเดต: 8 ตุลาคม 2026 · **กำลังดำเนินการ — เจ้าของยืนยัน Windows เข้าโจทย์ได้หลัง signed-session fix; กำลังทดสอบบันทึกคำตอบ**
+อัปเดต: 9 ตุลาคม 2026 · **Physical S6 พักก่อนเคส Windows เน็ตหลุด; W1 ห้องรอสอบยังรอ feasibility/shared-contract decision**
 
 เฟสนี้พิสูจน์ assignment-specific `.seb` artifact เดียวกันบน Windows, macOS,
 iPadOS และ iPhone/iOS จริง หลัง authenticated Staging mock ของ S5 ผ่านแล้ว
@@ -8,7 +8,10 @@ iPadOS และ iPhone/iOS จริง หลัง authenticated Staging mock
 
 **จุดพัก/แผนใหม่ 9 ตุลาคม 2026:** เจ้าของขอพักก่อนขั้น Windows เน็ตหลุด แล้วขอแผน
 ห้องรอสอบและโหมดข้อสอบเดียวก่อนทดสอบต่อ แผนย่อย W1–W7 อยู่ใน
-[`SEB_COMPLETION_PLAN.md`](./SEB_COMPLETION_PLAN.md) และยังรอคำสั่งเริ่ม implementation
+[`SEB_COMPLETION_PLAN.md`](./SEB_COMPLETION_PLAN.md) เจ้าของอนุมัติ W1–W6 เฉพาะเว็บทดสอบ
+และหยุดก่อน W7 แล้ว ผลตรวจ W1 พบ static native Quit URL ไม่ผ่านเงื่อนไขห้ามออกก่อนส่ง
+และ shared atomic start RPC ที่ต้องอนุมัติ จึงยังไม่ผ่าน gate/ไม่เริ่ม W2–W6 implementation
+ทาง completion reconfiguration เป็น candidate จาก source เท่านั้น ไม่ใช่ native pass
 ภาพล่าสุดของ r2-sessionfix อยู่ที่หน้าโจทย์เลือก ก พร้อมข้อความบันทึกอัตโนมัติ/
 เชื่อมห้องคุมสอบแล้ว ยังไม่มีผล offline/reconnect/resume/upload/submit/quit รอบนี้
 ไม่แก้ final r2, release, candidate manifest หรือสถานะผ่าน ให้เก็บเป็นประวัติเดิมและแยก

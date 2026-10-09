@@ -1,6 +1,6 @@
 # แผนปิดงาน Safe Exam Browser หลัง Drawing Board
 
-อัปเดต: 23 กันยายน 2026
+อัปเดต: 9 ตุลาคม 2026
 
 เอกสารนี้กำหนดลำดับงาน SEB/Exam ต่อจาก `origin/master` ที่ commit
 `15be506d38e06449a9a2d40242a2b9a0d919fa91` โดยแยกขอบเขตจาก Drawing Board
@@ -173,9 +173,9 @@ browser ปกติออกจาก native SEB ตามจริง แล�
   ทิ้ง plaintext password ทันที ห้ามเก็บ/แสดงย้อนกลับ และห้าม rotate ระหว่างมี attempt กำลังทำ
 - ห้ามอ้างว่า static Quit URL ที่ซ่อนปุ่มไว้เป็น authorization, ห้ามเปิด CK-only และห้าม merge
   vault/migration เก่าจนผ่านการทบทวน ledger, key recovery, tenant isolation และ BEK lifecycle ใหม่
-- Staging revision ถัดไปต้องตั้ง native Quit URL เป็น `/exam/quit`; หน้าผลการส่งแสดงลิงก์นี้เฉพาะ attempt ของ
-  นักเรียนที่ถูกตรวจ SEB แล้ว ลิงก์เป็นเพียงทางออกหลัง submit ไม่ใช่ authorization boundary และ
-  ยังต้องผ่าน native test ว่าปิดโดยไม่ถามรหัสจริง
+- contract ของ S4/r2 ใช้ native Quit URL `/exam/quit` และแสดงลิงก์เฉพาะหน้าผลของ attempt
+  ที่ตรวจ SEB แล้ว เป็น convenience ไม่ใช่ authorization boundary; requirement ห้องรอสอบ
+  ที่เพิ่มใน W1–W7 ห้ามใช้ contract นี้ยืนยันว่าออกก่อนส่งไม่ได้ revision ใหม่ต้องรอ W1 exit decision
 
 **เจ้าของผลิตภัณฑ์มีส่วนร่วม:**
 
@@ -283,7 +283,7 @@ Production และไม่ใช่หลักฐาน physical platform �
 
 ## แผนย่อย W1–W7 — ห้องรอสอบและโหมดข้อสอบเดียว
 
-เสนอวันที่ 9 ตุลาคม 2026 · **รอเจ้าของสั่งเริ่ม implementation**
+เสนอวันที่ 9 ตุลาคม 2026 · **เจ้าของอนุมัติ W1–W6 แล้ว; W1 ตรวจ baseline/inventory แล้ว แต่ feasibility gate ยังไม่ผ่าน**
 
 เจ้าของขอให้หลังเปิดไฟล์ SEB และล็อกอิน นักเรียนอยู่ในหน้ารอของข้อสอบนั้นเท่านั้น
 ไม่ไปห้องเรียน/แบบฝึกหัด/เฉลยงานอื่น ไม่มีโจทย์และไม่มีเวลาเดินจนกดเริ่มสอบ
@@ -292,7 +292,9 @@ Production และไม่ใช่หลักฐาน physical platform �
 ไม่มี Exam/Settings Password หรือรหัสเข้าสอบเพิ่มเติมจากการล็อกอินบัญชีตามปกติ
 
 นี่เป็นแผนย่อยก่อนกลับไปปิด S6 เดิม **ไม่ใช่การเริ่ม S7** และไม่ทำให้ผล S6 ผ่านเอง
-รอบวางแผนนี้ไม่แก้ application, `.seb`, release, secrets, migration หรือ deployment
+เจ้าของสั่งทำ W1–W6 ต่อเนื่อง อนุญาตทดสอบ/deploy เฉพาะเว็บทดสอบ และหยุดก่อน W7
+คำสั่งนี้ไม่ยกเลิกจุดหยุดด้าน requirement/shared contract ด้านล่าง ผลตรวจ W1 รอบนี้ยัง
+ไม่แก้ application, `.seb`, release, secrets, migration หรือ deployment
 
 ### ขอบเขตและการรบกวนเจ้าของ
 
@@ -323,6 +325,120 @@ Production และไม่ใช่หลักฐาน physical platform �
 
 **ผ่านเมื่อ:** มีขอบเขต/negative-test matrix และไม่มีข้อจำกัดที่ยังซ่อนอยู่; ถ้าต้องเปลี่ยน
 requirement หรือ Drawing Board contract ให้หยุดถามก่อน ไม่ให้เจ้าของเริ่มตั้งค่า native ใหม่
+
+#### ผลตรวจ W1 — 9 ตุลาคม 2026
+
+**สถานะ:** baseline, route/action inventory และ native source audit เสร็จ; **gate ยังไม่ผ่าน**
+รอเจ้าของตัดสินใจวิธีออกใหม่และอนุมัติ shared database contract ที่จำเป็นก่อน W2–W6
+ไม่ใช่ข้อสรุปว่า requirement ทำไม่ได้ แต่ยังไม่มีวิธีทดแทนที่พิสูจน์ครบทุก platform
+
+**Baseline และ isolation**
+
+- เริ่มจาก `4421f63` ที่ `codex/seb-phase-6` และ fetch/upstream ตรงกัน แยก branch
+  `codex/seb-exam-only-waiting-room`; ไม่ merge งาน UI/late-submission ของ master ที่ใหม่กว่า
+- tracked worktree ไม่มีงานค้าง; `.playwright-cli/` และ `output/` เป็น untracked เดิมและไม่แตะ
+- source ของ r2 dedicated UAT ที่บันทึกไว้คือ `07209c7597d8aadc9bbaa5a3e11e0572dfd256ca`
+  ไม่ deploy branch ใหม่ ไม่ยกผล source audit เป็นการตรวจ live alias ซ้ำหรือ physical pass
+- read-only Staging migration parity ผ่าน 140 รายการ ไม่มี local-only/remote-only ล่าสุด
+  `20261006102054`; ไม่ apply/repair SQL และไม่เปิดเผย credential/project ref
+
+**สถานะที่ออกแบบไว้ (ยังไม่ implementation)**
+
+- ก่อน login: signed navigation context รักษาข้อสอบปลายทางเท่านั้น ไม่ใช่สิทธิ์อ่านโจทย์
+- ห้องรอก่อนเริ่มครั้งแรก: auth/roster/window/release/native verification; ไม่สร้าง attempt/
+  question snapshot หรือเริ่ม timer จากหน้า/GET/RSC/prefetch ถ้ามี active attempt อยู่แล้ว
+  ให้แสดงเส้นทาง resume ของรอบเดิม ไม่กล่าวว่าไม่มี attempt หรือเริ่มนับเวลาใหม่
+- เริ่มสอบ: explicit server mutation สร้างหรือคืน exact active attempt แบบ atomic/idempotent
+  เริ่มเวลาจาก server `started_at`; reload/reconnect/resume ใช้ attempt และเวลาเดิม
+- ส่งแล้ว: ยืนยัน committed status ของ exact user/attempt/release ก่อนอนุญาตทางออกปกติ
+  response หายต้อง reconcile status ไม่เรียกสร้าง attempt ใหม่หรือเชื่อ client state
+- session หมดอายุ/ถูกแก้ไข: ปิดสิทธิ์อ่าน/เขียนจนตรวจใหม่ ไม่ลบเวลา/คำตอบ; exam timeout
+  ต้องคง server finalization เดิม การหมดเวลาฝั่ง client อย่างเดียวไม่ใช่ committed submission
+
+**ช่องว่างในเว็บ/ฐานข้อมูล**
+
+- `app/(app)/assignments/[id]/take/page.tsx` render เรียก `startSubmission` จึงใช้เป็นห้องรอ
+  ไม่ได้; password login, callback และ profile completion ยังกลับ dashboard/general shell
+- `create_seb_submission_with_revision` ใช้ `FOR KEY SHARE` และสร้างเฉพาะ submission header;
+  `lib/actions/submissions.ts` insert answer snapshots แยกอีกคำขอ unique attempt constraint
+  ป้องกันเลขซ้ำแต่ไม่คืน attempt เดิมให้ผู้แพ้ concurrent start และอาจเหลือ header ไม่มีคำตอบ
+  ต้องเพิ่ม service-role-only start RPC/transaction ที่ตรวจสิทธิ์/window/release/limits ซ้ำ
+  serialize ให้เข้ากับ revision rotation และ commit header+validated snapshots พร้อมกัน
+  นี่เป็น migration/function contract บน shared submissions ที่ต้องขออนุมัติก่อนเปลี่ยน
+- `getAttemptSolutions` และ result ของงานอื่นยังอาศัยสิทธิ์บัญชีปกติ ต้องเพิ่ม signed
+  restricted-request context และ guard ที่ page/action/read/write/resource ไม่ใช่แค่ซ่อนเมนู;
+  absent context ของ request เว็บปกติคงเดิม แต่ missing/expired/tampered context บน
+  canonical exam request รวม Server Action ที่ POST ไป exam URL ต้อง fail closed
+- Supabase ไม่เห็น application cookie และ RLS ยังให้อ่าน released own answers ตามสิทธิ์เดิม;
+  known solution URLs ใน public bucket ยังอ่านได้ ต้องกัน REST/solution asset ด้วย narrow
+  native filter; ถ้าใช้ exact exam resource proxy ต้องจับคู่กับ native denial ของ direct
+  Supabase REST/public assets ด้วย proxy ลำพังไม่ปิด URL เดิม ไม่อ้างว่า app guard ล็อกทั้งบัญชี
+  ไม่เปลี่ยน RLS/Storage เป็น account-wide lock โดยไม่มีการอนุมัติใหม่
+- submit retry หลัง response สำเร็จหายยังอาจได้ “ส่งแล้ว” เป็น error ต้อง reconcile committed
+  exact attempt ก่อนแสดง exit eligibility; `/exam/quit` HTTP handler ไม่ใช่ native authority
+
+**Native Quit URL: ข้อจำกัดยืนยันจาก official source**
+
+- Windows 3.10.2 commit `397f8e124387c54a9a770809003dd2e31946dcd5` ตรวจ matching Quit URL
+  ก่อน URL filter/HTTP; เมื่อ `quitURLRestart=false` handler ขอ termination โดยไม่ตรวจ
+  Quit Password (อาจถามยืนยัน yes/no) การซ่อนปุ่ม, deny filter หรือ protected web redirect
+  ไป static Quit URL เดิมจึงไม่ป้องกัน direct early quit
+  ([request handler](https://github.com/SafeExamBrowser/seb-win-refactoring/blob/397f8e124387c54a9a770809003dd2e31946dcd5/SafeExamBrowser.Browser/Handlers/RequestHandler.cs#L71),
+  [native quit](https://github.com/SafeExamBrowser/seb-win-refactoring/blob/397f8e124387c54a9a770809003dd2e31946dcd5/SafeExamBrowser.Browser/BrowserWindow.cs#L591))
+- macOS 3.7 commit `88b7f8df3c96781197efe400b8a2cbd818524736` และ Apple 3.7.1 commit
+  `a1e3f786aac4aa2e827998dcf8ca139f2c5205a9` intercept ก่อน filter เช่นกัน ทั้งคู่มี nonempty
+  guard จึงปิดกลไกนี้ได้ด้วย `quitURL=""`; ไม่ใช่ผลทดลอง native รอบใหม่
+  ([3.7](https://github.com/SafeExamBrowser/seb-mac/blob/88b7f8df3c96781197efe400b8a2cbd818524736/Classes/BrowserComponents/SEBAbstractWebView.m#L730),
+  [3.7.1](https://github.com/SafeExamBrowser/seb-mac/blob/a1e3f786aac4aa2e827998dcf8ca139f2c5205a9/Classes/BrowserComponents/SEBAbstractWebView.m#L737))
+
+**ทางเลือกเสนอ — ยังไม่อนุมัติ/ไม่ implement**
+
+- ทางทดลองที่แคบที่สุด: initial config ไม่มี Quit URL แต่คง teacher-owned emergency hash;
+  เปิด secure reconfiguration เฉพาะ same-origin release-specific URL ที่ server ตรวจ exact
+  user/attempt/revision/native context และ committed submit ก่อนส่ง terminal config
+  terminal config ยังเป็น exam-purpose ชั่วคราวและคง teacher quit hash ไม่ downgrade secure mode
+  นี่เปลี่ยน artifact/security contract ปัจจุบันที่ห้าม download/reconfigure และมี static Quit URL
+- source ยืนยันว่ากลไกมีจริง แต่ไม่รับรอง cookie handoff, deny/replay, download failure,
+  config restart และ passwordless quit บนอุปกรณ์จริง Windows มี session-start failure path
+  ที่ shutdown จึงห้ามสมมติว่า HTTP 403/HTML/truncated/invalid config ทุกแบบจะคงล็อกสอบเสมอ
+  ต้องพิสูจน์ negative เหล่านี้ใน W7; ไม่ข้าม gate ด้วย mock หรือรายงานว่าแก้ native แล้ว
+  ([Windows reconfiguration](https://github.com/SafeExamBrowser/seb-win-refactoring/blob/397f8e124387c54a9a770809003dd2e31946dcd5/SafeExamBrowser.Client/Responsibilities/BrowserResponsibility.cs#L96),
+  [failure path](https://github.com/SafeExamBrowser/seb-win-refactoring/blob/397f8e124387c54a9a770809003dd2e31946dcd5/SafeExamBrowser.Runtime/Responsibilities/SessionResponsibility.cs#L132),
+  [Apple URL guard/cookies](https://github.com/SafeExamBrowser/seb-mac/blob/a1e3f786aac4aa2e827998dcf8ca139f2c5205a9/Classes/BrowserComponents/SEBBrowserController.m#L702))
+- SEB Server มี remote quit instruction แต่ต้องเพิ่ม service/integration และผูก exact native
+  connection กับ committed KorKru attempt ไม่ใช่แค่ตั้งค่า ต้องขอขอบเขต infrastructure,
+  privacy และค่าใช้จ่ายก่อน ไม่สร้างบริการเพิ่มเอง
+  ([official monitoring](https://seb-server.readthedocs.io/en/latest/monitoring.html))
+- การให้ใช้รหัสครูหลังส่งทุกครั้งเป็นอีก requirement หนึ่ง ไม่ใช่ fallback ที่เลือกเองได้
+
+**Negative-test matrix สำหรับงานถัดไป**
+
+- Entry/auth: wrong account/roster/assignment; callback/open redirect/context switch;
+  OAuth/Magic Link cookie return; absent/expired/tampered restriction marker
+- Waiting/start: reload/Back/prefetch ไม่สร้าง attempt/ส่งโจทย์; future/closed windows;
+  double click/concurrent start/lost response; snapshot failure ต้อง rollback ทั้ง attempt
+- Verification: wrong CK/BEK/exact build/release/revision; session expiry/recheck ไม่ reset เวลา
+- Other content: page/URL/RSC/prefetch/action ของงานอื่น รวม POST solution action บน URL
+  ข้อสอบที่อนุญาต, Supabase REST และ known public solution asset ที่ native filter ต้องกัน
+- Resume/write: reconnect/offline/reload/ออกฉุกเฉินแล้วกลับ ใช้ attempt/เวลาเดิม;
+  autosave/upload/proctor/timeout และ normal browser/Android/Drawing Board regression
+- Submit: failure/retry/lost success response; reconcile committed exact status; ไม่มี exit
+  ก่อนสำเร็จและไม่สร้าง attempt ใหม่เพราะ retry
+- Native exit: direct Quit URL ก่อนส่ง; early/expired/wrong account/replay completion download;
+  denied/redirect/foreign/local/data/malformed/truncated config; teacher emergency password;
+  post-submit quit/reentry/session teardown ทุก platform/exact build ที่จะประกาศ
+
+**การตรวจรอบ W1**
+
+- baseline targeted regression 5 files / 47 tests ผ่าน (`seb-native-version`, version core,
+  release migration, exit และ physical evidence checker); ไม่ใช่ tests ของ waiting room ใหม่
+- `npx tsc --noEmit` ไม่ผ่าน: TS2339 เดิม 4 diagnostics ใน create-classroom modal/form
+  สองไฟล์ ไม่มี application diff รอบนี้ ไม่แก้งานห้องเรียนที่ไม่อยู่ในขอบเขต
+- ไม่รัน full test/build/token lint/runtime/native suite เพราะยังไม่เปลี่ยน application;
+  source audit ไม่แทน concurrency DB test หรือ physical negative test
+- W2–W6 ยังไม่เริ่ม implementation/deploy, W7 ยังไม่เริ่ม; เก็บ r2/fixture/keys/evidence เดิม
+  คำถามที่ต้องตอบก่อนต่อคืออนุมัติทดลอง native completion reconfiguration และ additive
+  shared start RPC เฉพาะ Staging หรือเลือกแนวทางอื่น ไม่ต้อง login/ตั้งค่าอุปกรณ์ใหม่ตอนนี้
 
 ### W2 — Server state, start และเวลา
 
@@ -405,7 +521,7 @@ native ที่ยังต้องพิสูจน์ถูกระบุ�
 **ผ่านเมื่อ:** physical gates ครบ platforms ที่จะประกาศรองรับ และรับรอง native restrictions
 ตามหลักฐานจริง จึงกลับมาปิด S6; S7 เดิม/merge master/Production รอการอนุมัติแยก
 
-### จุดหยุดและสถานะการเข้าถึงขณะวางแผน
+### จุดหยุดและสถานะการเข้าถึง
 
 - หยุดเฟสที่พบข้อมูล/เฉลยรั่ว, เวลาเริ่มก่อนกด, start ซ้ำ, early native quit ที่ไม่ผ่าน
   requirement, source/revision drift, การเปลี่ยน contract สำคัญ หรือ migration mismatch
@@ -414,8 +530,9 @@ native ที่ยังต้องพิสูจน์ถูกระบุ�
   แต่ CLI ต่ออายุ session บัญชีเดิมได้ จากนั้น authenticated read ตรวจ exact dedicated
   project/source/alias/READY/login/Staging badge ผ่าน ไม่ต้องให้เจ้าของ login ใหม่ตอนนี้
   สิ่งนี้ไม่รับประกันว่าการเชื่อมต่อจะไม่หมดอายุภายหลัง หากต้องยืนยันใหม่จะแจ้งทันที
-- รอบนี้เสนอและบันทึกแผนเท่านั้น ยังไม่เริ่ม W1–W7 implementation หรือเปลี่ยน r2 candidate
-- ตรวจเอกสารด้วย `git diff --check` ผ่าน, evidence regression 1 file / 8 tests ผ่าน และ
+- รอบวางแผนเสนอและบันทึกแผนเท่านั้น ต่อมาเจ้าของอนุมัติ W1–W6 เฉพาะเว็บทดสอบ;
+  W1 พบ native/shared-contract gate ด้านบน จึงหยุดก่อน W2 ไม่เปลี่ยน r2 candidate
+- ผลรอบวางแผน: `git diff --check` ผ่าน, evidence regression 1 file / 8 tests ผ่าน และ
   candidate/schema gate เดิมผ่าน แต่ physical aggregate ยัง NOT READY ตาม cases ที่ pending;
   ไม่รัน full tests/TypeScript/lint/build ซ้ำ เพราะแก้เฉพาะเอกสาร ไม่ apply migration/deploy
 
