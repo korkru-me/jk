@@ -1,11 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PGlite } from '@electric-sql/pglite'
-import { readFile, stat } from 'node:fs/promises'
+import { readFile, stat, mkdtemp, unlink, rmdir } from 'node:fs/promises'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import {
   STAGING_PROJECT_REF, WaitingPostgresProofError, assertProofEnvironment, blockerPathsReachControl,
   buildScratchSql, createLinkedCliQuery, extractAtomicFunction, linkedErrorSqlState, main,
   managementHolderSql, managementStartSql, offlineProofPlan, parseLinkedQueryOutput, parseProofArgs,
   runWaitingManagementProof, safeProofError,
+  reserveProofJournal, appendProofJournalRecord,
 } from './seb-waiting-postgres-concurrency.mjs'
 
 const migration = await readFile(new URL('../supabase/migrations/20261009142610_atomic_seb_exam_start.sql', import.meta.url), 'utf8')
@@ -21,7 +24,7 @@ const environment = {
   EXAM_QA_DATA_POLICY: 'synthetic-only', EXAM_QA_COPY_PRODUCTION_DATA: 'false', EXAM_QA_ALLOW_SYNTHETIC_WRITES: 'true',
   SEB_EXAM_WAITING_ENABLED: 'false',
 }
-const privateHandle = () => ({ truncate: vi.fn(async () => {}), write: vi.fn(async () => {}),
+const privateHandle = () => ({ truncate: vi.fn(async () => {}), writeFile: vi.fn(async () => {}),
   sync: vi.fn(async () => {}), close: vi.fn(async () => {}) })
 const databases = []
 afterEach(async () => { await Promise.all(databases.splice(0).map(db => db.close())) })
@@ -55,7 +58,8 @@ describe('offline PostgreSQL proof boundaries', () => {
       readEnvironment: async () => { order.push('environment'); throw new Error(sentinel) },
     })).rejects.toMatchObject({ code: 'POSTGRES_PROOF_FAILED' })
     expect(order).toEqual(['reserve', 'environment']); expect(query).not.toHaveBeenCalled()
-    expect(handle.write).toHaveBeenCalled(); expect(handle.close).toHaveBeenCalled()
+    expect(handle.writeFile).toHaveBeenCalled(); expect(handle.close).toHaveBeenCalled()
+    expect(handle.truncate).not.toHaveBeenCalled()
     expect(JSON.stringify(emit.mock.calls)).not.toContain(sentinel)
   })
   it('existing report denial happens before any private read or cloud request', async () => {
@@ -74,6 +78,70 @@ describe('offline PostgreSQL proof boundaries', () => {
   })
   it('redacts unknown driver errors, stack, details and SQL', () => {
     expect(safeProofError(Object.assign(new Error(sentinel), { code: '23514', detail: sentinel, query: sentinel }))).toBe('POSTGRES_PROOF_FAILED')
+  })
+})
+
+describe('durable private NDJSON journal (offline file/mock I/O only)', () => {
+  it('reserves wx0600 append mode and preserves complete identity records after a partial later write', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'korkru-seb-journal-test-'))
+    const path = join(directory, 'new-proof.ndjson')
+    const handle = await reserveProofJournal(path)
+    const first = { status: 'reserved', runId, schema }, second = { status: 'running', runId, schema }
+    try {
+      expect((await stat(path)).mode & 0o777).toBe(0o600)
+      await appendProofJournalRecord(handle, first)
+      await expect(reserveProofJournal(path)).rejects.toMatchObject({ code: 'REPORT_RESERVATION_FAILED' })
+      await appendProofJournalRecord(handle, second)
+      // Simulate a later append that writes only a prefix and then fails.
+      // Never use positional writes: pwrite semantics differ across platforms.
+      const partial = Buffer.from('{"status":"incomplete')
+      await expect(appendProofJournalRecord({
+        writeFile: async () => { await handle.writeFile(partial); throw new Error(sentinel) },
+        sync: async () => handle.sync(),
+      }, { status: 'failed', runId, schema })).rejects.toThrow(sentinel)
+      const lines = (await readFile(path, 'utf8')).split('\n')
+      expect(JSON.parse(lines[0])).toEqual(first)
+      expect(JSON.parse(lines[1])).toEqual(second)
+      expect(lines[2]).toBe(partial.toString())
+    } finally { await handle.close(); await unlink(path); await rmdir(directory) }
+  })
+  it.each([2, 3])('later journal failure at write %s preserves previously fsynced run identity and redacted JSON stdout', async failAt => {
+    const durable = [], emit = vi.fn(), handle = privateHandle()
+    let writes = 0
+    handle.writeFile.mockImplementation(async bytes => {
+      if (++writes >= failAt) throw new Error(sentinel)
+      durable.push(String(bytes))
+    })
+    const query = vi.fn(async sql => {
+      if (sql.includes('SELECT p.prosrc')) return [{ prosrc: atomic.body, prosecdef: true,
+        proconfig: ['search_path=""'], lanname: 'plpgsql', role: 'postgres', version: 170006 }]
+      if (sql.includes('CREATE SCHEMA')) throw new Error(sentinel)
+      return [] // No live SQL; exact schema is absent in this simulated failure.
+    })
+    await expect(main(['--apply', '--env-file', '/private/operator.env', '--report-file', '/private/new.ndjson'], {
+      emit, query, reserveReportFile: async () => handle, readEnvironment: async () => environment, readMigration: async () => migration,
+    })).rejects.toMatchObject({ code: 'RECONCILIATION_REQUIRED' })
+    expect(durable).toHaveLength(failAt - 1)
+    const records = durable.map(line => JSON.parse(line.trim()))
+    expect(records[0]).toMatchObject({ status: 'reserved', projectRef: STAGING_PROJECT_REF })
+    expect(records[0].runId).toMatch(/^[a-f0-9-]{36}$/)
+    expect(records[0].schema).toBe(`seb_waiting_concurrency_${records[0].runId.replaceAll('-', '')}`)
+    if (failAt === 3) expect(records[1]).toMatchObject({ status: 'running', runId: records[0].runId, schema: records[0].schema })
+    else expect(query.mock.calls.some(([sql]) => sql.includes('CREATE SCHEMA'))).toBe(false)
+    expect(handle.sync).toHaveBeenCalledTimes(failAt - 1)
+    expect(handle.truncate).not.toHaveBeenCalled()
+    expect(emit).toHaveBeenCalledTimes(1)
+    const finalJson = JSON.stringify(emit.mock.calls[0][0])
+    expect(JSON.parse(finalJson)).toMatchObject({ status: 'failed', code: 'RECONCILIATION_REQUIRED',
+      runId: records[0].runId, schema: records[0].schema })
+    expect(finalJson).not.toContain(sentinel)
+    expect(handle.close).toHaveBeenCalled()
+  })
+  it('help explains the journal format while stdout stays a JSON result', async () => {
+    const emit = vi.fn()
+    await main(['--help'], { emit })
+    expect(emit.mock.calls[0][0].reportFileFormat).toContain('NDJSON')
+    expect(emit.mock.calls[0][0].reportFileFormat).toContain('stdout is one JSON result')
   })
 })
 

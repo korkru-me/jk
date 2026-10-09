@@ -7,6 +7,11 @@
  * release registrations, migrations or roles are
  * created. The exact committed function body is rebound to private scratch
  * tables, exercised on four simultaneous independent backends, then the owned schema is removed.
+ * --report-file is a private append-only NDJSON journal, NOT one JSON document.
+ * Each complete line is one fsynced state record. The first reserved runId/schema
+ * is written before private reads or SQL; later writes never truncate it. After
+ * interruption, retain prior complete lines and ignore an incomplete final line.
+ * stdout remains one ordinary JSON result, not the journal stream.
  */
 import { createHash, randomUUID } from 'node:crypto'
 import { constants } from 'node:fs'
@@ -77,6 +82,7 @@ export function offlineProofPlan() {
     newDriverRequired: false, databasePasswordRequired: false, concurrentBackendCount: 4,
     requiredAuthority: 'Staging-only CREATE/DROP of one generated owned scratch schema',
     transactionBoundary: 'each Management API SQL request is a complete implicit transaction',
+    reportFileFormat: 'private append-only fsynced NDJSON journal',
     prohibited: ['transaction pool :6543', 'public fixture writes', 'public RPC execution',
       'release registration', 'native keys/artifacts', 'migration/grader/RLS/role changes'],
     nativeProof: 'not-run', publicRpcIntegration: 'not-run', publicRlsProof: 'not-run' })
@@ -494,39 +500,42 @@ export async function runWaitingManagementProof({ query, migration, schema, runI
   return { ...result, cleanup }
 }
 
-async function reserveReportFile(path) {
-  try { return await open(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600) }
+export async function reserveProofJournal(path) {
+  try { return await open(path, constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600) }
   catch { fail('REPORT_RESERVATION_FAILED') }
 }
-async function writeReport(handle, report) {
-  const bytes = Buffer.from(`${JSON.stringify(report, null, 2)}\n`)
-  await handle.truncate(0); await handle.write(bytes, 0, bytes.length, 0); await handle.sync()
+export async function appendProofJournalRecord(handle, report) {
+  // O_APPEND and writeFile's full-write handling preserve prior complete lines
+  // even on a partial later write. Never seek, replace, or truncate this journal.
+  await handle.writeFile(`${JSON.stringify(report)}\n`)
+  await handle.sync()
 }
 export async function main(args = process.argv.slice(2), dependencies = {}) {
   const options = parseProofArgs(args)
   const emit = dependencies.emit ?? (value => process.stdout.write(`${JSON.stringify(value, null, 2)}\n`))
   if (options.help) {
-    emit({ usage: 'node scripts/seb-waiting-postgres-concurrency.mjs [--apply --transport linked --env-file /private/operator.env --report-file /private/new-proof.json]',
+    emit({ usage: 'node scripts/seb-waiting-postgres-concurrency.mjs [--apply --transport linked --env-file /private/operator.env --report-file /private/new-proof.ndjson]',
+      reportFileFormat: 'Owner-only append-only NDJSON journal: one fsynced state record per line; first reserved identity remains recoverable; ignore an incomplete final line after interruption. stdout is one JSON result.',
       default: 'offline-plan; private environment is not read and report is not created', warning: 'Requires separately authorized scratch DDL. Not W7/native/public-RPC proof.' })
     return offlineProofPlan()
   }
   if (!options.apply) { const plan = offlineProofPlan(); emit(plan); return plan }
   const runId = randomUUID(), schema = `seb_waiting_concurrency_${runId.replaceAll('-', '')}`
-  const reserve = dependencies.reserveReportFile ?? reserveReportFile
+  const reserve = dependencies.reserveReportFile ?? reserveProofJournal
   const handle = await reserve(options.reportFile) // before credentials, connect or DDL
   let report = { status: 'reserved', runId, schema, projectRef: STAGING_PROJECT_REF, proofScope: PRIVATE_SCOPE, liveExecuted: false }
   try {
-    await writeReport(handle, report)
+    await appendProofJournalRecord(handle, report)
     const environment = await (dependencies.readEnvironment ?? readProofEnvironment)(options.envFile)
     assertProofEnvironment(environment)
     const migration = await (dependencies.readMigration ?? (() => readFile(MIGRATION_URL, 'utf8')))()
-    const onIdentity = async identity => { report = { ...report, ...identity, status: 'running', liveExecuted: true }; await writeReport(handle, report) }
+    const onIdentity = async identity => { report = { ...report, ...identity, status: 'running', liveExecuted: true }; await appendProofJournalRecord(handle, report) }
     report = await runWaitingManagementProof({ query: dependencies.query ?? createLinkedCliQuery(), migration, schema, runId, onIdentity })
-    await writeReport(handle, report); emit(report); return report
+    await appendProofJournalRecord(handle, report); emit(report); return report
   } catch (error) {
     report = error instanceof WaitingPostgresProofError && error.report
       ? error.report : { ...report, status: 'failed', code: safeProofError(error) }
-    try { await writeReport(handle, report) }
+    try { await appendProofJournalRecord(handle, report) }
     catch { report = { status: 'failed', code: 'RECONCILIATION_REQUIRED', runId, schema,
       cleanup: report.cleanup ?? 'unknown', proofScope: PRIVATE_SCOPE, liveExecuted: report.liveExecuted } }
     emit(report)
