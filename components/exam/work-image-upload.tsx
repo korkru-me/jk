@@ -6,6 +6,7 @@ import { Camera, Loader2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { downscaleImage } from '@/lib/image-downscale'
 import { uploadErrorMessage } from '@/lib/upload-error'
+import { isWaitingExamTransport, uploadWaitingExamFile, waitingExamResourceUrl } from '@/lib/seb-exam-client'
 
 // Loaded on demand rather than imported at the top: @supabase/supabase-js is
 // ~220 KB, and a student only needs it at the moment they attach a file. The
@@ -78,7 +79,7 @@ export function WorkImageUpload({
     const file = await downscaleImage(original)
     const previous = value
     try {
-      const { prepareExamAttachmentUpload, completeExamAttachmentUpload } = await import('@/lib/actions/exam-attachments')
+      const { prepareExamAttachmentUpload, completeExamAttachmentUpload } = await import('@/lib/seb-exam-client')
       const prepared = await prepareExamAttachmentUpload({
         submissionAnswerId,
         kind: 'work_image',
@@ -89,13 +90,14 @@ export function WorkImageUpload({
       })
       if (!prepared || 'error' in prepared) throw new Error(prepared?.error ?? 'เตรียมพื้นที่อัปโหลดไม่สำเร็จ')
       if (prepared.reused) throw new Error('สถานะอัปโหลดรูปวิธีทำไม่ถูกต้อง กรุณาลองใหม่')
-      const supabase = await browserSupabase()
-      const sent = await supabase.storage
-        .from(prepared.bucket)
-        .uploadToSignedUrl(prepared.path, prepared.token, file, {
-          contentType: file.type,
-          cacheControl: '300',
-        })
+      const sent = isWaitingExamTransport()
+        ? await uploadWaitingExamFile(prepared, file, file.type)
+        : await (await browserSupabase()).storage
+          .from(prepared.bucket)
+          .uploadToSignedUrl(prepared.path, prepared.token, file, {
+            contentType: file.type,
+            cacheControl: '300',
+          })
       if (sent.error) throw sent.error
       const completed = await completeExamAttachmentUpload({
         submissionAnswerId,
@@ -120,7 +122,7 @@ export function WorkImageUpload({
 
   async function removeStoredImage(url: string) {
     if (!submissionAnswerId || partIndex === undefined) return false
-    const { deleteExamAttachment } = await import('@/lib/actions/exam-attachments')
+    const { deleteExamAttachment } = await import('@/lib/seb-exam-client')
     const removed = await deleteExamAttachment({
       submissionAnswerId,
       kind: 'work_image',
@@ -158,12 +160,12 @@ export function WorkImageUpload({
             type="button"
             variant="ghost"
             aria-label="เปิดรูปวิธีทำขนาดเต็ม"
-            onClick={() => window.open(value, '_blank')}
+            onClick={() => window.open(waitingExamResourceUrl(value), '_blank')}
             className="block h-auto w-auto rounded-lg p-0"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={value}
+              src={waitingExamResourceUrl(value)}
               alt=""
               className="h-28 w-28 cursor-pointer rounded-lg border object-cover"
             />

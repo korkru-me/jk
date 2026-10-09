@@ -2,9 +2,28 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { cookies } from 'next/headers'
+import {
+  consumeWaitingAuthNonce,
+  finishWaitingAuthentication,
+  inspectWaitingAuthCallback,
+} from '@/lib/seb-exam-auth.server'
+import { sebExamRoutePath } from '@/lib/seb-exam-transport-policy'
+
+function waitingFailure(origin: string, loginHref: string | null, error: string) {
+  if (!loginHref) return NextResponse.json({ error: 'ลิงก์เข้าสู่ข้อสอบไม่ถูกต้อง กรุณาเปิดไฟล์ข้อสอบใหม่' }, {
+    status: 403, headers: { 'Cache-Control': 'private, no-store' },
+  })
+  const target = new URL(loginHref, origin)
+  target.searchParams.set('error', error)
+  const response = NextResponse.redirect(target)
+  response.headers.set('Cache-Control', 'private, no-store')
+  return response
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
+  const waiting = await inspectWaitingAuthCallback(request.url, request.headers.get('cookie'))
+  if (waiting.kind === 'denied') return waitingFailure(origin, waiting.loginHref, 'auth_failed')
   const code = searchParams.get('code')
   const requestedNext = searchParams.get('next')
   const requestedRole = searchParams.get('role')
@@ -13,8 +32,11 @@ export async function GET(request: NextRequest) {
     : '/dashboard'
 
   if (!code) {
+    if (waiting.kind === 'waiting') return waitingFailure(origin, sebExamRoutePath(waiting.context, 'login'), 'missing_code')
     return NextResponse.redirect(`${origin}/login?error=missing_code`)
   }
+
+  if (waiting.kind === 'waiting') await consumeWaitingAuthNonce()
 
   const cookieStore = await cookies()
 
@@ -34,7 +56,18 @@ export async function GET(request: NextRequest) {
   const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
   if (error || !data.user) {
+    if (waiting.kind === 'waiting') return waitingFailure(origin, sebExamRoutePath(waiting.context, 'login'), 'auth_failed')
     return NextResponse.redirect(`${origin}/login?error=auth_failed`)
+  }
+
+  if (waiting.kind === 'waiting') {
+    const result = await finishWaitingAuthentication(data.user, 'callback').catch(() => ({ error: 'auth_failed' } as const))
+    if ('error' in result || !result.href || ![
+      sebExamRoutePath(waiting.context, 'profile'), sebExamRoutePath(waiting.context, 'waiting'),
+    ].includes(result.href)) return waitingFailure(origin, sebExamRoutePath(waiting.context, 'login'), 'auth_failed')
+    const response = NextResponse.redirect(new URL(result.href, origin))
+    response.headers.set('Cache-Control', 'private, no-store')
+    return response
   }
 
   // Ensure profile row exists (first Google login creates it)

@@ -6,7 +6,7 @@ import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { IconButton } from '@/components/ui/icon-button'
-import { RichText } from '@/components/ui/rich-text'
+import { WaitingExamRichText as RichText } from '@/components/exam/seb-exam-rich-text'
 import { cn } from '@/lib/utils'
 
 export interface MatchingOption {

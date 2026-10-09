@@ -3,7 +3,10 @@
 import { lazy, Suspense, useState, useEffect, useCallback, useMemo, useRef, type ReactNode, type RefObject } from 'react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
-import { checkAnswer, drawNextStreakQuestion, rerollCheckedRandomAnswer, saveWorkImage, submitSubmission } from '@/lib/actions/submissions'
+import {
+  checkAnswer, drawNextStreakQuestion, rerollCheckedRandomAnswer, saveWorkImage, submitSubmission,
+  isWaitingExamTransport, waitingExamResourceUrl, waitingExamSubmittedHref, waitingExamRichTextHtml,
+} from '@/lib/seb-exam-client'
 import { StreakEndScreen, StreakMeter, type StreakView } from '@/components/exam/streak-progress'
 import type { StreakEnding } from '@/lib/streak-run'
 // Type-only: `gradeAnswer` pulls in mathjs (~640 KB), which only a teacher's
@@ -39,9 +42,8 @@ import {
   Wifi, WifiOff, ShieldAlert, Maximize, MonitorSmartphone, CircleCheck, RotateCcw,
   Pencil, Calculator as CalculatorIcon, NotebookPen, Loader2, Paperclip, Trash2, ListChecks, X,
 } from 'lucide-react'
-import { RichText } from '@/components/ui/rich-text'
+import { WaitingExamRichText as RichText } from '@/components/exam/seb-exam-rich-text'
 import { containsMath } from '@/lib/math/latex'
-import { renderRichTextHtml } from '@/lib/rich-text-html'
 import { partLabels } from '@/lib/part-labels'
 import { groupQuestionsBySection, sectionByQuestionId, type QuestionSetSection } from '@/lib/question-set-sections'
 import { getBlankType, splitFillBlankHtml, extractBlankNumbers } from '@/lib/fill-blank'
@@ -852,7 +854,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   const refreshWorkArtifacts = useCallback(async (answerId: string) => {
     if (previewMode) return
     try {
-      const { getStudentWorkArtifacts } = await import('@/lib/actions/math-work')
+      const { getStudentWorkArtifacts } = await import('@/lib/seb-exam-client')
       const result = await getStudentWorkArtifacts(answerId)
       if (!result || 'error' in result) {
         toast.error(result?.error ?? 'เปิดวิธีทำไม่สำเร็จ กรุณาลองใหม่')
@@ -890,7 +892,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
       if (previewMode) {
         if (artifact.previewUrl?.startsWith('blob:')) URL.revokeObjectURL(artifact.previewUrl)
       } else {
-        const { deleteStudentWorkArtifact } = await import('@/lib/actions/math-work')
+        const { deleteStudentWorkArtifact } = await import('@/lib/seb-exam-client')
         const result = await deleteStudentWorkArtifact(artifact.id)
         if (!result || 'error' in result) {
           toast.error(result?.error ?? 'ลบวิธีทำไม่สำเร็จ กรุณาลองใหม่')
@@ -1086,7 +1088,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
     // see the just-submitted attempt as in_progress, which starts a new retry.
     // Reload the document so the summary always reads the committed server state,
     // and replace history so Back cannot reopen the completed attempt.
-    window.location.replace(`/submissions/${submissionId}`)
+    window.location.replace(waitingExamSubmittedHref(`/submissions/${submissionId}`))
   }
 
   function findMissingWorkImage(): number | null {
@@ -1295,7 +1297,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
    * `rounded` is off inside โหมดโฟกัส, which is an overlay flush with the
    * window edges and has nothing to round against.
    */
-  const previewBanner = (rounded: boolean) => previewMode && (
+  const previewBanner = (rounded: boolean) => previewMode && !isWaitingExamTransport() && (
     <div
       className={`shrink-0 bg-warning text-amber-950 px-4 py-1.5 flex flex-col items-center gap-0.5 ${rounded ? 'rounded-xl' : ''}`}
       data-staging-badge-safe-zone
@@ -1371,7 +1373,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                       the student gets. Opens in a new tab so the preview — and
                       whatever has been typed into it — is still there to come
                       back to. */}
-                  {previewMode && current.canEditQuestion && (
+                  {previewMode && !isWaitingExamTransport() && current.canEditQuestion && (
                     <a
                       href={`/questions/${current.question_id}/edit`}
                       target="_blank"
@@ -1419,7 +1421,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                 <div className="flex flex-wrap gap-2">
                   {(current.questions.image_urls ?? []).map(url => (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img key={url} src={url} alt="รูปประกอบ" className="max-h-52 rounded-xl border object-contain" />
+                    <img key={url} src={waitingExamResourceUrl(url)} alt="รูปประกอบ" className="max-h-52 rounded-xl border object-contain" />
                   ))}
                 </div>
               )}
@@ -1429,13 +1431,13 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                   <div className="flex flex-wrap gap-2">
                     {((current.questions.extra_data as FileUploadConfig).attachment_urls ?? []).map(url => (
                       /\.pdf(\?|$)/i.test(url) ? (
-                        <a key={url} href={url} target="_blank" rel="noopener noreferrer"
+                        <a key={url} href={waitingExamResourceUrl(url)} target="_blank" rel="noopener noreferrer"
                           className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl border bg-muted/40 hover:bg-muted transition-colors">
                           📄 <span className="truncate max-w-[140px]">{decodeURIComponent(url.split('/').pop() ?? 'PDF')}</span>
                         </a>
                       ) : (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img key={url} src={url} alt="ไฟล์อ้างอิงโจทย์" className="max-h-52 rounded-xl border object-contain" />
+                        <img key={url} src={waitingExamResourceUrl(url)} alt="ไฟล์อ้างอิงโจทย์" className="max-h-52 rounded-xl border object-contain" />
                       )
                     ))}
                   </div>
@@ -1819,7 +1821,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
       )}
 
       {/* ── Preview results (previewMode only, after submit) ─────────────────── */}
-      {previewResult && (
+      {previewResult && !isWaitingExamTransport() && (
         <PreviewResultSummary
           answers={answers}
           graded={previewResult.graded}
@@ -2284,7 +2286,7 @@ function InstantCheckPanel({
               </span>
               {choice.imageUrl && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={choice.imageUrl} alt="" loading="lazy" decoding="async" className="max-h-20 w-auto object-contain rounded border shrink-0" />
+                <img src={waitingExamResourceUrl(choice.imageUrl)} alt="" loading="lazy" decoding="async" className="max-h-20 w-auto object-contain rounded border shrink-0" />
               )}
               <span className="text-sm flex-1 min-w-0">{choice.text}</span>
               {choice.correct && (
@@ -2663,7 +2665,7 @@ function MCQInput({
               <div className={`flex-1 min-w-0 flex items-center gap-2 ${isEliminated ? 'line-through text-muted-foreground' : ''}`}>
                 {opt.image_url && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={opt.image_url} alt="" loading="lazy" decoding="async" className="max-h-28 w-auto object-contain rounded border shrink-0" />
+                  <img src={waitingExamResourceUrl(opt.image_url)} alt="" loading="lazy" decoding="async" className="max-h-28 w-auto object-contain rounded border shrink-0" />
                 )}
                 {/* A picture-only option carries the choice letter as its text
                     (the answer's identity is opt.text, so it can't be blank) —
@@ -2774,10 +2776,10 @@ function WorkProofSlot({
         {artifact && (
           <div className="space-y-1.5">
             {artifact.previewUrl ? (
-              <a href={artifact.previewUrl} target="_blank" rel="noopener noreferrer" className="block">
+              <a href={waitingExamResourceUrl(artifact.previewUrl)} target="_blank" rel="noopener noreferrer" className="block">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={artifact.previewUrl}
+                  src={waitingExamResourceUrl(artifact.previewUrl)}
                   alt={`วิธีทำจากกระดาษทด ${label}`}
                   className="h-28 w-28 rounded-lg border bg-card object-cover transition-opacity hover:opacity-90"
                   onError={refreshPreview}
@@ -3361,11 +3363,11 @@ function MatchingAnswerInput({ prompts, options, mode, rawValue, onChange }: {
   if (!Array.isArray(picked)) picked = []
 
   const shared = {
-    prompts: prompts.map(p => ({ text: p.left_text ?? '', imageUrl: p.left_image })),
+    prompts: prompts.map(p => ({ text: p.left_text ?? '', imageUrl: p.left_image ? waitingExamResourceUrl(p.left_image) : p.left_image })),
     options: options.map((o, j) => ({
       id: String(j),
       text: o.right_text,
-      imageUrl: o.right_image,
+      imageUrl: o.right_image ? waitingExamResourceUrl(o.right_image) : o.right_image,
     })) satisfies MatchingOption[],
     placement: placementFromTexts(picked, options, prompts.length),
     onChange: (next: (string | null)[]) =>
@@ -3396,7 +3398,7 @@ function OrderingAnswerInput({ config, rawValue, onChange }: {
 
   return (
     <OrderingDragList
-      items={order}
+      items={isWaitingExamTransport() ? order.map(item => ({ ...item, image_url: item.image_url ? waitingExamResourceUrl(item.image_url) : item.image_url })) : order}
       answered={orderingIsAnswered(rawValue, items.length)}
       onReorder={ids => onChange(JSON.stringify(ids))}
       onConfirm={() => onChange(JSON.stringify(order.map(i => i.id)))}
@@ -3423,7 +3425,7 @@ function PartImages({ urls }: { urls?: string[] }) {
     <div className="flex flex-wrap gap-2">
       {urls.map(url => (
         // eslint-disable-next-line @next/next/no-img-element
-        <img key={url} src={url} alt="รูปประกอบข้อย่อย" className="max-h-40 rounded-xl border object-contain" />
+        <img key={url} src={waitingExamResourceUrl(url)} alt="รูปประกอบข้อย่อย" className="max-h-40 rounded-xl border object-contain" />
       ))}
     </div>
   )
@@ -3670,7 +3672,7 @@ function ClassifyAnswerInput({ config, rawValue, onChange }: {
                 <span className="mt-2 flex flex-wrap gap-2">
                   {(row.image_urls ?? []).map(url => (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img key={url} src={url} alt="รูปประกอบรายการ" className="max-h-28 rounded-lg border object-contain" />
+                    <img key={url} src={waitingExamResourceUrl(url)} alt="รูปประกอบรายการ" className="max-h-28 rounded-lg border object-contain" />
                   ))}
                 </span>
               )}
@@ -3724,7 +3726,7 @@ function ImageLabelAnswerInput({ config, rawValue, onChange, heading }: {
 
   return (
     <ImageLabelInput
-      imageUrl={config?.image_url ?? ''}
+      imageUrl={waitingExamResourceUrl(config?.image_url ?? '')}
       mode={normalizeImageLabelMode(config?.answer_mode)}
       markers={markers}
       bank={config?.bank}
@@ -3799,7 +3801,7 @@ function interpolateValues(text: string, values: Record<string, number>, variabl
 
 function UnitDisplay({ html }: { html: string }) {
   return /<[a-z][\s\S]*>/i.test(html) || containsMath(html)
-    ? <span className="text-sm text-muted-foreground [&_p]:inline" dangerouslySetInnerHTML={{ __html: renderRichTextHtml(html) }} />
+    ? <span className="text-sm text-muted-foreground [&_p]:inline" dangerouslySetInnerHTML={{ __html: waitingExamRichTextHtml(html) }} />
     : <span className="text-sm text-muted-foreground">{html}</span>
 }
 
@@ -3809,7 +3811,7 @@ function QuestionText({ text }: { text: string }) {
     return (
       <div
         className="leading-relaxed rich-text-content text-base [&_math]:my-1 [&_math]:inline-block"
-        dangerouslySetInnerHTML={{ __html: renderRichTextHtml(text) }}
+        dangerouslySetInnerHTML={{ __html: waitingExamRichTextHtml(text) }}
       />
     )
   }

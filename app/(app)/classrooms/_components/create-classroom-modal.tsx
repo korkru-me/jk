@@ -57,7 +57,7 @@ export function CreateClassroomModal() {
       : description.trim()
     startTransition(async () => {
       const res = await createClassroom({ name: name.trim(), description: fullDesc, classroomType })
-      if (res?.error) toast.error(res.error)
+      if (res && 'error' in res && res.error) toast.error(res.error)
       else { reset(); setOpen(false) }
     })
   }

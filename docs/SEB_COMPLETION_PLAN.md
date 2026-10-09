@@ -283,7 +283,7 @@ Production และไม่ใช่หลักฐาน physical platform �
 
 ## แผนย่อย W1–W7 — ห้องรอสอบและโหมดข้อสอบเดียว
 
-เสนอวันที่ 9 ตุลาคม 2026 · **เจ้าของอนุมัติ W1–W6 แล้ว; W1 ตรวจ baseline/inventory แล้ว แต่ feasibility gate ยังไม่ผ่าน**
+เสนอวันที่ 9 ตุลาคม 2026 · **เจ้าของอนุมัติ W1–W6 และสอง gate ของ W1 แล้ว; กำลังปิด machine checks ก่อน deploy dedicated UAT**
 
 เจ้าของขอให้หลังเปิดไฟล์ SEB และล็อกอิน นักเรียนอยู่ในหน้ารอของข้อสอบนั้นเท่านั้น
 ไม่ไปห้องเรียน/แบบฝึกหัด/เฉลยงานอื่น ไม่มีโจทย์และไม่มีเวลาเดินจนกดเริ่มสอบ
@@ -293,8 +293,50 @@ Production และไม่ใช่หลักฐาน physical platform �
 
 นี่เป็นแผนย่อยก่อนกลับไปปิด S6 เดิม **ไม่ใช่การเริ่ม S7** และไม่ทำให้ผล S6 ผ่านเอง
 เจ้าของสั่งทำ W1–W6 ต่อเนื่อง อนุญาตทดสอบ/deploy เฉพาะเว็บทดสอบ และหยุดก่อน W7
-คำสั่งนี้ไม่ยกเลิกจุดหยุดด้าน requirement/shared contract ด้านล่าง ผลตรวจ W1 รอบนี้ยัง
-ไม่แก้ application, `.seb`, release, secrets, migration หรือ deployment
+คำสั่งนี้ไม่ยกเลิกจุดหยุดด้าน requirement/shared contract ด้านล่าง เจ้าของตอบ “อนุมัติๆ”
+ให้ทดลอง initial Quit URL ว่าง → committed completion reconfiguration และเพิ่ม atomic
+start RPC บน Staging แล้ว จึงเริ่ม implementation โดยยังไม่เปลี่ยน r2/keys/Production
+
+### ผล implementation W2–W6 (9 ตุลาคม 2026)
+
+- เพิ่ม canonical `/exam/{assignment}/r/{revision}` แยกจาก app shell: entry/login/profile/
+  waiting/system-check/take/submitted และ closed JSON API/resource/upload/completion
+- signed host-only context เป็นเพียง routing restriction ไม่ใช่ native proof; auth/roster/
+  current release/revision/native session ตรวจซ้ำก่อนคำถามและ mutation; context หายหรือ
+  เสียบน canonical path ไม่ fallback ไปเว็บปกติ และ request เว็บปกติที่ไม่มี marker คงเดิม
+- waiting/GET/prefetch ไม่สร้างรอบหรือโหลดโจทย์; explicit signed generation start ผ่าน
+  service-role-only atomic RPC `20261009142610` ล็อก assignment และ commit header+snapshots
+  พร้อมกัน; receipt retry คืนรอบเดิม รวม retry หลังส่งแล้ว ไม่เพิ่ม timer หรือ attempt
+- เก็บ `started_at` เดิมในการ resume; ตรวจ duration และ effective per-student deadline
+  ก่อน question/resource DTO และก่อนส่งหน้า; timeout ใช้ exact native-authorized recovery
+  ไฟล์-upload ใน forced expired recovery เป็น pending teacher (`is_correct=null`, score 0)
+  ไม่ให้ full credit จาก URL ที่ไม่ได้ตรวจใหม่ และไม่บังคับซ่อมไฟล์หลังปิดรับคำตอบ
+- resource proxy ตรวจเฉพาะ snapshot/own-artifact allowlist; upload ใช้ bounded signed
+  receipt + create-only bytes และ read-back verification ไม่เปิด direct Supabase REST/
+  public solutions ใน native policy; client bridge ไม่เปลี่ยน stored resource models
+- submit error ไม่เปิด exit; lost response ตรวจ committed own receipt; terminal bytes
+  ออกได้จาก current exact submitted/graded receipt เท่านั้น ไม่ใช้ client success เป็นสิทธิ์
+- เพิ่ม strict frozen initial/terminal profile, private operator prepare/enroll พร้อม
+  fresh random admin hash, teacher-owned quit hash, no Exam/Settings Password, wx0600
+  outputs และ reconciliation-required แทน blind retry หลัง registration outcome ไม่ชัด
+- **ขอบเขตรุ่นทดลอง:** fixed online SEB exams ที่ `access_code IS NULL` เท่านั้น รูปแบบ
+  ตอบถูกติดต่อกันถูก fail closed พร้อมข้อความแจ้ง ไม่ตีความเป็น fixed และไม่เปลี่ยน legacy
+  streak การตรวจทานพบ check-count/summary แยก commit มี race ที่ deterministic draw ID
+  อย่างเดียวไม่แก้ จึงถามเจ้าของแยกเรื่อง atomic check ก่อนเพิ่ม SQL/grading authority
+- UI ใช้ primitives เดิม; local runtime UI-only fixture ยืนยัน waiting → verified →
+  active → submitted ทั้ง desktop/390px และ Next runtime ไม่พบ errors ไม่ใช้ภาพจำลอง
+  เป็นหลักฐานว่า auth/native/DB journey จริงผ่าน แก้ union narrowing สองฟอร์มห้องเรียน
+  อย่างน้อยที่สุดเพื่อปลด type/build blocker เดิม ไม่มี behavior/schema change ในสองฟอร์ม
+- full suite ล่าสุด 233 files / 3,494 tests, TypeScript และ token lint ผ่าน; webpack
+  production build ใช้ guarded Staging environment ผ่าน รวม finalization/expiry
+  regressions แล้ว; PGlite rollback/idempotence ไม่ใช่ independent PostgreSQL
+  connection concurrency proof การเดินเว็บกับ registered native release ใหม่รอ W7
+- migration ยังไม่ apply/deploy ใน snapshot นี้: ต้อง commit code+SQL+docs และ pushก่อน
+  exact dry-run/apply เพียง version ที่อนุมัติ แล้ว attest dedicated UAT source/alias/READY
+  feature/profile activation ยังคงปิดจนมี native final bytes/evidence ใหม่; ไม่ enroll คีย์สมมติ
+
+ชุด W6 → W7 อยู่ใน `docs/SEB_WAITING_ROOM_NATIVE_HANDOFF.md`; ห้ามเริ่ม W7 จนเจ้าของ
+อนุมัติใหม่ ผล physical S6/r2 เดิมยังไม่ครบและไม่เลื่อนเป็นผ่านจาก implementation นี้
 
 ### ขอบเขตและการรบกวนเจ้าของ
 
@@ -326,9 +368,9 @@ Production และไม่ใช่หลักฐาน physical platform �
 **ผ่านเมื่อ:** มีขอบเขต/negative-test matrix และไม่มีข้อจำกัดที่ยังซ่อนอยู่; ถ้าต้องเปลี่ยน
 requirement หรือ Drawing Board contract ให้หยุดถามก่อน ไม่ให้เจ้าของเริ่มตั้งค่า native ใหม่
 
-#### ผลตรวจ W1 — 9 ตุลาคม 2026
+#### ผลตรวจ W1 เริ่มต้น — 9 ตุลาคม 2026 (ก่อนคำอนุมัติสอง gate)
 
-**สถานะ:** baseline, route/action inventory และ native source audit เสร็จ; **gate ยังไม่ผ่าน**
+**สถานะ ณ การตรวจเริ่มต้น:** baseline, route/action inventory และ native source audit เสร็จ; **gate ยังไม่ผ่านในตอนนั้น**
 รอเจ้าของตัดสินใจวิธีออกใหม่และอนุมัติ shared database contract ที่จำเป็นก่อน W2–W6
 ไม่ใช่ข้อสรุปว่า requirement ทำไม่ได้ แต่ยังไม่มีวิธีทดแทนที่พิสูจน์ครบทุก platform
 
@@ -391,7 +433,7 @@ requirement หรือ Drawing Board contract ให้หยุดถาม�
   ([3.7](https://github.com/SafeExamBrowser/seb-mac/blob/88b7f8df3c96781197efe400b8a2cbd818524736/Classes/BrowserComponents/SEBAbstractWebView.m#L730),
   [3.7.1](https://github.com/SafeExamBrowser/seb-mac/blob/a1e3f786aac4aa2e827998dcf8ca139f2c5205a9/Classes/BrowserComponents/SEBAbstractWebView.m#L737))
 
-**ทางเลือกเสนอ — ยังไม่อนุมัติ/ไม่ implement**
+**ทางเลือกที่เสนอ ณ W1 — ต่อมาเจ้าของอนุมัติทางทดลองแรก**
 
 - ทางทดลองที่แคบที่สุด: initial config ไม่มี Quit URL แต่คง teacher-owned emergency hash;
   เปิด secure reconfiguration เฉพาะ same-origin release-specific URL ที่ server ตรวจ exact

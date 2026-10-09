@@ -24,6 +24,9 @@ import {
   sebSessionCookieName,
   validateSebChallenge,
 } from '@/lib/seb-session'
+import { readSebExamContext } from '@/lib/seb-exam-context.server'
+import { sebExamRoutePath } from '@/lib/seb-exam-transport-policy'
+import { readWaitingSebProfile } from '@/lib/seb-waiting-release-policy'
 
 interface VerifySebInput {
   assignmentId: string
@@ -88,6 +91,13 @@ export async function verifySafeExamBrowser(input: VerifySebInput) {
     return { error: 'ไฟล์ตั้งค่าข้อสอบเปลี่ยนแล้ว กรุณาเปิดข้อสอบใหม่' }
   }
 
+  const examContext = await readSebExamContext()
+  if (examContext.status === 'invalid' || (examContext.status === 'valid' && (
+    examContext.claims.userId !== user.id || examContext.claims.assignmentId !== input.assignmentId
+    || examContext.claims.revision !== release.revision || examContext.claims.releaseId !== release.releaseId
+    || input.purpose !== 'system_check' || !readWaitingSebProfile(release)
+  ))) return { error: 'ขอบเขตห้องสอบไม่ถูกต้อง กรุณาเปิดไฟล์ข้อสอบใหม่' }
+
   const version = parseSebVersion(input.version)
   if (!version) return { error: 'ไม่พบเวอร์ชัน Safe Exam Browser ที่รองรับ' }
 
@@ -96,7 +106,9 @@ export async function verifySafeExamBrowser(input: VerifySebInput) {
     normalizedRequestUrl = normalizeSebRequestUrl(input.requestUrl)
     const url = new URL(normalizedRequestUrl)
     const origin = requestOrigin(await headers())
-    const expectedPath = input.purpose === 'take'
+    const expectedPath = examContext.status === 'valid'
+      ? sebExamRoutePath(examContext.claims, 'system-check')
+      : input.purpose === 'take'
       ? `/assignments/${input.assignmentId}/take`
       : `/assignments/${input.assignmentId}/system-check`
     if (

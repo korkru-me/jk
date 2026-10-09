@@ -12,6 +12,7 @@ import {
 import { downscaleImage } from '@/lib/image-downscale'
 import { uploadErrorMessage } from '@/lib/upload-error'
 import type { SubmittedFile } from '@/lib/types'
+import { isWaitingExamTransport, uploadWaitingExamFile, waitingExamResourceUrl } from '@/lib/seb-exam-client'
 
 // Loaded on demand rather than imported at the top: @supabase/supabase-js is
 // ~220 KB, and a student only needs it at the moment they attach a file. The
@@ -60,10 +61,11 @@ export function FileSubmissionUpload({ submissionAnswerId, value, onChange, loca
 
   async function uploadCandidate(candidate: SubmissionUploadCandidate<File>, retry: boolean) {
     if (!submissionAnswerId) throw new Error('ไม่พบคำตอบสำหรับแนบไฟล์ กรุณาโหลดข้อสอบใหม่')
-    const { prepareExamAttachmentUpload, completeExamAttachmentUpload } = await import('@/lib/actions/exam-attachments')
+    const { prepareExamAttachmentUpload, completeExamAttachmentUpload } = await import('@/lib/seb-exam-client')
     return uploadSubmissionCandidate({ submissionAnswerId, candidate, retry }, {
       prepare: prepareExamAttachmentUpload,
       upload: async (target, file, mimeType) => {
+        if (isWaitingExamTransport()) return uploadWaitingExamFile(target, file, mimeType)
         const supabase = await browserSupabase()
         return supabase.storage
           .from(target.bucket)
@@ -164,7 +166,7 @@ export function FileSubmissionUpload({ submissionAnswerId, value, onChange, loca
         toast.error('ไม่พบคำตอบสำหรับลบไฟล์ กรุณาโหลดข้อสอบใหม่')
         return
       }
-      const { deleteExamAttachment } = await import('@/lib/actions/exam-attachments')
+      const { deleteExamAttachment } = await import('@/lib/seb-exam-client')
       const removed = await deleteExamAttachment({
         submissionAnswerId,
         kind: 'submission_file',
@@ -246,19 +248,19 @@ export function FileSubmissionUpload({ submissionAnswerId, value, onChange, loca
                   type="button"
                   variant="ghost"
                   aria-label={`เปิดไฟล์ ${f.name}`}
-                  onClick={() => window.open(f.url, '_blank')}
+                  onClick={() => window.open(waitingExamResourceUrl(f.url), '_blank')}
                   className="block h-auto w-auto rounded-lg p-0"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={f.url}
+                    src={waitingExamResourceUrl(f.url)}
                     alt=""
                     className="h-24 w-24 cursor-pointer rounded-lg border object-cover"
                   />
                 </Button>
               ) : (
                 <a
-                  href={f.url}
+                  href={waitingExamResourceUrl(f.url)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-24 h-24 flex flex-col items-center justify-center gap-1 rounded-lg border bg-muted/40 hover:bg-muted transition-colors px-1.5"

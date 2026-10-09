@@ -9,6 +9,8 @@ vi.mock('server-only', () => ({}))
 vi.mock('next/headers', () => ({
   cookies: async () => ({
     set: mocks.setCookie,
+    getAll: (name?: string) => [...mocks.cookieValues].filter(([key]) => !name || key === name)
+      .map(([key, value]) => ({ name: key, value })),
     get: (name: string) => {
       const value = mocks.cookieValues.get(name)
       return value === undefined ? undefined : { value }

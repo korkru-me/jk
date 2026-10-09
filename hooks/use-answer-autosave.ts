@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { saveAnswer } from '@/lib/actions/submissions'
+import { saveAnswer } from '@/lib/seb-exam-client'
 import { callIdempotentAction } from '@/lib/retry-action'
 import type { MathInputModes } from '@/lib/math/input-mode'
 import {

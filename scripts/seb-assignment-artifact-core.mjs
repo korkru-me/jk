@@ -375,6 +375,13 @@ function asPlaintextXml(bytes) {
   return decodePlaintextArtifact(bytes).xml
 }
 
+/** Strict plist primitives shared with the separate experimental profile. */
+export const assignmentSebPlistHelpers = Object.freeze({
+  decode: decodePlaintextArtifact,
+  parse: parseTopLevelPlistScalars,
+  readUrlFilterRules,
+})
+
 function readCommonStagingOrigin(xml) {
   const start = readScalar(xml, 'startURL')
   const quit = readScalar(xml, 'quitURL')

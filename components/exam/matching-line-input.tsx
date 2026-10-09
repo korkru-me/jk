@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { RichText } from '@/components/ui/rich-text'
+import { WaitingExamRichText as RichText } from '@/components/exam/seb-exam-rich-text'
 import { cn } from '@/lib/utils'
 import type { MatchingOption, MatchingPrompt } from './matching-drag-input'
 

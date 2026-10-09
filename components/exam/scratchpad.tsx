@@ -65,6 +65,7 @@ import {
 } from './drawing-board-utils'
 import type { FingerInputMode } from '@/lib/drawing-board-input'
 import { cn } from '@/lib/utils'
+import { isWaitingExamTransport, uploadWaitingExamFile, waitingExamResourceUrl } from '@/lib/seb-exam-client'
 import {
   initialScratchpadRevision,
   markScratchpadAttached,
@@ -497,9 +498,9 @@ export default function Scratchpad({
         scene = snapshotDrawingScene(previewAttachedSceneRef.current)
       } else {
         let sceneUrl = currentArtifact.sceneUrl
-        let response = sceneUrl ? await fetch(sceneUrl, { cache: 'no-store' }) : null
+        let response = sceneUrl ? await fetch(waitingExamResourceUrl(sceneUrl), { cache: 'no-store' }) : null
         if (!response?.ok) {
-          const { getStudentWorkArtifacts } = await import('@/lib/actions/math-work')
+          const { getStudentWorkArtifacts } = await import('@/lib/seb-exam-client')
           const refreshed = await getStudentWorkArtifacts(scope.answerId)
           if (!refreshed || 'error' in refreshed) throw new Error(refreshed?.error ?? 'เปิดไฟล์ต้นฉบับไม่สำเร็จ')
           const matched = refreshed.artifacts.find(item => item.partKey === artifactPartKey)
@@ -511,7 +512,7 @@ export default function Scratchpad({
             }
           }
           sceneUrl = matched?.sceneUrl ?? null
-          response = sceneUrl ? await fetch(sceneUrl, { cache: 'no-store' }) : null
+          response = sceneUrl ? await fetch(waitingExamResourceUrl(sceneUrl), { cache: 'no-store' }) : null
         }
         if (!response?.ok) throw new Error('เปิดไฟล์ต้นฉบับไม่สำเร็จ')
         const validated = validateDrawingScene(await response.json(), { role: 'student' })
@@ -753,7 +754,7 @@ export default function Scratchpad({
         getStudentWorkArtifacts,
         prepareStudentWorkArtifactUpload,
         saveStudentWorkArtifact,
-      } = await import('@/lib/actions/math-work')
+      } = await import('@/lib/seb-exam-client')
       const prepared = await prepareStudentWorkArtifactUpload({
         submissionAnswerId: scope.answerId,
         partKey: artifactPartKey,
@@ -766,14 +767,19 @@ export default function Scratchpad({
       if (!prepared || 'error' in prepared) {
         throw new Error(prepared?.error ?? 'เตรียมพื้นที่อัปโหลดไม่สำเร็จ')
       }
-      const { createClient } = await import('@/lib/supabase/client')
-      const bucket = createClient().storage.from(MATH_WORK_BUCKET)
       // The server already validated and stored scene.json. The browser gets a
       // token only for the derived preview, so no unvalidated scene can race it.
-      await bucket.uploadToSignedUrl(prepared.preview.path, prepared.preview.token, preview.blob, {
-        contentType: preview.blob.type,
-        cacheControl: '300',
-      })
+      if (isWaitingExamTransport()) {
+        const sent = await uploadWaitingExamFile(prepared, preview.blob, preview.blob.type)
+        if (sent.error) throw sent.error
+      } else {
+        const { createClient } = await import('@/lib/supabase/client')
+        const bucket = createClient().storage.from(MATH_WORK_BUCKET)
+        await bucket.uploadToSignedUrl(prepared.preview.path, prepared.preview.token, preview.blob, {
+          contentType: preview.blob.type,
+          cacheControl: '300',
+        })
+      }
       const saved: Awaited<ReturnType<typeof saveStudentWorkArtifact>> = await saveStudentWorkArtifact({
         submissionAnswerId: scope.answerId,
         partKey: artifactPartKey,

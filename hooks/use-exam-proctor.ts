@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { recordProctorSignal } from '@/lib/actions/exam-proctor'
+import { recordProctorSignal } from '@/lib/seb-exam-client'
 import type { ProctorEvent, ProctorEventType } from '@/lib/exam-proctor'
 import {
   mergeFailedProctorSignals,
