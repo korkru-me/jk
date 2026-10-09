@@ -13,6 +13,7 @@
 - Full suite **236 files / 3,597 tests PASSED**; `npx tsc --noEmit`, design-token lint
   และ guarded Next.js **16.3.5 webpack production build PASSED** บน Staging environment
   ที่ผ่าน isolation guard ไม่ใช่ Production rollout หรือ native physical result
+  ตัวเลขนี้เป็นรอบก่อน proof02; full validation ของ source รอบใหม่ยัง **PENDING**
 - `lib/seb-waiting-journey.test.ts` มี composed offline server journey **11 tests PASSED**:
   real Proxy/middleware/entry/password Auth binding/signed context/waiting/closed API/
   start/save/submit/resource/completion modules; แทนเฉพาะ framework request context/cache
@@ -60,9 +61,37 @@
   matching entries** ตรวจ service-only RPC permission ด้วย invalid-input request ผ่าน
   ผลนี้ไม่สร้าง attempt และไม่ใช่ independent concurrent-start proof
 - PGlite rollback/idempotence tests ผ่านใน software suite แต่ใช้ serialized connection
-  เดียว Independent PostgreSQL scratch experiment รอบแรก **NOT OBSERVED**, scratch
-  removed/cleaned; diagnostics/ผลรอบถัดไป **PENDING** ไม่บันทึกเป็น concurrency pass
-  และไม่สร้าง DB role/rotate password/เปลี่ยน application authority เพื่อให้ gate ผ่าน
+  เดียว ไม่ใช่หลักฐาน independent backends; scratch experiment รอบแรก **NOT OBSERVED**
+  และ removed/cleaned แล้ว เก็บผลแรกตามจริง ไม่ย้อนเปลี่ยนเป็น pass จากรอบใหม่
+
+### Independent PostgreSQL scratch proof02 — PASSED / cleanup removed
+
+- Observed proof run `8403ead7-f719-4272-b6ac-1a0ef0560422` ผ่านบน isolated Staging
+  **3 rounds**, แต่ละรอบมี **4 distinct backend PIDs**: holder, contenders 2 ตัว และ
+  observer; เห็น contenders ทั้งสอง active + `Lock` waiting โดย blocker chain ไปถึง
+  exact held assignment จริง (รวม transitive blocker) ไม่ถือเพียงการรอ lock ใด ๆ เป็น pass
+- ทดสอบ exact committed/live function body ที่ rebind ไป private scratch schema
+  พร้อม **14-table models** ไม่ใช่การเรียก public application RPC ทั้ง flow Migration
+  SHA-256 `dbc55e2b142bae082dbb9aad4073be173422e9540872d97ec66e3781ab22b395`;
+  function-body SHA-256 `e16b2db8276b2d8482a3392d99b78c34d0733a5493d011206c5420d3ac9f7c3a`
+- หลังปล่อย holder lock ผลยืนยัน one allocation ต่อ generation, immutable submission ID/
+  `started_at`/answer snapshots, completed-generation replay ไม่เปิดรอบใหม่, snapshot
+  constraint `23514` rollback header/answers และไม่กิน generation; wrong-only carried
+  metadata ที่ assertions กำหนดคงเดิมครบ ไม่ regrade/reset teacher-edited evidence
+- ปัญหารอบแรกมาจาก CLI auth/login-role preflight overlap; source `7e4c8b0` เพิ่ม bounded
+  startup stagger **2,500 ms** เฉพาะการเริ่ม CLI ไม่ serialize SQL ไม่ลด acceptance:
+  holder 15 seconds/observer window 5 seconds และ strict distinct-PID/blocker-chain
+  assertions คงเดิม การรันทับซ้อนจริงยืนยันจาก observed backends/locks ไม่ใช่ timing assumption
+- Cleanup disposition: **scratch removed** หลังรอบ proof02 ไม่เหลือ model tables/function
+  ของรอบนี้ SQL ของ harness ไม่สร้าง application/test roles และไม่เปลี่ยน application
+  RLS/grading authority หรือ DB password; อย่างไรก็ตาม normal CLI authentication อาจ
+  mint/refresh temporary CLI login role จึง **ไม่อ้างว่าไม่มี role mutation ทุกชนิด**
+- ผลนี้ปิด scoped independent PostgreSQL concurrency/rollback proof ของ function body
+  บน scratch models เท่านั้น ไม่ใช่ public RPC integration, entire live RLS/schema proof,
+  canonical browser/native journey หรือ W7 pass ไม่สร้าง submission ใน actual fixture
+
+### Dedicated UAT deployment — source รอบใหม่ PENDING
+
 - Last attested dedicated UAT deployment: source `7cde7b4`,
   `dpl_H24Jhy2A5YYjjkLKv1L4LZgMRf2r`, `https://korkru-seb-uat.vercel.app`
   exact source/project/alias/READY/login STAGING badge ถูกตรวจในรอบนั้น flags ยังคง
@@ -75,8 +104,8 @@ Pilot รับเฉพาะ fixed passwordless online SEB exam; **streak excl
 จนมีคำอนุมัติและผล atomic verdict/summary contract แยก ไม่เปลี่ยน legacy Browser/Android/
 streak หรือทำ account-wide restriction ทาง runtime/SQL เอง
 
-ก่อนปิด software W2–W6 ให้เติม observed runtime UI result, independent PostgreSQL
-result + cleanup disposition และ exact new deployment/source/flags หลังตรวจจริง หาก
+ก่อนปิด software W2–W6 ให้เติม observed runtime UI result, full validation รอบใหม่ และ
+exact new deployment/source/flags หลังตรวจจริง; proof02/cleanup ข้างต้นผ่านแล้วเฉพาะ scope นั้น หาก
 result ยังไม่เกิดให้คง `pending|blocked|not_observed` ไม่ลด requirement เพื่อเปลี่ยนเป็น pass
 Native passwordless entry, early-quit denial, completion/reconfiguration failures,
 teacher emergency quit และ committed terminal exit ทุก platform ยัง **W7 NOT RUN**
