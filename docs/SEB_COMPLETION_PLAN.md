@@ -283,7 +283,7 @@ Production และไม่ใช่หลักฐาน physical platform �
 
 ## แผนย่อย W1–W7 — ห้องรอสอบและโหมดข้อสอบเดียว
 
-เสนอวันที่ 9 ตุลาคม 2026 · **เจ้าของอนุมัติ W1–W6 และสอง gate ของ W1 แล้ว; กำลังปิด machine checks ก่อน deploy dedicated UAT**
+เสนอวันที่ 9 ตุลาคม 2026 · **W1–W6 machine-testable fixed-exam pilot ส่งขึ้น dedicated UAT แล้ว; หยุดก่อน W7/native activation**
 
 เจ้าของขอให้หลังเปิดไฟล์ SEB และล็อกอิน นักเรียนอยู่ในหน้ารอของข้อสอบนั้นเท่านั้น
 ไม่ไปห้องเรียน/แบบฝึกหัด/เฉลยงานอื่น ไม่มีโจทย์และไม่มีเวลาเดินจนกดเริ่มสอบ
@@ -331,9 +331,20 @@ start RPC บน Staging แล้ว จึงเริ่ม implementation �
   production build ใช้ guarded Staging environment ผ่าน รวม finalization/expiry
   regressions แล้ว; PGlite rollback/idempotence ไม่ใช่ independent PostgreSQL
   connection concurrency proof การเดินเว็บกับ registered native release ใหม่รอ W7
-- migration ยังไม่ apply/deploy ใน snapshot นี้: ต้อง commit code+SQL+docs และ pushก่อน
-  exact dry-run/apply เพียง version ที่อนุมัติ แล้ว attest dedicated UAT source/alias/READY
-  feature/profile activation ยังคงปิดจนมี native final bytes/evidence ใหม่; ไม่ enroll คีย์สมมติ
+- source code+SQL+docs `7cde7b4089092e7e65077094671f892a0e79d5a7` commit/push แล้วก่อน
+  mutation; exact dry-run พบเพียง `20261009142610` และ apply บน Staging สำเร็จ parity
+  ตรง 141 รายการ ไม่มี local-only/remote-only; live invalid-input permission check ยืนยัน
+  anon เรียก RPC ไม่ได้ (`42501`) และ service role ถูกปฏิเสธ invalid input (`22023`)
+  ไม่สร้าง attempt/fixture หรือถือว่าเป็น independent concurrent-start/native proof
+- deploy เฉพาะ `https://korkru-seb-uat.vercel.app` สำเร็จ จาก source `7cde7b4` ที่ตรึงไว้
+  deployment `dpl_H24Jhy2A5YYjjkLKv1L4LZgMRf2r` ตรวจ exact project/source/alias/READY,
+  login HTTP 200 + STAGING badge, UI-only lab และ missing-context start denial ผ่าน
+  ไม่มี Cron/Production mutation และไม่ได้ merge master; build/runtime flags บังคับ
+  `SEB_EXAM_WAITING_ENABLED=false`, manifest `[]` จนมี native final/evidence ใหม่
+- **หยุดก่อน W7:** ยังไม่มี fresh fixture/teacher revision/seed/native final/enrollment ของ
+  waiting profile; ต้องทำเมื่อเจ้าของอนุมัติ W7 และเลือกชุดข้อสอบสังเคราะห์ใหม่แล้ว
+  live auth/native integrated journey, independent concurrent-start connections และ native
+  failure/early-quit matrix ยังไม่ผ่าน/ไม่รัน ไม่ enroll คีย์สมมติและไม่ยกผล r2 มาปิดช่องว่าง
 
 ชุด W6 → W7 อยู่ใน `docs/SEB_WAITING_ROOM_NATIVE_HANDOFF.md`; ห้ามเริ่ม W7 จนเจ้าของ
 อนุมัติใหม่ ผล physical S6/r2 เดิมยังไม่ครบและไม่เลื่อนเป็นผ่านจาก implementation นี้

@@ -6,11 +6,18 @@
 
 **W7: NOT RUN / native proof: `pending_w7`.** เอกสารนี้เป็น runbook สำหรับ operator ในรอบที่เจ้าของอนุมัติเริ่ม W7 ภายหลัง ไม่ใช่คำสั่งให้เริ่มตอนนี้ และไม่ใช่ผลผ่านจากอุปกรณ์จริง
 
+งานเว็บส่งขึ้น dedicated UAT แล้วจาก source `7cde7b4`, deployment
+`dpl_H24Jhy2A5YYjjkLKv1L4LZgMRf2r`; Staging atomic-start migration `20261009142610`
+apply แล้วและ parity ตรง 141 รายการ Full suite 3,494 tests/TypeScript/token lint/build/
+local Next runtime ผ่าน เป็น software evidence เท่านั้น Deploy flags ยังคง false/manifest
+ว่าง ไม่มี fresh fixture/teacher revision/native seed/final/keys/enrollment ของ waiting
+profile และไม่มี master merge/Production mutation การเปิดใช้งานจริงรอ W7 ตามแผน
+
 งาน operator W6 ตรวจในเครื่องด้วยข้อมูลสังเคราะห์: 3 suites / 100 tests ผ่าน รวม strict parser, fixed-pilot predicate, private-file guard, mocked Storage/RPC, immutable bytes และ output reconciliation; Node syntax checks ผ่าน ไม่มี live environment, DB, Storage, native SEB หรือไฟล์ r2 ถูกใช้ในการตรวจนี้ การทดสอบ PGlite ที่มี connection เดียวไม่ใช่หลักฐานการแข่งขันของ PostgreSQL หลาย transaction อิสระ
 
 ยังไม่มี seed, native final, evidence, terminal artifact หรือ release ใหม่ที่สร้างจาก runbook นี้ ชื่อไฟล์/path/ค่าที่อยู่ในวงเล็บมุมด้านล่างเป็น **placeholder สำหรับ operator-run เท่านั้น** ห้ามเติมคีย์เดา ห้ามถือว่าคำสั่ง dry-run หรือ tests ผ่านแทน native pass และห้ามยกผล/คีย์/evidence/deployment ของ r2 มาใช้กับ profile ใหม่นี้
 
-หยุดที่ W6: ไม่เปิด Configuration Tool, ไม่สร้าง/บันทึกไฟล์ native, ไม่ enroll/upload/register, ไม่แก้ cloud environment และไม่ขอให้เจ้าของเริ่มทดสอบอุปกรณ์ในรอบส่งต่อนี้
+หยุดที่ W6: ไม่เปิด Configuration Tool, ไม่สร้าง/บันทึกไฟล์ native, ไม่ enroll/upload/register หรือเปิดใช้งาน release ใน cloud และไม่ขอให้เจ้าของเริ่มทดสอบอุปกรณ์ในรอบส่งต่อนี้ (การ deploy source/apply atomic-start SQL ที่กล่าวข้างต้นแยกจาก operator/native enrollment)
 
 ## เงื่อนไขก่อนเปิดรอบ W7
 
@@ -144,4 +151,4 @@ Initial phase มี `quitURL=""`; native Quit URL ที่เดาได้�
 
 W7 ผ่านได้เมื่อ observed cases ที่กำหนดครบทุก target/build/candidate รวม negatives และไม่มี prompt ก่อนเว็บ/exit bypass ก่อน commit ผู้ตรวจระบุช่องว่างตามจริงและเจ้าของอนุมัติผล ไม่มีการอนุมาน pass จาก parser/checkbox/system-check screenshot เพียงส่วนเดียว
 
-อ้างอิงแผนและหลักฐานเดิมได้ที่ [SEB_COMPLETION_PLAN.md](./SEB_COMPLETION_PLAN.md) และ [SEB_PHASE6_PHYSICAL_UAT.md](./SEB_PHASE6_PHYSICAL_UAT.md) แต่ runbook นี้ไม่แก้สถานะของสองเอกสารนั้นและไม่ย้ายผล r2 มาเป็น evidence ใหม่ ตอนส่งต่องานนี้ยัง **หยุดก่อน W7**; ไม่มี native generation/enrollment/cloud mutation หรือคำขอให้เจ้าของทำขั้นถัดไปเกิดขึ้น
+อ้างอิงแผนและหลักฐานเดิมได้ที่ [SEB_COMPLETION_PLAN.md](./SEB_COMPLETION_PLAN.md) และ [SEB_PHASE6_PHYSICAL_UAT.md](./SEB_PHASE6_PHYSICAL_UAT.md) แต่ runbook นี้ไม่ย้ายผล r2 มาเป็น evidence ใหม่ ตอนส่งต่องานนี้ยัง **หยุดก่อน W7**; ไม่มี native generation/enrollment/release activation จาก operator commands หรือคำขอให้เจ้าของทำขั้นถัดไปเกิดขึ้น งาน deploy/apply SQL ของเว็บรายงานแยกข้างต้น
