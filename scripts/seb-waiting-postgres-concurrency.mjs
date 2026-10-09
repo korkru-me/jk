@@ -299,7 +299,8 @@ export function linkedErrorSqlState(stderr) {
   if (!match) return null
   let payload
   try { payload = JSON.parse(match[1]) } catch { return null }
-  return typeof payload?.message === 'string' && /^Failed to run sql query: ERROR:\s+23514:/.test(payload.message) ? '23514' : null
+  const state = typeof payload?.message === 'string' ? payload.message.match(/^Failed to run sql query: ERROR:\s+([0-9A-Z]{5}):/) : null
+  return state?.[1] ?? null // SQLSTATE only; no arbitrary message or detail.
 }
 
 /** Private query files carry synthetic SQL, never credentials. */
@@ -323,9 +324,12 @@ export function createLinkedCliQuery({ workdir = fileURLToPath(new URL('../', im
     } catch (error) {
       if (error instanceof WaitingPostgresProofError) throw error
       // Capture SQLSTATE only, not messages/queries/details from the CLI.
-      if (linkedErrorSqlState(error?.stderr) === '23514') {
+      const sqlState = linkedErrorSqlState(error?.stderr)
+      if (sqlState === '23514') {
         const classified = new WaitingPostgresProofError('SNAPSHOT_CONSTRAINT_FAILURE'); classified.pgCode = '23514'; throw classified
       }
+      if (sqlState) fail(`LINKED_SQL_${sqlState}`)
+      if (error?.killed === true || error?.code === 'ETIMEDOUT') fail('LINKED_QUERY_TIMEOUT')
       fail('LINKED_QUERY_FAILED')
     } finally {
       await handle?.close()
@@ -336,32 +340,60 @@ export function createLinkedCliQuery({ workdir = fileURLToPath(new URL('../', im
   }
 }
 
-async function concurrentManagementStart({ query, schema, runId, round, options, waitTimeoutMs, poll }) {
+export async function concurrentManagementStart({ query, schema, runId, round, options, waitTimeoutMs, poll }) {
   const prefix = `swp:${runId.replaceAll('-', '')}:${round}`
   const tags = [`${prefix}:h`, `${prefix}:c1`, `${prefix}:c2`]
-  const holder = query(managementHolderSql(schema, tags[0])).then(value => ({ value }), error => ({ error }))
+  const startedAt = Date.now()
+  let holderOutcome, caughtFailure, stage = 'holder-readiness', polls = 0, lastObserved = []
+  const holder = query(managementHolderSql(schema, tags[0])).then(
+    value => { holderOutcome = { value }; return holderOutcome },
+    error => { holderOutcome = { error }; return holderOutcome })
   const pending = []
-  const watch = () => query(`SELECT pid,state,wait_event_type,pg_blocking_pids(pid) AS blockers,application_name,
+  const contenderOutcomes = []
+  const holderMustStillRun = () => {
+    if (holderOutcome?.error) throw new WaitingPostgresProofError(safeProofError(holderOutcome.error))
+    if (holderOutcome?.value) fail('MANAGEMENT_HOLDER_FINISHED_BEFORE_OBSERVATION')
+  }
+  const watch = async () => {
+    polls++
+    const rows = await query(`SELECT pid,state,wait_event_type,wait_event,pg_blocking_pids(pid) AS blockers,application_name,
     pg_backend_pid() AS observer_pid FROM pg_catalog.pg_stat_activity
     WHERE application_name=ANY(ARRAY[${tags.map(literal).join(',')}])`)
+    lastObserved = rows.filter(row => tags.includes(row.application_name)).map(row => ({
+      pid: Number.isInteger(row.pid) ? row.pid : null,
+      actor: tags.indexOf(row.application_name) === 0 ? 'holder' : 'contender',
+      state: ['active', 'idle', 'idle in transaction', 'idle in transaction (aborted)'].includes(row.state) ? row.state : 'other',
+      waitType: ['Lock', 'Timeout', 'Client', 'IO', 'LWLock'].includes(row.wait_event_type) ? row.wait_event_type : 'other',
+      sleeping: row.wait_event === 'PgSleep',
+    }))
+    return rows
+  }
   let evidence
   try {
     const readyDeadline = Date.now() + waitTimeoutMs
     let holderPid
     do {
+      holderMustStillRun()
       const row = (await watch()).find(row => row.application_name === tags[0])
-      // Timeout is sufficient: this exact tagged holder has one pg_sleep call.
-      if (row?.state === 'active' && row.wait_event_type === 'Timeout') holderPid = row.pid
+      holderMustStillRun()
+      if (row?.state === 'active' && row.wait_event_type === 'Timeout' && row.wait_event === 'PgSleep') holderPid = row.pid
       if (holderPid) break
       await poll(50)
     } while (Date.now() < readyDeadline)
+    holderMustStillRun()
     requireCondition(Number.isInteger(holderPid), 'MANAGEMENT_HOLDER_NOT_OBSERVED')
+    stage = 'contender-lock-waits'
     for (let index = 1; index < tags.length; index++) {
-      pending.push(query(managementStartSql(schema, tags[index], options)).then(value => ({ value }), error => ({ error })))
+      const outcomeIndex = index - 1
+      pending.push(query(managementStartSql(schema, tags[index], options)).then(
+        value => { contenderOutcomes[outcomeIndex] = { value }; return contenderOutcomes[outcomeIndex] },
+        error => { contenderOutcomes[outcomeIndex] = { error }; return contenderOutcomes[outcomeIndex] }))
     }
     const waitDeadline = Date.now() + waitTimeoutMs
     do {
       const rows = await watch()
+      const failedContender = contenderOutcomes.find(outcome => outcome?.error)
+      if (failedContender) throw new WaitingPostgresProofError(safeProofError(failedContender.error))
       const contenders = tags.slice(1).map(tag => rows.find(row => row.application_name === tag))
       const pids = contenders.map(row => row?.pid)
       const currentHolder = rows.find(row => row.application_name === tags[0])
@@ -374,8 +406,15 @@ async function concurrentManagementStart({ query, schema, runId, round, options,
           ({ pid, state, wait_event_type, blockers })) }
         break
       }
+      holderMustStillRun()
+      if (contenderOutcomes.some(outcome => outcome?.value)) fail('MANAGEMENT_START_FINISHED_WITHOUT_LOCK_EVIDENCE')
       await poll(50)
     } while (Date.now() < waitDeadline)
+    if (!evidence) {
+      const failedContender = contenderOutcomes.find(outcome => outcome?.error)
+      if (failedContender) throw new WaitingPostgresProofError(safeProofError(failedContender.error))
+      holderMustStillRun()
+    }
     requireCondition(evidence, 'INDEPENDENT_LOCK_WAIT_NOT_OBSERVED')
     const [held, ...outcomes] = await Promise.all([holder, ...pending])
     if (held.error || outcomes.some(outcome => outcome.error)) throw held.error ?? outcomes.find(outcome => outcome.error).error
@@ -388,7 +427,24 @@ async function concurrentManagementStart({ query, schema, runId, round, options,
     requireCondition(receipts.filter(receipt => receipt.created === true).length === 1
       && receipts.filter(receipt => receipt.created === false).length === 1, 'DUPLICATE_START_ALLOCATION')
     return { receipt: receipts[0], evidence }
-  } finally { await Promise.allSettled([holder, ...pending]) }
+  } catch (error) {
+    const classified = new WaitingPostgresProofError(safeProofError(error))
+    classified.diagnostics = { round, stage, elapsedMs: Date.now() - startedAt, observationDeadlineMs: waitTimeoutMs,
+      holderOutcome: holderOutcome?.error ? 'failed' : holderOutcome?.value ? 'finished' : 'pending',
+      holderCode: holderOutcome?.error ? safeProofError(holderOutcome.error) : null, polls, lastObserved }
+    caughtFailure = classified
+    throw classified
+  } finally {
+    await Promise.allSettled([holder, ...pending])
+    if (caughtFailure) {
+      caughtFailure.diagnostics.totalElapsedMs = Date.now() - startedAt
+      caughtFailure.diagnostics.holderFinalOutcome = holderOutcome?.error ? 'failed' : 'finished'
+      caughtFailure.diagnostics.holderFinalCode = holderOutcome?.error ? safeProofError(holderOutcome.error) : null
+      if (holderOutcome?.error && ['MANAGEMENT_HOLDER_NOT_OBSERVED', 'INDEPENDENT_LOCK_WAIT_NOT_OBSERVED'].includes(caughtFailure.code)) {
+        caughtFailure.code = safeProofError(holderOutcome.error); caughtFailure.message = caughtFailure.code
+      }
+    }
+  }
 }
 
 export async function runWaitingManagementProof({ query, migration, schema, runId, waitTimeoutMs = 5000,
@@ -494,7 +550,8 @@ export async function runWaitingManagementProof({ query, migration, schema, runI
   if (failure || cleanup === 'reconciliation-required') {
     const error = new WaitingPostgresProofError(cleanup === 'reconciliation-required' ? 'RECONCILIATION_REQUIRED' : safeProofError(failure))
     error.report = { status: 'failed', code: error.code, runId, schema, cleanup, transport: 'linked-management-api', proofScope: PRIVATE_SCOPE,
-      liveExecuted: true, nativeProof: 'not-run', publicRpcIntegration: 'not-run', publicRlsProof: 'not-run' }
+      liveExecuted: true, nativeProof: 'not-run', publicRpcIntegration: 'not-run', publicRlsProof: 'not-run',
+      ...(failure?.diagnostics ? { diagnostics: failure.diagnostics } : {}) }
     throw error
   }
   return { ...result, cleanup }

@@ -9,6 +9,7 @@ import {
   managementHolderSql, managementStartSql, offlineProofPlan, parseLinkedQueryOutput, parseProofArgs,
   runWaitingManagementProof, safeProofError,
   reserveProofJournal, appendProofJournalRecord,
+  concurrentManagementStart,
 } from './seb-waiting-postgres-concurrency.mjs'
 
 const migration = await readFile(new URL('../supabase/migrations/20261009142610_atomic_seb_exam_start.sql', import.meta.url), 'utf8')
@@ -187,10 +188,10 @@ describe('linked CLI transport (mock subprocess; no network)', () => {
     expect(() => parseLinkedQueryOutput(`prefix ${sentinel}`)).toThrow('LINKED_QUERY_RESPONSE_INVALID')
     expect(() => parseLinkedQueryOutput(JSON.stringify({ rows: sentinel }))).toThrow('LINKED_QUERY_RESPONSE_INVALID')
   })
-  it('classifies only anchored 23514, never returns arbitrary error messages', () => {
+  it('classifies only anchored SQLSTATE codes, never returns arbitrary error messages', () => {
     const stderr = `Initialising login role...\n\u001b[31munexpected status 400: ${JSON.stringify({ message: 'Failed to run sql query: ERROR:  23514: synthetic constraint failure\n' })}\u001b[0m\nTry debug`
     expect(linkedErrorSqlState(stderr)).toBe('23514')
-    expect(linkedErrorSqlState(stderr.replace('23514', '22012'))).toBeNull()
+    expect(linkedErrorSqlState(stderr.replace('23514', '22012'))).toBe('22012')
     expect(linkedErrorSqlState(`ERROR: 23514: ${sentinel}`)).toBeNull()
   })
   it('checks linked ref before subprocess/file creation, and does not accept arbitrary targets', async () => {
@@ -219,6 +220,62 @@ describe('linked CLI transport (mock subprocess; no network)', () => {
       .rejects.toMatchObject({ code: 'LINKED_QUERY_RESPONSE_INVALID' })
     await expect(stat(path)).rejects.toMatchObject({ code: 'ENOENT' })
   })
+  it('keeps precise SQLSTATE-only holder errors without exposing API messages', async () => {
+    const execute = vi.fn(async () => { throw { stderr: `unexpected status 400: ${JSON.stringify({ message: `Failed to run sql query: ERROR:  42601: ${sentinel}\n` })}` } })
+    await expect(createLinkedCliQuery({ execute, readLinkedRef: async () => STAGING_PROJECT_REF })('SELECT 1'))
+      .rejects.toMatchObject({ code: 'LINKED_SQL_42601' })
+  })
+})
+
+describe('honest holder observation failures (mock requests only)', () => {
+  const options = { schema, runId, round: 1, waitTimeoutMs: 100, poll: async () => {} }
+  it.each(['LINKED_SQL_42601', 'LINKED_QUERY_TIMEOUT'])('surfaces completed holder %s instead of hiding it behind readiness', async code => {
+    const query = vi.fn(async sql => {
+      if (sql.includes('WITH held AS MATERIALIZED')) throw new WaitingPostgresProofError(code)
+      return []
+    })
+    await expect(concurrentManagementStart({ ...options, query })).rejects.toMatchObject({ code,
+      diagnostics: { stage: 'holder-readiness', holderOutcome: 'failed', holderCode: code } })
+    expect(query.mock.calls.some(([sql]) => sql.includes('WITH context AS MATERIALIZED'))).toBe(false)
+  })
+  it('redacts arbitrary holder exception and safely records observation timing', async () => {
+    const query = vi.fn(async sql => { if (sql.includes('WITH held AS MATERIALIZED')) throw new Error(sentinel); return [] })
+    let caught
+    try { await concurrentManagementStart({ ...options, query }) } catch (error) { caught = error }
+    expect(caught.code).toBe('POSTGRES_PROOF_FAILED')
+    expect(caught.diagnostics.observationDeadlineMs).toBe(100)
+    expect(Number.isInteger(caught.diagnostics.elapsedMs)).toBe(true)
+    expect(JSON.stringify(caught.diagnostics)).not.toContain(sentinel)
+  })
+  it('successful holder completion without observed overlap remains a failure', async () => {
+    const query = vi.fn(async sql => sql.includes('WITH held AS MATERIALIZED') ? [{ pid: 101 }] : [])
+    await expect(concurrentManagementStart({ ...options, query })).rejects.toMatchObject({
+      code: 'MANAGEMENT_HOLDER_FINISHED_BEFORE_OBSERVATION', diagnostics: { holderOutcome: 'finished' },
+    })
+  })
+  it('preserves the final safe holder error if it arrives only while bounded requests settle', async () => {
+    const query = vi.fn(async sql => {
+      if (sql.includes('WITH held AS MATERIALIZED')) return new Promise((_done, reject) => {
+        setTimeout(() => reject(new WaitingPostgresProofError('LINKED_QUERY_TIMEOUT')), 150)
+      })
+      return []
+    })
+    await expect(concurrentManagementStart({ ...options, query, poll: async () => new Promise(done => setTimeout(done, 110)) }))
+      .rejects.toMatchObject({ code: 'LINKED_QUERY_TIMEOUT', diagnostics: { holderFinalOutcome: 'failed', holderFinalCode: 'LINKED_QUERY_TIMEOUT' } })
+  })
+  it('surfaces a contender SQL failure rather than calling it missing lock evidence', async () => {
+    let finishHolder, observations = 0
+    const tag = `swp:${runId.replaceAll('-', '')}:1:h`
+    const query = vi.fn(async sql => {
+      if (sql.includes('WITH held AS MATERIALIZED')) return new Promise(done => { finishHolder = done })
+      if (sql.includes('WITH context AS MATERIALIZED')) throw new WaitingPostgresProofError('LINKED_SQL_42501')
+      if (++observations > 1) finishHolder([{ pid: 101 }])
+      return [{ pid: 101, application_name: tag, state: 'active', wait_event_type: 'Timeout', wait_event: 'PgSleep', observer_pid: 104 }]
+    })
+    await expect(concurrentManagementStart({ ...options, query })).rejects.toMatchObject({
+      code: 'LINKED_SQL_42501', diagnostics: { stage: 'contender-lock-waits' },
+    })
+  })
 })
 
 /** This tests SQL/parser/orchestration contracts on one serialized embedded
@@ -235,7 +292,7 @@ async function embeddedHarness({ drift = false, cleanupMismatch = false, pidMism
     if (sql.includes('pg_catalog.pg_stat_activity')) {
       const round = [...rounds.values()].find(value => !value.completed)
       if (!round) return []
-      const holderRow = { pid: round.holderPid, state: 'active', wait_event_type: 'Timeout', blockers: [],
+      const holderRow = { pid: round.holderPid, state: 'active', wait_event_type: 'Timeout', wait_event: 'PgSleep', blockers: [],
         application_name: round.holderTag, observer_pid: round.holderPid + 3 }
       if (round.contenders.length !== 2) return [holderRow]
       const waits = round.contenders.map((item, index) => ({ pid: round.holderPid + index + 1,
