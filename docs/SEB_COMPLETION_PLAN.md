@@ -281,6 +281,144 @@ Production และไม่ใช่หลักฐาน physical platform �
 **เกณฑ์ผ่าน:** authenticated Staging mock exam ผ่านจาก source revision, deployment และ config
 เดียวกัน โดยไม่มีข้อมูล Production ปะปน
 
+## แผนย่อย W1–W7 — ห้องรอสอบและโหมดข้อสอบเดียว
+
+เสนอวันที่ 9 ตุลาคม 2026 · **รอเจ้าของสั่งเริ่ม implementation**
+
+เจ้าของขอให้หลังเปิดไฟล์ SEB และล็อกอิน นักเรียนอยู่ในหน้ารอของข้อสอบนั้นเท่านั้น
+ไม่ไปห้องเรียน/แบบฝึกหัด/เฉลยงานอื่น ไม่มีโจทย์และไม่มีเวลาเดินจนกดเริ่มสอบ
+เมื่อเริ่มแล้วใช้เวลาเดิมตลอดการ reconnect/resume; ทางออกปกติแสดงหลัง server ยืนยัน
+การส่งสำเร็จ ส่วนการออกก่อนส่งใช้ Quit/Unlock Password ที่ครูเจ้าของตั้งไว้
+ไม่มี Exam/Settings Password หรือรหัสเข้าสอบเพิ่มเติมจากการล็อกอินบัญชีตามปกติ
+
+นี่เป็นแผนย่อยก่อนกลับไปปิด S6 เดิม **ไม่ใช่การเริ่ม S7** และไม่ทำให้ผล S6 ผ่านเอง
+รอบวางแผนนี้ไม่แก้ application, `.seb`, release, secrets, migration หรือ deployment
+
+### ขอบเขตและการรบกวนเจ้าของ
+
+- ขอบเขตเริ่มต้นที่เสนอคือ restricted SEB session ของ exact user/assignment/release/revision
+  ไม่ล็อกทั้งบัญชีบนทุกอุปกรณ์ ไม่เปลี่ยนการใช้งานเว็บปกติของครู/นักเรียนหรือ Android
+  monitored; หากต้องการ account-wide restriction ให้แยกตัดสินใจและประเมิน schema/RLS
+- ไม่ถือ query, user-agent หรือการมี JavaScript API เป็นสิทธิ์ ต้องตรวจ native CK+BEK
+  และ signed server context ตาม release ก่อนอนุญาตเริ่ม/อ่าน/เขียนข้อสอบ
+- รักษาวิธีล็อกอินเดิมที่ประกาศรองรับและตรวจ callback/return target; หาก OAuth/Magic Link
+  ต้องขยาย allowlist หรือเปลี่ยนวิธีที่รองรับ ให้แจ้งก่อน ไม่ปิดฟีเจอร์เดิมเงียบ ๆ
+- ทำ machine-testable work ให้ครบก่อนขอให้เจ้าของเปิด Windows/Mac/iPad/iPhone หรือ
+  เก็บ native keys; ส่งขั้นตอนเหล่านี้เป็นชุดเดียวเมื่อ source/policy นิ่งแล้ว
+- แจ้งทันทีเฉพาะสิ่งที่หยุดงานจริง: ต้องยืนยันตัวตน, ขาดสิทธิ์, requirement ขัดกับ native
+  behavior, migration/RLS/Storage contract เปลี่ยน หรือข้อมูล/ประวัติ migration ไม่ตรง
+  เรื่องทดลองอ่านข้อความ/ตำแหน่งปุ่มที่ไม่กระทบ correctness รวมแจ้งตอนส่งมอบ
+- คำสั่งเริ่มแผนนี้ไม่ใช่อำนาจ merge master/deploy Production; การ deploy dedicated UAT
+  และ schema/authority-changing migration ต้องได้รับอนุมัติที่ตรงขอบเขต ก่อน mutation
+
+### W1 — ตรึง baseline และพิสูจน์ข้อจำกัด
+
+- ตรวจ branch/upstream/งานอื่นที่เปลี่ยนหลังหยุด; แยก implementation จากไฟล์/fixture ของ r2
+- ทำ route/action/resource inventory ตั้งแต่ entry/login/callback ถึง submit/quit รวม
+  prefetch, Back, URL ตรง, session expiry และ solution endpoints ของงานอื่น
+- กำหนดสถานะก่อน login → ห้องรอ → in progress → submitted/expired โดยไม่ให้สถานะ
+  client เป็นผู้เริ่มเวลา/สร้างสิทธิ์ และระบุวิธีรักษา exam context ก่อน native verification
+- ตรวจ native Quit URL interception เป็น feasibility gate ต้นงาน: static Quit URL และ
+  การซ่อนปุ่มไม่ใช่ authorization; ห้ามอ้างว่าปิดก่อนส่งไม่ได้หากยังเข้าลิงก์ตรงแล้วออกได้
+
+**ผ่านเมื่อ:** มีขอบเขต/negative-test matrix และไม่มีข้อจำกัดที่ยังซ่อนอยู่; ถ้าต้องเปลี่ยน
+requirement หรือ Drawing Board contract ให้หยุดถามก่อน ไม่ให้เจ้าของเริ่มตั้งค่า native ใหม่
+
+### W2 — Server state, start และเวลา
+
+- ห้องรอ/ตรวจเครื่องไม่สร้าง submission, ไม่เริ่ม timer และไม่ส่งโจทย์/เฉลย
+- การกดเริ่มเป็น explicit server mutation; ตรวจ user/roster/เวลาเปิดสอบ/release/session
+  ซ้ำ แล้วสร้างหนึ่ง attempt แบบ atomic/idempotent ไม่อาศัย page render/GET/prefetch
+- กดซ้ำพร้อมกันหรือ response หายต้องได้ attempt เดิม; reconnect/reload/ออกฉุกเฉินแล้ว
+  กลับมาใช้ `started_at` ฝั่ง server เดิม ไม่เพิ่มเวลา ไม่สร้างรอบใหม่ ไม่ถือเป็นการส่ง
+
+**ผ่านเมื่อ:** tests พิสูจน์ zero attempt/zero timer ก่อนปุ่ม และหนึ่ง attempt หลัง concurrent
+start/retry พร้อม wrong user/assignment/revision, expired session และ exam window negatives
+
+### W3 — Login และหน้ารอเฉพาะข้อสอบ
+
+- entry ของไฟล์รักษา exact exam context ผ่าน login/callback/profile completion โดยไม่
+  ส่งไป dashboard ก่อน ตรวจ return target ฝั่ง server ป้องกัน open redirect/เปลี่ยนข้อสอบ
+- ทำ exam-only shell ไม่มีเมนู/โลโก้/แจ้งเตือน/ลิงก์ที่พาออกไปแอปทั่วไป
+- ห้องรอมีชื่อข้อสอบ เวลาที่ได้รับ กติกา สถานะตรวจเครื่อง และปุ่มเริ่มที่บอกชัดว่าเวลาเริ่มทันที
+  ถ้ายังไม่ถึงเวลา/ตรวจไม่ผ่าน/session หมดอายุ ให้แสดงเหตุผลและทางกู้คืนเฉพาะข้อสอบ
+- ห้ามใช้ `/take` แบบปัจจุบันเป็นห้องรอ เพราะ page render เรียก `startSubmission` อยู่
+
+**ผ่านเมื่อ:** local runtime/browser journeys ยืนยัน login กลับข้อสอบถูกชุด, ก่อนเริ่มไม่มี
+question/answer-key payload และ reload/Back/prefetch ไม่เริ่มเวลา เว็บปกติยังทำงานเหมือนเดิม
+
+### W4 — ป้องกันหน้าอื่น, recovery และทางออก
+
+- บังคับขอบเขตทั้ง page/Server Actions/API/solution reads ไม่ใช่เพียงซ่อนเมนู; ตรวจ
+  direct request, URL ของงานอื่น และ context หาย/หมดอายุแบบ fail closed
+- รักษา autosave/offline queue/upload/proctor/timeout ของ attempt เดิมและข้อความกู้คืน
+- ทางออกบนเว็บเกิดหลัง committed submit เท่านั้น; submit/network failure ต้องไม่แสดง
+  ทางออกสำเร็จ และต้องไม่วนสร้าง attempt ใหม่เมื่อ retry
+- ตรวจ native early-quit/direct-link, teacher-owned emergency password และ native
+  passwordless quit หลัง submit แยกจาก web authorization ไม่ยก browser mock เป็น native pass
+
+**ผ่านเมื่อ:** negatives ทุก boundary ผ่าน, timer/answers ไม่ reset ใน tests และประเด็น
+native ที่ยังต้องพิสูจน์ถูกระบุชัด หาก guarantee ทำไม่ได้ให้รายงานก่อนลด requirement
+
+### W5 — Automated regression และ integrated mock
+
+- รัน targeted/full tests, TypeScript, token lint, production build และ Next runtime ตาม
+  ไฟล์ที่แก้ รวม normal exam/exercise, Android monitored และ shared Drawing Board regression
+- ทดสอบ login → waiting → explicit start → autosave/reconnect/resume/upload →
+  submit failure/retry → submitted exit state บน synthetic fixture แยกจาก r2 เดิม
+- เพิ่ม wrong account/roster, wrong CK/BEK/build/revision, expired/tampered context,
+  URL/action ของงานอื่น, concurrent start และ lost response
+- หากต้องทดสอบเว็บ deploy ให้ใช้ dedicated UAT ที่ได้รับอนุมัติ พร้อม source/alias/DB
+  isolation attestation; ไม่ apply migration เหมารวมเพื่อแก้ ledger gap
+- tests ที่จำลอง native API/registry เป็น machine evidence เท่านั้น การทดสอบ live ที่ต้อง
+  registered final release ใหม่รอ W7 หลัง native enrollment ไม่ปลอม keys หรือข้าม prerequisite
+  เพื่อรายงานว่า integrated native journey ผ่านก่อนเจ้าของได้ทำขั้นจำเป็น
+
+**ผ่านเมื่อ:** machine-testable checks ผ่านครบหรือมี pre-existing unrelated blocker ที่
+รายงานตรง ๆ; ห้ามกล่าวว่า native/S6 เสร็จจาก mock และยังไม่ส่งภาระให้เจ้าของลองแก้ config
+
+### W6 — เตรียม release ใหม่และชุดส่งต่อ native
+
+- หลัง route/policy นิ่งจึงทำ seed/materializer/validator ให้ Start URL เป็น entry ของ
+  ข้อสอบและ allowlist เฉพาะ auth/ข้อสอบ/resources ที่จำเป็น ไม่อนุญาตทั้ง origin เหมารวม
+- เตรียม fixture/revision/candidate ใหม่แยกจาก r2; เก็บ r2-final/release/หลักฐานเดิมไว้
+  ไม่หมุน revision ที่มี attempt กำลังทำ และไม่ออก CK/BEK สมมติเป็นคีย์จริง
+- การเปลี่ยน `.seb` ทำให้ต้องใช้ final bytes/native CK+BEK ชุดใหม่จาก exact builds;
+  เตรียม checklist, private handoff และ enrollment dry-run ให้เจ้าของทำรอบเดียว
+- ก่อน rollout ตรวจ exact source/deployment/alias, release byte digest/size และ migration
+  parity; schema apply ต้องผ่านคำอนุมัติและรายงาน Git/Staging DB/Production DB แยกกัน
+
+**ผ่านเมื่อ:** มีชุดส่งต่อครบและ source/policy ไม่เปลี่ยนระหว่างเก็บ native keys;
+สถานะเป็น **รอ final native save/enrollment** ไม่ใช่พร้อมใช้จริง ยังไม่ลงทะเบียนคีย์ที่ไม่ได้เก็บ
+
+### W7 — เจ้าของทำ native ขั้นจำเป็น แล้วปิด gate
+
+- แจ้งเจ้าของเป็นชุดเดียวเมื่อพร้อม: ครูตั้งรหัสออกเฉพาะ revision ใหม่ผ่านเว็บ, final save
+  ด้วย native tool ถ้าจำเป็น, เก็บ CK/BEK ทาง owner-only channel และยืนยัน exact builds
+- เปิดไฟล์เดียวกันบน Windows → Mac → iPad → iPhone ทดสอบไม่มี Exam/Settings Password,
+  login เข้าห้องรอ, ก่อนกดเวลาไม่เดิน/ไม่เห็นโจทย์, กดเริ่มครั้งเดียวและไปหน้าอื่นไม่ได้
+- ทดสอบ offline/resume เวลาเดิม, upload, submit failure/success, wrong/emergency quit,
+  native quit หลังส่ง, wrong/modified config และ normal-browser rejection
+- ล็อก candidate ใหม่ก่อนรับ physical results; ไม่ยกหลักฐานของ r2 เดิมข้าม source/config
+  และไม่ทดสอบหลาย candidate ปะปนกัน ต้องแก้ bug แล้ว reset suite ที่ได้รับผลกระทบตามจริง
+
+**ผ่านเมื่อ:** physical gates ครบ platforms ที่จะประกาศรองรับ และรับรอง native restrictions
+ตามหลักฐานจริง จึงกลับมาปิด S6; S7 เดิม/merge master/Production รอการอนุมัติแยก
+
+### จุดหยุดและสถานะการเข้าถึงขณะวางแผน
+
+- หยุดเฟสที่พบข้อมูล/เฉลยรั่ว, เวลาเริ่มก่อนกด, start ซ้ำ, early native quit ที่ไม่ผ่าน
+  requirement, source/revision drift, การเปลี่ยน contract สำคัญ หรือ migration mismatch
+  ทำได้เฉพาะงานอิสระที่ปลอดภัยต่อ ไม่เดินข้าม dependency/gate และไม่พักข้อผิดพลาดไว้ท้ายงาน
+- 9 ตุลาคม: `gh api user` ผ่านและ Git fetch/upstream ตรงกัน Vercel API เดิมตอบ 403
+  แต่ CLI ต่ออายุ session บัญชีเดิมได้ จากนั้น authenticated read ตรวจ exact dedicated
+  project/source/alias/READY/login/Staging badge ผ่าน ไม่ต้องให้เจ้าของ login ใหม่ตอนนี้
+  สิ่งนี้ไม่รับประกันว่าการเชื่อมต่อจะไม่หมดอายุภายหลัง หากต้องยืนยันใหม่จะแจ้งทันที
+- รอบนี้เสนอและบันทึกแผนเท่านั้น ยังไม่เริ่ม W1–W7 implementation หรือเปลี่ยน r2 candidate
+- ตรวจเอกสารด้วย `git diff --check` ผ่าน, evidence regression 1 file / 8 tests ผ่าน และ
+  candidate/schema gate เดิมผ่าน แต่ physical aggregate ยัง NOT READY ตาม cases ที่ pending;
+  ไม่รัน full tests/TypeScript/lint/build ซ้ำ เพราะแก้เฉพาะเอกสาร ไม่ apply migration/deploy
+
 ## เฟส S6 — Physical platform gate
 
 ทำซ้ำบน macOS, iPadOS, iOS และ Windows ด้วย production config revision และ build ที่จะประกาศจริง

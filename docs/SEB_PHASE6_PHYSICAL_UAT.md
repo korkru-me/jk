@@ -6,6 +6,14 @@
 iPadOS และ iPhone/iOS จริง หลัง authenticated Staging mock ของ S5 ผ่านแล้ว
 ผลจากไฟล์กลางรุ่นเก่า, native lab, browser จำลอง หรือคนละ artifact ห้ามนำมารวมกัน
 
+**จุดพัก/แผนใหม่ 9 ตุลาคม 2026:** เจ้าของขอพักก่อนขั้น Windows เน็ตหลุด แล้วขอแผน
+ห้องรอสอบและโหมดข้อสอบเดียวก่อนทดสอบต่อ แผนย่อย W1–W7 อยู่ใน
+[`SEB_COMPLETION_PLAN.md`](./SEB_COMPLETION_PLAN.md) และยังรอคำสั่งเริ่ม implementation
+ภาพล่าสุดของ r2-sessionfix อยู่ที่หน้าโจทย์เลือก ก พร้อมข้อความบันทึกอัตโนมัติ/
+เชื่อมห้องคุมสอบแล้ว ยังไม่มีผล offline/reconnect/resume/upload/submit/quit รอบนี้
+ไม่แก้ final r2, release, candidate manifest หรือสถานะผ่าน ให้เก็บเป็นประวัติเดิมและแยก
+candidate ใหม่เมื่อ source/config เปลี่ยน ไม่ให้นักเรียน/เจ้าของเริ่มตั้งค่า native ใหม่ก่อนเว็บนิ่ง
+
 ## สิ่งที่ยืนยันจาก S5 แล้ว
 
 - isolated Staging journey `seb-s5-20260927av` จบสถานะ `complete` เมื่อ
