@@ -8,12 +8,11 @@
 
 ## Software validation — PASSED ในขอบเขตที่ระบุ
 
-- Validation source `054ea61` รวม localhost real-client lab code `140410f`; documentation
-  snapshot ที่ใช้บันทึกรอบนี้คือ `2e49aec` ผล validation ไม่เท่ากับ source ที่ deploy แล้ว
-- Full suite **236 files / 3,597 tests PASSED**; `npx tsc --noEmit`, design-token lint
+- Validation source `7e4c8b0` รวม localhost real-client lab code `140410f`; actual-client
+  harness `f48e01d` และ final navigation error assertion ตรวจแยก ผลไม่เท่ากับ source ที่ deploy แล้ว
+- Full suite **236 files / 3,598 tests PASSED**; `npx tsc --noEmit`, design-token lint
   และ guarded Next.js **16.3.5 webpack production build PASSED** บน Staging environment
   ที่ผ่าน isolation guard ไม่ใช่ Production rollout หรือ native physical result
-  ตัวเลขนี้เป็นรอบก่อน proof02; full validation ของ source รอบใหม่ยัง **PENDING**
 - `lib/seb-waiting-journey.test.ts` มี composed offline server journey **11 tests PASSED**:
   real Proxy/middleware/entry/password Auth binding/signed context/waiting/closed API/
   start/save/submit/resource/completion modules; แทนเฉพาะ framework request context/cache
@@ -23,9 +22,16 @@
   frozen completion bytes รวม host/origin/context/CSRF/closed-operation/resource/account/
   expiry/streak negatives ผลนี้ไม่ใช่ rendered browser, real Auth/PostgREST/RLS หรือ
   independent PostgreSQL transaction proof
-- Localhost actual-client/intercepted-backend runtime UI QA **PENDING** ณ snapshot นี้
-  การมี lab code/build/tests ไม่ใช่ผลการเดิน UI แล้วจริง และ intercepted backend ไม่ใช่
-  live canonical/native integration ไม่เพิ่ม mock replacement ลง deployed exam endpoints
+- Localhost actual-client/intercepted-backend runtime UI QA **PASSED — 8 observations**:
+  explicit Start ก่อน actual React WaitingExamRunner/ExamClient/timer/inputs mount,
+  numeric/MCQ autosave, received refusal คง pending และไม่ replay อัตโนมัติ, offline
+  backup/remount restored answer + exact `started_at`/timer ไม่ reset/reconnect clearing,
+  lost upload response retry คง uploadId เดิม/หนึ่ง binary/หนึ่ง answer reference,
+  submit refusal คงหน้าสอบ และ success ไป exact canonical submitted receipt ที่ intercept
+  ไม่มี unexpected requests/ordinary actions/external requests/new client errors Scoped
+  Next MCP compilation/config/session diagnostics ว่าง มี historical `/` preflight missing-
+  Supabase env error 1 รายการรายงานแยก ไม่อ้าง global-zero-errors ทุก browser history
+  Backend Auth/DB/Storage/native ไม่ได้ทดสอบใน UI นี้ และไม่เพิ่ม mocks ลง deployed endpoints
 
 ## Actual isolated-Staging fixture — PREPARED ไม่ใช่การเริ่มสอบ
 
@@ -78,7 +84,8 @@
   `started_at`/answer snapshots, completed-generation replay ไม่เปิดรอบใหม่, snapshot
   constraint `23514` rollback header/answers และไม่กิน generation; wrong-only carried
   metadata ที่ assertions กำหนดคงเดิมครบ ไม่ regrade/reset teacher-edited evidence
-- ปัญหารอบแรกมาจาก CLI auth/login-role preflight overlap; source `7e4c8b0` เพิ่ม bounded
+- รอบแรกยังไม่เห็น holder; source audit/probes พบ CLI auth/login-role startup interference
+  ที่ควรหลีกเลี่ยง Source `7e4c8b0` เพิ่ม bounded
   startup stagger **2,500 ms** เฉพาะการเริ่ม CLI ไม่ serialize SQL ไม่ลด acceptance:
   holder 15 seconds/observer window 5 seconds และ strict distinct-PID/blocker-chain
   assertions คงเดิม การรันทับซ้อนจริงยืนยันจาก observed backends/locks ไม่ใช่ timing assumption
@@ -104,8 +111,8 @@ Pilot รับเฉพาะ fixed passwordless online SEB exam; **streak excl
 จนมีคำอนุมัติและผล atomic verdict/summary contract แยก ไม่เปลี่ยน legacy Browser/Android/
 streak หรือทำ account-wide restriction ทาง runtime/SQL เอง
 
-ก่อนปิด software W2–W6 ให้เติม observed runtime UI result, full validation รอบใหม่ และ
-exact new deployment/source/flags หลังตรวจจริง; proof02/cleanup ข้างต้นผ่านแล้วเฉพาะ scope นั้น หาก
+ก่อนปิด software W2–W6 ให้เติม exact new deployment/source/flags หลังตรวจจริง;
+machine/runtime UI/proof02/cleanup ข้างต้นผ่านแล้วเฉพาะ scope ที่แยกไว้ หาก
 result ยังไม่เกิดให้คง `pending|blocked|not_observed` ไม่ลด requirement เพื่อเปลี่ยนเป็น pass
 Native passwordless entry, early-quit denial, completion/reconfiguration failures,
 teacher emergency quit และ committed terminal exit ทุก platform ยัง **W7 NOT RUN**

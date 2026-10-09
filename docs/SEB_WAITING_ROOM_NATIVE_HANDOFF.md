@@ -1,6 +1,6 @@
 # ห้องสอบ SEB — ส่งต่องาน W6 ไป W7
 
-อัปเดต 9 ตุลาคม 2026 · profile `waiting-room-completion-experimental-v1`
+อัปเดต 10 ตุลาคม 2026 · profile `waiting-room-completion-experimental-v1`
 
 ## สถานะและจุดหยุด
 
@@ -8,10 +8,11 @@
 
 งานเว็บส่งขึ้น dedicated UAT แล้วจาก source `7cde7b4`, deployment
 `dpl_H24Jhy2A5YYjjkLKv1L4LZgMRf2r`; Staging atomic-start migration `20261009142610`
-apply แล้วและ parity ตรง 141 รายการถึง `20261009142610` Full suite ก่อน PostgreSQL/
-local-client QA ผ่าน 235 files / 3,545 tests; TypeScript/token lint/build/local Next runtime
-ที่ผ่านแล้วเป็น software evidence ตามรอบนั้น **final validation และ deploy source ใหม่
-pending** Deploy flags ยังคง false/manifest ว่าง ไม่มี master merge/Production mutation
+apply แล้วและ parity ตรง 141 รายการถึง `20261009142610` Full suite ล่าสุดผ่าน 236 files /
+3,598 tests; TypeScript/token lint/guarded Next.js 16.3.5 webpack build ผ่าน Actual-client
+browser QA 8 observations และ independent PostgreSQL scratch mechanics proof ผ่าน
+แยกจาก native/backend integration ดู `SEB_WAITING_ROOM_W6_EVIDENCE.md` **deployment
+source รอบใหม่ยังรอ attestation** Flags คง false/manifest ว่าง ไม่มี master merge/Production mutation
 การเปิดใช้งานจริงรอ W7 ตามแผน ไม่ใช้ source ใหม่อ้างว่า deployed แล้วก่อนตรวจ alias/source
 
 ชุด pure/mock operator tests เดิมผ่าน 3 suites / 100 tests รวม strict parser, fixed-pilot predicate, private-file guard, mocked Storage/RPC, immutable bytes และ output reconciliation; Node syntax checks ผ่าน การตรวจชุดนี้ไม่ได้ใช้ live environment/DB/Storage/native SEB หรือไฟล์ r2 ไม่รวม actual fixture preparation ที่รายงานแยกด้านล่าง การทดสอบ PGlite connection เดียวไม่ใช่หลักฐานการแข่งขันของ PostgreSQL หลาย transaction อิสระ
@@ -22,7 +23,7 @@ pending** Deploy flags ยังคง false/manifest ว่าง ไม่ม�
 - ตรวจ selected authenticated reads จริง: student questions=0, draft assignments=0, registry denied และ teacher-owned positive reads ผ่าน เฉพาะขอบเขตที่ตรวจ ไม่ใช่ whole-flow/direct-RLS proof ของทุก action (classroom/join actions ใช้ service role หลัง application authorization)
 - Scoped prepare สร้าง `.local/seb-waiting-w6/korkru-waiting-w6-r1-seed.seb` แล้ว **4,039 bytes**, SHA-256 `7a8ffa675f6d86865754a0427572a1c5d83c0dcdd2fdf90a0f83f132593107ea` และ fresh private admin credential; seed ไม่มี Exam/Settings file-entry password, initial Quit URL ว่าง และ canonical assignment/revision scope นี่คือ materialized seed ไม่ใช่ native-final artifact และไม่ใช่ native passwordless-entry/exit proof
 - ไม่มี native final/CK/BEK/evidence/terminal cloud artifact/release enrollment, ไม่ publish/start/create attempt หรือ activate manifest ใหม่ อย่าสร้าง fixture/revision/seed ซ้ำหรือทับ seed เดิม; ใช้ private receipt เดิมเพื่อตรวจ scope/reconciliation ก่อนทำขั้นต่อไปที่ได้รับอนุมัติ
-- Composed offline server journey 11 tests ผ่าน (real modules, external Auth/DB/Storage mocked, synthetic native inputs, zero network) ส่วน localhost actual-client/intercepted-backend QA ยัง pending Independent PostgreSQL scratch concurrency experiment รอบแรก **NOT OBSERVED**, scratch ล้างแล้ว; diagnosis/ผลรอบถัดไป pending ไม่ถือ PGlite หรือผลรอบแรกเป็น independent transaction pass
+- Composed offline server journey 11 tests และ localhost actual-client/intercepted-backend QA 8 observations ผ่าน โดยไม่เพิ่ม mocks ลง server endpoints Independent PostgreSQL scratch proof02 ผ่าน 3 rounds/four backends/strict lock overlap/idempotence/rollback/carried metadata และล้าง exact scratch แล้ว รอบแรก **NOT OBSERVED** คงบันทึกเป็นประวัติ ไม่ถือ PGlite หรือข้อพิสูจน์ scratch เป็น public-RPC/whole-RLS/native pass
 
 ชื่อไฟล์/path/ค่าที่อยู่ในวงเล็บมุมด้านล่างยังเป็น **ตัวอย่าง placeholder** ไม่ใช่ private IDs/credentials ของ fixture ที่เตรียมแล้ว ห้ามเติมคีย์เดา ห้ามถือ prepare/tests ผ่านแทน native pass และห้ามยกผล/คีย์/evidence/deployment ของ r2 มาใช้กับ profile ใหม่นี้
 

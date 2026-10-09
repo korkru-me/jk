@@ -283,7 +283,7 @@ Production และไม่ใช่หลักฐาน physical platform �
 
 ## แผนย่อย W1–W7 — ห้องรอสอบและโหมดข้อสอบเดียว
 
-เสนอวันที่ 9 ตุลาคม 2026 · **W2–W6 fixed-exam software/fixture/seed เตรียมแล้ว; final machine validation และ deploy source ใหม่ pending; หยุดก่อน W7/native activation**
+เสนอวันที่ 9 ตุลาคม 2026 · ตรวจล่าสุด 10 ตุลาคม 2026 · **W2–W6 fixed-exam machine checks/fixture/seed ผ่านแล้ว; กำลังส่ง candidate ล่าสุดขึ้น dedicated UAT; หยุดก่อน W7/native activation**
 
 เจ้าของขอให้หลังเปิดไฟล์ SEB และล็อกอิน นักเรียนอยู่ในหน้ารอของข้อสอบนั้นเท่านั้น
 ไม่ไปห้องเรียน/แบบฝึกหัด/เฉลยงานอื่น ไม่มีโจทย์และไม่มีเวลาเดินจนกดเริ่มสอบ
@@ -333,13 +333,19 @@ start RPC บน Staging แล้ว จึงเริ่ม implementation �
   เป็น local fixture เท่านั้น ไม่ enroll cloud keys และบังคับว่าไม่มี network call ครอบคลุม
   no-timer/no-question wait, explicit start, autosave fail/retry, same-timer resume,
   submit failure/committed-retry/exit bytes และ host/context/CSRF/resource negatives
-- full suite รอบก่อน PostgreSQL/local-client QA ผ่าน 235 files / 3,545 tests; TypeScript,
-  token lint และ guarded webpack build ที่ผ่านแล้วเป็น software evidence ตามรอบของมัน
-  **final validation ของ source ปัจจุบัน pending** ไม่ยกผลก่อนหน้าไปปิด gate ใหม่
-  PGlite rollback/idempotence ใช้ connection เดียว; independent PostgreSQL scratch
-  experiment รอบแรกเป็น **NOT OBSERVED** และล้าง scratch แล้ว ไม่ใช่ concurrency pass
-  การวิเคราะห์/ผลรอบถัดไปและ localhost actual-client/intercepted-backend QA ยัง pending
-  ทั้งหมดไม่แทน browser + real registered native release journey ซึ่งรอ W7
+- full suite ล่าสุดผ่าน 236 files / 3,598 tests พร้อม TypeScript, token lint และ guarded
+  Next.js 16.3.5 webpack build; real-client browser QA ผ่าน 8 observations ใช้ actual
+  WaitingExamRunner/ExamClient กับ browser-only interception: autosave/refusal/offline
+  backup/remount/reconnect เวลาเดิม, MCQ, lost-upload-response retry หนึ่ง uploadId/หนึ่ง
+  binary/หนึ่ง reference, submit refusal ไม่ออก และ success ไป canonical submitted receipt
+  ไม่มี unexpected requests/new active-client errors ไม่ใช่ Auth/DB/Storage/native proof
+- Independent PostgreSQL scratch proof02 ผ่าน 3 race rounds แต่ละรอบเห็น 4 backends
+  อิสระและสอง active Lock waits ไปยัง held assignment; one allocation, immutable receipt/
+  answer snapshots, completed replay, snapshot constraint rollback/ไม่กิน generation และ
+  wrong-only carried metadata ผ่าน ล้าง exact owned scratch แล้ว รอบแรก NOT OBSERVED
+  เก็บเป็นประวัติ ไม่ลบผลล้มเหลว SQL body ตรง committed/deployed function แต่ rebound
+  เฉพาะ private scratch models จึงไม่ใช่ public-RPC/whole-RLS/native integration proof
+  CLI startup stagger 2,500ms ไม่ serialize SQL หรือผ่อน strict overlap assertions
 - source code+SQL+docs `7cde7b4089092e7e65077094671f892a0e79d5a7` commit/push แล้วก่อน
   mutation; exact dry-run พบเพียง `20261009142610` และ apply บน Staging สำเร็จ parity
   ตรง 141 รายการ ไม่มี local-only/remote-only; live invalid-input permission check ยืนยัน
@@ -361,11 +367,11 @@ start RPC บน Staging แล้ว จึงเริ่ม implementation �
   ตรวจ seed policy ว่าไม่มี Exam/Settings file-entry password, initial Quit URL ว่าง
   และ scope/filter ตรง revision ใหม่ รายละเอียด nonsecret digest อยู่ในชุดส่งต่อ W6
   ไม่มี native final save, keys, Storage upload/enrollment, publish, start หรือ attempt ใหม่
-- **หยุดก่อน W7:** fresh fixture/revision/seed เป็น W6 preparation ไม่ใช่ native pass;
-  deployed waiting flag ยัง false/manifest `[]` และ deploy source หลังการตรวจล่าสุดยัง
-  pending ไม่เปลี่ยน r2/keys/evidence เดิม Live native auth/exit/reconfiguration failure
-  matrix ยัง NOT RUN; independent PostgreSQL result และ final UI/test result ต้องเติม
-  ตามที่สังเกตจริง ไม่ enroll คีย์สมมติหรือยกผล r2/local mocks มาปิดช่องว่าง
+- **หยุดก่อน W7:** fresh fixture/revision/seed และ machine checks เป็น W6 preparation
+  ไม่ใช่ native pass; deployed waiting flag ยัง false/manifest `[]` และ source/alias ของ
+  deployment รอบล่าสุดต้อง attest หลังส่งจริง ไม่เปลี่ยน r2/keys/evidence เดิม Live native
+  auth/exit/reconfiguration failure matrix ยัง NOT RUN ไม่ enroll คีย์สมมติหรือยกผล
+  r2/local mocks มาปิดช่องว่าง ดูผลแยกแต่ละประเภทใน `SEB_WAITING_ROOM_W6_EVIDENCE.md`
 
 ชุด W6 → W7 อยู่ใน `docs/SEB_WAITING_ROOM_NATIVE_HANDOFF.md`; ห้ามเริ่ม W7 จนเจ้าของ
 อนุมัติใหม่ ผล physical S6/r2 เดิมยังไม่ครบและไม่เลื่อนเป็นผ่านจาก implementation นี้
@@ -563,9 +569,10 @@ native ที่ยังต้องพิสูจน์ถูกระบุ�
 - tests ที่จำลอง native API/registry เป็น machine evidence เท่านั้น การทดสอบ live ที่ต้อง
   registered final release ใหม่รอ W7 หลัง native enrollment ไม่ปลอม keys หรือข้าม prerequisite
   เพื่อรายงานว่า integrated native journey ผ่านก่อนเจ้าของได้ทำขั้นจำเป็น
-- ผล composed server journey อยู่ใน `lib/seb-waiting-journey.test.ts`; ไม่ใช่ rendered
-  browser หรือ actual Auth/PostgREST/RLS/independent-transaction proof Local actual-client
-  QA ที่ intercept backend ยังอยู่ระหว่างตรวจ ต้องบันทึกผลแยกและไม่เรียกเป็น live native pass
+- ผล composed server journey อยู่ใน `lib/seb-waiting-journey.test.ts`; แยกจากผล rendered
+  actual-client QA ใน `scripts/seb-waiting-client-browser-qa.mjs` และ PostgreSQL scratch
+  proof ใน `scripts/seb-waiting-postgres-concurrency.mjs` ซึ่งผ่านตามขอบเขตของแต่ละชุด
+  ไม่เรียกรวมเป็น live canonical Auth/PostgREST/RLS/native pass
 
 **ผ่านเมื่อ:** machine-testable checks ผ่านครบหรือมี pre-existing unrelated blocker ที่
 รายงานตรง ๆ; ห้ามกล่าวว่า native/S6 เสร็จจาก mock และยังไม่ส่งภาระให้เจ้าของลองแก้ config
@@ -573,9 +580,9 @@ native ที่ยังต้องพิสูจน์ถูกระบุ�
 ### W6 — เตรียม release ใหม่และชุดส่งต่อ native
 
 **ผลปัจจุบัน:** fresh synthetic draft/current teacher revision และ private seed เตรียมแล้ว
-ภายใต้คำอนุมัติ W6 TEST; native final/enrollment/activation ยังไม่เริ่ม Final machine
-validation/source deployment ยัง pending ตามรายการด้านบน ไม่ให้สร้าง fixture ซ้ำเพื่อแทน
-unknown outcome และไม่แก้ r2 หรือบันทึก credentials/private entity IDs ในเอกสารนี้
+ภายใต้คำอนุมัติ W6 TEST; native final/enrollment/activation ยังไม่เริ่ม Machine validation
+ผ่านตามรายการด้านบน ส่วน candidate deployment รอบใหม่ยังต้อง attest ตามจริง ไม่ให้สร้าง
+fixture ซ้ำเพื่อแทน unknown outcome ไม่แก้ r2 หรือบันทึก credentials/private entity IDs
 
 - หลัง route/policy นิ่งจึงทำ seed/materializer/validator ให้ Start URL เป็น entry ของ
   ข้อสอบและ allowlist เฉพาะ auth/ข้อสอบ/resources ที่จำเป็น ไม่อนุญาตทั้ง origin เหมารวม

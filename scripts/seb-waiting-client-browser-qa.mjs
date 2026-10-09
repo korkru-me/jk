@@ -177,7 +177,8 @@ export async function runWaitingClientBrowserQa({ discover = false } = {}) {
             body: FIXTURE_PDF.toString('base64') }); return
         }
         if (request.method === 'GET' && (url.pathname === LAB_PATH || url.pathname.startsWith('/_next/')
-          || ['/favicon.ico', '/icon.png', '/apple-icon.png', '/brand/deer-mark.svg'].includes(url.pathname))) {
+          || ['/favicon.ico', '/icon.png', '/apple-icon.png', '/brand/deer-mark.svg',
+            '/__nextjs_font/geist-latin.woff2'].includes(url.pathname))) {
           await send('Fetch.continueRequest', { requestId }); return
         }
         unexpected.push({ method: request.method, path: url.pathname })
@@ -346,13 +347,19 @@ export async function runWaitingClientBrowserQa({ discover = false } = {}) {
     assert.equal(requests.filter(request => request.operation === 'submitSubmission').length, 2)
     observations.push({ case: 'successful_submit_canonical_receipt_navigation', passed: true,
       canonicalPath: `${BASE}/submitted`, receipt: 'intercepted_browser_only' })
+    const finalBrowserErrors = JSON.parse(await browser(['errors', '--json']))
+    assert.equal(finalBrowserErrors.success, true)
+    assert.ok(Array.isArray(finalBrowserErrors.data?.errors))
+    const finalNewBrowserErrors = finalBrowserErrors.data.errors.filter(error => !baselineErrorIds.has(JSON.stringify(error)))
+    assert.deepEqual(finalNewBrowserErrors, [], 'successful receipt navigation introduces no new browser errors')
+    assert.equal(activeExceptions.size, 0, 'no uncaught client exception after successful receipt navigation')
     assert.equal(interceptionFailure, null)
     assert.deepEqual(unexpected, [])
     return { status: 'passed', scope: 'real_client_browser_only_synthetic_interception',
       backendAuthDbNativeProof: 'not_exercised_pending_w7', observations, unexpected,
       operations: requests.map(request => request.operation), uploadCount,
       activeClientUncaughtErrorCount: activeExceptions.size,
-      newBrowserErrorCount: newBrowserErrors.length,
+      newBrowserErrorCount: finalNewBrowserErrors.length,
       preexistingBrowserLogErrorCount: baselineErrors.data.errors.length }
   } catch (error) {
     process.stdout.write(`${JSON.stringify({ observations, unexpected, requests,
