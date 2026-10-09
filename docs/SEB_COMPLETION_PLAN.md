@@ -283,7 +283,7 @@ Production และไม่ใช่หลักฐาน physical platform �
 
 ## แผนย่อย W1–W7 — ห้องรอสอบและโหมดข้อสอบเดียว
 
-เสนอวันที่ 9 ตุลาคม 2026 · **W1–W6 machine-testable fixed-exam pilot ส่งขึ้น dedicated UAT แล้ว; หยุดก่อน W7/native activation**
+เสนอวันที่ 9 ตุลาคม 2026 · **W2–W6 fixed-exam software/fixture/seed เตรียมแล้ว; final machine validation และ deploy source ใหม่ pending; หยุดก่อน W7/native activation**
 
 เจ้าของขอให้หลังเปิดไฟล์ SEB และล็อกอิน นักเรียนอยู่ในหน้ารอของข้อสอบนั้นเท่านั้น
 ไม่ไปห้องเรียน/แบบฝึกหัด/เฉลยงานอื่น ไม่มีโจทย์และไม่มีเวลาเดินจนกดเริ่มสอบ
@@ -327,10 +327,19 @@ start RPC บน Staging แล้ว จึงเริ่ม implementation �
   active → submitted ทั้ง desktop/390px และ Next runtime ไม่พบ errors ไม่ใช้ภาพจำลอง
   เป็นหลักฐานว่า auth/native/DB journey จริงผ่าน แก้ union narrowing สองฟอร์มห้องเรียน
   อย่างน้อยที่สุดเพื่อปลด type/build blocker เดิม ไม่มี behavior/schema change ในสองฟอร์ม
-- full suite ล่าสุด 233 files / 3,494 tests, TypeScript และ token lint ผ่าน; webpack
-  production build ใช้ guarded Staging environment ผ่าน รวม finalization/expiry
-  regressions แล้ว; PGlite rollback/idempotence ไม่ใช่ independent PostgreSQL
-  connection concurrency proof การเดินเว็บกับ registered native release ใหม่รอ W7
+- เพิ่ม composed offline server journey 11 tests ใช้ real Proxy/middleware, entry/auth/
+  signed context/waiting/API/start/save/submit/resource/completion modules โดยแทนเฉพาะ
+  framework request context/cache และ external Auth/DB/Storage; synthetic native inputs
+  เป็น local fixture เท่านั้น ไม่ enroll cloud keys และบังคับว่าไม่มี network call ครอบคลุม
+  no-timer/no-question wait, explicit start, autosave fail/retry, same-timer resume,
+  submit failure/committed-retry/exit bytes และ host/context/CSRF/resource negatives
+- full suite รอบก่อน PostgreSQL/local-client QA ผ่าน 235 files / 3,545 tests; TypeScript,
+  token lint และ guarded webpack build ที่ผ่านแล้วเป็น software evidence ตามรอบของมัน
+  **final validation ของ source ปัจจุบัน pending** ไม่ยกผลก่อนหน้าไปปิด gate ใหม่
+  PGlite rollback/idempotence ใช้ connection เดียว; independent PostgreSQL scratch
+  experiment รอบแรกเป็น **NOT OBSERVED** และล้าง scratch แล้ว ไม่ใช่ concurrency pass
+  การวิเคราะห์/ผลรอบถัดไปและ localhost actual-client/intercepted-backend QA ยัง pending
+  ทั้งหมดไม่แทน browser + real registered native release journey ซึ่งรอ W7
 - source code+SQL+docs `7cde7b4089092e7e65077094671f892a0e79d5a7` commit/push แล้วก่อน
   mutation; exact dry-run พบเพียง `20261009142610` และ apply บน Staging สำเร็จ parity
   ตรง 141 รายการ ไม่มี local-only/remote-only; live invalid-input permission check ยืนยัน
@@ -341,10 +350,22 @@ start RPC บน Staging แล้ว จึงเริ่ม implementation �
   login HTTP 200 + STAGING badge, UI-only lab และ missing-context start denial ผ่าน
   ไม่มี Cron/Production mutation และไม่ได้ merge master; build/runtime flags บังคับ
   `SEB_EXAM_WAITING_ENABLED=false`, manifest `[]` จนมี native final/evidence ใหม่
-- **หยุดก่อน W7:** ยังไม่มี fresh fixture/teacher revision/seed/native final/enrollment ของ
-  waiting profile; ต้องทำเมื่อเจ้าของอนุมัติ W7 และเลือกชุดข้อสอบสังเคราะห์ใหม่แล้ว
-  live auth/native integrated journey, independent concurrent-start connections และ native
-  failure/early-quit matrix ยังไม่ผ่าน/ไม่รัน ไม่ enroll คีย์สมมติและไม่ยกผล r2 มาปิดช่องว่าง
+- เจ้าของอนุมัติ W6 TEST preparation เพิ่มแล้ว: สร้าง fixture ใหม่แยกจาก r2 บน isolated
+  Staging ผ่าน real Auth และ actual application actions มี 2 บัญชีสังเคราะห์, 1 ห้อง,
+  3 โจทย์ (written/MCQ/file upload), draft fixed `seb_required` exam ที่ไม่มี `access_code`
+  และ teacher-owned quit revision 1 (รหัส ASCII 6 หลักเฉพาะ fixture นี้ ไม่ใช่รหัสกลาง)
+  Selected actual authenticated read negatives ผ่าน: student อ่าน questions ได้ 0,
+  draft assignments ได้ 0 และ registry ถูกปฏิเสธ; teacher อ่าน own rows ได้ตามที่ตรวจ
+  ผลนี้ไม่ใช่ whole-flow/direct-RLS proof เพราะบาง application actions ใช้ service role
+- scoped prepare สร้าง private seed ใหม่แล้ว 4,039 bytes และ private admin credential;
+  ตรวจ seed policy ว่าไม่มี Exam/Settings file-entry password, initial Quit URL ว่าง
+  และ scope/filter ตรง revision ใหม่ รายละเอียด nonsecret digest อยู่ในชุดส่งต่อ W6
+  ไม่มี native final save, keys, Storage upload/enrollment, publish, start หรือ attempt ใหม่
+- **หยุดก่อน W7:** fresh fixture/revision/seed เป็น W6 preparation ไม่ใช่ native pass;
+  deployed waiting flag ยัง false/manifest `[]` และ deploy source หลังการตรวจล่าสุดยัง
+  pending ไม่เปลี่ยน r2/keys/evidence เดิม Live native auth/exit/reconfiguration failure
+  matrix ยัง NOT RUN; independent PostgreSQL result และ final UI/test result ต้องเติม
+  ตามที่สังเกตจริง ไม่ enroll คีย์สมมติหรือยกผล r2/local mocks มาปิดช่องว่าง
 
 ชุด W6 → W7 อยู่ใน `docs/SEB_WAITING_ROOM_NATIVE_HANDOFF.md`; ห้ามเริ่ม W7 จนเจ้าของ
 อนุมัติใหม่ ผล physical S6/r2 เดิมยังไม่ครบและไม่เลื่อนเป็นผ่านจาก implementation นี้
@@ -542,11 +563,19 @@ native ที่ยังต้องพิสูจน์ถูกระบุ�
 - tests ที่จำลอง native API/registry เป็น machine evidence เท่านั้น การทดสอบ live ที่ต้อง
   registered final release ใหม่รอ W7 หลัง native enrollment ไม่ปลอม keys หรือข้าม prerequisite
   เพื่อรายงานว่า integrated native journey ผ่านก่อนเจ้าของได้ทำขั้นจำเป็น
+- ผล composed server journey อยู่ใน `lib/seb-waiting-journey.test.ts`; ไม่ใช่ rendered
+  browser หรือ actual Auth/PostgREST/RLS/independent-transaction proof Local actual-client
+  QA ที่ intercept backend ยังอยู่ระหว่างตรวจ ต้องบันทึกผลแยกและไม่เรียกเป็น live native pass
 
 **ผ่านเมื่อ:** machine-testable checks ผ่านครบหรือมี pre-existing unrelated blocker ที่
 รายงานตรง ๆ; ห้ามกล่าวว่า native/S6 เสร็จจาก mock และยังไม่ส่งภาระให้เจ้าของลองแก้ config
 
 ### W6 — เตรียม release ใหม่และชุดส่งต่อ native
+
+**ผลปัจจุบัน:** fresh synthetic draft/current teacher revision และ private seed เตรียมแล้ว
+ภายใต้คำอนุมัติ W6 TEST; native final/enrollment/activation ยังไม่เริ่ม Final machine
+validation/source deployment ยัง pending ตามรายการด้านบน ไม่ให้สร้าง fixture ซ้ำเพื่อแทน
+unknown outcome และไม่แก้ r2 หรือบันทึก credentials/private entity IDs ในเอกสารนี้
 
 - หลัง route/policy นิ่งจึงทำ seed/materializer/validator ให้ Start URL เป็น entry ของ
   ข้อสอบและ allowlist เฉพาะ auth/ข้อสอบ/resources ที่จำเป็น ไม่อนุญาตทั้ง origin เหมารวม

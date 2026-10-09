@@ -8,20 +8,29 @@
 
 งานเว็บส่งขึ้น dedicated UAT แล้วจาก source `7cde7b4`, deployment
 `dpl_H24Jhy2A5YYjjkLKv1L4LZgMRf2r`; Staging atomic-start migration `20261009142610`
-apply แล้วและ parity ตรง 141 รายการ Full suite 3,494 tests/TypeScript/token lint/build/
-local Next runtime ผ่าน เป็น software evidence เท่านั้น Deploy flags ยังคง false/manifest
-ว่าง ไม่มี fresh fixture/teacher revision/native seed/final/keys/enrollment ของ waiting
-profile และไม่มี master merge/Production mutation การเปิดใช้งานจริงรอ W7 ตามแผน
+apply แล้วและ parity ตรง 141 รายการถึง `20261009142610` Full suite ก่อน PostgreSQL/
+local-client QA ผ่าน 235 files / 3,545 tests; TypeScript/token lint/build/local Next runtime
+ที่ผ่านแล้วเป็น software evidence ตามรอบนั้น **final validation และ deploy source ใหม่
+pending** Deploy flags ยังคง false/manifest ว่าง ไม่มี master merge/Production mutation
+การเปิดใช้งานจริงรอ W7 ตามแผน ไม่ใช้ source ใหม่อ้างว่า deployed แล้วก่อนตรวจ alias/source
 
-งาน operator W6 ตรวจในเครื่องด้วยข้อมูลสังเคราะห์: 3 suites / 100 tests ผ่าน รวม strict parser, fixed-pilot predicate, private-file guard, mocked Storage/RPC, immutable bytes และ output reconciliation; Node syntax checks ผ่าน ไม่มี live environment, DB, Storage, native SEB หรือไฟล์ r2 ถูกใช้ในการตรวจนี้ การทดสอบ PGlite ที่มี connection เดียวไม่ใช่หลักฐานการแข่งขันของ PostgreSQL หลาย transaction อิสระ
+ชุด pure/mock operator tests เดิมผ่าน 3 suites / 100 tests รวม strict parser, fixed-pilot predicate, private-file guard, mocked Storage/RPC, immutable bytes และ output reconciliation; Node syntax checks ผ่าน การตรวจชุดนี้ไม่ได้ใช้ live environment/DB/Storage/native SEB หรือไฟล์ r2 ไม่รวม actual fixture preparation ที่รายงานแยกด้านล่าง การทดสอบ PGlite connection เดียวไม่ใช่หลักฐานการแข่งขันของ PostgreSQL หลาย transaction อิสระ
 
-ยังไม่มี seed, native final, evidence, terminal artifact หรือ release ใหม่ที่สร้างจาก runbook นี้ ชื่อไฟล์/path/ค่าที่อยู่ในวงเล็บมุมด้านล่างเป็น **placeholder สำหรับ operator-run เท่านั้น** ห้ามเติมคีย์เดา ห้ามถือว่าคำสั่ง dry-run หรือ tests ผ่านแทน native pass และห้ามยกผล/คีย์/evidence/deployment ของ r2 มาใช้กับ profile ใหม่นี้
+### ผล W6 TEST preparation ที่ทำแล้ว
 
-หยุดที่ W6: ไม่เปิด Configuration Tool, ไม่สร้าง/บันทึกไฟล์ native, ไม่ enroll/upload/register หรือเปิดใช้งาน release ใน cloud และไม่ขอให้เจ้าของเริ่มทดสอบอุปกรณ์ในรอบส่งต่อนี้ (การ deploy source/apply atomic-start SQL ที่กล่าวข้างต้นแยกจาก operator/native enrollment)
+- เจ้าของอนุมัติ fresh fixture บน isolated Staging แล้ว สร้างผ่าน real Auth + actual application actions: 2 บัญชีสังเคราะห์, 1 ห้องเรียน, 3 โจทย์ written/MCQ/file upload และ draft fixed online `seb_required` exam ที่ `access_code IS NULL`; teacher-owned quit revision 1 ใช้รหัส ASCII 6 หลักเฉพาะ fixture ไม่ใช่รหัสกลาง Credentials/entity IDs เก็บใน private handoff เท่านั้น ไม่เขียนลง Git/แชต
+- ตรวจ selected authenticated reads จริง: student questions=0, draft assignments=0, registry denied และ teacher-owned positive reads ผ่าน เฉพาะขอบเขตที่ตรวจ ไม่ใช่ whole-flow/direct-RLS proof ของทุก action (classroom/join actions ใช้ service role หลัง application authorization)
+- Scoped prepare สร้าง `.local/seb-waiting-w6/korkru-waiting-w6-r1-seed.seb` แล้ว **4,039 bytes**, SHA-256 `7a8ffa675f6d86865754a0427572a1c5d83c0dcdd2fdf90a0f83f132593107ea` และ fresh private admin credential; seed ไม่มี Exam/Settings file-entry password, initial Quit URL ว่าง และ canonical assignment/revision scope นี่คือ materialized seed ไม่ใช่ native-final artifact และไม่ใช่ native passwordless-entry/exit proof
+- ไม่มี native final/CK/BEK/evidence/terminal cloud artifact/release enrollment, ไม่ publish/start/create attempt หรือ activate manifest ใหม่ อย่าสร้าง fixture/revision/seed ซ้ำหรือทับ seed เดิม; ใช้ private receipt เดิมเพื่อตรวจ scope/reconciliation ก่อนทำขั้นต่อไปที่ได้รับอนุมัติ
+- Composed offline server journey 11 tests ผ่าน (real modules, external Auth/DB/Storage mocked, synthetic native inputs, zero network) ส่วน localhost actual-client/intercepted-backend QA ยัง pending Independent PostgreSQL scratch concurrency experiment รอบแรก **NOT OBSERVED**, scratch ล้างแล้ว; diagnosis/ผลรอบถัดไป pending ไม่ถือ PGlite หรือผลรอบแรกเป็น independent transaction pass
+
+ชื่อไฟล์/path/ค่าที่อยู่ในวงเล็บมุมด้านล่างยังเป็น **ตัวอย่าง placeholder** ไม่ใช่ private IDs/credentials ของ fixture ที่เตรียมแล้ว ห้ามเติมคีย์เดา ห้ามถือ prepare/tests ผ่านแทน native pass และห้ามยกผล/คีย์/evidence/deployment ของ r2 มาใช้กับ profile ใหม่นี้
+
+หยุดที่ W6: prepare seed/private credential ข้างต้นทำตามคำอนุมัติแล้ว แต่ไม่เปิด Configuration Tool, ไม่ทำ native final save, ไม่ enroll/upload/register หรือเปิดใช้งาน release ใน cloud และไม่ขอให้เจ้าของเริ่มทดสอบอุปกรณ์ในรอบส่งต่อนี้ (การ deploy source/apply atomic-start SQL แยกจาก operator/native enrollment)
 
 ## เงื่อนไขก่อนเปิดรอบ W7
 
-- เจ้าของเลือกและอนุมัติ **ข้อสอบสังเคราะห์ใหม่** ของครู/นักเรียน/ห้องเรียนสังเคราะห์บน dedicated SEB UAT เท่านั้น ไม่ใช้ข้อมูลจริงหรือ artifact เก่า ข้อสอบเริ่มต้นเป็น online exam แบบ fixed ปกติ มีโจทย์ที่ตรวจอัตโนมัติและโจทย์เขียน/แนบวิธีทำสำหรับทดสอบ Drawing Board; ยังไม่ใช้ streak pilot จนผ่าน atomic streak-verdict/summary check ที่ได้รับอนุมัติเฉพาะทางนั้น ข้อนี้จำกัด pilot ไม่ได้เปลี่ยน contract ของ max attempts หรือ wrong-only retry ทั่วระบบ
+- ใช้ **fresh synthetic fixture ที่เจ้าของอนุมัติและเตรียมใน W6** ผ่าน private receipt และ recheck scope ก่อน W7 ไม่สร้างใหม่/ใช้ข้อมูลจริงหรือ artifact เก่าเพื่อข้ามผลไม่แน่นอน ข้อสอบเป็น fixed online exam มีโจทย์ตรวจอัตโนมัติและโจทย์เขียน/แนบวิธีทำสำหรับ Drawing Board; streak ยัง fail closed จนได้รับอนุมัติและผ่าน atomic streak-verdict/summary contract แยก ข้อนี้จำกัด pilot ไม่ได้เปลี่ยน max attempts/wrong-only retry ทั่วระบบ
 - ตอน prepare/enroll ต้องเป็น **draft**, `seb_required`, ไม่มี active attempt, มี current teacher-owned revision ที่ org/owner ตรงกับ assignment และยังไม่มี release ของ revision นั้น ครูเลือก Quit/Unlock Password ใหม่ผ่านเว็บที่ผูก exact revision; ไม่ใช้รหัสกลางหรือรหัสเดิมจาก r2 และไม่ rotate ระหว่างมี attempt
 - Operator apply บังคับ pilot ด้วย `SELECT id` ที่จำกัด assignment และ predicate `type=exam`, `mode=online`, `secure_browser_mode=seb_required`, `completion_rule=fixed`, `access_code IS NULL` โดยไม่อ่านค่ารหัส/โจทย์ หากไม่ตรงให้หยุดด้วย `SEB_WAITING_OPERATOR_ASSIGNMENT_UNSUPPORTED`; streak candidate หรือข้อสอบมี code จึงไม่ไปถึงการสร้างไฟล์/enroll W7 ปลด pilot guard ต้องเป็นงานที่เจ้าของอนุมัติแยกหลัง atomic check ไม่ใช่ flag ที่ operator ข้ามได้ เว็บปกติยังใช้ contract เดิม ห้ามแก้ไฟล์ SEB ให้ถามรหัสแทน
 - ล็อก exact source commit/deployment/alias ของ candidate ใหม่ พร้อม DB migration parity และ atomic-start authorization check ที่เกี่ยวข้องก่อน pilot; หากมี gap ให้หยุด ไม่ apply/repair/reset DB เป็นทางลัด ตรวจ badge `STAGING · ระบบทดสอบ` ในทุก manual journey ผลของ candidate เก่าไม่ยกมารวม
@@ -42,11 +51,11 @@ profile และไม่มี master merge/Production mutation การเ�
 
 Administrator Password ถูกสุ่มใหม่อย่างแข็งแรงต่อ seed: random 24 bytes เป็น plaintext 32 ตัวอักษรแล้ว hash; ไม่สืบทอด admin hash จาก template/r2 และไม่เท่ากับ teacher exit hash ค่า plaintext ไม่แสดงบนเว็บหรือ console และไม่เก็บใน DB `--admin-password-output` เขียนเฉพาะ private file แบบ `wx`/0600 เมื่อ operator ต้องใช้ใน native tool; ถ้าไม่ระบุจะไม่เก็บ plaintext ไว้ให้เรียกคืน นักเรียนต้องเข้า initial file ได้โดย **ไม่ถามรหัสก่อนเว็บ** การใช้ admin credential ในงานตั้งค่าของ operator ไม่ใช่รหัสเข้าสอบของนักเรียน
 
-## คำสั่งใหม่ — ใช้โดย operator หลังอนุมัติ W7 เท่านั้น
+## คำสั่ง operator — prepare อยู่ W6; native/enroll รออนุมัติ W7
 
 ไม่ใช้ `prepare-assignment-seb-artifact.mjs` / `enroll-assignment-seb-artifact.mjs` กับ profile ใหม่นี้ Legacy inspector ตั้งใจไม่ยอมรับ waiting/reconfiguration policy และ command เดิมไม่ถูกเปลี่ยน
 
-ทุกตัวอย่างต่อไปนี้ **ยังไม่รัน** และ literal placeholder ไม่ใช่ค่าที่ใช้งานได้ ตัวอย่างเป็น Node CLI สำหรับ operator ไม่ใช่คำสั่งให้นักเรียนรันบนเครื่องสอบ Output ต้องเป็น path ใหม่ ไม่ชน template/final/env/evidence หรือ output อื่น ไม่ overwrite ไฟล์เดิม
+Literal placeholders ต่อไปนี้ไม่ใช่ actual command arguments ของ fixture; scoped prepare W6 ที่ทำแล้วรายงานไว้ข้างบน ส่วน native/enroll **ยังไม่รัน** ตัวอย่างเป็น Node CLI สำหรับ operator ไม่ใช่คำสั่งให้นักเรียนรันบนเครื่องสอบ Output ต้องเป็น path ใหม่ ไม่ชน template/final/env/evidence หรือ output อื่น ไม่ overwrite ไฟล์เดิม ไม่รัน prepare ซ้ำทับ seed ที่มี receipt แล้ว
 
 ### Prepare dry-run — ไม่มี network/context/credential generation/output write
 
@@ -105,8 +114,8 @@ Manifest และ optional terminal output ถูก reserve `wx`/0600 **ก่
 
 ทุกข้อด้านล่างเป็นลำดับสำหรับรอบอนาคต ยังไม่ใช่งานที่เจ้าของต้องทำตอนอ่านเอกสารนี้ ชื่อเมนู/ปุ่มของ native tool ต้องยืนยันจาก build ที่ใช้จริง ไม่เดาจากอุปกรณ์อื่น
 
-1. เจ้าของเลือก synthetic draft exam/current teacher revision และยืนยันไม่มี `access_code`, release หรือ active attempt ตาม preflight Operator บันทึก exact candidate lock ใหม่ใน evidence ที่อนุมัติ โดยไม่อ่าน/บันทึกซ้ำ r2
-2. Operator จัด private env/template/output locations และรัน prepare dry-run จากนั้นทำ prepare `--apply` เมื่ออนุมัติการอ่าน context/เขียนไฟล์แล้ว ตรวจว่าไม่มีคีย์ native ถูกสร้างหรือแสดง และ admin plaintext อยู่เฉพาะ private operator file หากเลือกเก็บ
+1. หลังเจ้าของอนุมัติเริ่ม W7 ใช้ synthetic draft/current teacher revision จาก W6 private receipt และ recheck ไม่มี `access_code`, release หรือ active attempt ตาม preflight Operator บันทึก exact candidate lock ใหม่ใน evidence ที่อนุมัติ โดยไม่สร้าง fixture ซ้ำและไม่อ่าน/บันทึกซ้ำ r2
+2. ตรวจ digest/size/private permissions ของ seed W6 และ private admin handoff; ไม่รัน prepare ซ้ำทับไฟล์เดิม ถ้า route/policy เปลี่ยนต้องหยุดและขอ controlled seed/candidate ใหม่ใน path ใหม่ก่อนทำ native ไม่มีคีย์ native ถูกสร้างหรือแสดงจาก preparation และ admin plaintext อยู่เฉพาะ private operator file
 3. บน Windows ใช้ native SEB/Configuration Tool **3.10.2 build 920** ที่ตรวจ version/build จากเครื่องจริง เปิดเฉพาะ seed ใหม่ Operator ใช้ fresh admin credential เฉพาะเมื่อ native settings tool จำเป็นต้องถาม ห้ามให้นักเรียนใช้ credential นี้
 4. ตรวจ student-entry contract: config เป็น exam-purpose, ไม่มี file-entry password, Start URL เป็น canonical entry ของ assignment/revision นี้, initial Quit URL ว่าง, completion URL exact extensionless, finite filters, developer console/address bar/back-forward/downloads ปิดตาม profile Teacher quit hash ต้องตรง current revision อย่าแทนที่ด้วย global password
 5. ทำ Final Save **ครั้งเดียวไปชื่อ private ใหม่** ไม่ทับ seed และไม่แตะ r2 ตรวจรูปแบบ passwordless container ที่ inspector รับได้ หาก native export กลายเป็น password-encrypted file หรือ policy เปลี่ยน ให้หยุดก่อน enroll
@@ -151,4 +160,4 @@ Initial phase มี `quitURL=""`; native Quit URL ที่เดาได้�
 
 W7 ผ่านได้เมื่อ observed cases ที่กำหนดครบทุก target/build/candidate รวม negatives และไม่มี prompt ก่อนเว็บ/exit bypass ก่อน commit ผู้ตรวจระบุช่องว่างตามจริงและเจ้าของอนุมัติผล ไม่มีการอนุมาน pass จาก parser/checkbox/system-check screenshot เพียงส่วนเดียว
 
-อ้างอิงแผนและหลักฐานเดิมได้ที่ [SEB_COMPLETION_PLAN.md](./SEB_COMPLETION_PLAN.md) และ [SEB_PHASE6_PHYSICAL_UAT.md](./SEB_PHASE6_PHYSICAL_UAT.md) แต่ runbook นี้ไม่ย้ายผล r2 มาเป็น evidence ใหม่ ตอนส่งต่องานนี้ยัง **หยุดก่อน W7**; ไม่มี native generation/enrollment/release activation จาก operator commands หรือคำขอให้เจ้าของทำขั้นถัดไปเกิดขึ้น งาน deploy/apply SQL ของเว็บรายงานแยกข้างต้น
+อ้างอิงแผนและหลักฐานเดิมได้ที่ [SEB_COMPLETION_PLAN.md](./SEB_COMPLETION_PLAN.md) และ [SEB_PHASE6_PHYSICAL_UAT.md](./SEB_PHASE6_PHYSICAL_UAT.md) แต่ runbook นี้ไม่ย้ายผล r2 มาเป็น evidence ใหม่ ตอนส่งต่องานนี้ยัง **หยุดก่อน W7**; W6 fixture/seed preparation ทำแล้วตามรายการข้างต้น แต่ไม่มี native final save/enrollment/release activation หรือคำขอให้เจ้าของเริ่มทดสอบอุปกรณ์ งาน deploy/apply SQL ของเว็บและ final machine validation รายงานแยก
