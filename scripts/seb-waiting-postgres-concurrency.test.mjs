@@ -229,6 +229,38 @@ describe('linked CLI transport (mock subprocess; no network)', () => {
 
 describe('honest holder observation failures (mock requests only)', () => {
   const options = { schema, runId, round: 1, waitTimeoutMs: 100, poll: async () => {} }
+  it('staggers CLI startups but keeps both SQL requests outstanding before strict lock observation', async () => {
+    const events = [], contenders = []
+    let finishHolder
+    const holderTag = `swp:${runId.replaceAll('-', '')}:1:h`
+    const receipt = { submission_id: '70000000-0000-4000-8000-000000000001', started_at: '2026-01-01T00:00:00Z',
+      submission_status: 'in_progress', attempt_number: 1, seb_config_revision: 1 }
+    const query = async sql => {
+      if (sql.includes('WITH held AS MATERIALIZED')) {
+        events.push('holder-launch'); return new Promise(done => { finishHolder = done })
+      }
+      if (sql.includes('WITH context AS MATERIALIZED')) {
+        events.push(`c${contenders.length + 1}-launch`)
+        return new Promise(done => { contenders.push({ done, tag: sql.match(/set_config\('application_name','([^']+)'/)[1] }) })
+      }
+      events.push('observer')
+      const holderRow = { pid: 101, application_name: holderTag, state: 'active', wait_event_type: 'Timeout',
+        wait_event: 'PgSleep', observer_pid: 104, blockers: [] }
+      if (contenders.length < 2) return [holderRow]
+      const rows = [holderRow, ...contenders.map((item, index) => ({ pid: 102 + index, application_name: item.tag,
+        state: 'active', wait_event_type: 'Lock', blockers: [101], observer_pid: 104 }))]
+      queueMicrotask(() => {
+        finishHolder([{ pid: 101 }])
+        contenders.forEach((item, index) => item.done([{ pid: 102 + index, receipt: { ...receipt, created: index === 0 } }]))
+      })
+      return rows
+    }
+    const result = await concurrentManagementStart({ ...options, query, poll: async ms => { events.push(`warm:${ms}`) } })
+    expect(events).toEqual(['holder-launch', 'warm:2500', 'observer', 'c1-launch', 'warm:2500', 'c2-launch', 'warm:2500', 'observer'])
+    expect(result.evidence).toMatchObject({ holderPid: 101, contenderPids: [102, 103], observerPid: 104,
+      cliStartupStaggerMs: 2500, startupWaits: 3 })
+    expect(result.evidence.lockWaits).toHaveLength(2)
+  })
   it.each(['LINKED_SQL_42601', 'LINKED_QUERY_TIMEOUT'])('surfaces completed holder %s instead of hiding it behind readiness', async code => {
     const query = vi.fn(async sql => {
       if (sql.includes('WITH held AS MATERIALIZED')) throw new WaitingPostgresProofError(code)
@@ -355,7 +387,7 @@ describe('management runner offline SQL/orchestration regression, NOT independen
   })
   it('does not drop another owner/marker and reports reconciliation-required', async () => {
     const harness = await embeddedHarness({ pidMismatch: true, cleanupMismatch: true })
-    await expect(runWaitingManagementProof({ ...harness, migration, schema, runId })).rejects.toMatchObject({
+    await expect(runWaitingManagementProof({ ...harness, migration, schema, runId, poll: async () => {} })).rejects.toMatchObject({
       code: 'RECONCILIATION_REQUIRED', report: { schema, cleanup: 'reconciliation-required' },
     })
     expect(harness.calls.some(sql => sql.includes('DROP SCHEMA'))).toBe(false)

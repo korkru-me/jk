@@ -3,9 +3,11 @@
  * Opt-in Staging PostgreSQL mechanics proof, NOT a native/public-RPC/RLS proof.
  * Default invocation is offline: no credentials, driver, or network are read.
  * Live invocation uses the authenticated linked CLI. No DB password or new
- * driver is needed. No public fixtures,
- * release registrations, migrations or roles are
- * created. The exact committed function body is rebound to private scratch
+ * driver is needed. Our SQL creates no public fixtures, release registrations,
+ * migrations or application/test roles. The CLI's normal auth preflight may
+ * mint/refresh its temporary cli_login_postgres role and resolve a connection.
+ * Bounded startup waits let that setup finish; they do NOT serialize the SQL.
+ * The exact committed function body is rebound to private scratch
  * tables, exercised on four simultaneous independent backends, then the owned schema is removed.
  * --report-file is a private append-only NDJSON journal, NOT one JSON document.
  * Each complete line is one fsynced state record. The first reserved runId/schema
@@ -33,6 +35,8 @@ const TABLES = Object.freeze(['organizations', 'users', 'assignments', 'question
 const SCHEMA_PATTERN = /^seb_waiting_concurrency_[a-f0-9]{32}$/
 const UUID_PATTERN = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/
 const PRIVATE_SCOPE = 'scratch-function-mechanics-only'
+const CLI_STARTUP_STAGGER_MS = 2500
+const CLI_AUTH_SCOPE = 'Existing CLI authentication may initialize/refresh its temporary login role; no application/test role SQL is issued.'
 const VERSION = '2026-01-01T00:00:00.123456Z'
 const IDS = Object.freeze({ org: '10000000-0000-4000-8000-000000000001',
   owner: '20000000-0000-4000-8000-000000000001', student: '20000000-0000-4000-8000-000000000002',
@@ -82,9 +86,10 @@ export function offlineProofPlan() {
     newDriverRequired: false, databasePasswordRequired: false, concurrentBackendCount: 4,
     requiredAuthority: 'Staging-only CREATE/DROP of one generated owned scratch schema',
     transactionBoundary: 'each Management API SQL request is a complete implicit transaction',
+    cliStartupStaggerMs: CLI_STARTUP_STAGGER_MS, cliAuthPreflight: CLI_AUTH_SCOPE,
     reportFileFormat: 'private append-only fsynced NDJSON journal',
     prohibited: ['transaction pool :6543', 'public fixture writes', 'public RPC execution',
-      'release registration', 'native keys/artifacts', 'migration/grader/RLS/role changes'],
+      'release registration', 'native keys/artifacts', 'public migration/grader/RLS/application-role SQL changes'],
     nativeProof: 'not-run', publicRpcIntegration: 'not-run', publicRlsProof: 'not-run' })
 }
 
@@ -118,7 +123,6 @@ async function readProofEnvironment(path) {
     fail('PRIVATE_ENVIRONMENT_FILE_REQUIRED')
   } finally { await handle?.close() }
 }
-
 
 export function extractAtomicFunction(migration) {
   requireCondition(typeof migration === 'string' && migration.length < 100000, 'UNEXPECTED_ATOMIC_MIGRATION')
@@ -344,7 +348,7 @@ export async function concurrentManagementStart({ query, schema, runId, round, o
   const prefix = `swp:${runId.replaceAll('-', '')}:${round}`
   const tags = [`${prefix}:h`, `${prefix}:c1`, `${prefix}:c2`]
   const startedAt = Date.now()
-  let holderOutcome, caughtFailure, stage = 'holder-readiness', polls = 0, lastObserved = []
+  let holderOutcome, caughtFailure, stage = 'holder-startup', polls = 0, startupWaits = 0, lastObserved = []
   const holder = query(managementHolderSql(schema, tags[0])).then(
     value => { holderOutcome = { value }; return holderOutcome },
     error => { holderOutcome = { error }; return holderOutcome })
@@ -370,6 +374,11 @@ export async function concurrentManagementStart({ query, schema, runId, round, o
   }
   let evidence
   try {
+    // Each CLI command resolves credentials/login-role setup BEFORE posting SQL.
+    // Let the holder finish that preflight before another CLI command can refresh
+    // it. The later SQL still overlaps, and overlap must be observed explicitly.
+    startupWaits++; await poll(CLI_STARTUP_STAGGER_MS)
+    stage = 'holder-readiness'
     const readyDeadline = Date.now() + waitTimeoutMs
     let holderPid
     do {
@@ -382,13 +391,18 @@ export async function concurrentManagementStart({ query, schema, runId, round, o
     } while (Date.now() < readyDeadline)
     holderMustStillRun()
     requireCondition(Number.isInteger(holderPid), 'MANAGEMENT_HOLDER_NOT_OBSERVED')
-    stage = 'contender-lock-waits'
+    stage = 'contender-startup'
     for (let index = 1; index < tags.length; index++) {
       const outcomeIndex = index - 1
       pending.push(query(managementStartSql(schema, tags[index], options)).then(
         value => { contenderOutcomes[outcomeIndex] = { value }; return contenderOutcomes[outcomeIndex] },
         error => { contenderOutcomes[outcomeIndex] = { error }; return contenderOutcomes[outcomeIndex] }))
+      // c1 startup completes before c2; c2 startup completes before the observer.
+      // Neither start receipt is awaited here: both SQL requests may be blocked
+      // simultaneously behind the held assignment lock, which the observer proves.
+      startupWaits++; await poll(CLI_STARTUP_STAGGER_MS)
     }
+    stage = 'contender-lock-waits'
     const waitDeadline = Date.now() + waitTimeoutMs
     do {
       const rows = await watch()
@@ -402,7 +416,8 @@ export async function concurrentManagementStart({ query, schema, runId, round, o
         const observerPid = contenders[0].observer_pid
         requireCondition(Number.isInteger(observerPid) && contenders.every(row => row.observer_pid === observerPid)
           && new Set([holderPid, ...pids, observerPid]).size === 4, 'DEDICATED_BACKENDS_REQUIRED')
-        evidence = { holderPid, contenderPids: pids, observerPid, lockWaits: contenders.map(({ pid, state, wait_event_type, blockers }) =>
+        evidence = { holderPid, contenderPids: pids, observerPid, cliStartupStaggerMs: CLI_STARTUP_STAGGER_MS, startupWaits,
+          lockWaits: contenders.map(({ pid, state, wait_event_type, blockers }) =>
           ({ pid, state, wait_event_type, blockers })) }
         break
       }
@@ -430,6 +445,7 @@ export async function concurrentManagementStart({ query, schema, runId, round, o
   } catch (error) {
     const classified = new WaitingPostgresProofError(safeProofError(error))
     classified.diagnostics = { round, stage, elapsedMs: Date.now() - startedAt, observationDeadlineMs: waitTimeoutMs,
+      cliStartupStaggerMs: CLI_STARTUP_STAGGER_MS, startupWaits,
       holderOutcome: holderOutcome?.error ? 'failed' : holderOutcome?.value ? 'finished' : 'pending',
       holderCode: holderOutcome?.error ? safeProofError(holderOutcome.error) : null, polls, lastObserved }
     caughtFailure = classified
@@ -532,6 +548,7 @@ export async function runWaitingManagementProof({ query, migration, schema, runI
         'immutable-time-and-answer-snapshot-replay', 'completed-generation-replay-no-new-attempt',
         'snapshot-failure-rolls-back-header-and-answers', 'rollback-does-not-consume-generation', 'wrong-only-carry-preserves-metadata'],
       liveExecuted: true, publicRpcExecuted: false, publicFixturesWritten: false,
+      cliAuthPreflight: CLI_AUTH_SCOPE,
       nativeProof: 'not-run', publicRpcIntegration: 'not-run', publicRlsProof: 'not-run' }
   } catch (error) { failure = error }
   finally {
@@ -551,6 +568,7 @@ export async function runWaitingManagementProof({ query, migration, schema, runI
     const error = new WaitingPostgresProofError(cleanup === 'reconciliation-required' ? 'RECONCILIATION_REQUIRED' : safeProofError(failure))
     error.report = { status: 'failed', code: error.code, runId, schema, cleanup, transport: 'linked-management-api', proofScope: PRIVATE_SCOPE,
       liveExecuted: true, nativeProof: 'not-run', publicRpcIntegration: 'not-run', publicRlsProof: 'not-run',
+      cliAuthPreflight: CLI_AUTH_SCOPE,
       ...(failure?.diagnostics ? { diagnostics: failure.diagnostics } : {}) }
     throw error
   }
