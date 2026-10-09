@@ -283,7 +283,7 @@ Production และไม่ใช่หลักฐาน physical platform �
 
 ## แผนย่อย W1–W7 — ห้องรอสอบและโหมดข้อสอบเดียว
 
-เสนอวันที่ 9 ตุลาคม 2026 · ตรวจล่าสุด 10 ตุลาคม 2026 · **W2–W6 fixed-exam machine checks/fixture/seed ผ่านแล้ว; กำลังส่ง candidate ล่าสุดขึ้น dedicated UAT; หยุดก่อน W7/native activation**
+เสนอวันที่ 9 ตุลาคม 2026 · ตรวจล่าสุด 10 ตุลาคม 2026 · **W2–W6 fixed-exam machine checks/fixture/seed/dedicated UAT deploy DONE; หยุดก่อน W7/native activation**
 
 เจ้าของขอให้หลังเปิดไฟล์ SEB และล็อกอิน นักเรียนอยู่ในหน้ารอของข้อสอบนั้นเท่านั้น
 ไม่ไปห้องเรียน/แบบฝึกหัด/เฉลยงานอื่น ไม่มีโจทย์และไม่มีเวลาเดินจนกดเริ่มสอบ
@@ -356,6 +356,11 @@ start RPC บน Staging แล้ว จึงเริ่ม implementation �
   login HTTP 200 + STAGING badge, UI-only lab และ missing-context start denial ผ่าน
   ไม่มี Cron/Production mutation และไม่ได้ merge master; build/runtime flags บังคับ
   `SEB_EXAM_WAITING_ENABLED=false`, manifest `[]` จนมี native final/evidence ใหม่
+- **latest verified W6 deployment:** candidate `a6ed37b9a4208812d5dff2873fc7ce635bc73929`
+  commit/push ก่อน deploy จาก frozen checkout; `dpl_8PiUS9WjtqFXCHEaFV4ThhJMgQe4`
+  ตรวจ exact dedicated project/source/alias/READY, login STAGING badge, UI labs และ
+  missing-context canonical start HTTP 403 ผ่าน Build/runtime overrides คง flag=false/
+  manifest=[] ไม่มี release activation/master merge/Production/Cron mutation
 - เจ้าของอนุมัติ W6 TEST preparation เพิ่มแล้ว: สร้าง fixture ใหม่แยกจาก r2 บน isolated
   Staging ผ่าน real Auth และ actual application actions มี 2 บัญชีสังเคราะห์, 1 ห้อง,
   3 โจทย์ (written/MCQ/file upload), draft fixed `seb_required` exam ที่ไม่มี `access_code`
@@ -369,7 +374,7 @@ start RPC บน Staging แล้ว จึงเริ่ม implementation �
   ไม่มี native final save, keys, Storage upload/enrollment, publish, start หรือ attempt ใหม่
 - **หยุดก่อน W7:** fresh fixture/revision/seed และ machine checks เป็น W6 preparation
   ไม่ใช่ native pass; deployed waiting flag ยัง false/manifest `[]` และ source/alias ของ
-  deployment รอบล่าสุดต้อง attest หลังส่งจริง ไม่เปลี่ยน r2/keys/evidence เดิม Live native
+  deployment รอบล่าสุด attest แล้ว ไม่เปลี่ยน r2/keys/evidence เดิม Live native
   auth/exit/reconfiguration failure matrix ยัง NOT RUN ไม่ enroll คีย์สมมติหรือยกผล
   r2/local mocks มาปิดช่องว่าง ดูผลแยกแต่ละประเภทใน `SEB_WAITING_ROOM_W6_EVIDENCE.md`
 
@@ -581,7 +586,7 @@ native ที่ยังต้องพิสูจน์ถูกระบุ�
 
 **ผลปัจจุบัน:** fresh synthetic draft/current teacher revision และ private seed เตรียมแล้ว
 ภายใต้คำอนุมัติ W6 TEST; native final/enrollment/activation ยังไม่เริ่ม Machine validation
-ผ่านตามรายการด้านบน ส่วน candidate deployment รอบใหม่ยังต้อง attest ตามจริง ไม่ให้สร้าง
+และ candidate deployment/source/alias attestation ผ่านตามรายการด้านบน ไม่ให้สร้าง
 fixture ซ้ำเพื่อแทน unknown outcome ไม่แก้ r2 หรือบันทึก credentials/private entity IDs
 
 - หลัง route/policy นิ่งจึงทำ seed/materializer/validator ให้ Start URL เป็น entry ของ
@@ -595,6 +600,9 @@ fixture ซ้ำเพื่อแทน unknown outcome ไม่แก้ r2 
 
 **ผ่านเมื่อ:** มีชุดส่งต่อครบและ source/policy ไม่เปลี่ยนระหว่างเก็บ native keys;
 สถานะเป็น **รอ final native save/enrollment** ไม่ใช่พร้อมใช้จริง ยังไม่ลงทะเบียนคีย์ที่ไม่ได้เก็บ
+
+**ผล 10 ตุลาคม 2026:** W6 software/preparation/deploy DONE ตาม scoped evidence ใน
+`SEB_WAITING_ROOM_W6_EVIDENCE.md`; ไม่มีงาน native อัตโนมัติต่อ หยุดรออนุมัติ W7
 
 ### W7 — เจ้าของทำ native ขั้นจำเป็น แล้วปิด gate
 

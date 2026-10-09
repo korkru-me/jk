@@ -6,13 +6,15 @@
 
 **W7: NOT RUN / native proof: `pending_w7`.** เอกสารนี้เป็น runbook สำหรับ operator ในรอบที่เจ้าของอนุมัติเริ่ม W7 ภายหลัง ไม่ใช่คำสั่งให้เริ่มตอนนี้ และไม่ใช่ผลผ่านจากอุปกรณ์จริง
 
-งานเว็บส่งขึ้น dedicated UAT แล้วจาก source `7cde7b4`, deployment
-`dpl_H24Jhy2A5YYjjkLKv1L4LZgMRf2r`; Staging atomic-start migration `20261009142610`
+**W2–W6 software/preparation/deploy DONE.** งานเว็บส่งขึ้น dedicated UAT แล้วจาก source
+`a6ed37b9a4208812d5dff2873fc7ce635bc73929`, deployment
+`dpl_8PiUS9WjtqFXCHEaFV4ThhJMgQe4`; Staging atomic-start migration `20261009142610`
 apply แล้วและ parity ตรง 141 รายการถึง `20261009142610` Full suite ล่าสุดผ่าน 236 files /
 3,598 tests; TypeScript/token lint/guarded Next.js 16.3.5 webpack build ผ่าน Actual-client
 browser QA 8 observations และ independent PostgreSQL scratch mechanics proof ผ่าน
-แยกจาก native/backend integration ดู `SEB_WAITING_ROOM_W6_EVIDENCE.md` **deployment
-source รอบใหม่ยังรอ attestation** Flags คง false/manifest ว่าง ไม่มี master merge/Production mutation
+แยกจาก native/backend integration ดู `SEB_WAITING_ROOM_W6_EVIDENCE.md` Deployment
+project/source/alias/READY/login badge/UI labs/missing-context 403 attest แล้ว Flags คง
+false/manifest ว่าง ไม่มี master merge/Production mutation
 การเปิดใช้งานจริงรอ W7 ตามแผน ไม่ใช้ source ใหม่อ้างว่า deployed แล้วก่อนตรวจ alias/source
 
 ชุด pure/mock operator tests เดิมผ่าน 3 suites / 100 tests รวม strict parser, fixed-pilot predicate, private-file guard, mocked Storage/RPC, immutable bytes และ output reconciliation; Node syntax checks ผ่าน การตรวจชุดนี้ไม่ได้ใช้ live environment/DB/Storage/native SEB หรือไฟล์ r2 ไม่รวม actual fixture preparation ที่รายงานแยกด้านล่าง การทดสอบ PGlite connection เดียวไม่ใช่หลักฐานการแข่งขันของ PostgreSQL หลาย transaction อิสระ

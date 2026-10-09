@@ -2,14 +2,16 @@
 
 อัปเดต 10 ตุลาคม 2026 · fixed-exam pilot `waiting-room-completion-experimental-v1`
 
-เอกสารนี้แยกผลที่ตรวจแล้วออกจากสิ่งที่ยัง pending ของ W2–W6 ไม่ใช่ native release certificate
+**W2–W6 software/preparation/deploy: DONE ตาม scope ด้านล่าง.** เอกสารนี้แยกผลที่ตรวจแล้ว
+ออกจากสิ่งที่ยังต้องรอ W7 ไม่ใช่ native release certificate
 และไม่ประกาศว่า end-to-end/native gates ผ่านครบ **W7: HOLD / NOT RUN / `pending_w7`**
 ยังไม่ขอให้เจ้าของเปิดอุปกรณ์หรือเก็บคีย์ ไม่เปลี่ยน r2/keys/evidence เดิมหรือ Production
 
 ## Software validation — PASSED ในขอบเขตที่ระบุ
 
-- Validation source `7e4c8b0` รวม localhost real-client lab code `140410f`; actual-client
-  harness `f48e01d` และ final navigation error assertion ตรวจแยก ผลไม่เท่ากับ source ที่ deploy แล้ว
+- Frozen code/deployment candidate `a6ed37b9a4208812d5dff2873fc7ce635bc73929` รวม
+  localhost real-client lab `140410f`, proof startup fix `7e4c8b0` และ actual-client harness
+  `f48e01d` + final navigation error assertion; runtime/browser harness rerun PASSED
 - Full suite **236 files / 3,598 tests PASSED**; `npx tsc --noEmit`, design-token lint
   และ guarded Next.js **16.3.5 webpack production build PASSED** บน Staging environment
   ที่ผ่าน isolation guard ไม่ใช่ Production rollout หรือ native physical result
@@ -97,13 +99,15 @@
   บน scratch models เท่านั้น ไม่ใช่ public RPC integration, entire live RLS/schema proof,
   canonical browser/native journey หรือ W7 pass ไม่สร้าง submission ใน actual fixture
 
-### Dedicated UAT deployment — source รอบใหม่ PENDING
+### Dedicated UAT deployment — PASSED
 
-- Last attested dedicated UAT deployment: source `7cde7b4`,
-  `dpl_H24Jhy2A5YYjjkLKv1L4LZgMRf2r`, `https://korkru-seb-uat.vercel.app`
-  exact source/project/alias/READY/login STAGING badge ถูกตรวจในรอบนั้น flags ยังคง
-  `SEB_EXAM_WAITING_ENABLED=false`, manifest `[]`; deploy/source attestation รอบใหม่
-  **PENDING** ห้ามถือ latest local code ว่า live แล้วหรือเติม deploy pass ล่วงหน้า
+- Candidate commit/push `a6ed37b9a4208812d5dff2873fc7ce635bc73929` ก่อน deploy จาก
+  clean frozen checkout ไป dedicated `https://korkru-seb-uat.vercel.app` เท่านั้น
+  deployment `dpl_8PiUS9WjtqFXCHEaFV4ThhJMgQe4` ตรวจ exact project/source/alias/READY,
+  login HTTP 200 + STAGING badge, UI labs และ missing-context canonical start HTTP 403
+  ผ่าน Runtime/build overrides คง `SEB_EXAM_WAITING_ENABLED=false`, manifest `[]`
+  ไม่ enroll/publish/activate native release, ไม่ merge master/แตะ Production/Cron
+  ภายหลัง deployment commit มีเฉพาะ docs attestation ไม่เปลี่ยน candidate runtime policy
 
 ## จุดหยุดและการปิดรายการ
 
@@ -111,9 +115,8 @@ Pilot รับเฉพาะ fixed passwordless online SEB exam; **streak excl
 จนมีคำอนุมัติและผล atomic verdict/summary contract แยก ไม่เปลี่ยน legacy Browser/Android/
 streak หรือทำ account-wide restriction ทาง runtime/SQL เอง
 
-ก่อนปิด software W2–W6 ให้เติม exact new deployment/source/flags หลังตรวจจริง;
-machine/runtime UI/proof02/cleanup ข้างต้นผ่านแล้วเฉพาะ scope ที่แยกไว้ หาก
-result ยังไม่เกิดให้คง `pending|blocked|not_observed` ไม่ลด requirement เพื่อเปลี่ยนเป็น pass
+Software W2–W6 ปิดแล้วตาม machine/runtime UI/proof02/cleanup/fixture/seed/deployment
+evidence ที่แยกไว้ ไม่ลด requirement หรือย้าย live/native gap มาเป็น mock pass
 Native passwordless entry, early-quit denial, completion/reconfiguration failures,
 teacher emergency quit และ committed terminal exit ทุก platform ยัง **W7 NOT RUN**
 HTTP/byte/hash/local mocks/software tests ไม่แทน observed native evidence
