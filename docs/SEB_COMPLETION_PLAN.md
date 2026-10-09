@@ -283,6 +283,15 @@ Production และไม่ใช่หลักฐาน physical platform �
 
 ## แผนย่อย W1–W7 — ห้องรอสอบและโหมดข้อสอบเดียว
 
+### ส่วนเพิ่มที่เจ้าของอนุมัติ 10 ตุลาคม — ข้อสอบที่ไม่ใช้ SEB ต้องมีหน้ารอด้วย
+
+- เพิ่มเฉพาะ `type=exam` บนเว็บปกติและ legacy verified SEB/approved Android path: เปิดหน้ารอก่อนโจทย์และก่อนเริ่มเวลา กดปุ่ม POST เพื่อเริ่ม/ทำต่อ/ตรวจผลรอบที่หมดเวลา แบบฝึกหัดไม่เปลี่ยน และไม่กล่าวว่า browser ธรรมดาล็อกการออกแบบ native SEB
+- GET/prefetch เป็น metadata-only ไม่สร้างรอบ/grade/draw; resume ใช้ own exact current receipt และ `started_at` เดิม URL hint ไม่จัดรอบใหม่ กรณี slow read ข้ามเวลาไม่ serialize โจทย์; stale operation/recovery replay ไม่สร้าง successor
+- Streak ข้อแรกย้ายไป explicit POST เฉพาะรอบที่ไม่มี answer rows การกลับเข้าสอบที่มีข้ออยู่แล้วไม่ draw ข้อถัดไป ไม่เปลี่ยน scoring/verdict contract
+- ไม่เพิ่ม migration ไม่เปลี่ยน Auth/RLS สูตรคะแนน native files/keys/release/activation และไม่ยก ordinary separate header/answer writes เป็น atomic guarantee
+- Local verification: entry/route regressions ใหม่ 31 cases, full 238 files / 3,629 tests, TypeScript/token lint/guarded build ผ่าน; shared controller UI lab ผ่าน idle/explicit/code/refusal/no-replay/double-submit/recovery และ 320px/axe/Next runtime ไม่มี errors ไม่ใช่ hosted Auth-to-DB หรือ native physical proof
+- **W7 HOLD ตามเดิม** ส่วนเพิ่มนี้ไม่ใช่การอนุมัติ native activation หรือ Production; บันทึก source/deployment แยกเมื่อ deploy เฉพาะ dedicated TEST สำเร็จ
+
 เสนอวันที่ 9 ตุลาคม 2026 · ตรวจล่าสุด 10 ตุลาคม 2026 · **W2–W6 fixed-exam machine checks/fixture/seed/dedicated UAT deploy DONE; หยุดก่อน W7/native activation**
 
 เจ้าของขอให้หลังเปิดไฟล์ SEB และล็อกอิน นักเรียนอยู่ในหน้ารอของข้อสอบนั้นเท่านั้น
