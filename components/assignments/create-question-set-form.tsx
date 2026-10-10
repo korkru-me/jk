@@ -12,10 +12,18 @@ import {
 } from '@/lib/actions/question-sets'
 import { getMyTeamOrgOptions } from '@/lib/actions/team-org'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { TeamShareChips } from '@/components/questions/general-info-section'
 import { QuestionPicker } from '@/components/assignments/question-picker'
 import { SetStructurePanel } from '@/components/questions/set-structure-panel'
@@ -347,7 +355,7 @@ export function CreateQuestionSetForm({
     })
   }
 
-  /** How the read-only card names the current การมองเห็น. */
+  /** How the compact page header names the current การมองเห็น. */
   const visibilityLabel = visibility === 'private'
     ? 'ส่วนตัว — แค่ฉันเห็นแฟ้มโจทย์นี้'
     : allSelectedTeamIds.length > 1
@@ -355,161 +363,173 @@ export function CreateQuestionSetForm({
       : selectedTeamName ? `ทีมของฉัน (${selectedTeamName})` : 'ทีมของฉัน'
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4">
       {/* The แฟ้ม's own name is the page's heading, read off the current state
           so a rename appears while its autosave is being queued. */}
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">
-            {initialSet ? (
-              <>
-                <span className="text-muted-foreground font-semibold">แฟ้มโจทย์</span>{' '}
-                {title.trim() || <span className="text-muted-foreground">ไม่มีชื่อ</span>}
-              </>
-            ) : 'สร้างแฟ้มโจทย์'}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {initialSet
-              ? 'การแก้ไขจะไม่ย้อนกลับไปเปลี่ยนชุดข้อสอบที่มอบหมายไปแล้วจากแฟ้มนี้'
-              : 'รวมโจทย์จากคลังไว้ในแฟ้มเพื่อใช้ซ้ำ'}
-          </p>
-        </div>
-        {initialSet && (
-          <div
-            role="status"
-            aria-live="polite"
-            className="min-h-8 flex items-center gap-1.5 text-sm text-muted-foreground"
-          >
-            {autosaveStatus.state === 'saved' && (
-              <><CheckCircle2 className="size-4 text-success" aria-hidden="true" /> บันทึกอัตโนมัติแล้ว</>
-            )}
-            {autosaveStatus.state === 'waiting' && (
-              <><LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> รอบันทึกอัตโนมัติ…</>
-            )}
-            {autosaveStatus.state === 'saving' && (
-              <><LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> กำลังบันทึก…</>
-            )}
-            {autosaveStatus.state === 'error' && (
-              <>
-                <CloudAlert className="size-4 text-destructive" aria-hidden="true" />
-                <span className="text-destructive">{autosaveStatus.error}</span>
-                {canSave && (
-                  <Button type="button" variant="link" size="xs" onClick={retryAutosave} className="h-auto px-1">
-                    ลองใหม่
-                  </Button>
+      <header className="flex flex-col gap-2 pb-1">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 basis-full sm:basis-0 sm:flex-1">
+            <h1 className="text-2xl font-bold text-foreground">
+              {initialSet ? (
+                <>
+                  <span className="font-semibold text-muted-foreground">แฟ้มโจทย์</span>{' '}
+                  {title.trim() || <span className="text-muted-foreground">ไม่มีชื่อ</span>}
+                </>
+              ) : 'สร้างแฟ้มโจทย์'}
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {initialSet
+                ? 'การแก้ไขจะไม่ย้อนกลับไปเปลี่ยนชุดข้อสอบที่มอบหมายไปแล้วจากแฟ้มนี้'
+                : 'รวมโจทย์จากคลังไว้ในแฟ้มเพื่อใช้ซ้ำ'}
+            </p>
+          </div>
+          {initialSet && (
+            <div className="flex w-full shrink-0 flex-wrap items-center justify-between gap-2 sm:w-auto sm:justify-end">
+              <div
+                role="status"
+                aria-live="polite"
+                className="flex min-h-8 items-center gap-1.5 text-sm text-muted-foreground"
+              >
+                {autosaveStatus.state === 'saved' && (
+                  <>
+                    <CheckCircle2 className="size-4 text-success" aria-hidden="true" />
+                    บันทึกอัตโนมัติแล้ว
+                  </>
                 )}
-              </>
-            )}
+                {autosaveStatus.state === 'waiting' && (
+                  <>
+                    <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+                    รอบันทึกอัตโนมัติ…
+                  </>
+                )}
+                {autosaveStatus.state === 'saving' && (
+                  <>
+                    <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+                    กำลังบันทึก…
+                  </>
+                )}
+                {autosaveStatus.state === 'error' && (
+                  <>
+                    <CloudAlert className="size-4 text-destructive" aria-hidden="true" />
+                    <span className="text-destructive">{autosaveStatus.error}</span>
+                    {canSave && (
+                      <Button type="button" variant="link" size="xs" onClick={retryAutosave} className="h-auto px-1">
+                        ลองใหม่
+                      </Button>
+                    )}
+                  </>
+                )}
+              </div>
+              <Button
+                type="button"
+                variant={editingInfo ? 'ghost' : 'outline'}
+                size="sm"
+                onClick={() => editingInfo ? finishEditingInfo() : setEditingInfo(true)}
+              >
+                {editingInfo ? 'เสร็จสิ้น' : (
+                  <>
+                    <Pencil data-icon="inline-start" />
+                    แก้ไข
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {initialSet && !editingInfo && (
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+            <Badge variant="outline">{visibilityLabel}</Badge>
+            <p
+              className="min-w-0 max-w-3xl truncate text-muted-foreground"
+              title={description.trim() || 'ไม่มีคำอธิบาย'}
+            >
+              {description.trim() || 'ไม่มีคำอธิบาย'}
+            </p>
           </div>
         )}
-      </div>
+      </header>
 
-      <Card padding="xl" className="space-y-4">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <h2 className="font-semibold text-foreground">ข้อมูลแฟ้มโจทย์</h2>
-          {initialSet && (
-            <Button
-              type="button"
-              variant={editingInfo ? 'ghost' : 'outline'}
-              size="sm"
-              onClick={() => editingInfo ? finishEditingInfo() : setEditingInfo(true)}
-              className="gap-1.5"
-            >
-              {editingInfo ? 'เสร็จสิ้น' : <><Pencil className="w-3.5 h-3.5" /> แก้ไข</>}
-            </Button>
-          )}
-        </div>
+      {editingInfo && (
+        <Card padding="md">
+          <FieldGroup className="gap-4">
+            <Field>
+              <FieldLabel htmlFor="set-title">
+                ชื่อแฟ้มโจทย์ <span className="text-destructive">*</span>
+              </FieldLabel>
+              <Input
+                id="set-title"
+                value={title}
+                onChange={e => { markInfoChanged(); setTitle(e.target.value) }}
+                placeholder="เช่น แบบฝึกหัด กฎการเคลื่อนที่ของนิวตัน"
+                autoFocus
+                key={editingInfo ? 'editing' : 'idle'}
+              />
+            </Field>
 
-        {!editingInfo && (
-          <dl className="grid grid-cols-1 sm:grid-cols-[10rem_1fr] gap-x-4 gap-y-2 text-sm">
-            <dt className="text-muted-foreground">ชื่อแฟ้มโจทย์</dt>
-            <dd className="text-foreground">{title.trim() || <span className="text-muted-foreground">ยังไม่ได้ตั้งชื่อ</span>}</dd>
+            <Field>
+              <FieldLabel htmlFor="set-desc">คำอธิบาย</FieldLabel>
+              <Textarea
+                id="set-desc"
+                value={description}
+                onChange={e => { markInfoChanged(); setDescription(e.target.value) }}
+                placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"
+                rows={2}
+              />
+            </Field>
 
-            <dt className="text-muted-foreground">คำอธิบาย</dt>
-            <dd className="text-foreground whitespace-pre-wrap">
-              {description.trim() || <span className="text-muted-foreground">—</span>}
-            </dd>
-
-            <dt className="text-muted-foreground">การมองเห็น</dt>
-            <dd className="text-foreground">{visibilityLabel}</dd>
-          </dl>
-        )}
-
-        {editingInfo && <>
-        <div className="space-y-1.5">
-          <Label htmlFor="set-title">ชื่อแฟ้มโจทย์ <span className="text-destructive">*</span></Label>
-          <Input
-            id="set-title"
-            value={title}
-            onChange={e => { markInfoChanged(); setTitle(e.target.value) }}
-            placeholder="เช่น แบบฝึกหัด กฎการเคลื่อนที่ของนิวตัน"
-            autoFocus
-            key={editingInfo ? 'editing' : 'idle'}
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="set-desc">คำอธิบาย</Label>
-          <Textarea
-            id="set-desc"
-            value={description}
-            onChange={e => { markInfoChanged(); setDescription(e.target.value) }}
-            placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"
-            rows={2}
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <Label>การมองเห็น</Label>
-          <Select
-            value={visibility === 'school' ? 'organization' : visibility}
-            onValueChange={(v) => {
-              if (v === null) return
-              markInfoChanged()
-              setVisibility(v as Visibility)
-              if (v === 'private') {
-                setTeamOrgId(null)
-                setSharedOrgIds([])
-              } else if (teams.length === 1) {
-                setTeamOrgId(teams[0].id)
-              }
-            }}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="เลือกการมองเห็น">
-                {visibility === 'organization' || visibility === 'school'
-                  ? (allSelectedTeamIds.length > 1
-                      ? `ทีมของฉัน (${allSelectedTeamIds.length} ทีม)`
-                      : selectedTeamName ? `ทีมของฉัน (${selectedTeamName})` : 'ทีมของฉัน')
-                  : 'ส่วนตัว'}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="private">ส่วนตัว — แค่ฉันเห็นแฟ้มโจทย์นี้</SelectItem>
-              <SelectItem value="organization" disabled={teamChecked && !hasTeams}>
-                ทีมของฉัน{teams.length === 1 ? ` (${teams[0].name})` : ''}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-          {teamChecked && !hasTeams && (
-            <p className="text-xs text-muted-foreground">
-              สร้างทีมก่อนเพื่อใช้งาน —{' '}
-              <a href="/settings/team" className="text-primary hover:underline">
-                ไปที่หน้าทีมของฉัน
-              </a>
-            </p>
-          )}
-          {visibility === 'organization' && teams.length > 1 && (
-            <TeamShareChips
-              label="แชร์ให้ทีมไหน (เลือกได้หลายทีม)"
-              teams={teams}
-              selectedIds={allSelectedTeamIds}
-              onToggle={toggleTeam}
-            />
-          )}
-        </div>
-        </>}
-      </Card>
+            <Field>
+              <FieldLabel>การมองเห็น</FieldLabel>
+              <Select
+                value={visibility === 'school' ? 'organization' : visibility}
+                onValueChange={(v) => {
+                  if (v === null) return
+                  markInfoChanged()
+                  setVisibility(v as Visibility)
+                  if (v === 'private') {
+                    setTeamOrgId(null)
+                    setSharedOrgIds([])
+                  } else if (teams.length === 1) {
+                    setTeamOrgId(teams[0].id)
+                  }
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="เลือกการมองเห็น">
+                    {visibility === 'organization' || visibility === 'school'
+                      ? (allSelectedTeamIds.length > 1
+                        ? `ทีมของฉัน (${allSelectedTeamIds.length} ทีม)`
+                        : selectedTeamName ? `ทีมของฉัน (${selectedTeamName})` : 'ทีมของฉัน')
+                      : 'ส่วนตัว'}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="private">ส่วนตัว — แค่ฉันเห็นแฟ้มโจทย์นี้</SelectItem>
+                    <SelectItem value="organization" disabled={teamChecked && !hasTeams}>
+                      ทีมของฉัน{teams.length === 1 ? ` (${teams[0].name})` : ''}
+                    </SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              {teamChecked && !hasTeams && (
+                <FieldDescription>
+                  สร้างทีมก่อนเพื่อใช้งาน —{' '}
+                  <a href="/settings/team">ไปที่หน้าทีมของฉัน</a>
+                </FieldDescription>
+              )}
+              {visibility === 'organization' && teams.length > 1 && (
+                <TeamShareChips
+                  label="แชร์ให้ทีมไหน (เลือกได้หลายทีม)"
+                  teams={teams}
+                  selectedIds={allSelectedTeamIds}
+                  onToggle={toggleTeam}
+                />
+              )}
+            </Field>
+          </FieldGroup>
+        </Card>
+      )}
 
       <SetStructurePanel
         questions={questions}
