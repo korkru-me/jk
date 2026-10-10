@@ -1,6 +1,7 @@
 'use client'
 
-import { useRef, useState, useTransition } from 'react'
+import { useMemo, useRef, useState, useTransition } from 'react'
+import type { DialogRootChangeEventDetails } from '@base-ui/react/dialog'
 import {
   Settings, Users, CalendarDays, Clock, School, Home, Info, Palette,
 } from 'lucide-react'
@@ -30,6 +31,7 @@ import { ClassroomIconPicker } from '@/components/classrooms/classroom-icon-pick
 import { ClassroomCoverPattern } from '@/components/classrooms/classroom-cover-pattern'
 import { ClassroomCoverPatternPicker } from '@/components/classrooms/classroom-cover-pattern-picker'
 import { ClassroomCoverThemePicker } from '@/components/classrooms/classroom-cover-theme-picker'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 
 export function ClassroomSettingsDialog({
   classroom, onCover = false, placement = 'banner',
@@ -44,9 +46,14 @@ export function ClassroomSettingsDialog({
 }) {
   const compact = useSidebarCompact() && placement === 'sidebar'
   const dialogContentRef = useRef<HTMLDivElement>(null)
+  const savedMeta = useMemo(
+    () => parseDescription(classroom.description),
+    [classroom.description],
+  )
   const [open, setOpen] = useState(false)
   const [name, setName] = useState(classroom.name)
-  const [meta, setMeta] = useState<ClassroomMeta>(() => parseDescription(classroom.description))
+  const [meta, setMeta] = useState<ClassroomMeta>(() => savedMeta)
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false)
   const [isPending, startTransition] = useTransition()
 
   const isHomeroom = classroom.classroom_type === 'homeroom'
@@ -58,15 +65,46 @@ export function ClassroomSettingsDialog({
   // Classrooms created before cover colours were persisted have none saved;
   // the preview stays on the neutral surface until a teacher picks one.
   const cover = coverOf(meta)
+  const hasUnsavedChanges = name.trim() !== classroom.name.trim()
+    || composeDescription(meta) !== composeDescription(savedMeta)
+
+  function resetDraft() {
+    setName(classroom.name)
+    setMeta(savedMeta)
+  }
+
+  function requestClose(eventDetails?: DialogRootChangeEventDetails) {
+    // A failed request must leave the draft available for another attempt.
+    if (isPending) {
+      eventDetails?.cancel()
+      return
+    }
+
+    if (hasUnsavedChanges) {
+      eventDetails?.cancel()
+      setConfirmingDiscard(true)
+      return
+    }
+
+    setOpen(false)
+  }
 
   // Re-seed from the server copy on every open so a cancelled edit — or a
   // change made in another tab — never lingers into the next visit.
-  function handleOpenChange(next: boolean) {
+  function handleOpenChange(next: boolean, eventDetails: DialogRootChangeEventDetails) {
     if (next) {
-      setName(classroom.name)
-      setMeta(parseDescription(classroom.description))
+      resetDraft()
+      setConfirmingDiscard(false)
+      setOpen(true)
+      return
     }
-    setOpen(next)
+
+    requestClose(eventDetails)
+  }
+
+  function discardChanges() {
+    resetDraft()
+    setOpen(false)
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -89,7 +127,8 @@ export function ClassroomSettingsDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger
         render={
           <Button
@@ -343,7 +382,7 @@ export function ClassroomSettingsDialog({
             <Button type="submit" disabled={isPending} className="flex-1">
               {isPending ? 'กำลังบันทึก...' : 'บันทึกการตั้งค่า'}
             </Button>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isPending}>
+            <Button type="button" variant="outline" onClick={() => requestClose()} disabled={isPending}>
               ยกเลิก
             </Button>
           </div>
@@ -357,6 +396,21 @@ export function ClassroomSettingsDialog({
           <DeleteClassroomButton id={classroom.id} />
         </div>
       </DialogContent>
-    </Dialog>
+      </Dialog>
+
+      {/* A sibling root keeps the confirmation's own backdrop dismissible;
+          Base UI intentionally suppresses backdrops for nested dialog roots. */}
+      <ConfirmDialog
+        open={confirmingDiscard}
+        onOpenChange={setConfirmingDiscard}
+        title="ปิดโดยไม่บันทึกการตั้งค่า?"
+        description="คุณมีการแก้ไขที่ยังไม่ได้บันทึก หากปิดตอนนี้ สิ่งที่แก้ไขจะหายไป ส่วนการตั้งค่าห้องเรียนที่บันทึกไว้เดิมจะยังอยู่"
+        confirmLabel="ปิดโดยไม่บันทึก"
+        cancelLabel="กลับไปตั้งค่าต่อ"
+        variant="destructive"
+        onConfirm={discardChanges}
+        finalFocus={dialogContentRef}
+      />
+    </>
   )
 }
