@@ -11,6 +11,7 @@ import type { Classroom, ClassroomPost } from '@/lib/types'
 import { ClassroomSettingsDialog } from './classroom-settings-dialog'
 import { parseDescription, coverOf, displayDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
 import { ClassroomIcon } from '@/components/classrooms/classroom-icon'
+import { ClassroomCoverPattern } from '@/components/classrooms/classroom-cover-pattern'
 import type { SortKey as StudentSortKey } from './student-table'
 import type { CoTeacherRow, InviteRow } from './co-teachers'
 import type { ClassroomAssignmentRow } from './classroom-assignments-tab'
@@ -254,6 +255,10 @@ export function ClassroomDetailClient({
             : `text-white bg-gradient-to-br ${isHomeroom ? 'from-slate-800 via-slate-800 to-indigo-900' : 'from-gray-900 to-gray-800'}`,
         )}
       >
+        <ClassroomCoverPattern
+          patternKey={classroomMeta.coverPattern}
+          className="pointer-events-none absolute inset-0 size-full opacity-35"
+        />
         <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex-1 min-w-0">
             {isHomeroom && (

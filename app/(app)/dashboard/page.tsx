@@ -83,18 +83,24 @@ export default async function DashboardPage() {
     const liveQuestionIds = new Set((liveQuestions ?? []).map(q => q.id))
 
     const classroomRows = (classroomsRes.data ?? []) as any[]
-    const classrooms: DashboardClassroom[] = classroomRows.map(row => ({
-      id: row.id,
-      name: row.name,
-      classroom_type: row.classroom_type,
-      iconKey: parseDescription(row.description).iconKey,
-      studentCount: row.classroom_students?.[0]?.count ?? 0,
-      assignmentCount: row.assignment_classrooms?.[0]?.count ?? 0,
-    }))
+    const classrooms: DashboardClassroom[] = classroomRows.map(row => {
+      const meta = parseDescription(row.description)
+      return {
+        id: row.id,
+        name: row.name,
+        classroom_type: row.classroom_type,
+        cover: meta.cover,
+        coverPattern: meta.coverPattern,
+        iconKey: meta.iconKey,
+        gradeLevel: meta.gradeLevel,
+        academicTerm: meta.academicTerm,
+        studentCount: row.classroom_students?.[0]?.count ?? 0,
+        assignmentCount: row.assignment_classrooms?.[0]?.count ?? 0,
+      }
+    })
 
     return (
       <TeacherDashboard
-        user={user}
         classroomsCount={classrooms.length}
         questionsCount={questionsRes.count ?? 0}
         setsCount={setsRes.count ?? 0}

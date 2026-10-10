@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { CLASSROOM_ICON_OPTIONS, classroomIconKey } from './classroom-icons'
+import { CLASSROOM_COVER_PATTERN_OPTIONS, classroomCoverPatternKey } from './classroom-cover-patterns'
 import { composeDescription, coverImageOf, displayDescription, EMPTY_META, parseDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
 
 describe('optional classroom icon metadata', () => {
@@ -36,6 +37,19 @@ describe('optional classroom icon metadata', () => {
     const meta = { ...EMPTY_META, description: 'ฟิสิกส์', tags: ['ฟิสิกส์'], iconKey: 'art' as const }
     expect(parseDescription(composeDescription(meta)).iconKey).toBe('art')
     expect(parseDescription(composeDescription({ ...meta, iconKey: undefined })).iconKey).toBeUndefined()
+  })
+
+  it.each(CLASSROOM_COVER_PATTERN_OPTIONS)('round-trips the $key cover pattern without exposing it as copy', option => {
+    const raw = composeDescription({ ...parseDescription(legacy), coverPattern: option.key })
+
+    expect(classroomCoverPatternKey(parseDescription(raw).coverPattern)).toBe(option.key)
+    expect(displayDescription(raw)).not.toContain('ลายปก:')
+  })
+
+  it('ignores an unknown saved cover pattern', () => {
+    const raw = 'คำอธิบาย\nลายปก: copied-cover · การเข้าร่วม: เปิดรับอิสระ'
+    expect(parseDescription(raw).coverPattern).toBeUndefined()
+    expect(displayDescription(raw)).toBe('คำอธิบาย\nการเข้าร่วม: เปิดรับอิสระ')
   })
 
   it('drops unknown icon values safely and never prints presentation keys', () => {

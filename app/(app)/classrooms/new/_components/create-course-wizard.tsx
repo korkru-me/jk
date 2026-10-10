@@ -23,6 +23,13 @@ import { Card } from '@/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ClassroomIconPicker } from '@/components/classrooms/classroom-icon-picker'
 import { DEFAULT_CLASSROOM_ICON, classroomIconKey, isClassroomIconKey, type ClassroomIconKey } from '@/lib/classroom-icons'
+import { ClassroomCoverPatternPicker } from '@/components/classrooms/classroom-cover-pattern-picker'
+import {
+  DEFAULT_CLASSROOM_COVER_PATTERN,
+  classroomCoverPatternKey,
+  isClassroomCoverPatternKey,
+  type ClassroomCoverPatternKey,
+} from '@/lib/classroom-cover-patterns'
 
 // ─── Static Data ──────────────────────────────────────────────────────────────
 
@@ -31,6 +38,7 @@ import { DEFAULT_CLASSROOM_ICON, classroomIconKey, isClassroomIconKey, type Clas
 const wizardSchema = z.object({
   classroomType:   z.enum(['subject', 'homeroom']),
   cover:           z.string(),
+  coverPattern:    z.custom<ClassroomCoverPatternKey>(isClassroomCoverPatternKey, 'กรุณาเลือกลวดลายปกจากตัวเลือกที่มี'),
   iconKey:         z.custom<ClassroomIconKey>(isClassroomIconKey, 'กรุณาเลือกไอคอนจากตัวเลือกที่มี'),
   name:            z.string().min(1, 'กรุณากรอกชื่อห้องเรียน').max(100, 'ชื่อห้องเรียนไม่เกิน 100 ตัวอักษร'),
   description:     z.string().max(500, 'คำอธิบายไม่เกิน 500 ตัวอักษร'),
@@ -49,6 +57,7 @@ export type WizardData = z.infer<typeof wizardSchema>
 const DEFAULT_VALUES: WizardData = {
   classroomType:   'subject',
   cover:           COVER_PRESETS[0].id,
+  coverPattern:    DEFAULT_CLASSROOM_COVER_PATTERN,
   iconKey:         DEFAULT_CLASSROOM_ICON,
   name:            '',
   description:     '',
@@ -77,12 +86,14 @@ function FieldError({ message }: { message?: string }) {
 // ─── Cover Design Section ─────────────────────────────────────────────────────
 
 function CoverDesignSection({
-  iconKey, cover, onIconChange, onCoverChange,
+  iconKey, cover, coverPattern, onIconChange, onCoverChange, onCoverPatternChange,
 }: {
   iconKey: ClassroomIconKey
   cover: string
+  coverPattern: ClassroomCoverPatternKey
   onIconChange: (key: ClassroomIconKey) => void
   onCoverChange: (id: string) => void
+  onCoverPatternChange: (key: ClassroomCoverPatternKey) => void
 }) {
   const iconPickerRef = useRef<HTMLDivElement>(null)
   const themePickerRef = useRef<HTMLDivElement>(null)
@@ -106,55 +117,62 @@ function CoverDesignSection({
   }, [iconPickerOpen, themePickerOpen])
 
   return (
-    <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
-      <div ref={iconPickerRef}>
-        <ClassroomIconPicker
-          value={iconKey}
-          onValueChange={onIconChange}
-          compact
-          open={iconPickerOpen}
-          onOpenChange={setIconPickerOpen}
-        />
-      </div>
+    <div className="flex flex-col gap-4">
+      <ClassroomCoverPatternPicker
+        value={coverPattern}
+        onValueChange={onCoverPatternChange}
+        previewClassName={`${selectedPreset.surface} ${selectedPreset.text}`}
+      />
 
-      <div ref={themePickerRef} className="space-y-1.5">
-        <Label className="text-sm font-medium">ธีมสี</Label>
-        <Collapsible open={themePickerOpen} onOpenChange={setThemePickerOpen}>
-          <CollapsibleTrigger
-            render={<Button type="button" variant="outline" className="h-10 w-full justify-start gap-3" />}
-            aria-label={`ธีมสี: ${selectedPreset.label}`}
-          >
-            <span className={cn('size-5 shrink-0 rounded-full ring-1 ring-border', selectedPreset.solid)} aria-hidden="true" />
-            <span className="min-w-0 flex-1 truncate text-left">{selectedPreset.label}</span>
-            <ChevronDown className={cn('size-4 shrink-0 transition-transform', themePickerOpen && 'rotate-180')} aria-hidden="true" />
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <Card padding="sm" radius="sm" className="mt-2 flex flex-wrap gap-2">
-              {COVER_PRESETS.map((preset) => (
-                <button
-                  key={preset.id}
-                  type="button"
-                  title={preset.label}
-                  aria-label={preset.label}
-                  aria-pressed={cover === preset.id}
-                  onClick={() => {
-                    onCoverChange(preset.id)
-                    setThemePickerOpen(false)
-                  }}
-                  className={cn(
-                    'size-8 rounded-full transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
-                    preset.solid,
-                    cover === preset.id
-                      ? 'shadow-sm ring-2 ring-ring ring-offset-2'
-                      : 'opacity-70 hover:opacity-100',
-                  )}
-                />
-              ))}
-            </Card>
-          </CollapsibleContent>
-        </Collapsible>
-      </div>
+      <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
+        <div ref={iconPickerRef}>
+          <ClassroomIconPicker
+            value={iconKey}
+            onValueChange={onIconChange}
+            compact
+            open={iconPickerOpen}
+            onOpenChange={setIconPickerOpen}
+          />
+        </div>
 
+        <div ref={themePickerRef} className="space-y-1.5">
+          <Label className="text-sm font-medium">ธีมสี</Label>
+          <Collapsible open={themePickerOpen} onOpenChange={setThemePickerOpen}>
+            <CollapsibleTrigger
+              render={<Button type="button" variant="outline" className="h-10 w-full justify-start gap-3" />}
+              aria-label={`ธีมสี: ${selectedPreset.label}`}
+            >
+              <span className={cn('size-5 shrink-0 rounded-full ring-1 ring-border', selectedPreset.solid)} aria-hidden="true" />
+              <span className="min-w-0 flex-1 truncate text-left">{selectedPreset.label}</span>
+              <ChevronDown className={cn('size-4 shrink-0 transition-transform', themePickerOpen && 'rotate-180')} aria-hidden="true" />
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <Card padding="sm" radius="sm" className="mt-2 flex flex-wrap gap-2">
+                {COVER_PRESETS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    title={preset.label}
+                    aria-label={preset.label}
+                    aria-pressed={cover === preset.id}
+                    onClick={() => {
+                      onCoverChange(preset.id)
+                      setThemePickerOpen(false)
+                    }}
+                    className={cn(
+                      'size-8 rounded-full transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+                      preset.solid,
+                      cover === preset.id
+                        ? 'shadow-sm ring-2 ring-ring ring-offset-2'
+                        : 'opacity-70 hover:opacity-100',
+                    )}
+                  />
+                ))}
+              </Card>
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
+      </div>
     </div>
   )
 }
@@ -221,6 +239,7 @@ function ClassroomFormContent({
   values,
   onClassroomTypeChange,
   onCoverChange,
+  onCoverPatternChange,
   onIconChange,
   onToggleCapacity,
   classroomTypeLocked,
@@ -230,6 +249,7 @@ function ClassroomFormContent({
   values: WizardData
   onClassroomTypeChange: (v: ClassroomType) => void
   onCoverChange: (id: string) => void
+  onCoverPatternChange: (key: ClassroomCoverPatternKey) => void
   onIconChange: (key: ClassroomIconKey) => void
   onToggleCapacity: (v: boolean) => void
   classroomTypeLocked?: boolean
@@ -323,8 +343,10 @@ function ClassroomFormContent({
       <CoverDesignSection
         iconKey={values.iconKey}
         cover={values.cover}
+        coverPattern={values.coverPattern}
         onIconChange={onIconChange}
         onCoverChange={onCoverChange}
+        onCoverPatternChange={onCoverPatternChange}
       />
 
       <div className="border-t border-border pt-4">
@@ -432,6 +454,7 @@ export function CreateCourseWizard({
       ...initialValues,
       accessType: initialAccessType ?? DEFAULT_VALUES.accessType,
       iconKey: classroomIconKey(initialValues?.iconKey),
+      coverPattern: classroomCoverPatternKey(initialValues?.coverPattern),
     },
     mode: 'onTouched',
   })
@@ -465,6 +488,7 @@ export function CreateCourseWizard({
       description:     data.description,
       cover:           data.cover,
       coverImageUrl:   '',
+      coverPattern:    data.coverPattern,
       iconKey:         data.iconKey,
       gradeLevel:      data.gradeLevel,
       academicTerm:    data.academicTerm,
@@ -522,6 +546,7 @@ export function CreateCourseWizard({
           values={values}
           onClassroomTypeChange={(v) => setValue('classroomType', v)}
           onCoverChange={(id) => setValue('cover', id)}
+          onCoverPatternChange={(key) => setValue('coverPattern', key, { shouldDirty: true })}
           onIconChange={(key) => setValue('iconKey', key, { shouldDirty: true })}
           onToggleCapacity={(v) => setValue('capacityEnabled', v)}
           classroomTypeLocked={!!duplicateSourceId}

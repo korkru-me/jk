@@ -28,6 +28,8 @@ import { AccessTypePicker, CreatableCombobox } from '@/app/(app)/classrooms/_com
 import { DeleteClassroomButton } from '@/components/classrooms/delete-classroom-button'
 import { ClassroomIcon } from '@/components/classrooms/classroom-icon'
 import { ClassroomIconPicker } from '@/components/classrooms/classroom-icon-picker'
+import { ClassroomCoverPattern } from '@/components/classrooms/classroom-cover-pattern'
+import { ClassroomCoverPatternPicker } from '@/components/classrooms/classroom-cover-pattern-picker'
 
 export function ClassroomSettingsDialog({
   classroom, onCover = false, placement = 'banner',
@@ -152,10 +154,7 @@ export function ClassroomSettingsDialog({
           <div className="space-y-2.5">
             <Label className="flex items-center gap-1.5">
               <Palette className="w-3.5 h-3.5 text-muted-foreground" />
-              สีหน้าปก
-              <span className="text-xs text-muted-foreground font-normal">
-                (เลือกวงแรกเพื่อใช้สีอัตโนมัติ)
-              </span>
+              ปกห้องเรียน
             </Label>
             <div
               className={cn(
@@ -163,9 +162,20 @@ export function ClassroomSettingsDialog({
                 cover ? `${cover.surface} ${cover.text}` : 'bg-muted border-border text-muted-foreground',
               )}
             >
+              <ClassroomCoverPattern
+                patternKey={meta.coverPattern}
+                className="pointer-events-none absolute inset-0 size-full opacity-55"
+              />
               <ClassroomIcon iconKey={meta.iconKey} className="relative z-10 mr-3 size-7 shrink-0" />
               <p className="relative z-10 font-bold text-lg truncate">{name || 'ชื่อห้องเรียน'}</p>
             </div>
+            <ClassroomCoverPatternPicker
+              value={meta.coverPattern}
+              onValueChange={key => set('coverPattern', key)}
+              disabled={isPending}
+              previewClassName={cover ? `${cover.surface} ${cover.text}` : undefined}
+            />
+            <p className="text-xs font-medium text-muted-foreground">สีของปก · เลือกวงแรกเพื่อใช้สีอัตโนมัติ</p>
             <div className="flex flex-wrap gap-2">
               <IconButton
                 type="button"

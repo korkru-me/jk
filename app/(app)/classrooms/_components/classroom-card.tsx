@@ -11,6 +11,7 @@ import { IconButton } from '@/components/ui/icon-button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { ClassroomIcon } from '@/components/classrooms/classroom-icon'
+import { ClassroomCoverPattern } from '@/components/classrooms/classroom-cover-pattern'
 
 interface Props {
   classroom: Classroom
@@ -47,6 +48,10 @@ export function ClassroomCard({
             : 'border-b border-border bg-muted text-foreground',
         )}
       >
+        <ClassroomCoverPattern
+          patternKey={meta.coverPattern}
+          className="pointer-events-none absolute inset-0 size-full opacity-45"
+        />
         {/* Checkbox overlay in selection mode */}
         {isSelecting && (
           <div
@@ -59,7 +64,7 @@ export function ClassroomCard({
           </div>
         )}
         {dragHandle}
-        <div className={cn('pointer-events-none relative min-w-0 flex-1', (isSelecting || dragHandle) && 'ml-10')}>
+        <div className={cn('pointer-events-none relative z-10 min-w-0 flex-1', (isSelecting || dragHandle) && 'ml-10')}>
           <div className="flex min-w-0 items-center gap-2">
             <ClassroomIcon iconKey={meta.iconKey} className="size-5 shrink-0" />
             <p className="truncate text-base font-bold leading-tight">

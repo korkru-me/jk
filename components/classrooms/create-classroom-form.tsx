@@ -18,7 +18,7 @@ export function CreateClassroomForm() {
     if (!name.trim()) { toast.error('กรอกชื่อห้องเรียน'); return }
     startTransition(async () => {
       const res = await createClassroom({ name: name.trim(), description: description.trim() })
-      if (res?.error) toast.error(res.error)
+      if ('error' in res) toast.error(res.error)
     })
   }
 

@@ -1,69 +1,62 @@
 import Link from 'next/link'
 import {
-  BookOpen, Layers, School, Plus, ChevronRight, Users, FileText,
-  ListChecks, PenLine, NotebookPen, ToggleLeft, TextCursorInput,
-  ArrowLeftRight, ListOrdered, Paperclip, Boxes, Table2,
+  ArrowLeftRight,
+  BookOpen,
+  Boxes,
+  ChevronRight,
+  FileText,
+  Layers,
+  ListChecks,
+  ListOrdered,
+  NotebookPen,
+  Paperclip,
+  PenLine,
+  Plus,
+  School,
+  Table2,
+  TextCursorInput,
+  ToggleLeft,
+  Users,
 } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { TYPE_LABEL } from '@/lib/question-display'
-import type { User } from '@/lib/types'
 import type { ClassroomIconKey } from '@/lib/classroom-icons'
+import type { ClassroomCoverPatternKey } from '@/lib/classroom-cover-patterns'
 import { ClassroomIcon } from '@/components/classrooms/classroom-icon'
+import { ClassroomCoverPattern } from '@/components/classrooms/classroom-cover-pattern'
+import { COVER_PRESETS, type CoverPreset } from '@/app/(app)/classrooms/_components/classroom-meta'
 
 /**
- * One decorative accent per section, so ห้องเรียน / แฟ้มโจทย์ / โจทย์ read as
- * three different things at a glance instead of three identical grey lists.
- *
- * These ride on --tint-*, which the design system defines as decoration with
- * no meaning: a preset may recolour them freely, and nothing a teacher reads
- * changes. Semantic tokens (success, warning, flag) are deliberately absent —
- * green here would claim a state that does not exist. Every class is spelled
- * out in full because Tailwind scans source text, not runtime values.
+ * Decorative accents distinguish the three kinds of work without claiming a
+ * semantic status. The tokens are owned by the active visual preset.
  */
 interface Accent {
-  /** Icon chip: tinted fill behind a tinted glyph. */
   chip: string
-  /** Card edge, tinted just enough to tie it to the chip. */
   border: string
-  /** Stripe across the top of the section card. */
-  bar: string
-  /** Row hover wash. */
-  row: string
-  /** Blurred corner glow on a stat card. */
-  glow: string
+  hover: string
 }
 
 const CLASSROOM_ACCENT: Accent = {
   chip: 'bg-tint-1/10 text-tint-1',
   border: 'border-tint-1/25',
-  bar: 'bg-gradient-to-r from-tint-1 to-tint-1/15',
-  row: 'hover:bg-tint-1/5',
-  glow: 'bg-tint-1/25',
+  hover: 'hover:bg-tint-1/5',
 }
 
 const SET_ACCENT: Accent = {
   chip: 'bg-tint-2/10 text-tint-2',
   border: 'border-tint-2/25',
-  bar: 'bg-gradient-to-r from-tint-2 to-tint-2/15',
-  row: 'hover:bg-tint-2/5',
-  glow: 'bg-tint-2/25',
+  hover: 'hover:bg-tint-2/5',
 }
 
 const QUESTION_ACCENT: Accent = {
   chip: 'bg-tint-3/10 text-tint-3',
   border: 'border-tint-3/25',
-  bar: 'bg-gradient-to-r from-tint-3 to-tint-3/15',
-  row: 'hover:bg-tint-3/5',
-  glow: 'bg-tint-3/25',
+  hover: 'hover:bg-tint-3/5',
 }
 
-/**
- * A glyph per question type, so a list of titles is scannable by kind. Labels
- * still come from TYPE_LABEL — the icon is redundant with the text on purpose,
- * never the only carrier of the type.
- */
 const TYPE_ICON: Record<string, React.ElementType> = {
   mcq: ListChecks,
   written: PenLine,
@@ -81,7 +74,11 @@ export interface DashboardClassroom {
   id: string
   name: string
   classroom_type: string
+  cover?: string
+  coverPattern?: ClassroomCoverPatternKey
   iconKey?: ClassroomIconKey
+  gradeLevel?: string
+  academicTerm?: string
   studentCount: number
   assignmentCount: number
 }
@@ -99,7 +96,6 @@ export interface DashboardQuestion {
 }
 
 interface Props {
-  user: Pick<User, 'id' | 'full_name' | 'role'>
   classroomsCount: number
   questionsCount: number
   setsCount: number
@@ -110,151 +106,124 @@ interface Props {
 }
 
 export function TeacherDashboard({
-  user, classroomsCount, questionsCount, setsCount, studentsCount,
-  classrooms, questionSets, questions,
+  classroomsCount,
+  questionsCount,
+  setsCount,
+  studentsCount,
+  classrooms,
+  questionSets,
+  questions,
 }: Props) {
   const isEmpty = classroomsCount === 0 && questionsCount === 0 && setsCount === 0
 
+  if (isEmpty) return <GettingStarted />
+
   return (
-    <div className="space-y-6 max-w-5xl">
-      <div>
-        <h1 className="text-2xl font-bold">สวัสดี, {user.full_name}</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {isEmpty ? 'เริ่มต้นใช้งานได้จากด้านล่าง' : 'ภาพรวมงานสอนของคุณ'}
-        </p>
+    <div className="flex max-w-[1200px] flex-col gap-7">
+      {/* A compact strip keeps useful totals without pushing the actual work
+          below the fold. */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <CompactStatCard
+          href="/classrooms"
+          icon={School}
+          accent={CLASSROOM_ACCENT}
+          value={classroomsCount}
+          label="ห้องเรียน"
+          sub={studentsCount > 0 ? `นักเรียนรวม ${studentsCount} คน` : 'ยังไม่มีนักเรียน'}
+        />
+        <CompactStatCard
+          href="/questions"
+          icon={BookOpen}
+          accent={QUESTION_ACCENT}
+          value={questionsCount}
+          label="โจทย์ในคลัง"
+          sub="โจทย์ที่คุณสร้างเอง"
+        />
+        <CompactStatCard
+          href="/questions/sets"
+          icon={Layers}
+          accent={SET_ACCENT}
+          value={setsCount}
+          label="แฟ้มโจทย์"
+          sub="แฟ้มที่คุณสร้างเอง"
+        />
       </div>
 
-      {isEmpty ? (
-        <GettingStarted />
-      ) : (
-        <>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <StatCard
-              href="/classrooms"
-              icon={School}
-              accent={CLASSROOM_ACCENT}
-              value={classroomsCount}
-              label="ห้องเรียน"
-              sub={studentsCount > 0 ? `นักเรียนรวม ${studentsCount} คน` : 'ยังไม่มีนักเรียน'}
-            />
-            <StatCard
-              href="/questions"
-              icon={BookOpen}
-              accent={QUESTION_ACCENT}
-              value={questionsCount}
-              label="โจทย์ในคลัง"
-              sub="โจทย์ที่คุณสร้างเอง"
-            />
-            <StatCard
-              href="/questions/sets"
+      <DashboardSection
+        title="ห้องเรียนของฉัน"
+        icon={School}
+        accent={CLASSROOM_ACCENT}
+        href="/classrooms"
+        seeAll={classroomsCount > classrooms.length ? `ดูทั้งหมด ${classroomsCount} ห้อง` : 'ดูทั้งหมด'}
+        isEmpty={classrooms.length === 0}
+        emptyText="ยังไม่มีห้องเรียน"
+        emptyAction={{ href: '/classrooms/new', label: 'สร้างห้องเรียนแรก' }}
+      >
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {classrooms.map(classroom => (
+            <ClassroomDashboardCard key={classroom.id} classroom={classroom} />
+          ))}
+        </div>
+      </DashboardSection>
+
+      <DashboardSection
+        title="แฟ้มโจทย์ล่าสุด"
+        icon={Layers}
+        accent={SET_ACCENT}
+        href="/questions/sets"
+        seeAll={setsCount > questionSets.length ? `ดูทั้งหมด ${setsCount} แฟ้ม` : 'ดูทั้งหมด'}
+        isEmpty={questionSets.length === 0}
+        emptyText="ยังไม่มีแฟ้มโจทย์"
+        emptyAction={{ href: '/questions/sets/new', label: 'สร้างแฟ้มโจทย์แรก' }}
+      >
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          {questionSets.map(set => (
+            <CompactResourceCard
+              key={set.id}
+              href={`/questions/sets/${set.id}/edit`}
+              title={set.title}
+              meta={`${set.questionCount} ข้อ`}
               icon={Layers}
               accent={SET_ACCENT}
-              value={setsCount}
-              label="แฟ้มโจทย์"
-              sub="แฟ้มที่คุณสร้างเอง"
             />
-          </div>
+          ))}
+        </div>
+      </DashboardSection>
 
-          <div className="flex flex-wrap gap-2">
-            <Link href="/questions/new" className={cn(buttonVariants({ size: 'sm' }), 'gap-1.5')}>
-              <Plus className="w-3.5 h-3.5" /> สร้างโจทย์
-            </Link>
-            <Link href="/questions/sets/new" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'gap-1.5')}>
-              <Plus className="w-3.5 h-3.5" /> สร้างแฟ้มโจทย์
-            </Link>
-            <Link href="/classrooms/new" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'gap-1.5')}>
-              <Plus className="w-3.5 h-3.5" /> สร้างห้องเรียน
-            </Link>
-          </div>
-
-          <Section
-            title="ห้องเรียนของฉัน"
-            icon={School}
-            accent={CLASSROOM_ACCENT}
-            href="/classrooms"
-            seeAll={classroomsCount > classrooms.length ? `ดูทั้งหมด ${classroomsCount} ห้อง` : 'ดูทั้งหมด'}
-            isEmpty={classrooms.length === 0}
-            emptyText="ยังไม่มีห้องเรียน"
-            emptyAction={{ href: '/classrooms/new', label: 'สร้างห้องเรียนแรก' }}
-          >
-            {classrooms.map(classroom => (
-              <Row
-                key={classroom.id}
-                href={`/classrooms/${classroom.id}`}
-                title={classroom.name}
-                icon={School}
-                iconNode={<ClassroomIcon iconKey={classroom.iconKey} className="size-4" />}
-                accent={CLASSROOM_ACCENT}
-              >
-                <span className="inline-flex items-center gap-1">
-                  <Users className="w-3 h-3" />
-                  {classroom.studentCount} คน
-                </span>
-                {classroom.classroom_type === 'homeroom' ? (
-                  <span>ที่ปรึกษา</span>
-                ) : (
-                  <span className="inline-flex items-center gap-1">
-                    <FileText className="w-3 h-3" />
-                    {classroom.assignmentCount} ชุดข้อสอบ
-                  </span>
-                )}
-              </Row>
-            ))}
-          </Section>
-
-          <Section
-            title="แฟ้มโจทย์ล่าสุด"
-            icon={Layers}
-            accent={SET_ACCENT}
-            href="/questions/sets"
-            seeAll={setsCount > questionSets.length ? `ดูทั้งหมด ${setsCount} แฟ้ม` : 'ดูทั้งหมด'}
-            isEmpty={questionSets.length === 0}
-            emptyText="ยังไม่มีแฟ้มโจทย์"
-            emptyAction={{ href: '/questions/sets/new', label: 'สร้างแฟ้มโจทย์แรก' }}
-          >
-            {questionSets.map(set => (
-              <Row
-                key={set.id}
-                href={`/questions/sets/${set.id}/edit`}
-                title={set.title}
-                icon={Layers}
-                accent={SET_ACCENT}
-              >
-                <span>{set.questionCount} ข้อ</span>
-              </Row>
-            ))}
-          </Section>
-
-          <Section
-            title="โจทย์ล่าสุด"
-            icon={BookOpen}
-            accent={QUESTION_ACCENT}
-            href="/questions"
-            seeAll={questionsCount > questions.length ? `ดูทั้งหมด ${questionsCount} ข้อ` : 'ดูทั้งหมด'}
-            isEmpty={questions.length === 0}
-            emptyText="ยังไม่มีโจทย์ในคลัง"
-            emptyAction={{ href: '/questions/new', label: 'สร้างโจทย์แรก' }}
-          >
-            {questions.map(question => (
-              <Row
-                key={question.id}
-                href={`/questions/${question.id}/edit`}
-                title={question.title}
-                icon={TYPE_ICON[question.question_type] ?? FileText}
-                accent={QUESTION_ACCENT}
-              >
-                <span>{TYPE_LABEL[question.question_type] ?? question.question_type}</span>
-              </Row>
-            ))}
-          </Section>
-        </>
-      )}
+      <DashboardSection
+        title="โจทย์ล่าสุด"
+        icon={BookOpen}
+        accent={QUESTION_ACCENT}
+        href="/questions"
+        seeAll={questionsCount > questions.length ? `ดูทั้งหมด ${questionsCount} ข้อ` : 'ดูทั้งหมด'}
+        isEmpty={questions.length === 0}
+        emptyText="ยังไม่มีโจทย์ในคลัง"
+        emptyAction={{ href: '/questions/new', label: 'สร้างโจทย์แรก' }}
+      >
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          {questions.map(question => (
+            <CompactResourceCard
+              key={question.id}
+              href={`/questions/${question.id}/edit`}
+              title={question.title}
+              meta={TYPE_LABEL[question.question_type] ?? question.question_type}
+              icon={TYPE_ICON[question.question_type] ?? FileText}
+              accent={QUESTION_ACCENT}
+            />
+          ))}
+        </div>
+      </DashboardSection>
     </div>
   )
 }
 
-function StatCard({
-  href, icon: Icon, accent, value, label, sub,
+function CompactStatCard({
+  href,
+  icon: Icon,
+  accent,
+  value,
+  label,
+  sub,
 }: {
   href: string
   icon: React.ElementType
@@ -264,35 +233,42 @@ function StatCard({
   sub: string
 }) {
   return (
-    <Link href={href}>
+    <Link href={href} className="group" data-dashboard-stat-card>
       <Card
         radius="md"
-        padding="md"
+        padding="sm"
         interactive
-        className={cn('h-full relative overflow-hidden', accent.border)}
+        className={cn(
+          'flex min-h-20 flex-col items-center justify-center gap-1.5 p-2 text-center sm:min-h-18 sm:flex-row sm:justify-start sm:gap-3 sm:p-3 sm:text-left',
+          accent.border
+        )}
       >
-        <span
-          aria-hidden
-          className={cn(
-            'pointer-events-none absolute -right-6 -top-6 w-20 h-20 rounded-full blur-2xl',
-            accent.glow
-          )}
-        />
-        <div className="relative">
-          <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center mb-3', accent.chip)}>
-            <Icon className="w-4 h-4" />
-          </div>
-          <p className="text-2xl font-bold leading-none">{value.toLocaleString()}</p>
-          <p className="text-sm mt-1.5">{label}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>
-        </div>
+        <span className={cn('flex size-8 shrink-0 items-center justify-center rounded-lg sm:size-9', accent.chip)}>
+          <Icon className="size-4" aria-hidden="true" />
+        </span>
+        <span className="min-w-0 sm:flex-1">
+          <span className="flex flex-col items-center gap-0.5 sm:flex-row sm:items-baseline sm:gap-2">
+            <strong className="text-lg leading-none sm:text-xl">{value.toLocaleString()}</strong>
+            <span className="text-xs leading-tight font-medium sm:truncate sm:text-sm">{label}</span>
+          </span>
+          <span className="mt-1 hidden truncate text-xs text-muted-foreground sm:block">{sub}</span>
+        </span>
+        <ChevronRight className="hidden size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 sm:block" aria-hidden="true" />
       </Card>
     </Link>
   )
 }
 
-function Section({
-  title, icon: Icon, accent, href, seeAll, isEmpty, emptyText, emptyAction, children,
+function DashboardSection({
+  title,
+  icon: Icon,
+  accent,
+  href,
+  seeAll,
+  isEmpty,
+  emptyText,
+  emptyAction,
+  children,
 }: {
   title: string
   icon: React.ElementType
@@ -305,20 +281,18 @@ function Section({
   children: React.ReactNode
 }) {
   return (
-    <div className="space-y-2">
+    <section className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2 text-sm font-semibold">
-          <span
-            aria-hidden
-            className={cn('w-7 h-7 rounded-lg flex items-center justify-center shrink-0', accent.chip)}
-          >
-            <Icon className="w-4 h-4" />
+        <h2 className="flex items-center gap-2 text-base font-semibold">
+          <span className={cn('flex size-8 shrink-0 items-center justify-center rounded-lg', accent.chip)}>
+            <Icon className="size-4" aria-hidden="true" />
           </span>
           {title}
         </h2>
         {!isEmpty && (
-          <Link href={href} className="text-xs text-primary inline-flex items-center gap-0.5 shrink-0">
-            {seeAll} <ChevronRight className="w-3 h-3" />
+          <Link href={href} className="inline-flex shrink-0 items-center gap-0.5 text-sm text-primary hover:underline">
+            {seeAll}
+            <ChevronRight className="size-4" aria-hidden="true" />
           </Link>
         )}
       </div>
@@ -327,52 +301,107 @@ function Section({
           <p className="text-sm text-muted-foreground">{emptyText}</p>
           <Link
             href={emptyAction.href}
-            className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'gap-1.5 mt-3')}
+            className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'mt-3')}
           >
-            <Plus className="w-3.5 h-3.5" /> {emptyAction.label}
+            <Plus data-icon="inline-start" />
+            {emptyAction.label}
           </Link>
         </Card>
-      ) : (
-        <Card radius="md" padding="none" className={cn('overflow-hidden', accent.border)}>
-          <div aria-hidden className={cn('h-1', accent.bar)} />
-          <div className="divide-y divide-border">{children}</div>
-        </Card>
-      )}
-    </div>
+      ) : children}
+    </section>
   )
 }
 
-function Row({
-  href, title, icon: Icon, iconNode, accent, children,
+function ClassroomDashboardCard({ classroom }: { classroom: DashboardClassroom }) {
+  const cover = dashboardCover(classroom)
+  const isHomeroom = classroom.classroom_type === 'homeroom'
+
+  return (
+    <Card radius="md" className="group overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+      <Link href={`/classrooms/${classroom.id}`} className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <span className={cn('relative block h-20 overflow-hidden border-b', cover.surface, cover.text)}>
+          <ClassroomCoverPattern
+            patternKey={classroom.coverPattern}
+            className="absolute inset-0 size-full opacity-65 transition-transform duration-300 group-hover:scale-[1.03]"
+          />
+        </span>
+        <span className="relative flex min-h-36 flex-col gap-3 px-4 pb-4 pt-8">
+          <span className={cn(
+            'absolute -top-6 left-4 flex size-12 items-center justify-center rounded-2xl border-4 border-card bg-card shadow-sm',
+            cover.text,
+          )}>
+            <ClassroomIcon iconKey={classroom.iconKey} className="size-6" />
+          </span>
+          <span className="flex min-w-0 items-center gap-2">
+            <strong className="min-w-0 flex-1 truncate text-base">{classroom.name}</strong>
+            {isHomeroom && <Badge variant="warning">ที่ปรึกษา</Badge>}
+          </span>
+          {(classroom.gradeLevel || classroom.academicTerm) && (
+            <span className="-mt-2 block truncate text-xs text-muted-foreground">
+              {[classroom.gradeLevel, classroom.academicTerm].filter(Boolean).join(' • ')}
+            </span>
+          )}
+          <span className="flex flex-wrap items-center gap-2">
+            <Badge variant="secondary">
+              <Users aria-hidden="true" />
+              {classroom.studentCount} คน
+            </Badge>
+            {!isHomeroom && (
+              <Badge variant="secondary">
+                <FileText aria-hidden="true" />
+                {classroom.assignmentCount} ชุดข้อสอบ
+              </Badge>
+            )}
+          </span>
+          <span className={cn(buttonVariants({ size: 'sm' }), 'mt-auto w-full')}>
+            เข้าห้องเรียน
+            <ChevronRight data-icon="inline-end" />
+          </span>
+        </span>
+      </Link>
+    </Card>
+  )
+}
+
+function CompactResourceCard({
+  href,
+  title,
+  meta,
+  icon: Icon,
+  accent,
 }: {
   href: string
   title: string
+  meta: string
   icon: React.ElementType
-  iconNode?: React.ReactNode
   accent: Accent
-  children: React.ReactNode
 }) {
   return (
-    <Link href={href} className={cn('flex items-center gap-3 px-4 py-3 transition-colors', accent.row)}>
-      <span
-        aria-hidden
-        className={cn('w-8 h-8 rounded-lg flex items-center justify-center shrink-0', accent.chip)}
-      >
-        {iconNode ?? <Icon className="w-4 h-4" />}
-      </span>
-      {/* The icon chip costs the title about 50px, which on a phone left names
-          truncated to "ก...". Wrapping the meta onto its own line below the
-          title buys that width back instead of hiding what a teacher came to
-          read; from sm up both sit on one line as before. */}
-      <span className="flex-1 min-w-0 flex flex-wrap items-center gap-x-3 gap-y-0.5">
-        <span className="basis-full sm:basis-auto sm:flex-1 min-w-0 truncate text-sm font-medium">
-          {title}
+    <Card radius="md" className={cn('overflow-hidden', accent.border)}>
+      <Link href={href} className={cn('flex min-h-20 items-center gap-3 p-3 transition-colors', accent.hover)}>
+        <span className={cn('flex size-10 shrink-0 items-center justify-center rounded-xl', accent.chip)}>
+          <Icon className="size-5" aria-hidden="true" />
         </span>
-        <span className="flex items-center gap-3 text-xs text-muted-foreground">{children}</span>
-      </span>
-      <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-    </Link>
+        <span className="min-w-0 flex-1">
+          <strong className="block truncate text-sm">{title}</strong>
+          <span className="mt-0.5 block text-xs text-muted-foreground">{meta}</span>
+        </span>
+        <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+      </Link>
+    </Card>
   )
+}
+
+function dashboardCover(classroom: DashboardClassroom): CoverPreset {
+  const saved = COVER_PRESETS.find(preset => preset.id === classroom.cover)
+  if (saved) return saved
+
+  // Legacy rooms with no chosen colour still get a stable automatic colour.
+  // Persisted metadata is untouched; the same room simply hashes to the same
+  // visual every time until the teacher explicitly chooses a theme.
+  let hash = 0
+  for (const character of classroom.id) hash = ((hash << 5) - hash + character.charCodeAt(0)) | 0
+  return COVER_PRESETS[Math.abs(hash) % Math.min(8, COVER_PRESETS.length)]
 }
 
 function GettingStarted() {
@@ -401,35 +430,27 @@ function GettingStarted() {
   ]
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-      {steps.map(step => {
-        const Icon = step.icon
-        return (
-          <Link key={step.href} href={step.href}>
-            <Card
-              radius="md"
-              padding="lg"
-              interactive
-              className={cn('h-full relative overflow-hidden', step.accent.border)}
-            >
-              <span
-                aria-hidden
-                className={cn(
-                  'pointer-events-none absolute -right-6 -top-6 w-20 h-20 rounded-full blur-2xl',
-                  step.accent.glow
-                )}
-              />
-              <div className="relative">
-                <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center mb-3', step.accent.chip)}>
-                  <Icon className="w-4 h-4" />
-                </div>
-                <p className="text-sm font-semibold">{step.title}</p>
-                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{step.desc}</p>
-              </div>
-            </Card>
-          </Link>
-        )
-      })}
+    <div className="flex max-w-[1200px] flex-col gap-4">
+      <div>
+        <h1 className="text-xl font-bold">เริ่มต้นใช้งาน</h1>
+        <p className="mt-1 text-sm text-muted-foreground">เลือกสิ่งที่คุณอยากสร้างก่อน</p>
+      </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {steps.map(step => {
+          const Icon = step.icon
+          return (
+            <Link key={step.href} href={step.href}>
+              <Card radius="md" padding="lg" interactive className={cn('h-full', step.accent.border)}>
+                <span className={cn('flex size-9 items-center justify-center rounded-lg', step.accent.chip)}>
+                  <Icon className="size-4" aria-hidden="true" />
+                </span>
+                <p className="mt-3 text-sm font-semibold">{step.title}</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{step.desc}</p>
+              </Card>
+            </Link>
+          )
+        })}
+      </div>
     </div>
   )
 }
