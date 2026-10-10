@@ -164,6 +164,7 @@ export function ClassroomSettingsDialog({
             >
               <ClassroomCoverPattern
                 patternKey={meta.coverPattern}
+                placement="end"
                 className="pointer-events-none absolute inset-0 size-full opacity-55"
               />
               <ClassroomIcon iconKey={meta.iconKey} className="relative z-10 mr-3 size-7 shrink-0" />

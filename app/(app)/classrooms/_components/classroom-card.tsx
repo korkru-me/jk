@@ -50,6 +50,7 @@ export function ClassroomCard({
       >
         <ClassroomCoverPattern
           patternKey={meta.coverPattern}
+          placement="end"
           className="pointer-events-none absolute inset-0 size-full opacity-45"
         />
         {/* Checkbox overlay in selection mode */}

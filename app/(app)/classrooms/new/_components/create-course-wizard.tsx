@@ -38,7 +38,7 @@ import {
 const wizardSchema = z.object({
   classroomType:   z.enum(['subject', 'homeroom']),
   cover:           z.string(),
-  coverPattern:    z.custom<ClassroomCoverPatternKey>(isClassroomCoverPatternKey, 'กรุณาเลือกลวดลายปกจากตัวเลือกที่มี'),
+  coverPattern:    z.custom<ClassroomCoverPatternKey>(isClassroomCoverPatternKey, 'กรุณาเลือกภาพปกจากตัวเลือกที่มี'),
   iconKey:         z.custom<ClassroomIconKey>(isClassroomIconKey, 'กรุณาเลือกไอคอนจากตัวเลือกที่มี'),
   name:            z.string().min(1, 'กรุณากรอกชื่อห้องเรียน').max(100, 'ชื่อห้องเรียนไม่เกิน 100 ตัวอักษร'),
   description:     z.string().max(500, 'คำอธิบายไม่เกิน 500 ตัวอักษร'),

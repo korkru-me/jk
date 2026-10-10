@@ -257,6 +257,7 @@ export function ClassroomDetailClient({
       >
         <ClassroomCoverPattern
           patternKey={classroomMeta.coverPattern}
+          placement="end"
           className="pointer-events-none absolute inset-0 size-full opacity-35"
         />
         <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

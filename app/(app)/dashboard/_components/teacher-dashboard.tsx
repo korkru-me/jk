@@ -322,6 +322,7 @@ function ClassroomDashboardCard({ classroom }: { classroom: DashboardClassroom }
         <span className={cn('relative block h-20 overflow-hidden border-b', cover.surface, cover.text)}>
           <ClassroomCoverPattern
             patternKey={classroom.coverPattern}
+            placement="end"
             className="absolute inset-0 size-full opacity-65 transition-transform duration-300 group-hover:scale-[1.03]"
           />
         </span>
