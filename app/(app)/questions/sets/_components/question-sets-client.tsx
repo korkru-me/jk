@@ -6,9 +6,11 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Plus, Search, Layers, Trash2, Send, Download, Users, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { IconButton } from '@/components/ui/icon-button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input } from '@/components/ui/input'
+import { Separator } from '@/components/ui/separator'
 import { deleteQuestionSet } from '@/lib/actions/question-sets'
 import { exportQuestionSet } from '@/lib/actions/question-export'
 import { downloadTextFile, cn } from '@/lib/utils'
@@ -59,7 +61,7 @@ export function QuestionSetsClient({
   const filteredTeam = useMemo(() => teamSets.filter(matches), [teamSets, search])
 
   return (
-    <div className="space-y-4 max-w-[1200px]">
+    <div className="flex max-w-[1200px] flex-col gap-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="min-w-0">
           <h1 className="text-xl font-bold text-foreground">คลังแฟ้มโจทย์</h1>
@@ -71,11 +73,9 @@ export function QuestionSetsClient({
             className="gap-2"
             onImported={() => router.refresh()}
           />
-          <Link href="/questions/sets/new">
-            <Button className="gap-2 shadow-sm">
-              <Plus className="w-4 h-4" /> สร้างแฟ้มโจทย์ใหม่
-            </Button>
-          </Link>
+          <Button render={<Link href="/questions/sets/new" />} className="shadow-sm">
+            <Plus data-icon="inline-start" /> สร้างแฟ้มโจทย์ใหม่
+          </Button>
         </div>
       </div>
 
@@ -92,6 +92,7 @@ export function QuestionSetsClient({
               <button
                 key={opt.value}
                 onClick={() => setScope(opt.value)}
+                aria-pressed={scope === opt.value}
                 className={cn(
                   'flex items-center gap-1.5 rounded-md px-2.5 h-[26px] text-sm font-medium transition-all',
                   scope === opt.value ? 'bg-background text-foreground shadow-sm' : 'text-foreground/60 hover:text-foreground/80'
@@ -115,6 +116,7 @@ export function QuestionSetsClient({
             <div className="relative flex-1 min-w-48 max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
+                aria-label="ค้นหาชื่อแฟ้มโจทย์"
                 placeholder="ค้นหาชื่อแฟ้มโจทย์..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
@@ -124,7 +126,7 @@ export function QuestionSetsClient({
           </div>
 
           {(scope === 'all' || scope === 'mine') && (
-            <div className="space-y-3">
+            <div className="flex flex-col gap-3">
               {scope === 'all' && <h2 className="text-sm font-semibold text-muted-foreground">แฟ้มโจทย์ของฉัน</h2>}
               {mySets.length === 0 ? (
                 <p className="text-sm text-muted-foreground">ยังไม่มีแฟ้มโจทย์ของคุณ</p>
@@ -134,7 +136,7 @@ export function QuestionSetsClient({
                   <p className="text-muted-foreground font-medium">ไม่พบแฟ้มโจทย์ที่ตรงกัน</p>
                 </Card>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-4">
                   {filteredMine.map(set => <SetCard key={set.id} set={set} currentUserId={currentUserId} />)}
                 </div>
               )}
@@ -142,7 +144,7 @@ export function QuestionSetsClient({
           )}
 
           {(scope === 'all' || scope === 'team') && (
-            <div className="space-y-3">
+            <div className="flex flex-col gap-3">
               {scope === 'all' && <h2 className="text-sm font-semibold text-muted-foreground">แฟ้มโจทย์ที่แชร์ในทีม</h2>}
               {teamSets.length === 0 ? (
                 <p className="text-sm text-muted-foreground">ยังไม่มีแฟ้มโจทย์ที่ทีมแชร์ไว้</p>
@@ -152,7 +154,7 @@ export function QuestionSetsClient({
                   <p className="text-muted-foreground font-medium">ไม่พบแฟ้มโจทย์ที่ตรงกัน</p>
                 </Card>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-4">
                   {filteredTeam.map(set => <SetCard key={set.id} set={set} currentUserId={currentUserId} />)}
                 </div>
               )}
@@ -187,7 +189,10 @@ function SetCard({ set, currentUserId }: { set: QuestionSetSummaryWithCreator; c
     startTransition(async () => {
       const res = await deleteQuestionSet(set.id)
       if (res?.error) toast.error(res.error)
-      else setDeleted(true)
+      else {
+        toast.success('ลบแฟ้มโจทย์แล้ว')
+        setDeleted(true)
+      }
     })
   }
 
@@ -204,10 +209,12 @@ function SetCard({ set, currentUserId }: { set: QuestionSetSummaryWithCreator; c
 
   return (
     <Card
-      edge="ring"
-      padding="md"
+      edge="border"
+      radius="md"
+      elevation="sm"
       interactive
-      className="group relative flex flex-col gap-3 transition-colors hover:ring-primary/30 focus-within:ring-primary/30"
+      data-question-set-card
+      className="group relative flex flex-col overflow-hidden focus-within:ring-3 focus-within:ring-ring/50"
     >
       {/* The whole card is the link, laid over the content rather than wrapped
           around it: an <a> around the footer would swallow its buttons and
@@ -215,38 +222,51 @@ function SetCard({ set, currentUserId }: { set: QuestionSetSummaryWithCreator; c
       <Link
         href={cardHref}
         aria-label={`${cardAction} ${set.title}`}
-        className="absolute inset-0 rounded-2xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="absolute inset-0 z-10 rounded-[inherit] outline-none"
       />
 
-      <div className="flex items-start gap-3">
-        <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-          <Layers className="w-4 h-4 text-primary" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="font-semibold text-foreground text-sm truncate transition-colors group-hover:text-primary">
-            {set.title}
-          </p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {sections.length > 0 && <>{sections.length} แฟ้มย่อย · </>}
-            {questionCount} ข้อ
-          </p>
+      <div className="relative overflow-hidden border-b border-primary/10 bg-primary/5 p-4">
+        <Layers
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-3 -bottom-6 size-24 text-primary/5 transition-transform group-hover:-translate-y-1 group-hover:rotate-3"
+        />
+        <div className="relative flex items-start gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-card text-primary shadow-sm">
+            <Layers className="size-5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h3 className="line-clamp-2 text-base leading-snug font-semibold text-foreground transition-colors group-hover:text-primary">
+              {set.title}
+            </h3>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <Badge variant="secondary">{questionCount} ข้อ</Badge>
+              {sections.length > 0 && (
+                <Badge variant="outline">{sections.length} แฟ้มย่อย</Badge>
+              )}
+            </div>
+          </div>
+          <ChevronDown
+            aria-hidden="true"
+            className="mt-1 size-4 shrink-0 -rotate-90 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary"
+          />
         </div>
       </div>
 
-      <div className="flex-1 space-y-2">
-        {set.description && (
-          <p className="text-xs text-muted-foreground line-clamp-2">{set.description}</p>
-        )}
+      <div className="relative flex flex-1 flex-col gap-3 p-4">
+        <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">
+          {set.description
+            || (isOwner ? 'เปิดแฟ้มเพื่อเพิ่มรายละเอียดและจัดลำดับโจทย์' : 'แฟ้มที่ทีมแชร์ไว้ พร้อมนำไปมอบหมายให้ห้องเรียน')}
+        </p>
 
         {sections.length > 0 && (
           <div className="flex items-center gap-1.5 flex-wrap">
             {sections.slice(0, 3).map(section => (
-              <span key={section.id} className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+              <Badge key={section.id} variant="secondary" className="max-w-36 truncate">
                 {section.title || 'ไม่ได้ตั้งชื่อ'}
-              </span>
+              </Badge>
             ))}
             {sections.length > 3 && (
-              <span className="text-[11px] text-muted-foreground">+{sections.length - 3}</span>
+              <Badge variant="outline">+{sections.length - 3}</Badge>
             )}
           </div>
         )}
@@ -254,36 +274,38 @@ function SetCard({ set, currentUserId }: { set: QuestionSetSummaryWithCreator; c
         {(set.organizations?.name || set.shared_org_names?.length || (!isOwner && set.users?.full_name)) && (
           <div className="flex items-center gap-1.5 flex-wrap">
             {set.organizations?.name && (
-              <span className="text-[11px] px-2 py-0.5 rounded-full bg-tint-1/10 text-tint-1">
+              <Badge variant="outline">
                 {set.organizations.name}
-              </span>
+              </Badge>
             )}
             {set.shared_org_names?.map((name) => (
-              <span key={name} className="text-[11px] px-2 py-0.5 rounded-full bg-tint-2/10 text-tint-2">
+              <Badge key={name} variant="secondary">
                 + {name}
-              </span>
+              </Badge>
             ))}
             {!isOwner && set.users?.full_name && (
-              <span className="text-[11px] text-muted-foreground">โดย {set.users.full_name}</span>
+              <span className="text-xs text-muted-foreground">โดย {set.users.full_name}</span>
             )}
           </div>
         )}
       </div>
 
-      <div className="relative z-10 flex items-center gap-2 pt-3 border-t border-border">
+      <Separator />
+      <div className="relative z-20 flex items-center gap-2 bg-muted/30 p-3">
         <div className="flex flex-1 min-w-0">
           <Button
             render={<Link href={assignHref} />}
+            aria-label={`มอบหมายแฟ้มโจทย์ ${set.title}`}
             className={cn('flex-1 min-w-0 gap-1.5', sections.length > 0 && 'rounded-r-none')}
           >
-            <Send className="w-3.5 h-3.5" /> มอบหมาย
+            <Send data-icon="inline-start" /> มอบหมาย
           </Button>
           {sections.length > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger
-                render={<Button className="rounded-l-none border-l border-primary-foreground/20 px-2" aria-label="เลือกแฟ้มย่อยที่จะมอบหมาย" />}
+                render={<Button className="rounded-l-none border-l border-primary-foreground/20 px-2" aria-label={`เลือกแฟ้มย่อยจาก ${set.title} ที่จะมอบหมาย`} />}
               >
-                <ChevronDown className="w-3.5 h-3.5" />
+                <ChevronDown />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuGroup>
@@ -309,22 +331,22 @@ function SetCard({ set, currentUserId }: { set: QuestionSetSummaryWithCreator; c
         {isOwner && (
           <>
             {/* Keeps ดาวน์โหลด/ลบ from reading as one control with มอบหมาย. */}
-            <span aria-hidden className="w-px h-5 bg-border shrink-0" />
+            <Separator orientation="vertical" className="mx-0.5" />
             <IconButton
-              label="ดาวน์โหลดเป็นไฟล์ (ส่งให้ครูต่างโรงเรียน)"
+              label={`ดาวน์โหลดแฟ้มโจทย์ ${set.title} เป็นไฟล์`}
               onClick={handleExport}
               disabled={isPending}
-              className="text-muted-foreground/60 hover:text-primary"
+              className="text-muted-foreground hover:text-primary"
             >
-              <Download className="w-4 h-4" />
+              <Download />
             </IconButton>
             <IconButton
-              label="ลบแฟ้มโจทย์"
+              label={`ลบแฟ้มโจทย์ ${set.title}`}
               onClick={() => setConfirmingDelete(true)}
               disabled={isPending}
-              className="text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10"
+              className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
             >
-              <Trash2 className="w-4 h-4" />
+              <Trash2 />
             </IconButton>
           </>
         )}
@@ -335,7 +357,7 @@ function SetCard({ set, currentUserId }: { set: QuestionSetSummaryWithCreator; c
         onOpenChange={setConfirmingDelete}
         title={`ลบแฟ้มโจทย์ “${set.title}”?`}
         description={
-          <span className="space-y-2 block">
+          <span className="flex flex-col gap-2">
             <span className="block">แฟ้มนี้จะถูกลบถาวร กู้คืนไม่ได้</span>
             <span className="block">
               โจทย์ {questionCount} ข้อข้างในยังอยู่ในคลังโจทย์ และงานที่มอบหมายไปแล้วจากแฟ้มนี้ไม่ได้รับผลกระทบ
@@ -360,11 +382,9 @@ function EmptyState() {
       <p className="text-sm text-muted-foreground mb-6 max-w-xs mx-auto">
         รวมโจทย์จากคลังไว้ในแฟ้ม แล้วนำไปมอบหมายให้ห้องเรียนได้ทีหลัง
       </p>
-      <Link href="/questions/sets/new">
-        <Button className="gap-2 shadow-sm">
-          <Plus className="w-4 h-4" /> สร้างแฟ้มโจทย์แรก
-        </Button>
-      </Link>
+      <Button render={<Link href="/questions/sets/new" />} className="shadow-sm">
+        <Plus data-icon="inline-start" /> สร้างแฟ้มโจทย์แรก
+      </Button>
     </Card>
   )
 }
