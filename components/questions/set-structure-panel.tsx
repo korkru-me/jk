@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import {
   Plus, ChevronUp, ChevronDown, MoreVertical, Folder, FolderOpen, X, Layers, Search, Eye, Edit2,
@@ -433,9 +433,11 @@ function SectionDialog({
   onSaveBeforeEdit?: () => Promise<boolean>
 }) {
   const router = useRouter()
+  const titleInputRef = useRef<HTMLInputElement>(null)
   const [search, setSearch] = useState('')
   const [draftTitle, setDraftTitle] = useState('')
   const [draftIds, setDraftIds] = useState<string[]>([])
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false)
   const [previewQ, setPreviewQ] = useState<PreviewQuestion | null>(null)
   const [previewLoadingId, setPreviewLoadingId] = useState<string | null>(null)
   const [leavingId, setLeavingId] = useState<string | null>(null)
@@ -457,6 +459,11 @@ function SectionDialog({
   const added = draftIds.filter(id => !baselineIds.includes(id))
   const removed = baselineIds.filter(id => !draftIds.includes(id))
   const titleChanged = draftTitle.trim() !== baselineTitle
+  // Closing a dialog should protect everything the teacher can see disappear,
+  // including title whitespace that cannot be confirmed but may still be an
+  // unfinished thought. Membership has no order of its own, so added/removed
+  // is the exact dirty check for the ticks.
+  const draftDirty = draftTitle !== baselineTitle || added.length > 0 || removed.length > 0
   const canConfirm = isNew || added.length > 0 || removed.length > 0 || titleChanged
 
   /**
@@ -470,6 +477,19 @@ function SectionDialog({
    */
   const hasPendingChanges = isNew || added.length > 0 || removed.length > 0 || titleChanged
   const canEditQuestions = !!setId && !!onSaveBeforeEdit
+
+  function requestClose() {
+    if (draftDirty) {
+      setConfirmingDiscard(true)
+      return
+    }
+    onCancel()
+  }
+
+  function discardDraft() {
+    setConfirmingDiscard(false)
+    onCancel()
+  }
 
   async function openPreview(id: string) {
     setPreviewLoadingId(id)
@@ -509,7 +529,8 @@ function SectionDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={o => { if (!o) onCancel() }}>
+    <>
+    <Dialog open={open} onOpenChange={o => { if (!o) requestClose() }}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader className="min-w-0">
           <DialogTitle className="flex items-center gap-2">
@@ -523,6 +544,7 @@ function SectionDialog({
         <div className="space-y-1.5 min-w-0">
           <Label htmlFor="section-title">ชื่อแฟ้มย่อย</Label>
           <Input
+            ref={titleInputRef}
             id="section-title"
             autoFocus={isNew}
             value={draftTitle}
@@ -664,7 +686,7 @@ function SectionDialog({
             )}
           </span>
           <span className="flex items-center gap-2">
-            <Button type="button" variant="outline" onClick={onCancel}>ยกเลิก</Button>
+            <Button type="button" variant="outline" onClick={requestClose}>ยกเลิก</Button>
             <Button
               type="button"
               disabled={!canConfirm}
@@ -690,5 +712,20 @@ function SectionDialog({
         )}
       </DialogContent>
     </Dialog>
+
+    <ConfirmDialog
+      open={confirmingDiscard}
+      onOpenChange={setConfirmingDiscard}
+      title="ออกโดยไม่ยืนยันการเปลี่ยนแปลง?"
+      description={isNew
+        ? 'ชื่อแฟ้มย่อยหรือโจทย์ที่เลือกไว้ยังไม่ได้กด “สร้างแฟ้มย่อย” หากออกตอนนี้ ข้อมูลที่กรอกและเลือกไว้จะหายไป'
+        : 'การแก้ชื่อหรือรายการโจทย์ยังไม่ได้กด “ยืนยัน” หากออกตอนนี้ การเปลี่ยนแปลงครั้งนี้จะหายไป'}
+      confirmLabel="ออกโดยไม่บันทึก"
+      cancelLabel={isNew ? 'กลับไปสร้างต่อ' : 'กลับไปแก้ไขต่อ'}
+      variant="destructive"
+      onConfirm={discardDraft}
+      finalFocus={titleInputRef}
+    />
+    </>
   )
 }

@@ -1,11 +1,15 @@
 'use client'
 
+import { useState } from 'react'
 import { QuestionSetsClient } from '@/app/(app)/questions/sets/_components/question-sets-client'
 import type {
   QuestionSetSummary,
   QuestionSetSummaryWithCreator,
 } from '@/app/(app)/questions/sets/page'
 import { Card } from '@/components/ui/card'
+import { SetStructurePanel, type PanelQuestion } from '@/components/questions/set-structure-panel'
+import type { QuestionSetSection } from '@/lib/question-set-sections'
+import type { QuestionCardData } from '@/lib/question-card-data'
 
 const LAB_USER = '00000000-0000-4000-8000-000000000001'
 
@@ -65,7 +69,44 @@ const TEAM_SETS: QuestionSetSummaryWithCreator[] = [
   },
 ]
 
+const STRUCTURE_QUESTIONS: PanelQuestion[] = [
+  {
+    id: '00000000-0000-4000-8000-000000000091',
+    title: 'งาน ง่าย งานติดลบ',
+    question_text: '<p>โจทย์จำลองเรื่องงานและพลังงาน</p>',
+    question_type: 'written',
+    difficulty: 'medium',
+    tags: ['อัตนัย'],
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000092',
+    title: 'พลังงาน อนุรักษ์ โยนวัตถุ หาความสูง',
+    question_text: '<p>โจทย์จำลองเรื่องกฎอนุรักษ์พลังงาน</p>',
+    question_type: 'written',
+    difficulty: 'medium',
+    tags: ['อัตนัย'],
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000093',
+    title: 'พลังงาน อนุรักษ์ ปล่อยวัตถุ หาอัตราเร็ว',
+    question_text: '<p>โจทย์จำลองเรื่องพลังงานจลน์</p>',
+    question_type: 'mcq',
+    difficulty: 'easy',
+    tags: [],
+  },
+]
+
+const STRUCTURE_CARD_DATA: QuestionCardData = {
+  details: Object.fromEntries(STRUCTURE_QUESTIONS.map(question => [question.id, {
+    subject: 'ฟิสิกส์', category: 'งานและพลังงาน', group_id: null, order_in_group: null,
+  }])),
+  stats: {}, duplicateCounts: {}, subQuestionCounts: {}, setMemberships: {}, solutionPresence: {},
+}
+const STRUCTURE_QUESTION_IDS = STRUCTURE_QUESTIONS.map(question => question.id)
+
 export function QuestionSetsLabClient() {
+  const [structureSections, setStructureSections] = useState<QuestionSetSection[]>([])
+
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-4 p-4 sm:p-6">
       <Card padding="md" radius="md" className="flex flex-col gap-1">
@@ -86,6 +127,23 @@ export function QuestionSetsLabClient() {
             พื้นที่คลังโจทย์จำลอง — การตรวจรอบนี้เน้นเฉพาะการ์ดแฟ้มโจทย์
           </Card>
         )}
+      />
+
+      <Card padding="md" radius="md" className="space-y-1">
+        <h2 className="font-semibold">ห้องทดลองร่างแฟ้มย่อย</h2>
+        <p className="text-sm text-muted-foreground">
+          ใช้ตรวจการเตือนเมื่อปิดหน้าต่างที่กรอกชื่อหรือติ๊กโจทย์ไว้ โดยข้อมูลอยู่ในหน่วยความจำของแท็บเท่านั้น
+        </p>
+      </Card>
+      <SetStructurePanel
+        questions={STRUCTURE_QUESTIONS}
+        questionIds={STRUCTURE_QUESTION_IDS}
+        sections={structureSections}
+        onChange={next => setStructureSections(next.sections)}
+        onAddQuestions={() => {}}
+        allTags={['อัตนัย']}
+        myTeams={[]}
+        initialCardData={STRUCTURE_CARD_DATA}
       />
     </main>
   )
