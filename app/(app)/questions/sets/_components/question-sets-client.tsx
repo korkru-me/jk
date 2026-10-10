@@ -136,7 +136,7 @@ export function QuestionSetsClient({
                   <p className="text-muted-foreground font-medium">ไม่พบแฟ้มโจทย์ที่ตรงกัน</p>
                 </Card>
               ) : (
-                <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-4">
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-3">
                   {filteredMine.map(set => <SetCard key={set.id} set={set} currentUserId={currentUserId} />)}
                 </div>
               )}
@@ -154,7 +154,7 @@ export function QuestionSetsClient({
                   <p className="text-muted-foreground font-medium">ไม่พบแฟ้มโจทย์ที่ตรงกัน</p>
                 </Card>
               ) : (
-                <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-4">
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-3">
                   {filteredTeam.map(set => <SetCard key={set.id} set={set} currentUserId={currentUserId} />)}
                 </div>
               )}
@@ -225,20 +225,20 @@ function SetCard({ set, currentUserId }: { set: QuestionSetSummaryWithCreator; c
         className="absolute inset-0 z-10 rounded-[inherit] outline-none"
       />
 
-      <div className="relative overflow-hidden border-b border-primary/10 bg-primary/5 p-4">
+      <div className="relative overflow-hidden border-b border-primary/10 bg-primary/5 p-3">
         <Layers
           aria-hidden="true"
-          className="pointer-events-none absolute -right-3 -bottom-6 size-24 text-primary/5 transition-transform group-hover:-translate-y-1 group-hover:rotate-3"
+          className="pointer-events-none absolute -right-2 -bottom-5 size-20 text-primary/5 transition-transform group-hover:-translate-y-1 group-hover:rotate-3"
         />
-        <div className="relative flex items-start gap-3">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-card text-primary shadow-sm">
-            <Layers className="size-5" aria-hidden="true" />
+        <div className="relative flex items-start gap-2.5">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-card text-primary shadow-sm">
+            <Layers className="size-4" aria-hidden="true" />
           </span>
           <div className="min-w-0 flex-1">
-            <h3 className="line-clamp-2 text-base leading-snug font-semibold text-foreground transition-colors group-hover:text-primary">
+            <h3 title={set.title} className="truncate text-base leading-snug font-semibold text-foreground transition-colors group-hover:text-primary">
               {set.title}
             </h3>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <div className="mt-1.5 flex flex-wrap items-center gap-1">
               <Badge variant="secondary">{questionCount} ข้อ</Badge>
               {sections.length > 0 && (
                 <Badge variant="outline">{sections.length} แฟ้มย่อย</Badge>
@@ -252,27 +252,29 @@ function SetCard({ set, currentUserId }: { set: QuestionSetSummaryWithCreator; c
         </div>
       </div>
 
-      <div className="relative flex flex-1 flex-col gap-3 p-4">
-        <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">
-          {set.description
-            || (isOwner ? 'เปิดแฟ้มเพื่อเพิ่มรายละเอียดและจัดลำดับโจทย์' : 'แฟ้มที่ทีมแชร์ไว้ พร้อมนำไปมอบหมายให้ห้องเรียน')}
-        </p>
+      <div className="relative flex flex-1 flex-col justify-center gap-1.5 p-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <p className="min-w-0 flex-1 truncate text-sm leading-snug text-muted-foreground">
+            {set.description
+              || (isOwner ? 'เปิดแฟ้มเพื่อเพิ่มรายละเอียดและจัดลำดับโจทย์' : 'แฟ้มที่ทีมแชร์ไว้ พร้อมนำไปมอบหมายให้ห้องเรียน')}
+          </p>
 
-        {sections.length > 0 && (
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {sections.slice(0, 3).map(section => (
-              <Badge key={section.id} variant="secondary" className="max-w-36 truncate">
-                {section.title || 'ไม่ได้ตั้งชื่อ'}
-              </Badge>
-            ))}
-            {sections.length > 3 && (
-              <Badge variant="outline">+{sections.length - 3}</Badge>
-            )}
-          </div>
-        )}
+          {sections.length > 0 && (
+            <div className="flex max-w-[52%] shrink-0 items-center gap-1 overflow-hidden">
+              {sections.slice(0, 1).map(section => (
+                <Badge key={section.id} variant="secondary" className="min-w-0 max-w-24 truncate">
+                  {section.title || 'ไม่ได้ตั้งชื่อ'}
+                </Badge>
+              ))}
+              {sections.length > 1 && (
+                <Badge variant="outline">+{sections.length - 1}</Badge>
+              )}
+            </div>
+          )}
+        </div>
 
         {(set.organizations?.name || set.shared_org_names?.length || (!isOwner && set.users?.full_name)) && (
-          <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="flex flex-wrap items-center gap-1">
             {set.organizations?.name && (
               <Badge variant="outline">
                 {set.organizations.name}
@@ -291,7 +293,7 @@ function SetCard({ set, currentUserId }: { set: QuestionSetSummaryWithCreator; c
       </div>
 
       <Separator />
-      <div className="relative z-20 flex items-center gap-2 bg-muted/30 p-3">
+      <div className="relative z-20 flex items-center gap-1.5 bg-muted/30 p-2">
         <div className="flex flex-1 min-w-0">
           <Button
             render={<Link href={assignHref} />}
