@@ -16,7 +16,7 @@ import type {
 import { coverOf, parseDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { SidebarButton, useSidebarCompact } from '@/components/layout/sidebar-display'
+import { SidebarButton, SidebarSectionLabel, useSidebarCompact } from '@/components/layout/sidebar-display'
 import { AssignmentCreationMenu } from '@/components/assignments/assignment-creation-menu'
 import {
   DropdownMenu,
@@ -82,7 +82,7 @@ export function ClassroomContextNavigation({
       <DropdownMenu>
       <div className={cn(
         'flex items-center gap-3 rounded-lg border p-3',
-        compact && 'md:flex-col md:gap-1 md:p-1',
+        compact && 'md:relative md:justify-center',
         cover ? cn(cover.surface, cover.text) : 'border-primary/20 bg-primary/5',
       )} title={classroom.name}>
         <div className={cn(
@@ -96,7 +96,7 @@ export function ClassroomContextNavigation({
         {compact && canSwitchClassroom && (
           <DropdownMenuTrigger
             id={`${switcherId}-icon`}
-            render={<Button type="button" variant="ghost" size="icon" className="hidden transition-colors md:inline-flex" aria-label="สลับไปห้องเรียนอื่น" title="สลับไปห้องเรียนอื่น" />}
+            render={<Button type="button" variant="ghost" size="icon" className="hidden transition-colors md:absolute md:left-1/2 md:top-1/2 md:inline-flex md:-translate-x-1/2 md:-translate-y-1/2" aria-label="สลับไปห้องเรียนอื่น" title="สลับไปห้องเรียนอื่น" />}
           >
             <ClassroomIcon iconKey={meta.iconKey} />
           </DropdownMenuTrigger>
@@ -108,6 +108,9 @@ export function ClassroomContextNavigation({
             {subtitle || (classroom.classroom_type === 'homeroom' ? 'ห้องโฮมรูม' : 'ห้องเรียนวิชา')}
           </p>
         </div>
+        {compact && (
+          <div aria-hidden="true" className="hidden h-12 w-0 shrink-0 md:block" />
+        )}
         {canSwitchClassroom && (
           <>
             <DropdownMenuTrigger
@@ -177,9 +180,9 @@ export function ClassroomContextNavigation({
 
       <Separator />
 
-      <div id={navigationHeadingId} className={cn('px-2 text-xs font-medium text-muted-foreground', compact && 'md:sr-only')}>
+      <SidebarSectionLabel id={navigationHeadingId} className="px-2 text-xs font-medium text-muted-foreground">
         เมนูห้องเรียน
-      </div>
+      </SidebarSectionLabel>
       <nav aria-labelledby={navigationHeadingId} className="flex flex-col gap-1">
         {navigationItems.map(item => {
           const Icon = CLASSROOM_NAVIGATION_ICONS[item.key]
@@ -222,9 +225,9 @@ export function ClassroomContextNavigation({
       {managementActions && (
         <section aria-labelledby={managementHeadingId} className="flex flex-col gap-2">
           <Separator />
-          <div id={managementHeadingId} className={cn('px-2 text-xs font-medium text-muted-foreground', compact && 'md:sr-only')}>
+          <SidebarSectionLabel id={managementHeadingId} className="px-2 text-xs font-medium text-muted-foreground">
             จัดการห้องเรียน
-          </div>
+          </SidebarSectionLabel>
           {managementActions}
         </section>
       )}

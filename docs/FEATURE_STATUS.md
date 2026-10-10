@@ -1,5 +1,10 @@
 # Feature status
 
+### ตรึงตำแหน่งไอคอน sidebar ระหว่างย่อและขยาย (10 ตุลาคม 2026)
+
+- **UI-050** — icon rail บน desktop ซ่อนเฉพาะข้อความและจัดไอคอนเข้ากึ่งกลางในแกน X โดยยังสงวน padding, ความสูงการ์ดห้องปัจจุบัน, หัวข้อหมวด และความสูงแถวเมนูเท่ากับ panel เต็ม ตำแหน่งกึ่งกลางไอคอนในแกน Y จึงไม่กระโดดเมื่อกด hamburger หรือชี้ rail เพื่อเปิด overlay preview; mobile drawer และ navigation/permission behavior เดิมไม่เปลี่ยน
+- local Chrome fixture ที่ `/exam-screen-lab/classroom-icons` วัดไอคอนเมนูตั้งแต่ “ภาพรวม” ถึง “เมนูหลัก” ได้ค่า Y ตรงกันทุกพิกเซลในโหมดย่อ, panel เต็ม และ hover preview พร้อมตรวจภาพทั้ง rail/panel แล้วไม่พบ browser หรือ Next.js runtime/compilation error; axe ของ sidebar ไม่พบ violation และ design-token lint ผ่าน · repo-wide TypeScript ยังหยุดที่ 4 errors เดิมใน `create-classroom-modal.tsx` และ `create-classroom-form.tsx` ส่วน production build ใน sandbox นี้ดึง Google Fonts ไม่ได้และเมื่ออนุญาต network แล้ว Turbopack ยังถูก environment ปฏิเสธการ bind port จึงไม่ได้ยืนยัน build รอบนี้ ไม่มี migration และ fixture ไม่เขียน Supabase
+
 ### ขยายเมนูด้านซ้ายแบบ overlay เมื่อชี้ icon rail (8 ตุลาคม 2026)
 
 - **UI-049** — เมื่อ sidebar อยู่ในสถานะย่อบน desktop การ hover ที่ icon rail จะเปิด label และ contextual action ทั้งแผงเป็น overlay `w-64` เหนือเนื้อหา โดย outer flex slot ยังคง `w-20` จึงไม่ดัน main content; เมื่อ pointer ออกจากแถบจะหุบทันที ส่วนการกด hamburger ยังเป็นวิธีเดียวที่ปักหมุดแถบเต็ม จำสถานะใน localStorage และขยาย layout จริง · mobile drawer, backdrop, Escape, contextual registry และสิทธิ์ไม่เปลี่ยน

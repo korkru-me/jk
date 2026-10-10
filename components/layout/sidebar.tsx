@@ -28,7 +28,7 @@ import { cn } from '@/lib/utils'
 import { isClassroomSectionPath } from '@/lib/classroom-navigation'
 import { Separator } from '@/components/ui/separator'
 import { sidebarSearchKey, useSidebarContext } from './sidebar-context'
-import { SidebarDisplayProvider, SidebarLabel, useSidebarCompact } from './sidebar-display'
+import { SidebarDisplayProvider, SidebarLabel, SidebarSectionLabel, useSidebarCompact } from './sidebar-display'
 import type { UserRole } from '@/lib/types'
 
 interface NavItem {
@@ -137,7 +137,7 @@ function NavGroupItem({ group, pathname, onNavigate, compactOnDesktop = false }:
           hasActiveChild
             ? 'bg-primary/10 text-primary'
             : 'text-foreground/70 hover:bg-muted hover:text-foreground',
-          compactOnDesktop && 'md:min-h-11 md:justify-center md:px-2'
+          compactOnDesktop && 'md:justify-center md:px-2'
         )}
       >
         <NavItemIcon icon={group.icon} />
@@ -180,7 +180,7 @@ function NavGroupItem({ group, pathname, onNavigate, compactOnDesktop = false }:
                   isNavActive(pathname, child.href)
                     ? 'bg-primary/10 text-primary'
                     : 'text-foreground/70 hover:bg-muted hover:text-foreground',
-                  compactOnDesktop && 'md:min-h-11 md:justify-center md:px-2'
+                  compactOnDesktop && 'md:justify-center md:px-2'
                 )}
               >
                 <NavItemIcon icon={child.icon} />
@@ -211,7 +211,7 @@ function ClassroomSectionNavigation({ pathname, onNavigate }: {
         href="/dashboard"
         onClick={onNavigate}
         title={compact ? 'เมนูหลัก' : undefined}
-        className={cn('flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground', compact && 'md:justify-center md:px-0 md:h-11')}
+        className={cn('flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground', compact && 'md:justify-center md:px-0')}
       >
         <ChevronLeft aria-hidden="true" className="size-4" />
         <SidebarLabel>เมนูหลัก</SidebarLabel>
@@ -229,7 +229,9 @@ function ClassroomSectionNavigation({ pathname, onNavigate }: {
 
       <Separator />
 
-      <div className={cn('px-2 text-xs font-medium text-muted-foreground', compact && 'md:sr-only')}>เมนูห้องเรียน</div>
+      <SidebarSectionLabel className="px-2 text-xs font-medium text-muted-foreground">
+        เมนูห้องเรียน
+      </SidebarSectionLabel>
       <nav aria-label="เมนูจัดการห้องเรียน" className="flex flex-col gap-1">
         {items.map(({ href, label, Icon }) => {
           const selected = pathname === href
@@ -245,7 +247,7 @@ function ClassroomSectionNavigation({ pathname, onNavigate }: {
                 selected
                   ? 'bg-primary/10 text-primary'
                   : 'text-foreground/70 hover:bg-muted hover:text-foreground',
-                compact && 'md:h-11 md:justify-center md:px-0',
+                compact && 'md:justify-center md:px-0',
               )}
             >
               <Icon aria-hidden="true" className="size-4" />
@@ -335,11 +337,11 @@ export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = f
       >
         {/* Nav */}
         {contextualContent || usesClassroomSidebar ? (
-          <div className={cn('flex-1 overflow-y-auto overflow-x-hidden p-3', compactOnDesktop && 'md:p-2')}>
+          <div className="flex-1 overflow-y-auto overflow-x-hidden p-3">
             {contextualContent ?? <ClassroomSectionNavigation pathname={pathname} onNavigate={onClose} />}
           </div>
         ) : (
-          <nav aria-label="เมนูหลัก" className={cn('flex flex-1 flex-col gap-1 overflow-y-auto overflow-x-hidden p-3', compactOnDesktop && 'md:p-2')}>
+          <nav aria-label="เมนูหลัก" className="flex flex-1 flex-col gap-1 overflow-y-auto overflow-x-hidden p-3">
             {navItems.map((entry) => (
               isGroup(entry)
                 ? (
@@ -363,7 +365,7 @@ export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = f
                       isNavActive(pathname, entry.href)
                         ? 'bg-primary/10 text-primary'
                         : 'text-foreground/70 hover:bg-muted hover:text-foreground',
-                      compactOnDesktop && 'md:justify-center md:px-2 md:min-h-11',
+                      compactOnDesktop && 'md:justify-center md:px-2',
                     )}
                   >
                     <NavItemIcon icon={entry.icon} />

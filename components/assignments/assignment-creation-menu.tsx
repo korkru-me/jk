@@ -60,7 +60,7 @@ export function AssignmentCreationMenu({
             type="button"
             variant={variant}
             size={size}
-            className={cn('transition-colors', className, compactOnDesktop && 'md:h-11 md:justify-center md:px-0')}
+            className={cn('transition-colors', className, compactOnDesktop && 'md:justify-center md:px-0')}
             aria-label={label}
             title={compactOnDesktop ? label : undefined}
             aria-current={active ? 'page' : undefined}

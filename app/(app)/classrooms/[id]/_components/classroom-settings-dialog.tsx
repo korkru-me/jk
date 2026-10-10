@@ -107,7 +107,7 @@ export function ClassroomSettingsDialog({
                   ? 'border-current text-current hover:bg-current/10 hover:text-current'
                   : 'border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground'
               ),
-              compact && 'md:h-11 md:justify-center md:px-0',
+              compact && 'md:justify-center md:px-0',
             )}
           />
         }

@@ -65,7 +65,7 @@ import {
 } from '@/lib/teaching-board-draft-state'
 import { scratchpadHasMeaningfulDraft } from '@/lib/scratchpad-state'
 import { useContextualSidebar } from '@/components/layout/sidebar-context'
-import { SidebarButton, useSidebarCompact } from '@/components/layout/sidebar-display'
+import { SidebarButton, SidebarSectionLabel, useSidebarCompact } from '@/components/layout/sidebar-display'
 import { cn } from '@/lib/utils'
 import { TeachingAnswerCheck, tryFields } from './teaching-try-answer'
 
@@ -601,7 +601,9 @@ export function TeachingModeSidebar({
         </div>
       </Card>
 
-      <div className={cn('px-2 text-xs font-medium text-muted-foreground', compact && 'md:sr-only')}>การแสดงผล</div>
+      <SidebarSectionLabel className="px-2 text-xs font-medium text-muted-foreground">
+        การแสดงผล
+      </SidebarSectionLabel>
       <div className="flex flex-col gap-1.5">
         <SidebarButton
           label={showQuestion ? 'ซ่อนโจทย์' : 'แสดงโจทย์'}
