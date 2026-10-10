@@ -13,6 +13,7 @@ import { getQuestionClientDetail } from '@/lib/actions/questions'
 import { getQuestionCardData } from '@/lib/actions/question-card-data'
 import { EMPTY_CARD_DATA, type QuestionCardData } from '@/lib/question-card-data'
 import { QuestionCard, type QuestionCardRow } from './question-card'
+import { QuestionSectionBadges } from './question-section-badges'
 import type { QuestionDetailWithCategory } from './preview-modal'
 import type { Question } from '@/lib/types'
 
@@ -295,25 +296,12 @@ export function SetQuestionList({
                   className="accent-primary shrink-0"
                 />
                 <span className="text-xs text-muted-foreground w-6 shrink-0 tabular-nums">{index + 1}.</span>
-                <span className={cn('flex-1 min-w-0 text-sm truncate', byId.has(id) ? 'text-foreground' : 'text-destructive')}>
-                  {label(id)}
-                </span>
-
-                {titles.length > 0 && (
-                  <span className="hidden sm:flex items-center gap-1 shrink-0">
-                    {titles.slice(0, 2).map(title => (
-                      <span
-                        key={title}
-                        className="text-[11px] px-2 py-0.5 rounded-full bg-primary/10 text-primary whitespace-nowrap max-w-[8rem] truncate"
-                      >
-                        {title}
-                      </span>
-                    ))}
-                    {titles.length > 2 && (
-                      <span className="text-[11px] text-muted-foreground">+{titles.length - 2}</span>
-                    )}
+                <span className="flex flex-1 min-w-0 flex-col gap-1">
+                  <span className={cn('text-sm truncate', byId.has(id) ? 'text-foreground' : 'text-destructive')}>
+                    {label(id)}
                   </span>
-                )}
+                  <QuestionSectionBadges titles={titles} />
+                </span>
 
                 {/* Hover-to-reveal only from sm up: on a phone there is no
                     hover, so controls that hide would be unreachable. */}

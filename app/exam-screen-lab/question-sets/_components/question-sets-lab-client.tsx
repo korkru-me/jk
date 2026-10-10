@@ -103,9 +103,21 @@ const STRUCTURE_CARD_DATA: QuestionCardData = {
   stats: {}, duplicateCounts: {}, subQuestionCounts: {}, setMemberships: {}, solutionPresence: {},
 }
 const STRUCTURE_QUESTION_IDS = STRUCTURE_QUESTIONS.map(question => question.id)
+const STRUCTURE_SECTIONS: QuestionSetSection[] = [
+  {
+    id: 'lab-section-work',
+    title: 'งาน',
+    question_ids: [STRUCTURE_QUESTION_IDS[0], STRUCTURE_QUESTION_IDS[1]],
+  },
+  {
+    id: 'lab-section-energy',
+    title: 'กฎอนุรักษ์พลังงาน',
+    question_ids: [STRUCTURE_QUESTION_IDS[1], STRUCTURE_QUESTION_IDS[2]],
+  },
+]
 
 export function QuestionSetsLabClient() {
-  const [structureSections, setStructureSections] = useState<QuestionSetSection[]>([])
+  const [structureSections, setStructureSections] = useState<QuestionSetSection[]>(STRUCTURE_SECTIONS)
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-4 p-4 sm:p-6">

@@ -31,6 +31,7 @@ import { getQuestionClientDetail } from '@/lib/actions/questions'
 import { getQuestionCardData } from '@/lib/actions/question-card-data'
 import { questionEditHref, RETURN_SET_PARAM } from '@/lib/question-return'
 import { SetQuestionList, type SetListQuestion } from './set-question-list'
+import { QuestionSectionBadges } from './question-section-badges'
 import type { QuestionDetailWithCategory as PreviewQuestion } from './preview-modal'
 
 const PreviewModal = dynamic(
@@ -587,7 +588,7 @@ function SectionDialog({
                     const isMember = draftIds.includes(id)
                     const wasMember = baselineIds.includes(id)
                     const pending = isMember && !wasMember ? 'add' : !isMember && wasMember ? 'remove' : null
-                    const elsewhere = (owners.get(id) ?? []).filter(s => s.id !== section?.id)
+                    const ownerTitles = (owners.get(id) ?? []).map(owner => owner.title || UNNAMED)
                     const q = byId.get(id)
 
                     return (
@@ -627,18 +628,19 @@ function SectionDialog({
                               <span className="block text-sm text-foreground truncate">
                                 {questionLabel(q)}
                               </span>
-                              {pending ? (
+                              {pending && (
                                 <span className={cn(
                                   'block text-[11px] font-medium mt-0.5',
                                   pending === 'add' ? 'text-success' : 'text-destructive'
                                 )}>
                                   {pending === 'add' ? '+ จะเพิ่มเข้าแฟ้มย่อยนี้' : '− จะเอาออกจากแฟ้มย่อยนี้'}
                                 </span>
-                              ) : elsewhere.length > 0 ? (
-                                <span className="block text-[11px] text-muted-foreground mt-0.5 truncate">
-                                  อยู่ใน {elsewhere.map(s => `“${s.title || UNNAMED}”`).join(' · ')} ด้วย
-                                </span>
-                              ) : null}
+                              )}
+                              <QuestionSectionBadges
+                                titles={ownerTitles}
+                                showEmpty
+                                className="mt-1"
+                              />
                             </span>
                           </label>
 
