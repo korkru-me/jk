@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react'
 import { CreateCourseWizard, type CreateCourseWizardActions } from '@/app/(app)/classrooms/new/_components/create-course-wizard'
 import { ClassroomContextNavigation } from '@/app/(app)/classrooms/[id]/_components/classroom-context-sidebar'
+import { ClassroomSettingsDialog } from '@/app/(app)/classrooms/[id]/_components/classroom-settings-dialog'
 import { composeDescription, EMPTY_META, parseDescription, type AccessType } from '@/app/(app)/classrooms/_components/classroom-meta'
 import { AccessTypePicker } from '@/app/(app)/classrooms/_components/classroom-meta-fields'
 import { ClassroomCard } from '@/app/(app)/classrooms/_components/classroom-card'
@@ -101,6 +102,13 @@ function LabContent({ initialCoverPattern }: { initialCoverPattern: ClassroomCov
     <Card padding="lg" className="flex flex-col gap-3" data-lab-access-type-picker>
       <h2 className="font-semibold">ประเภทการเข้าร่วมแบบกะทัดรัด</h2>
       <AccessTypePicker value={accessType} onChange={setAccessType} compact />
+    </Card>
+    <Card padding="lg" className="flex flex-col items-start gap-3" data-lab-classroom-settings>
+      <div>
+        <h2 className="font-semibold">ตั้งค่าห้องเรียนจำลอง</h2>
+        <p className="text-sm text-muted-foreground">ใช้ตรวจป๊อปอัปเท่านั้น โดยไม่บันทึกข้อมูลจริง</p>
+      </div>
+      <ClassroomSettingsDialog classroom={room} />
     </Card>
     <CreateCourseWizard
       key={formKey}

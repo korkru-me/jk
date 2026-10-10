@@ -1,15 +1,14 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 import {
-  Settings, Users, CalendarDays, Clock, School, Home, Info, Palette, Check, Ban,
+  Settings, Users, CalendarDays, Clock, School, Home, Info, Palette,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { useSidebarCompact } from '@/components/layout/sidebar-display'
 import { Card } from '@/components/ui/card'
-import { IconButton } from '@/components/ui/icon-button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -21,7 +20,7 @@ import { updateClassroom } from '@/lib/actions/classrooms'
 import type { Classroom } from '@/lib/types'
 import {
   composeDescription, parseDescription, GRADE_SUGGESTIONS, getTermSuggestions,
-  COVER_PRESETS, coverOf,
+  coverOf,
   type ClassroomMeta,
 } from '@/app/(app)/classrooms/_components/classroom-meta'
 import { AccessTypePicker, CreatableCombobox } from '@/app/(app)/classrooms/_components/classroom-meta-fields'
@@ -30,6 +29,7 @@ import { ClassroomIcon } from '@/components/classrooms/classroom-icon'
 import { ClassroomIconPicker } from '@/components/classrooms/classroom-icon-picker'
 import { ClassroomCoverPattern } from '@/components/classrooms/classroom-cover-pattern'
 import { ClassroomCoverPatternPicker } from '@/components/classrooms/classroom-cover-pattern-picker'
+import { ClassroomCoverThemePicker } from '@/components/classrooms/classroom-cover-theme-picker'
 
 export function ClassroomSettingsDialog({
   classroom, onCover = false, placement = 'banner',
@@ -43,6 +43,7 @@ export function ClassroomSettingsDialog({
   placement?: 'banner' | 'sidebar'
 }) {
   const compact = useSidebarCompact() && placement === 'sidebar'
+  const dialogContentRef = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
   const [name, setName] = useState(classroom.name)
   const [meta, setMeta] = useState<ClassroomMeta>(() => parseDescription(classroom.description))
@@ -57,10 +58,6 @@ export function ClassroomSettingsDialog({
   // Classrooms created before cover colours were persisted have none saved;
   // the preview stays on the neutral surface until a teacher picks one.
   const cover = coverOf(meta)
-
-  function clearCover() {
-    setMeta(prev => ({ ...prev, cover: '' }))
-  }
 
   // Re-seed from the server copy on every open so a cancelled edit — or a
   // change made in another tab — never lingers into the next visit.
@@ -118,7 +115,20 @@ export function ClassroomSettingsDialog({
         <span className={cn(compact && 'md:sr-only')}>ตั้งค่าห้องเรียน</span>
       </DialogTrigger>
 
-      <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent
+        ref={dialogContentRef}
+        initialFocus={() => {
+          const content = dialogContentRef.current
+          if (!content) return true
+
+          // Focusing a field farther down used to reopen this long dialog in
+          // the middle. Focus the popup itself and reset its own scroll area.
+          content.scrollTop = 0
+          return content
+        }}
+        data-classroom-settings-content
+        className="max-h-[85vh] overflow-y-auto sm:max-w-2xl"
+      >
         <DialogHeader>
           <DialogTitle>ตั้งค่าห้องเรียน</DialogTitle>
           <DialogDescription>
@@ -126,13 +136,18 @@ export function ClassroomSettingsDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-7 pt-1">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-5 pt-1">
           {/* ── Identity (read-only) ── */}
-          <Card padding="lg" className="flex flex-wrap items-center gap-x-8 gap-y-3">
+          <Card
+            padding="sm"
+            radius="md"
+            data-classroom-settings-identity
+            className="flex flex-wrap items-center gap-x-6 gap-y-2"
+          >
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center shrink-0">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted">
                 {isHomeroom
-                  ? <Home className="w-4 h-4 text-muted-foreground" />
+                  ? <Home className="size-4 text-muted-foreground" aria-hidden="true" />
                   : <School className="size-4 text-muted-foreground" aria-hidden="true" />}
               </div>
               <div>
@@ -140,25 +155,25 @@ export function ClassroomSettingsDialog({
                 <p className="text-sm font-medium">{isHomeroom ? 'ห้อง Homeroom' : 'ห้องเรียน'}</p>
               </div>
             </div>
-            <div>
+            <div className="sm:ml-auto">
               <p className="text-xs text-muted-foreground">รหัสห้องเรียน</p>
               <p className="font-mono font-bold tracking-[0.2em]">{classroom.class_code}</p>
             </div>
-            <p className="flex items-start gap-1.5 text-xs text-muted-foreground basis-full">
-              <Info className="w-3 h-3 mt-0.5 shrink-0" />
+            <p className="flex basis-full items-start gap-1.5 text-xs leading-4 text-muted-foreground">
+              <Info className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
               สองอย่างนี้เปลี่ยนไม่ได้ — นักเรียนใช้รหัสเข้าร่วมอยู่ และการเปลี่ยนประเภทจะทำให้งานที่มอบหมายไว้ใช้ไม่ได้
             </p>
           </Card>
 
           {/* ── Cover ── */}
-          <div className="space-y-2.5">
+          <div data-classroom-settings-cover className="flex flex-col gap-2">
             <Label className="flex items-center gap-1.5">
-              <Palette className="w-3.5 h-3.5 text-muted-foreground" />
+              <Palette className="size-3.5 text-muted-foreground" aria-hidden="true" />
               ปกห้องเรียน
             </Label>
             <div
               className={cn(
-                'relative h-20 overflow-hidden rounded-2xl border-2 flex items-center px-5 transition-colors',
+                'relative flex h-14 items-center overflow-hidden rounded-xl border px-4 transition-colors',
                 cover ? `${cover.surface} ${cover.text}` : 'bg-muted border-border text-muted-foreground',
               )}
             >
@@ -167,53 +182,32 @@ export function ClassroomSettingsDialog({
                 placement="end"
                 className="pointer-events-none absolute inset-0 size-full opacity-55"
               />
-              <ClassroomIcon iconKey={meta.iconKey} className="relative z-10 mr-3 size-7 shrink-0" />
-              <p className="relative z-10 font-bold text-lg truncate">{name || 'ชื่อห้องเรียน'}</p>
+              <ClassroomIcon iconKey={meta.iconKey} className="relative z-10 mr-2.5 size-6 shrink-0" />
+              <p className="relative z-10 truncate text-base font-bold">{name || 'ชื่อห้องเรียน'}</p>
             </div>
-            <ClassroomCoverPatternPicker
-              value={meta.coverPattern}
-              onValueChange={key => set('coverPattern', key)}
-              disabled={isPending}
-              previewClassName={cover ? `${cover.surface} ${cover.text}` : undefined}
-            />
-            <p className="text-xs font-medium text-muted-foreground">สีของปก · เลือกวงแรกเพื่อใช้สีอัตโนมัติ</p>
-            <div className="flex flex-wrap gap-2">
-              <IconButton
-                type="button"
-                onClick={clearCover}
-                label="ใช้สีอัตโนมัติ"
-                aria-pressed={!cover}
-                className={cn(
-                  'w-9 h-9 rounded-full bg-muted text-muted-foreground hover:bg-muted transition-all',
-                  !cover ? 'ring-2 ring-offset-2 ring-ring scale-110' : 'opacity-70 hover:opacity-100',
-                )}
-              >
-                <Ban className="w-4 h-4" />
-              </IconButton>
-              {COVER_PRESETS.map(preset => {
-                const isSelected = meta.cover === preset.id
-                return (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    onClick={() => set('cover', preset.id)}
-                    title={preset.label}
-                    aria-label={preset.label}
-                    aria-pressed={isSelected}
-                    className={cn(
-                      'w-9 h-9 rounded-full flex items-center justify-center transition-all',
-                      preset.solid,
-                      isSelected ? 'ring-2 ring-offset-2 ring-ring scale-110' : 'opacity-70 hover:opacity-100',
-                    )}
-                  >
-                    {isSelected && <Check className="w-4 h-4 text-background" />}
-                  </button>
-                )
-              })}
+            <div className="grid items-start gap-2 sm:grid-cols-2">
+              <ClassroomCoverPatternPicker
+                value={meta.coverPattern}
+                onValueChange={key => set('coverPattern', key)}
+                disabled={isPending}
+                compact
+                previewClassName={cover ? `${cover.surface} ${cover.text}` : undefined}
+              />
+              <ClassroomCoverThemePicker
+                value={meta.cover}
+                onValueChange={value => set('cover', value)}
+                disabled={isPending}
+                allowAuto
+              />
             </div>
-          </div>
 
-          <ClassroomIconPicker value={meta.iconKey} onValueChange={key => set('iconKey', key)} disabled={isPending} />
+            <ClassroomIconPicker
+              value={meta.iconKey}
+              onValueChange={key => set('iconKey', key)}
+              disabled={isPending}
+              compact
+            />
+          </div>
 
           {/* ── Basics ── */}
           <div className="space-y-5">
@@ -224,7 +218,6 @@ export function ClassroomSettingsDialog({
                 value={name}
                 onChange={e => setName(e.target.value)}
                 placeholder={isHomeroom ? 'เช่น ที่ปรึกษา ม.4/1' : 'เช่น ฟิสิกส์ ม.4/1'}
-                autoFocus
               />
             </div>
 

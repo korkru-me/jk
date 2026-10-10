@@ -5,7 +5,7 @@ import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
-import { Check, ChevronDown, Clock, Info } from 'lucide-react'
+import { Check, Clock, Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,8 +20,8 @@ import { AccessTypePicker, CreatableCombobox } from '@/app/(app)/classrooms/_com
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import type { ClassroomType } from '@/lib/types'
 import { Card } from '@/components/ui/card'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ClassroomIconPicker } from '@/components/classrooms/classroom-icon-picker'
+import { ClassroomCoverThemePicker } from '@/components/classrooms/classroom-cover-theme-picker'
 import { DEFAULT_CLASSROOM_ICON, classroomIconKey, isClassroomIconKey, type ClassroomIconKey } from '@/lib/classroom-icons'
 import { ClassroomCoverPatternPicker } from '@/components/classrooms/classroom-cover-pattern-picker'
 import {
@@ -96,25 +96,22 @@ function CoverDesignSection({
   onCoverPatternChange: (key: ClassroomCoverPatternKey) => void
 }) {
   const iconPickerRef = useRef<HTMLDivElement>(null)
-  const themePickerRef = useRef<HTMLDivElement>(null)
   const [iconPickerOpen, setIconPickerOpen] = useState(false)
-  const [themePickerOpen, setThemePickerOpen] = useState(false)
   const selectedPreset = COVER_PRESETS.find(preset => preset.id === cover) ?? COVER_PRESETS[0]
 
   useEffect(() => {
-    if (!iconPickerOpen && !themePickerOpen) return
+    if (!iconPickerOpen) return
 
-    function closePickersOnOutsidePointerDown(event: PointerEvent) {
+    function closeIconPickerOnOutsidePointerDown(event: PointerEvent) {
       const target = event.target
       if (!(target instanceof Node)) return
-      if (iconPickerRef.current?.contains(target) || themePickerRef.current?.contains(target)) return
+      if (iconPickerRef.current?.contains(target)) return
       setIconPickerOpen(false)
-      setThemePickerOpen(false)
     }
 
-    document.addEventListener('pointerdown', closePickersOnOutsidePointerDown, true)
-    return () => document.removeEventListener('pointerdown', closePickersOnOutsidePointerDown, true)
-  }, [iconPickerOpen, themePickerOpen])
+    document.addEventListener('pointerdown', closeIconPickerOnOutsidePointerDown, true)
+    return () => document.removeEventListener('pointerdown', closeIconPickerOnOutsidePointerDown, true)
+  }, [iconPickerOpen])
 
   return (
     <div className="flex flex-col gap-4">
@@ -135,43 +132,7 @@ function CoverDesignSection({
           />
         </div>
 
-        <div ref={themePickerRef} className="space-y-1.5">
-          <Label className="text-sm font-medium">ธีมสี</Label>
-          <Collapsible open={themePickerOpen} onOpenChange={setThemePickerOpen}>
-            <CollapsibleTrigger
-              render={<Button type="button" variant="outline" className="h-10 w-full justify-start gap-3" />}
-              aria-label={`ธีมสี: ${selectedPreset.label}`}
-            >
-              <span className={cn('size-5 shrink-0 rounded-full ring-1 ring-border', selectedPreset.solid)} aria-hidden="true" />
-              <span className="min-w-0 flex-1 truncate text-left">{selectedPreset.label}</span>
-              <ChevronDown className={cn('size-4 shrink-0 transition-transform', themePickerOpen && 'rotate-180')} aria-hidden="true" />
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <Card padding="sm" radius="sm" className="mt-2 flex flex-wrap gap-2">
-                {COVER_PRESETS.map((preset) => (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    title={preset.label}
-                    aria-label={preset.label}
-                    aria-pressed={cover === preset.id}
-                    onClick={() => {
-                      onCoverChange(preset.id)
-                      setThemePickerOpen(false)
-                    }}
-                    className={cn(
-                      'size-8 rounded-full transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
-                      preset.solid,
-                      cover === preset.id
-                        ? 'shadow-sm ring-2 ring-ring ring-offset-2'
-                        : 'opacity-70 hover:opacity-100',
-                    )}
-                  />
-                ))}
-              </Card>
-            </CollapsibleContent>
-          </Collapsible>
-        </div>
+        <ClassroomCoverThemePicker value={cover} onValueChange={onCoverChange} />
       </div>
     </div>
   )
