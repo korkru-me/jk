@@ -15,7 +15,7 @@ export function BrandLogo({ layout = 'horizontal', subtitle, compact = false, cl
   return (
     <span className={cn(
       'inline-flex shrink-0 items-center',
-      stacked ? 'flex-col gap-0.5' : 'gap-2.5',
+      stacked ? 'flex-col gap-0.5' : (compact ? 'gap-2' : 'gap-2.5'),
       className,
     )}>
       <Image
@@ -28,7 +28,7 @@ export function BrandLogo({ layout = 'horizontal', subtitle, compact = false, cl
           'w-auto shrink-0 object-contain dark:brightness-0 dark:invert',
           stacked
             ? (compact ? 'h-8' : 'h-10')
-            : (compact ? 'h-9' : 'h-11'),
+            : (compact ? 'h-8' : 'h-11'),
         )}
       />
       <span className={cn('flex flex-col', stacked && 'items-center')}>
@@ -36,7 +36,7 @@ export function BrandLogo({ layout = 'horizontal', subtitle, compact = false, cl
           'font-bold leading-none tracking-tight text-brand-foreground',
           stacked
             ? (compact ? 'text-xs' : 'text-sm')
-            : (compact ? 'text-base' : 'text-lg'),
+            : (compact ? 'text-sm' : 'text-lg'),
         )}>
           K<span className="text-brand-accent">o</span>rKru
         </span>

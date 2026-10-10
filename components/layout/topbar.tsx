@@ -37,8 +37,8 @@ export function Topbar({ user, initialUnreadCount, onMenuToggle, sidebarCollapse
   useEffect(() => setThemeMounted(true), [])
 
   return (
-    <header className="h-14 border-b bg-card flex items-center justify-between gap-2 pl-3 pr-2 sm:pr-6 shrink-0">
-      <div className="flex shrink-0 items-center gap-2">
+    <header className="h-12 border-b bg-card flex items-center justify-between gap-2 pl-3 pr-2 sm:pr-6 shrink-0">
+      <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
         <IconButton
           className="size-11 md:hidden"
           onClick={onMenuToggle}
@@ -58,12 +58,12 @@ export function Topbar({ user, initialUnreadCount, onMenuToggle, sidebarCollapse
           <Menu />
         </IconButton>
 
-        <Link href="/dashboard" onClick={onLogoNavigate} title="KorKru · หน้าหลัก" className="shrink-0">
-          <BrandLogo layout="stacked" compact />
+        <Link href="/dashboard" onClick={onLogoNavigate} title="KorKru · หน้าหลัก" className="flex shrink-0">
+          <BrandLogo layout="horizontal" compact />
         </Link>
       </div>
 
-      <div className="flex items-center gap-1.5 sm:gap-3">
+      <div className="flex items-center gap-1 sm:gap-3">
         {/* Notifications */}
         <span data-notification-anchor className="flex size-9 shrink-0 items-center justify-center">
           {notificationsEnabled && <NotificationsBell initialUnreadCount={initialUnreadCount} />}
@@ -92,11 +92,11 @@ export function Topbar({ user, initialUnreadCount, onMenuToggle, sidebarCollapse
             </button>
             <Moon size={13} className={cn('hidden sm:block', isDark ? 'text-primary' : 'text-muted-foreground')} />
           </div>
-        ) : <div className="h-6 w-[81px]" aria-hidden="true" />}
+        ) : <div className="h-6 w-11 sm:w-[81px]" aria-hidden="true" />}
 
         {/* User dropdown */}
         <DropdownMenu>
-          <DropdownMenuTrigger className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-muted transition-colors outline-none">
+          <DropdownMenuTrigger className="flex items-center gap-1 rounded-lg px-1 py-1.5 text-sm hover:bg-muted transition-colors outline-none sm:gap-2 sm:px-2">
             <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-bold">
               {user.full_name.charAt(0)}
             </div>

@@ -2,8 +2,8 @@
 
 ### ย่อความสูงแถบด้านบนของแอป (10 ตุลาคม 2026)
 
-- **UI-061** — ลด Topbar ของ app shell จาก `h-16` เป็น `h-14` และเพิ่มขนาด compact ให้ `BrandLogo` เฉพาะตำแหน่งนี้ จึงดึงพื้นที่เนื้อหาด้านล่างขึ้นโดยไม่ลดพื้นที่กดของเมนู การแจ้งเตือน ตัวสลับธีม หรือโปรไฟล์ · ปรับ mobile sidebar และ backdrop จาก `top-16` เป็น `top-14` ให้แนบใต้แถบใหม่พอดี
-- local fixture `/exam-screen-lab/classroom-icons` ยืนยันความสูงลดจากประมาณ `77px` เหลือ `67px` ตาม spacing preset, sidebar/main เริ่มตรงที่ขอบล่างเดียวกัน, mobile 390px ไม่มีช่องว่าง ไม่มีการซ้อนทับ และไม่มี horizontal overflow; axe เฉพาะ Topbar ไม่พบ violation · TypeScript, design-token lint, unit test 2,904 รายการ และ webpack production build ผ่าน ไม่มี migration
+- **UI-061** — ลด Topbar ของ app shell จาก `h-16` เป็น `h-12` และใช้ `BrandLogo` แบบ horizontal ขนาด compact เฉพาะตำแหน่งนี้ ให้รูปกวางกับชื่อ KorKru อยู่บรรทัดเดียวกัน จึงดึงพื้นที่เนื้อหาด้านล่างขึ้นโดยไม่ลดพื้นที่กดของเมนู การแจ้งเตือน ตัวสลับธีม หรือโปรไฟล์ · ปรับ mobile sidebar และ backdrop จาก `top-16` เป็น `top-12` ให้แนบใต้แถบใหม่พอดี
+- local fixture `/exam-screen-lab/classroom-icons` ยืนยันความสูงลดจากประมาณ `77px` เหลือ `58px` ตาม spacing preset, sidebar/main เริ่มตรงที่ขอบล่างเดียวกัน, mobile 320/390px ไม่มีช่องว่าง ไม่มีการซ้อนทับ และไม่มี horizontal overflow; axe เฉพาะ Topbar ไม่พบ violation · TypeScript, design-token lint, unit test 2,904 รายการ และ webpack production build ผ่าน ไม่มี migration
 
 ### การ์ดห้องเรียนหน้าแรกแบบกะทัดรัด (10 ตุลาคม 2026)
 

@@ -320,7 +320,7 @@ export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = f
       }}
       onMouseLeave={() => setDesktopPreviewOpen(false)}
       className={cn(
-        'fixed bottom-0 left-0 top-14 z-30 w-64 flex-shrink-0 transition-none',
+        'fixed bottom-0 left-0 top-12 z-30 w-64 flex-shrink-0 transition-none',
         'md:static md:overflow-visible',
         isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
         collapsed ? 'md:w-20' : 'md:w-64',
