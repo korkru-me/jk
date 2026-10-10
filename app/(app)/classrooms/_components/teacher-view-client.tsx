@@ -324,7 +324,7 @@ function SortableClassroomCard(props: ComponentProps<typeof ClassroomCard>) {
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={cn(isDragging && 'relative opacity-80 shadow-xl')}
+      className={cn(isDragging && 'relative opacity-80')}
     >
       <ClassroomCard
         {...props}
