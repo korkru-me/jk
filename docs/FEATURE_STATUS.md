@@ -1,5 +1,10 @@
 # Feature status
 
+### โลโก้ KorKru สีเดียวตามธีม (10 ตุลาคม 2026)
+
+- **UI-063** — โลโก้หลัก render silhouette กวางจาก `public/brand/deer-mark.svg` เป็น mask สีเดียวด้วย token `brand-accent` ซึ่งอ้างอิง `primary` ของธีม จึงถอดสีกรมท่า/ส้มเดิมออกจากภาพที่แสดงและเปลี่ยนสีพร้อม preset/light-dark mode; ตัว `o` ในคำว่า `KorKru` ใช้ token เดียวกับกวาง ส่วนตัวอักษรอื่นคง `brand-foreground` เพื่อรักษาความชัดเจน
+- local fixture `/exam-screen-lab/classroom-icons` ยืนยันกวางกับตัว `o` มี computed color ตรงกันทั้ง light/dark mode, โลโก้ horizontal ยังอยู่ครบที่ viewport 320px โดย document ไม่ล้น และ axe เฉพาะลิงก์โลโก้ไม่พบ violation · ไม่เปลี่ยนไฟล์ geometry ต้นฉบับ ไม่มี migration
+
 ### ย่อความสูงการ์ดแฟ้มโจทย์ (10 ตุลาคม 2026)
 
 - **UI-062** — ลดพื้นที่แนวตั้งของการ์ด “แฟ้มโจทย์ของฉัน” โดยย่อ padding ของหัวการ์ด/เนื้อหา/footer, ลดขนาดภาพชั้นแฟ้มตกแต่ง และวางคำอธิบายกับป้ายชื่อแฟ้มย่อยในแถวเดียวกัน จึงไม่ต้องสงวนช่องว่างหลายบรรทัด; ชื่อและคำอธิบายยาวใช้ ellipsis โดยยังมีชื่อเต็มใน accessible name/`title` และจำนวนข้อกับจำนวนแฟ้มย่อยยังอยู่ครบ

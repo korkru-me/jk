@@ -1,4 +1,3 @@
-import Image from 'next/image'
 import { cn } from '@/lib/utils'
 
 interface BrandLogoProps {
@@ -18,14 +17,14 @@ export function BrandLogo({ layout = 'horizontal', subtitle, compact = false, cl
       stacked ? 'flex-col gap-0.5' : (compact ? 'gap-2' : 'gap-2.5'),
       className,
     )}>
-      <Image
-        src="/brand/deer-mark.svg"
-        alt=""
-        width={580}
-        height={1045}
-        unoptimized
+      <span
+        aria-hidden="true"
+        style={{
+          WebkitMask: "url('/brand/deer-mark.svg') center / contain no-repeat",
+          mask: "url('/brand/deer-mark.svg') center / contain no-repeat",
+        }}
         className={cn(
-          'w-auto shrink-0 object-contain dark:brightness-0 dark:invert',
+          'block aspect-[580/1045] shrink-0 bg-brand-accent',
           stacked
             ? (compact ? 'h-8' : 'h-10')
             : (compact ? 'h-8' : 'h-11'),
