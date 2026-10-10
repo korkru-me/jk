@@ -53,7 +53,10 @@ export function ClassroomIconPicker({
             <ToggleGroup
               value={[selected.key]}
               onValueChange={keys => {
-                if (keys.length) onValueChange(classroomIconKey(keys[0]))
+                if (!keys.length) return
+
+                onValueChange(classroomIconKey(keys[0]))
+                handleOpenChange(false)
               }}
               disabled={disabled}
               aria-labelledby={labelId}
