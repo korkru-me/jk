@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { CLASSROOM_ICON_OPTIONS, classroomIconKey } from './classroom-icons'
 import { CLASSROOM_COVER_PATTERN_OPTIONS, classroomCoverPatternKey } from './classroom-cover-patterns'
-import { composeDescription, coverImageOf, displayDescription, EMPTY_META, parseDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
+import {
+  composeDescription,
+  coverImageOf,
+  displayDescription,
+  EMPTY_META,
+  ensureRandomClassroomCoverPattern,
+  parseDescription,
+} from '@/app/(app)/classrooms/_components/classroom-meta'
 
 describe('optional classroom icon metadata', () => {
   const legacy = 'เรียนรู้ร่วมกัน\nหน้าปก: blue · ระดับ: ม.4 · ภาคเรียน: 1/2569 · แท็ก: วิชา, เสริม · การเข้าร่วม: ต้องอนุมัติ · ที่นั่ง: 40 คน · เปิด: 2026-05-01 · ปิด: 2026-10-01'
@@ -50,6 +57,20 @@ describe('optional classroom icon metadata', () => {
     const raw = 'คำอธิบาย\nลายปก: copied-cover · การเข้าร่วม: เปิดรับอิสระ'
     expect(parseDescription(raw).coverPattern).toBeUndefined()
     expect(displayDescription(raw)).toBe('คำอธิบาย\nการเข้าร่วม: เปิดรับอิสระ')
+  })
+
+  it('adds one random cover to a new description and preserves an existing choice', () => {
+    const generated = ensureRandomClassroomCoverPattern('ห้องใหม่', () => 0)
+    expect(parseDescription(generated).coverPattern).toBe(CLASSROOM_COVER_PATTERN_OPTIONS[0].key)
+    expect(displayDescription(generated)).toBe('ห้องใหม่\nการเข้าร่วม: เปิดรับอิสระ')
+
+    let randomCalls = 0
+    const existing = composeDescription({ ...EMPTY_META, description: 'ห้องเดิม', coverPattern: 'korkru-deer' })
+    expect(ensureRandomClassroomCoverPattern(existing, () => {
+      randomCalls += 1
+      return 0
+    })).toBe(existing)
+    expect(randomCalls).toBe(0)
   })
 
   it('drops unknown icon values safely and never prints presentation keys', () => {

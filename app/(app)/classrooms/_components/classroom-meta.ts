@@ -11,6 +11,7 @@ import { DEFAULT_CLASSROOM_ICON, isClassroomIconKey, type ClassroomIconKey } fro
 import { isClassroomCoverUrl } from '@/lib/classroom-cover'
 import {
   isClassroomCoverPatternKey,
+  randomClassroomCoverPatternKey,
   type ClassroomCoverPatternKey,
 } from '@/lib/classroom-cover-patterns'
 
@@ -237,6 +238,17 @@ export function parseDescription(raw: string | null): ClassroomMeta {
   }
 
   return meta
+}
+
+/** Add a random cover only while creating a new room; edit flows must not call this. */
+export function ensureRandomClassroomCoverPattern(
+  raw: string,
+  random: () => number = Math.random,
+): string {
+  const normalized = raw.trim()
+  const meta = parseDescription(normalized)
+  if (isClassroomCoverPatternKey(meta.coverPattern)) return normalized
+  return composeDescription({ ...meta, coverPattern: randomClassroomCoverPatternKey(random) })
 }
 
 // What a teacher should read on a card or header: everything they entered

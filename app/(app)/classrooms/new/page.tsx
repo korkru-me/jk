@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/auth/server'
 import { CreateCourseWizard } from './_components/create-course-wizard'
 import { parseDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
+import { randomClassroomCoverPatternKey } from '@/lib/classroom-cover-patterns'
 
 export const metadata = { title: 'สร้างห้องเรียนใหม่ — KorKru' }
 
@@ -22,7 +23,10 @@ export default async function NewClassroomPage({
   const query = await searchParams
   const copyFrom = typeof query.copyFrom === 'string' ? query.copyFrom : undefined
   let duplicateSourceId: string | undefined
-  let initialValues: Parameters<typeof CreateCourseWizard>[0]['initialValues']
+  const randomCoverPattern = randomClassroomCoverPatternKey()
+  let initialValues: Parameters<typeof CreateCourseWizard>[0]['initialValues'] = {
+    coverPattern: randomCoverPattern,
+  }
 
   if (copyFrom) {
     const { data: source } = await supabase
@@ -41,7 +45,7 @@ export default async function NewClassroomPage({
       name: `${source.name} (สำเนา)`,
       description: meta.description,
       cover: meta.cover,
-      coverPattern: meta.coverPattern,
+      coverPattern: meta.coverPattern ?? randomCoverPattern,
       iconKey: meta.iconKey,
       gradeLevel: meta.gradeLevel,
       academicTerm: meta.academicTerm,

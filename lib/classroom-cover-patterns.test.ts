@@ -7,6 +7,7 @@ import {
   DEFAULT_CLASSROOM_COVER_PATTERN,
   classroomCoverPatternKey,
   isClassroomCoverPatternKey,
+  randomClassroomCoverPatternKey,
 } from './classroom-cover-patterns'
 
 const EXPECTED_KEYS = [
@@ -24,9 +25,11 @@ const EXPECTED_KEYS = [
 ] as const
 
 describe('theme-reactive classroom cover artwork', () => {
-  it('offers the ten requested subjects plus the KorKru deer', () => {
+  it('keeps all eleven stable choices without subject labels or descriptions', () => {
     expect(CLASSROOM_COVER_PATTERN_OPTIONS.map(option => option.key)).toEqual(EXPECTED_KEYS)
-    expect(new Set(CLASSROOM_COVER_PATTERN_OPTIONS.map(option => option.label)).size).toBe(11)
+    expect(CLASSROOM_COVER_PATTERN_OPTIONS.every(option => (
+      Object.keys(option).length === 1 && Object.hasOwn(option, 'key')
+    ))).toBe(true)
     expect(DEFAULT_CLASSROOM_COVER_PATTERN).toBe('classroom')
   })
 
@@ -52,7 +55,7 @@ describe('theme-reactive classroom cover artwork', () => {
     expect(strokes.every(value => value === 'none' || value === 'currentColor')).toBe(true)
   })
 
-  it('keeps every subject motif visually distinct', () => {
+  it('keeps every cover motif visually distinct', () => {
     const artwork = CLASSROOM_COVER_PATTERN_OPTIONS.map(option => (
       renderToStaticMarkup(createElement(ClassroomCoverPattern, { patternKey: option.key }))
         .replaceAll(`data-classroom-cover-pattern="${option.key}"`, '')
@@ -72,6 +75,14 @@ describe('theme-reactive classroom cover artwork', () => {
     expect(html).toContain('data-classroom-cover-field="upper-right"')
     expect(html).toContain('d="M0 0h320v112Z"')
   })
+
+  it.each(CLASSROOM_COVER_PATTERN_OPTIONS.map((option, index) => ({ ...option, index })))(
+    'can randomly choose the stable $key cover',
+    ({ key, index }) => {
+      const randomValue = (index + 0.5) / CLASSROOM_COVER_PATTERN_OPTIONS.length
+      expect(randomClassroomCoverPatternKey(() => randomValue)).toBe(key)
+    },
+  )
 
   it.each([undefined, null, '', 'google-classroom', '<svg>', {}, 11])('falls back safely for %j', value => {
     expect(isClassroomCoverPatternKey(value)).toBe(false)

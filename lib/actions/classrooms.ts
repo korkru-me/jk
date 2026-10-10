@@ -6,7 +6,10 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { getMyOrgId } from '@/lib/actions/org'
 import type { Assignment } from '@/lib/types'
-import { parseDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
+import {
+  ensureRandomClassroomCoverPattern,
+  parseDescription,
+} from '@/app/(app)/classrooms/_components/classroom-meta'
 import { isClassroomCoverUrl } from '@/lib/classroom-cover'
 
 function generateClassCode(): string {
@@ -39,6 +42,7 @@ export async function createClassroom(data: { name: string; description: string;
 
   const checkedDescription = validateClassroomDescription(data.description, user.id)
   if ('error' in checkedDescription) return checkedDescription
+  const description = ensureRandomClassroomCoverPattern(checkedDescription.description)
 
   const orgId = await getMyOrgId()
   if (!orgId) return { error: 'ไม่พบข้อมูลสถาบัน กรุณาติดต่อผู้ดูแล' }
@@ -57,7 +61,7 @@ export async function createClassroom(data: { name: string; description: string;
     org_id: orgId,
     teacher_id: user.id,
     name: data.name,
-    description: checkedDescription.description || null,
+    description: description || null,
     class_code: classCode,
     status: 'active',
     classroom_type: data.classroomType ?? 'subject',
@@ -148,6 +152,7 @@ export async function duplicateClassroom(
   const description = overrides ? overrides.description.trim() : source.description
   const checkedDescription = validateClassroomDescription(description ?? '', user.id)
   if ('error' in checkedDescription) return checkedDescription
+  const descriptionWithCover = ensureRandomClassroomCoverPattern(checkedDescription.description)
 
   let classCode = generateClassCode()
   for (let i = 0; i < 5; i++) {
@@ -174,7 +179,7 @@ export async function duplicateClassroom(
       org_id: source.org_id,
       teacher_id: user.id,
       name,
-      description: checkedDescription.description || null,
+      description: descriptionWithCover || null,
       class_code: classCode,
       status: 'active',
       classroom_type: source.classroom_type,

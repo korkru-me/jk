@@ -32,8 +32,7 @@ export function ClassroomCoverPatternPicker({
   const descriptionId = useId()
   const [open, setOpen] = useState(false)
   const selectedKey = classroomCoverPatternKey(value)
-  const selected = CLASSROOM_COVER_PATTERN_OPTIONS.find(option => option.key === selectedKey)
-    ?? CLASSROOM_COVER_PATTERN_OPTIONS[0]
+  const selectedIndex = CLASSROOM_COVER_PATTERN_OPTIONS.findIndex(option => option.key === selectedKey)
 
   return (
     <FieldSet disabled={disabled} className={compact ? 'gap-2' : undefined}>
@@ -54,23 +53,24 @@ export function ClassroomCoverPatternPicker({
             />
           )}
           aria-describedby={descriptionId}
+          aria-label={`เลือกภาพปก ตอนนี้เลือกภาพปกแบบที่ ${selectedIndex + 1}`}
         >
           <span className={cn(
             'relative h-full w-24 shrink-0 overflow-hidden rounded-lg border',
             previewClassName ?? 'border-primary/20 bg-primary/10 text-primary',
           )}>
-            <ClassroomCoverPattern patternKey={selected.key} placement="end" className="size-full opacity-80" />
+            <ClassroomCoverPattern patternKey={selectedKey} placement="end" className="size-full opacity-80" />
           </span>
           <span className="min-w-0 flex-1 text-left">
-            <span className="block truncate font-medium">{selected.label}</span>
-            {!compact && <span className="block truncate text-xs text-foreground/70">{selected.description}</span>}
+            <span className="block truncate font-medium">ภาพปกที่เลือก</span>
+            {!compact && <span className="block truncate text-xs text-foreground/70">กดเพื่อดูแบบอื่น</span>}
           </span>
           <ChevronDown data-icon="inline-end" className={cn('transition-transform', open && 'rotate-180')} />
         </CollapsibleTrigger>
         <CollapsibleContent>
           <Card padding="sm" radius="sm" className="mt-2">
             <ToggleGroup
-              value={[selected.key]}
+              value={[selectedKey]}
               onValueChange={keys => {
                 if (!keys.length) return
                 onValueChange(classroomCoverPatternKey(keys[0]))
@@ -82,18 +82,16 @@ export function ClassroomCoverPatternPicker({
               variant="primary"
               className="grid w-full grid-cols-2 items-stretch gap-2 sm:grid-cols-3"
             >
-              {CLASSROOM_COVER_PATTERN_OPTIONS.map(option => (
+              {CLASSROOM_COVER_PATTERN_OPTIONS.map((option, index) => (
                 <ToggleGroupItem
                   key={option.key}
                   value={option.key}
-                  aria-label={`${option.label}: ${option.description}`}
-                  title={option.description}
-                  className="h-auto min-h-[78px] min-w-0 flex-col items-stretch gap-1.5 overflow-hidden p-1.5"
+                  aria-label={`ภาพปกแบบที่ ${index + 1}`}
+                  className="h-auto min-h-0 min-w-0 items-stretch overflow-hidden p-1.5"
                 >
                   <span className="h-12 w-full overflow-hidden rounded-md bg-current/5">
                     <ClassroomCoverPattern patternKey={option.key} placement="end" className="size-full opacity-80" />
                   </span>
-                  <span className="truncate px-1 text-xs font-medium">{option.label}</span>
                 </ToggleGroupItem>
               ))}
             </ToggleGroup>
