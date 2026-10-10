@@ -40,11 +40,11 @@ interface Props {
   surface?: 'card' | 'plain'
   /**
    * What the selection was before this session of picking. Given it, the list
-   * marks each row จะเพิ่ม / จะเอาออก instead of silently changing, and keeps
+   * highlights pending additions, marks pending removals explicitly, and keeps
    * a question the teacher just unticked pinned where they can put it back.
    */
   baselineIds?: string[]
-  /** What the picks go into, for the จะเพิ่ม/จะเอาออก notes on each row. */
+  /** What the picks go into, for the pending-removal note on each row. */
   collectionNoun?: string
 }
 
@@ -143,9 +143,9 @@ export function QuestionPicker({
             )}
             {q.title}
           </p>
-          {pending ? (
-            <p className={cn('mt-0.5 text-xs font-medium', pending === 'add' ? 'text-success' : 'text-destructive')}>
-              {pending === 'add' ? `+ จะเพิ่มเข้า${collectionNoun}` : `− จะเอาออกจาก${collectionNoun}`}
+          {pending === 'remove' ? (
+            <p className="mt-0.5 text-xs font-medium text-destructive">
+              − จะเอาออกจาก{collectionNoun}
             </p>
           ) : (
             <p className="mt-0.5 truncate text-xs text-muted-foreground">{questionExcerpt(q.question_text)}</p>
