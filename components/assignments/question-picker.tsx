@@ -1,5 +1,6 @@
 'use client'
 
+import { useLayoutEffect, useRef } from 'react'
 import { Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,6 +9,7 @@ import { DIFF_META, TYPE_SHORT, questionExcerpt } from '@/lib/question-display'
 import { filterQuestions, tagsMatchingTerm } from '@/lib/question-search'
 import type { AssignmentQuestionOption } from '@/components/assignments/create-assignment-form'
 import { Card } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 
 const DIFFICULTY_FILTERS = ['all', 'easy', 'medium', 'hard', 'analytical'] as const
 
@@ -76,26 +78,88 @@ export function QuestionPicker({
     onDiffFilterChange('all')
   }
 
-  // Pin selected questions to the top, in the order they were picked — with
-  // a bank of hundreds/thousands of questions, scrolling to find whichever
-  // ones are already checked is painful, so piling them up front instead
-  // makes review/toggling fast regardless of list size.
-  const filteredIdSet = new Set(filteredQs.map(q => q.id))
-  // Pending removals stay pinned alongside the picks: unticking a question
-  // must not fling it back into a bank of thousands, where undoing the
-  // mistake means finding it again.
   const baseline = baselineIds ?? []
-  const pinnedIds = baselineIds
-    ? [...selectedIds, ...baseline.filter(id => !selectedIds.includes(id))]
-    : selectedIds
-  const pinnedQs = pinnedIds
-    .filter(id => filteredIdSet.has(id))
-    .map(id => filteredQs.find(q => q.id === id)!)
-  const pinnedIdSet = new Set(pinnedQs.map(q => q.id))
-  const restQs = filteredQs.filter(q => !pinnedIdSet.has(q.id))
-  const orderedQs = [...pinnedQs, ...restQs]
+  const filteredById = new Map(filteredQs.map(question => [question.id, question]))
+  // Keep a review copy of each pick at the top, but leave the original row in
+  // its bank position too. Teachers can keep scanning from the same place and
+  // the original checkbox remains the visible source of truth.
+  const selectedQs = selectedIds
+    .map(id => filteredById.get(id))
+    .filter((question): question is AssignmentQuestionOption => question !== undefined)
+
+  const listRef = useRef<HTMLDivElement>(null)
+  const bankRowRefs = useRef(new Map<string, HTMLDivElement>())
+  const pendingAnchorRef = useRef<{ id: string; top: number } | null>(null)
+
+  useLayoutEffect(() => {
+    const pendingAnchor = pendingAnchorRef.current
+    const list = listRef.current
+    const row = pendingAnchor ? bankRowRefs.current.get(pendingAnchor.id) : null
+    if (pendingAnchor && list && row) {
+      list.scrollTop += row.getBoundingClientRect().top - pendingAnchor.top
+    }
+    pendingAnchorRef.current = null
+  }, [selectedIds])
+
+  function toggleFromBank(id: string) {
+    const row = bankRowRefs.current.get(id)
+    if (row) pendingAnchorRef.current = { id, top: row.getBoundingClientRect().top }
+    onToggle(id)
+  }
 
   const Surface = surface === 'plain' ? PlainSurface : CardSurface
+
+  function questionRow(q: AssignmentQuestionOption, toggle: () => void, location: 'selected' | 'bank') {
+    const diff = DIFF_META[q.difficulty]
+    const isSelected = selectedIds.includes(q.id)
+    const wasSelected = baseline.includes(q.id)
+    const pending = !baselineIds ? null
+      : isSelected && !wasSelected ? 'add'
+      : !isSelected && wasSelected ? 'remove'
+      : null
+    const orderNumber = isSelected ? selectedIds.indexOf(q.id) + 1 : null
+
+    return (
+      <label
+        className={cn(
+          'flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-all',
+          pending === 'add' && 'border-success/30 bg-success/10',
+          pending === 'remove' && 'border-destructive/30 bg-destructive/10',
+          !pending && isSelected && 'border-border bg-primary/10',
+          !pending && !isSelected && 'border-transparent hover:bg-muted',
+        )}
+      >
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={toggle}
+          aria-label={`${isSelected ? 'ยกเลิกการเลือก' : 'เลือก'}โจทย์ ${q.title}${location === 'selected' ? ' จากกลุ่มโจทย์ที่เลือก' : ''}`}
+          className="mt-0.5 accent-primary"
+        />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-foreground">
+            {orderNumber !== null && (
+              <span className="mr-1.5 font-semibold text-primary">ข้อ {orderNumber}</span>
+            )}
+            {q.title}
+          </p>
+          {pending ? (
+            <p className={cn('mt-0.5 text-xs font-medium', pending === 'add' ? 'text-success' : 'text-destructive')}>
+              {pending === 'add' ? `+ จะเพิ่มเข้า${collectionNoun}` : `− จะเอาออกจาก${collectionNoun}`}
+            </p>
+          ) : (
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">{questionExcerpt(q.question_text)}</p>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <span className={cn('rounded border px-1.5 py-0.5 text-xs', diff ? `${diff.badge} ${diff.border}` : 'border-border bg-muted text-muted-foreground')}>
+            {diff?.label ?? q.difficulty}
+          </span>
+          <span className="text-xs text-muted-foreground">{TYPE_SHORT[q.question_type] ?? q.question_type}</span>
+        </div>
+      </label>
+    )
+  }
 
   return (
     <Surface>
@@ -178,7 +242,7 @@ export function QuestionPicker({
         </p>
       )}
 
-      <div className="max-h-96 overflow-y-auto space-y-1.5 pr-1">
+      <div ref={listRef} className="max-h-96 overflow-y-auto space-y-1.5 pr-1">
         {filteredQs.length === 0 ? (
           <div className="text-center py-12 text-sm space-y-2">
             <p className="text-muted-foreground">
@@ -202,69 +266,36 @@ export function QuestionPicker({
               </>
             )}
           </div>
-        ) : orderedQs.map((q, i) => {
-          const diff = DIFF_META[q.difficulty]
-          const isSelected = selectedIds.includes(q.id)
-          const wasSelected = baseline.includes(q.id)
-          const pending = !baselineIds ? null
-            : isSelected && !wasSelected ? 'add'
-            : !isSelected && wasSelected ? 'remove'
-            : null
-          const orderNumber = isSelected ? selectedIds.indexOf(q.id) + 1 : null
-          // Divider right where the pinned (selected) block ends, only when
-          // both groups are present — makes the reordering self-explanatory
-          // instead of the list just silently jumping around.
-          const showDivider = i === pinnedQs.length && pinnedQs.length > 0 && restQs.length > 0
-          return (
-            <div key={q.id}>
-              {showDivider && (
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide px-1 pt-1 pb-1.5">
-                  โจทย์อื่นๆ
+        ) : (
+          <>
+            {selectedQs.length > 0 && (
+              <>
+                <p className="px-1 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  โจทย์ที่เลือก ({selectedIds.length} ข้อ)
                 </p>
-              )}
-              <label
-                className={`flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-all border ${
-                  pending === 'add' ? 'bg-success/10 border-success/30'
-                    : pending === 'remove' ? 'bg-destructive/10 border-destructive/30'
-                    : isSelected ? 'border-border bg-primary/10'
-                    : 'border-transparent hover:bg-muted'
-                }`}
+                {selectedQs.map(q => (
+                  <div key={`selected-${q.id}`}>
+                    {questionRow(q, () => onToggle(q.id), 'selected')}
+                  </div>
+                ))}
+                <p className="px-1 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  โจทย์ทั้งหมด
+                </p>
+              </>
+            )}
+            {filteredQs.map(q => (
+              <div
+                key={`bank-${q.id}`}
+                ref={node => {
+                  if (node) bankRowRefs.current.set(q.id, node)
+                  else bankRowRefs.current.delete(q.id)
+                }}
               >
-                <input
-                  type="checkbox"
-                  checked={isSelected}
-                  onChange={() => onToggle(q.id)}
-                  className="mt-0.5 accent-primary"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">
-                    {/* Which number this question will carry in the finished
-                        paper. The footer chips numbered the picks already; the
-                        rows did not, so the order was only visible by counting
-                        chips against a list of titles. */}
-                    {orderNumber !== null && (
-                      <span className="text-primary font-semibold mr-1.5">ข้อ {orderNumber}</span>
-                    )}
-                    {q.title}
-                  </p>
-                  {pending ? (
-                    <p className={`text-xs mt-0.5 font-medium ${pending === 'add' ? 'text-success' : 'text-destructive'}`}>
-                      {pending === 'add' ? `+ จะเพิ่มเข้า${collectionNoun}` : `− จะเอาออกจาก${collectionNoun}`}
-                    </p>
-                  ) : (
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">{questionExcerpt(q.question_text)}</p>
-                  )}
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <span className={`text-xs px-1.5 py-0.5 rounded border ${diff ? `${diff.badge} ${diff.border}` : 'bg-muted text-muted-foreground border-border'}`}>
-                    {diff?.label ?? q.difficulty}
-                  </span>
-                  <span className="text-xs text-muted-foreground">{TYPE_SHORT[q.question_type] ?? q.question_type}</span>
-                </div>
-              </label>
-            </div>
-          )
-        })}
+                {questionRow(q, () => toggleFromBank(q.id), 'bank')}
+              </div>
+            ))}
+          </>
+        )}
       </div>
 
       {showSelectedFooter && selectedIds.length > 0 && (

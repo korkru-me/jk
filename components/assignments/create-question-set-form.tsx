@@ -53,6 +53,7 @@ export function CreateQuestionSetForm({ questions, initialSet, initialCardData }
   // by accident then has no effect until it is reviewed in the summary.
   const [pickerOpen, setPickerOpen] = useState(false)
   const [draftIds, setDraftIds] = useState<string[]>([])
+  const [confirmingPickerDiscard, setConfirmingPickerDiscard] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [search, setSearch] = useState('')
   const [diffFilter, setDiffFilter] = useState('all')
@@ -122,6 +123,20 @@ export function CreateQuestionSetForm({ questions, initialSet, initialCardData }
 
   const pickerAdded = draftIds.filter(id => !selectedIds.includes(id))
   const pickerRemoved = selectedIds.filter(id => !draftIds.includes(id))
+  const pickerDirty = pickerAdded.length > 0 || pickerRemoved.length > 0
+
+  function handlePickerOpenChange(open: boolean) {
+    if (!open && pickerDirty) {
+      setConfirmingPickerDiscard(true)
+      return
+    }
+    setPickerOpen(open)
+  }
+
+  function discardPickerChanges() {
+    setDraftIds(selectedIds)
+    setPickerOpen(false)
+  }
 
   function confirmPicker() {
     const next = normalizeSetSections(sections, draftIds)
@@ -348,7 +363,7 @@ export function CreateQuestionSetForm({ questions, initialSet, initialCardData }
         initialCardData={initialCardData}
       />
 
-      <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+      <Dialog open={pickerOpen} onOpenChange={handlePickerOpenChange}>
         <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>เพิ่มโจทย์จากคลัง</DialogTitle>
@@ -399,6 +414,17 @@ export function CreateQuestionSetForm({ questions, initialSet, initialCardData }
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={confirmingPickerDiscard}
+        onOpenChange={setConfirmingPickerDiscard}
+        title="ออกโดยไม่ยืนยันการเลือก?"
+        description="คุณมีการเลือกหรือเอาโจทย์ออกที่ยังไม่ได้กด “ยืนยันการเปลี่ยนแปลง” หากออกตอนนี้ การเปลี่ยนแปลงครั้งนี้จะหายไป"
+        confirmLabel="ออกโดยไม่บันทึก"
+        cancelLabel="กลับไปเลือกต่อ"
+        variant="destructive"
+        onConfirm={discardPickerChanges}
+      />
 
       {initialSet && (
         <ConfirmDialog

@@ -31,6 +31,7 @@ import { IconButton } from '@/components/ui/icon-button'
 import {
   Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { OrderNumberInput } from '@/components/assignments/order-number-input'
 import { QuestionPicker } from '@/components/assignments/question-picker'
 import type { BankQuestion } from '@/lib/question-bank'
@@ -274,10 +275,25 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
   // mis-tick in a bank of a thousand is not an instant edit.
   const [pickerOpen, setPickerOpen] = useState(false)
   const [draftIds, setDraftIds] = useState<string[]>([])
+  const [confirmingPickerDiscard, setConfirmingPickerDiscard] = useState(false)
   const [pickerSearch, setPickerSearch] = useState('')
   const [pickerDiff, setPickerDiff] = useState('all')
   const pickerAdded = draftIds.filter(id => !questionIds.includes(id))
   const pickerRemoved = questionIds.filter(id => !draftIds.includes(id))
+  const pickerDirty = pickerAdded.length > 0 || pickerRemoved.length > 0
+
+  function handlePickerOpenChange(open: boolean) {
+    if (!open && pickerDirty) {
+      setConfirmingPickerDiscard(true)
+      return
+    }
+    setPickerOpen(open)
+  }
+
+  function discardPickerChanges() {
+    setDraftIds(questionIds)
+    setPickerOpen(false)
+  }
 
   function openPicker() {
     setDraftIds(questionIds)
@@ -1257,7 +1273,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
         </Button>
       </div>
 
-      <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+      <Dialog open={pickerOpen} onOpenChange={handlePickerOpenChange}>
         <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>เพิ่มหรือเอาโจทย์ออก</DialogTitle>
@@ -1314,6 +1330,17 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={confirmingPickerDiscard}
+        onOpenChange={setConfirmingPickerDiscard}
+        title="ออกโดยไม่ยืนยันการเลือก?"
+        description="คุณมีการเลือกหรือเอาโจทย์ออกที่ยังไม่ได้กด “ยืนยันการเปลี่ยนแปลง” หากออกตอนนี้ การเปลี่ยนแปลงครั้งนี้จะหายไป"
+        confirmLabel="ออกโดยไม่บันทึก"
+        cancelLabel="กลับไปเลือกต่อ"
+        variant="destructive"
+        onConfirm={discardPickerChanges}
+      />
     </form>
   )
 }
