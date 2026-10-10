@@ -1,5 +1,15 @@
 # แผนปิดงาน Safe Exam Browser หลัง Drawing Board
 
+## ส่วนเพิ่มหน้ารอสอบสำหรับเว็บจริง — 10 ตุลาคม 2026 / pending release
+
+เจ้าของอนุมัติให้นำเฉพาะส่วนที่เสร็จขึ้น Production แล้ว และยืนยัน Vercel CLI ใหม่สำเร็จ แต่ไม่ได้อนุมัติข้าม native W7 แยก candidate `codex/exam-waiting-production` จาก master `8d54184` ที่ live Production ใช้อยู่ โดย port หน้ารอสอบ Browser/legacy verified SEB/approved Android จาก `326ead6` เท่านั้น ไม่รวม `/exam/{assignment}/r/{revision}` pilot, atomic-start migration, operator scripts, native artifact/keys/release/activation ของ W1–W6 ซึ่งยังอยู่ `codex/seb-exam-only-waiting-room` ที่ `b8a6b57` ขอบเขตนี้ไม่เปลี่ยนแบบฝึกหัดหรือสูตรคะแนน และรักษา score adjustment ของ master
+
+Candidate local verification ผ่าน: waiting entry/route 33 regressions รวมสองเคส score-adjustment compatibility, full 215 files / 2,892 tests, TypeScript, token lint, guarded TEST-only webpack build, Chrome controller lab ที่ 320px/axe/Next runtime ไม่มี errors ไม่ใช่ authenticated hosted-to-DB หรือ native physical proof แก้ union narrowing สองบรรทัดในสองฟอร์มห้องเรียนเพื่อให้ TypeScript/build ผ่าน ไม่เปลี่ยนฟอร์มหรือ payload
+
+**หยุดก่อน TEST/Production deploy:** read-only Staging ledger เทียบ candidate พบ local-only งานกำหนดส่ง/ปรับคะแนนสามไฟล์ `20261007145225_assignment_late_submission_bands.sql`, `20261007151705_late_submission_score_adjustments.sql`, `20261008025659_late_bands_stable_volatility.sql`; schema-only `submissions` select `score_adjustment` limit=0 ถูกปฏิเสธ `42703` สอดคล้องกับ gap นี้ Remote-only `20261009142610` เป็น pilot ของ branch แยก ไม่ใช่สิ่งที่จะ replay หรือ repair ทิ้ง รอเจ้าของอนุมัติจัดการเฉพาะสามรายการบน Staging ก่อน hosted test; ห้าม `db push` ทั้ง folderหรือใช้ main branch ที่ link Production แทนเป้าหมายทดสอบ ไม่มี SQL/คะแนน/fixture/alias/env mutation ในรอบนี้ และยังไม่ได้ merge master
+
+Production preflight อ่าน project `jk`/production branch `master`/verified domains/source/READY ได้ แต่ sensitive `NEXT_PUBLIC_SUPABASE_URL` กับ service key ไม่ส่ง value คืนจาก Vercel API จึงยังไม่ยืนยัน Production DB target/ledger และไม่ apply Production การมี URL ใน local `.env.local` หรือ ref ใน cached CLI linkไม่ใช่หลักฐานแทน deployment ต้องยืนยัน exact target ก่อน read ledger/dry-run/apply ตามกฎ migration-delivery; Production schema authority changes ยังต้องขออนุมัติแยก และไม่เปิด W7 อัตโนมัติ
+
 อัปเดต: 23 กันยายน 2026
 
 เอกสารนี้กำหนดลำดับงาน SEB/Exam ต่อจาก `origin/master` ที่ commit

@@ -1,5 +1,13 @@
 # Feature status
 
+### หน้ารอสอบ — Production candidate (10 ตุลาคม 2026; ยังไม่ merge/deploy)
+
+- แยก `codex/exam-waiting-production` จาก master `8d54184dd2224e7a4771c65a482c7efb505eb220` (Production alias `korkru.com` READY และ source ตรง ณ preflight) แล้ว port เฉพาะหน้ารอสอบจาก `326ead6` ไม่รวม canonical SEB waiting pilot/SQL/operator/native artifacts ที่รอ W7
+- `/assignments/[id]/take` ของ exam อ่าน allowlisted metadata-only ก่อนโจทย์/เวลา เริ่มด้วย deliberate POST, resume ใช้ own exact receipt/เวลาเดิม, expired recovery ไม่เปิด successor ในคำขอเดียวกัน Streak exam วาดข้อแรกเฉพาะ POST ของรอบว่าง ไม่วาดข้อถัดไปจากการกลับเข้า แบบฝึกหัดคงเส้นทางเดิม; Auth/roster/กำหนดการ/code/native session ตรวจใหม่เสมอ รองรับ Browser และ legacy verified SEB/approved Android ตาม gates เดิม ไม่เปิด SEB release ใหม่
+- รักษา score-adjustment threshold policy ของ master ล่าสุดทั้ง metadata และ POST พร้อม regression สองเคส ไม่มีคะแนน/เฉลย/code ใน waiting DTO ไม่เปลี่ยน RLS/สูตรคะแนน/schema/native files/keys; ordinary header/answers ยังคง separate inserts ไม่อ้าง atomic guarantee เพิ่ม แก้ union narrowing เพียงสองบรรทัดในสองฟอร์มห้องเรียนเพื่อปลด TypeScript/build blocker เดิม ไม่เปลี่ยน payload/พฤติกรรมห้องเรียน
+- ตรวจ 215 files / 2,892 tests ผ่าน (waiting regressions 33 cases), TypeScript/token lint/guarded TEST-environment webpack build ผ่าน Local Chrome เป็น shared controller + in-memory lab: idle 0 requests/no questions, explicit 1 receipt, blocked disabled, 320px ไม่ล้น, scoped axe 0 violations/0 incomplete, Next compilation/runtime ไม่มี errors และ React tree ไม่มี ExamClient/timer ไม่ใช่ hosted Auth-to-DB/native proof
+- Vercel CLI reauthentication สำเร็จแล้ว แต่ **TEST/Production release pending**: Staging schema-only `limit=0` read พบ `submissions.score_adjustment` ไม่มี (`42703`) เปรียบเทียบ ledger กับ candidate ได้ local 143 / remote 141: local-only งานส่งช้า `20261007145225`, `20261007151705`, `20261008025659`; remote-only atomic SEB `20261009142610` เป็นความต่างที่ตั้งใจเพราะไม่ port pilot นี้ ห้าม replay/repair/reset/apply ทั้ง folderเพื่อทำ parity รอเจ้าของอนุมัติเฉพาะ migration งานส่งช้าบน Staging ก่อน hosted validation; Production identity/ledger/apply และ W7 เป็น gates แยก ยังไม่มี SQL/fixture/คะแนน/alias/env mutation หรือ master merge ในรอบนี้
+
 ### ตรึงตำแหน่งไอคอน sidebar ระหว่างย่อและขยาย (10 ตุลาคม 2026)
 
 - **UI-050** — icon rail บน desktop ซ่อนเฉพาะข้อความและจัดไอคอนเข้ากึ่งกลางในแกน X โดยยังสงวน padding, ความสูงการ์ดห้องปัจจุบัน, หัวข้อหมวด และความสูงแถวเมนูเท่ากับ panel เต็ม ตำแหน่งกึ่งกลางไอคอนในแกน Y จึงไม่กระโดดเมื่อกด hamburger หรือชี้ rail เพื่อเปิด overlay preview; mobile drawer และ navigation/permission behavior เดิมไม่เปลี่ยน
