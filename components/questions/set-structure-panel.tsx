@@ -631,7 +631,7 @@ function SectionDialog({
                             </IconButton>
                             <IconButton
                               label={hasPendingChanges
-                                ? 'กดยืนยันการเปลี่ยนแปลงก่อน จึงจะไปแก้ไขโจทย์ได้'
+                                ? 'กดยืนยันก่อน จึงจะไปแก้ไขโจทย์ได้'
                                 : 'แก้ไขโจทย์ข้อนี้'}
                               size="2xs"
                               disabled={!q || !canEditQuestions || hasPendingChanges || leavingId !== null}
@@ -670,7 +670,7 @@ function SectionDialog({
               disabled={!canConfirm}
               onClick={() => onConfirm(draftTitle.trim(), draftIds)}
             >
-              {isNew ? 'สร้างแฟ้มย่อย' : 'ยืนยันการเปลี่ยนแปลง'}
+              {isNew ? 'สร้างแฟ้มย่อย' : 'ยืนยัน'}
             </Button>
           </span>
         </DialogFooter>

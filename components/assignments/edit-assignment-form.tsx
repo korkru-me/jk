@@ -1324,7 +1324,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
                   draftIds.length === 0 || (pickerAdded.length === 0 && pickerRemoved.length === 0)
                 }
               >
-                ยืนยันการเปลี่ยนแปลง
+                ยืนยัน
               </Button>
             </span>
           </DialogFooter>
@@ -1335,7 +1335,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
         open={confirmingPickerDiscard}
         onOpenChange={setConfirmingPickerDiscard}
         title="ออกโดยไม่ยืนยันการเลือก?"
-        description="คุณมีการเลือกหรือเอาโจทย์ออกที่ยังไม่ได้กด “ยืนยันการเปลี่ยนแปลง” หากออกตอนนี้ การเปลี่ยนแปลงครั้งนี้จะหายไป"
+        description="คุณมีการเลือกหรือเอาโจทย์ออกที่ยังไม่ได้กด “ยืนยัน” หากออกตอนนี้ การเปลี่ยนแปลงครั้งนี้จะหายไป"
         confirmLabel="ออกโดยไม่บันทึก"
         cancelLabel="กลับไปเลือกต่อ"
         variant="destructive"
