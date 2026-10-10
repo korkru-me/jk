@@ -285,6 +285,8 @@ Production และไม่ใช่หลักฐาน physical platform �
 
 ### ส่วนเพิ่มที่เจ้าของอนุมัติ 10 ตุลาคม — ข้อสอบที่ไม่ใช้ SEB ต้องมีหน้ารอด้วย
 
+- **คำขอนำส่วนที่เสร็จขึ้น Production / 10 ตุลาคม:** เจ้าของอนุญาต commit และนำส่วนที่เสร็จขึ้นเว็บจริงแล้ว แต่ไม่ได้อนุมัติเปิด canonical SEB pilot หรือข้าม W7 ตรวจ remote ล่าสุดพบ `origin/master` มีงานใหม่ 5 commits ขณะที่ branch นี้มี 41 commits ที่ยังไม่อยู่ใน master รวม native pilot/migration จึงห้าม merge/deploy ทั้ง branch เป็นทางลัด ต้องเตรียม candidate เฉพาะหน้ารอสอบบนฐาน master ล่าสุด ตรวจ dependency/พฤติกรรมเดิม (รวม score adjustment) และทดสอบ candidate บน TEST ก่อน Production ส่วนที่ยังรอ native proof คง disabled ไม่ apply SQL ของ pilot จากคำอนุญาต deploy เว็บเพียงอย่างเดียว
+- Production release ยัง **pending**: ตรวจ Vercel CLI account ซ้ำได้ HTTP 403 จึงเริ่ม device-confirmation ด้วยบัญชีเดิมและรอเจ้าของยืนยัน ไม่มี merge/deploy/DB mutation รอบนี้ ไม่บันทึกรหัสหรือ confirmation URL ลง Git หลังยืนยันต้องตรวจ exact Production project/origin/source/DB readiness และ TEST results ใหม่ก่อนนำส่วนที่ผ่านขึ้นจริง
 - เพิ่มเฉพาะ `type=exam` บนเว็บปกติและ legacy verified SEB/approved Android path: เปิดหน้ารอก่อนโจทย์และก่อนเริ่มเวลา กดปุ่ม POST เพื่อเริ่ม/ทำต่อ/ตรวจผลรอบที่หมดเวลา แบบฝึกหัดไม่เปลี่ยน และไม่กล่าวว่า browser ธรรมดาล็อกการออกแบบ native SEB
 - GET/prefetch เป็น metadata-only ไม่สร้างรอบ/grade/draw; resume ใช้ own exact current receipt และ `started_at` เดิม URL hint ไม่จัดรอบใหม่ กรณี slow read ข้ามเวลาไม่ serialize โจทย์; stale operation/recovery replay ไม่สร้าง successor
 - Streak ข้อแรกย้ายไป explicit POST เฉพาะรอบที่ไม่มี answer rows การกลับเข้าสอบที่มีข้ออยู่แล้วไม่ draw ข้อถัดไป ไม่เปลี่ยน scoring/verdict contract
