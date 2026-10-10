@@ -1,10 +1,15 @@
 'use client'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Pencil, Save, Trash2 } from 'lucide-react'
-import { createQuestionSet, updateQuestionSet, saveQuestionSet, deleteQuestionSet } from '@/lib/actions/question-sets'
+import { CheckCircle2, CloudAlert, LoaderCircle, Pencil, Save, Trash2 } from 'lucide-react'
+import {
+  createQuestionSet,
+  saveQuestionSet,
+  deleteQuestionSet,
+  type QuestionSetData,
+} from '@/lib/actions/question-sets'
 import { getMyTeamOrgOptions } from '@/lib/actions/team-org'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,6 +29,13 @@ import type { QuestionCardData } from '@/lib/question-card-data'
 import { rankCountedTags } from '@/lib/tag-suggest'
 import type { QuestionSet, Visibility } from '@/lib/types'
 import { Card } from '@/components/ui/card'
+import { createLatestSaveQueue } from '@/lib/latest-save-queue'
+
+type AutosaveUiStatus =
+  | { state: 'saved' }
+  | { state: 'waiting' }
+  | { state: 'saving' }
+  | { state: 'error'; error: string }
 
 interface Props {
   /** The whole คลัง, as the picker needs it — including `tags`, which it
@@ -38,9 +50,19 @@ interface Props {
    * every open, which reads as the page loading twice.
    */
   initialCardData?: QuestionCardData
+  /** Local visual fixtures can keep autosave in memory and avoid Supabase. */
+  saveExistingSet?: (id: string, data: QuestionSetData) => Promise<{ ok: true } | { error: string }>
+  /** Supplied by local visual fixtures so mounting them does not read Supabase. */
+  teamOptions?: { id: string; name: string }[]
 }
 
-export function CreateQuestionSetForm({ questions, initialSet, initialCardData }: Props) {
+export function CreateQuestionSetForm({
+  questions,
+  initialSet,
+  initialCardData,
+  saveExistingSet = saveQuestionSet,
+  teamOptions,
+}: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
@@ -63,6 +85,28 @@ export function CreateQuestionSetForm({ questions, initialSet, initialCardData }
   const [sharedOrgIds, setSharedOrgIds] = useState<string[]>(initialSet?.shared_org_ids ?? [])
   const [teams, setTeams] = useState<{ id: string; name: string }[]>([])
   const [teamChecked, setTeamChecked] = useState(false)
+  const [autosaveStatus, setAutosaveStatus] = useState<AutosaveUiStatus>({ state: 'saved' })
+  const infoTouchedRef = useRef(false)
+  const infoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const latestPayloadRef = useRef<QuestionSetData | null>(null)
+  const saveQueueRef = useRef<ReturnType<typeof createLatestSaveQueue<QuestionSetData>> | null>(null)
+
+  if (initialSet && !saveQueueRef.current) {
+    saveQueueRef.current = createLatestSaveQueue<QuestionSetData>({
+      save: data => saveExistingSet(initialSet.id, data),
+      onStatusChange: status => {
+        if (status.state === 'saving') {
+          setAutosaveStatus({ state: 'saving' })
+        } else if (status.state === 'saved') {
+          setAutosaveStatus({ state: 'saved' })
+        } else if (status.state === 'error') {
+          const message = 'บันทึกแฟ้มไม่สำเร็จ กรุณาลองใหม่'
+          setAutosaveStatus({ state: 'error', error: message })
+          toast.error(message)
+        }
+      },
+    })
+  }
   /**
    * ข้อมูลแฟ้มโจทย์ opens read-only on an existing แฟ้ม.
    *
@@ -74,6 +118,11 @@ export function CreateQuestionSetForm({ questions, initialSet, initialCardData }
   const [editingInfo, setEditingInfo] = useState(!initialSet)
 
   useEffect(() => {
+    if (teamOptions) {
+      setTeams(teamOptions)
+      setTeamChecked(true)
+      return
+    }
     getMyTeamOrgOptions()
       .then((list) => {
         setTeams(list)
@@ -81,7 +130,7 @@ export function CreateQuestionSetForm({ questions, initialSet, initialCardData }
       })
       .finally(() => setTeamChecked(true))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [teamOptions])
 
   // teamOrgId can be left over from a *private* set — where it points at the
   // creator's personal workspace, not a real team. Only count it once it's
@@ -92,7 +141,50 @@ export function CreateQuestionSetForm({ questions, initialSet, initialCardData }
   const selectedTeamName = teams.find(t => t.id === effectiveTeamOrgId)?.name ?? null
   const allSelectedTeamIds = effectiveTeamOrgId ? [effectiveTeamOrgId, ...sharedOrgIds] : sharedOrgIds
 
+  const currentPayload: QuestionSetData = {
+    title: title.trim(),
+    description: description.trim(),
+    question_ids: selectedIds,
+    sections,
+    visibility,
+    org_id: teamOrgId,
+    shared_org_ids: sharedOrgIds,
+  }
+  latestPayloadRef.current = currentPayload
+
+  function clearInfoSaveTimer() {
+    if (!infoSaveTimerRef.current) return
+    clearTimeout(infoSaveTimerRef.current)
+    infoSaveTimerRef.current = null
+  }
+
+  function markInfoChanged() {
+    if (!initialSet) return
+    infoTouchedRef.current = true
+    setAutosaveStatus({ state: 'waiting' })
+  }
+
+  function queueExistingSetSave(data: QuestionSetData) {
+    if (!initialSet || !saveQueueRef.current) return
+    if (!data.title.trim()) {
+      setAutosaveStatus({ state: 'error', error: 'กรุณาตั้งชื่อแฟ้มโจทย์' })
+      return
+    }
+    saveQueueRef.current.enqueue(data)
+  }
+
+  function changeStructure(next: { questionIds: string[]; sections: QuestionSetSection[] }) {
+    setSelectedIds(next.questionIds)
+    setSections(next.sections)
+    queueExistingSetSave({
+      ...currentPayload,
+      question_ids: next.questionIds,
+      sections: next.sections,
+    })
+  }
+
   function toggleTeam(id: string) {
+    markInfoChanged()
     const isSelected = allSelectedTeamIds.includes(id)
     if (isSelected) {
       if (allSelectedTeamIds.length <= 1) return
@@ -140,30 +232,22 @@ export function CreateQuestionSetForm({ questions, initialSet, initialCardData }
 
   function confirmPicker() {
     const next = normalizeSetSections(sections, draftIds)
-    setSelectedIds(next.question_ids)
-    setSections(next.sections)
+    changeStructure({ questionIds: next.question_ids, sections: next.sections })
     setPickerOpen(false)
     const parts = []
     if (pickerAdded.length) parts.push(`เพิ่ม ${pickerAdded.length} ข้อ`)
     if (pickerRemoved.length) parts.push(`เอาออก ${pickerRemoved.length} ข้อ`)
-    if (parts.length) toast.success(`${parts.join(' · ')} แล้ว — อย่าลืมกดบันทึก`)
+    if (parts.length) toast.success(`${parts.join(' · ')} และบันทึกในแฟ้มแล้ว`)
   }
 
   const canSave = title.trim().length > 0
 
-  const payload = () => ({
-    title: title.trim(), description: description.trim(), question_ids: selectedIds,
-    sections,
-    visibility, org_id: teamOrgId, shared_org_ids: sharedOrgIds,
-  })
-
   function handleSubmit() {
+    if (initialSet) return
     startTransition(async () => {
-      const res = initialSet
-        ? await updateQuestionSet(initialSet.id, payload())
-        : await createQuestionSet(payload())
+      const res = await createQuestionSet(currentPayload)
       if ('error' in res) { toast.error(res.error); return }
-      if (!initialSet && 'id' in res) {
+      if ('id' in res) {
         toast.success('สร้างแฟ้มโจทย์แล้ว')
         router.push('/questions/sets')
       }
@@ -171,12 +255,9 @@ export function CreateQuestionSetForm({ questions, initialSet, initialCardData }
   }
 
   /**
-   * Writes the แฟ้ม down before a card leaves for the โจทย์ editor.
-   *
-   * Everything on this page is a draft until บันทึก — a reordering, a new
-   * แฟ้มย่อย, a โจทย์ just added — and แก้ไข navigates away. Saving first is
-   * what stops that click from quietly throwing the draft out; refusing to
-   * leave when the save fails is what stops it from doing so loudly.
+   * Flushes the newest snapshot before a card leaves for the โจทย์ editor.
+   * Structural changes are already queued immediately, but waiting here keeps
+   * navigation from racing the final write on a slow connection.
    */
   async function saveBeforeEdit(): Promise<boolean> {
     if (!initialSet) return false
@@ -184,14 +265,63 @@ export function CreateQuestionSetForm({ questions, initialSet, initialCardData }
       toast.error('ตั้งชื่อแฟ้มก่อน จึงจะบันทึกและไปแก้ไขโจทย์ได้')
       return false
     }
-    const res = await saveQuestionSet(initialSet.id, payload())
+    clearInfoSaveTimer()
+    const res = await saveQueueRef.current?.saveAndWait(latestPayloadRef.current ?? currentPayload)
+    if (!res) return false
     if ('error' in res) {
-      toast.error(`บันทึกแฟ้มไม่สำเร็จ จึงยังไม่ได้ไปหน้าแก้ไขโจทย์ — ${res.error}`)
+      toast.error('บันทึกแฟ้มไม่สำเร็จ จึงยังไม่ได้ไปหน้าแก้ไขโจทย์ กรุณาลองใหม่')
       return false
     }
-    toast.success('บันทึกแฟ้มแล้ว — กำลังไปหน้าแก้ไขโจทย์')
     return true
   }
+
+  function finishEditingInfo() {
+    if (!canSave) {
+      setAutosaveStatus({ state: 'error', error: 'กรุณาตั้งชื่อแฟ้มโจทย์' })
+      toast.error('กรุณาตั้งชื่อแฟ้มโจทย์')
+      return
+    }
+    clearInfoSaveTimer()
+    if (infoTouchedRef.current && latestPayloadRef.current) {
+      queueExistingSetSave(latestPayloadRef.current)
+    }
+    setEditingInfo(false)
+  }
+
+  function retryAutosave() {
+    if (!latestPayloadRef.current) return
+    queueExistingSetSave(latestPayloadRef.current)
+  }
+
+  useEffect(() => {
+    if (!initialSet || !infoTouchedRef.current) return
+    clearInfoSaveTimer()
+    if (!title.trim()) {
+      setAutosaveStatus({ state: 'error', error: 'กรุณาตั้งชื่อแฟ้มโจทย์' })
+      return
+    }
+
+    setAutosaveStatus({ state: 'waiting' })
+    infoSaveTimerRef.current = setTimeout(() => {
+      infoSaveTimerRef.current = null
+      if (latestPayloadRef.current) queueExistingSetSave(latestPayloadRef.current)
+    }, 650)
+
+    return clearInfoSaveTimer
+    // Only information fields are debounced. Structural actions call
+    // changeStructure() and enter the serialized queue immediately.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, description, visibility, teamOrgId, sharedOrgIds, initialSet])
+
+  useEffect(() => {
+    if (!initialSet || autosaveStatus.state === 'saved') return
+    const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = true
+    }
+    window.addEventListener('beforeunload', warnBeforeLeaving)
+    return () => window.removeEventListener('beforeunload', warnBeforeLeaving)
+  }, [autosaveStatus.state, initialSet])
 
   // Suggestions for the add-a-tag control on each card, ranked by how much of
   // the คลัง already uses them. Read off the rows the picker loaded, so it
@@ -226,22 +356,52 @@ export function CreateQuestionSetForm({ questions, initialSet, initialCardData }
 
   return (
     <div className="space-y-4">
-      {/* The แฟ้ม's own name is the page's heading, read off the draft so a
-          rename shows up before it is saved. */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">
-          {initialSet ? (
-            <>
-              <span className="text-muted-foreground font-semibold">แฟ้มโจทย์</span>{' '}
-              {title.trim() || <span className="text-muted-foreground">ไม่มีชื่อ</span>}
-            </>
-          ) : 'สร้างแฟ้มโจทย์'}
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {initialSet
-            ? 'การแก้ไขจะไม่ย้อนกลับไปเปลี่ยนชุดข้อสอบที่มอบหมายไปแล้วจากแฟ้มนี้'
-            : 'รวมโจทย์จากคลังไว้ในแฟ้มเพื่อใช้ซ้ำ'}
-        </p>
+      {/* The แฟ้ม's own name is the page's heading, read off the current state
+          so a rename appears while its autosave is being queued. */}
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">
+            {initialSet ? (
+              <>
+                <span className="text-muted-foreground font-semibold">แฟ้มโจทย์</span>{' '}
+                {title.trim() || <span className="text-muted-foreground">ไม่มีชื่อ</span>}
+              </>
+            ) : 'สร้างแฟ้มโจทย์'}
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {initialSet
+              ? 'การแก้ไขจะไม่ย้อนกลับไปเปลี่ยนชุดข้อสอบที่มอบหมายไปแล้วจากแฟ้มนี้'
+              : 'รวมโจทย์จากคลังไว้ในแฟ้มเพื่อใช้ซ้ำ'}
+          </p>
+        </div>
+        {initialSet && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="min-h-8 flex items-center gap-1.5 text-sm text-muted-foreground"
+          >
+            {autosaveStatus.state === 'saved' && (
+              <><CheckCircle2 className="size-4 text-success" aria-hidden="true" /> บันทึกอัตโนมัติแล้ว</>
+            )}
+            {autosaveStatus.state === 'waiting' && (
+              <><LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> รอบันทึกอัตโนมัติ…</>
+            )}
+            {autosaveStatus.state === 'saving' && (
+              <><LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> กำลังบันทึก…</>
+            )}
+            {autosaveStatus.state === 'error' && (
+              <>
+                <CloudAlert className="size-4 text-destructive" aria-hidden="true" />
+                <span className="text-destructive">{autosaveStatus.error}</span>
+                {canSave && (
+                  <Button type="button" variant="link" size="xs" onClick={retryAutosave} className="h-auto px-1">
+                    ลองใหม่
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <Card padding="xl" className="space-y-4">
@@ -252,7 +412,7 @@ export function CreateQuestionSetForm({ questions, initialSet, initialCardData }
               type="button"
               variant={editingInfo ? 'ghost' : 'outline'}
               size="sm"
-              onClick={() => setEditingInfo(v => !v)}
+              onClick={() => editingInfo ? finishEditingInfo() : setEditingInfo(true)}
               className="gap-1.5"
             >
               {editingInfo ? 'เสร็จสิ้น' : <><Pencil className="w-3.5 h-3.5" /> แก้ไข</>}
@@ -281,7 +441,7 @@ export function CreateQuestionSetForm({ questions, initialSet, initialCardData }
           <Input
             id="set-title"
             value={title}
-            onChange={e => setTitle(e.target.value)}
+            onChange={e => { markInfoChanged(); setTitle(e.target.value) }}
             placeholder="เช่น แบบฝึกหัด กฎการเคลื่อนที่ของนิวตัน"
             autoFocus
             key={editingInfo ? 'editing' : 'idle'}
@@ -293,7 +453,7 @@ export function CreateQuestionSetForm({ questions, initialSet, initialCardData }
           <Textarea
             id="set-desc"
             value={description}
-            onChange={e => setDescription(e.target.value)}
+            onChange={e => { markInfoChanged(); setDescription(e.target.value) }}
             placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"
             rows={2}
           />
@@ -305,6 +465,7 @@ export function CreateQuestionSetForm({ questions, initialSet, initialCardData }
             value={visibility === 'school' ? 'organization' : visibility}
             onValueChange={(v) => {
               if (v === null) return
+              markInfoChanged()
               setVisibility(v as Visibility)
               if (v === 'private') {
                 setTeamOrgId(null)
@@ -354,7 +515,7 @@ export function CreateQuestionSetForm({ questions, initialSet, initialCardData }
         questions={questions}
         questionIds={selectedIds}
         sections={sections}
-        onChange={next => { setSelectedIds(next.questionIds); setSections(next.sections) }}
+        onChange={changeStructure}
         onAddQuestions={openPicker}
         allTags={allTags}
         myTeams={teams}
@@ -445,7 +606,7 @@ export function CreateQuestionSetForm({ questions, initialSet, initialCardData }
         />
       )}
 
-      <div className="flex items-center justify-between pt-2">
+      <div className={`flex items-center pt-2 ${initialSet ? 'justify-start' : 'justify-between'}`}>
         {initialSet ? (
           <Button type="button" variant="outline" onClick={() => setConfirmingDelete(true)} disabled={isPending} className="gap-2 text-destructive border-destructive/20 hover:bg-destructive/10">
             <Trash2 className="w-4 h-4" /> ลบแฟ้มโจทย์
@@ -455,10 +616,12 @@ export function CreateQuestionSetForm({ questions, initialSet, initialCardData }
             ยกเลิก
           </Button>
         )}
-        <Button type="button" onClick={handleSubmit} disabled={isPending || !canSave} className="gap-2">
-          <Save className="w-4 h-4" />
-          {isPending ? 'กำลังบันทึก...' : initialSet ? 'บันทึกการแก้ไข' : 'สร้างแฟ้มโจทย์'}
-        </Button>
+        {!initialSet && (
+          <Button type="button" onClick={handleSubmit} disabled={isPending || !canSave} className="gap-2">
+            <Save className="w-4 h-4" />
+            {isPending ? 'กำลังบันทึก...' : 'สร้างแฟ้มโจทย์'}
+          </Button>
+        )}
       </div>
     </div>
   )

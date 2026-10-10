@@ -13,7 +13,7 @@ import {
 import { fileQuestionsIntoSets } from '@/lib/question-set-filing'
 import type { QuestionSet, Visibility } from '@/lib/types'
 
-interface QuestionSetData {
+export interface QuestionSetData {
   title: string
   description: string
   question_ids: string[]
@@ -66,6 +66,7 @@ export async function createQuestionSet(data: QuestionSetData) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+  if (!data.title.trim()) return { error: 'กรุณาตั้งชื่อแฟ้มโจทย์' }
 
   const orgResult = await resolveOrgId(data.visibility, data.org_id)
   if ('error' in orgResult) return orgResult
@@ -123,6 +124,7 @@ async function writeQuestionSet(id: string, data: QuestionSetData) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+  if (!data.title.trim()) return { error: 'กรุณาตั้งชื่อแฟ้มโจทย์' }
 
   const orgResult = await resolveOrgId(data.visibility, data.org_id)
   if ('error' in orgResult) return orgResult

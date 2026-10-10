@@ -10,6 +10,10 @@ import { Card } from '@/components/ui/card'
 import { SetStructurePanel, type PanelQuestion } from '@/components/questions/set-structure-panel'
 import type { QuestionSetSection } from '@/lib/question-set-sections'
 import type { QuestionCardData } from '@/lib/question-card-data'
+import { CreateQuestionSetForm } from '@/components/assignments/create-question-set-form'
+import type { BankQuestion } from '@/lib/question-bank'
+import type { QuestionSet } from '@/lib/types'
+import type { QuestionSetData } from '@/lib/actions/question-sets'
 
 const LAB_USER = '00000000-0000-4000-8000-000000000001'
 
@@ -103,6 +107,17 @@ const STRUCTURE_CARD_DATA: QuestionCardData = {
   stats: {}, duplicateCounts: {}, subQuestionCounts: {}, setMemberships: {}, solutionPresence: {},
 }
 const STRUCTURE_QUESTION_IDS = STRUCTURE_QUESTIONS.map(question => question.id)
+const AUTOSAVE_QUESTIONS: BankQuestion[] = STRUCTURE_QUESTIONS.map(question => ({
+  id: question.id,
+  title: question.title,
+  question_text: question.question_text ?? '',
+  question_type: question.question_type,
+  difficulty: question.difficulty,
+  tags: question.tags ?? [],
+  sub_question_count: 1,
+  default_points: 1,
+  has_random_values: false,
+}))
 const STRUCTURE_SECTIONS: QuestionSetSection[] = [
   {
     id: 'lab-section-work',
@@ -115,6 +130,25 @@ const STRUCTURE_SECTIONS: QuestionSetSection[] = [
     question_ids: [STRUCTURE_QUESTION_IDS[1], STRUCTURE_QUESTION_IDS[2]],
   },
 ]
+
+const AUTOSAVE_SET: QuestionSet = {
+  id: '00000000-0000-4000-8000-000000000099',
+  org_id: LAB_USER,
+  created_by: LAB_USER,
+  visibility: 'private',
+  title: 'งานและพลังงาน',
+  description: null,
+  question_ids: STRUCTURE_QUESTION_IDS,
+  sections: STRUCTURE_SECTIONS,
+  tags: [],
+  created_at: '2026-10-10T00:00:00.000Z',
+  updated_at: '2026-10-10T00:00:00.000Z',
+}
+
+async function saveAutosaveFixture(_id: string, _data: QuestionSetData) {
+  await new Promise(resolve => setTimeout(resolve, 180))
+  return { ok: true as const }
+}
 
 export function QuestionSetsLabClient() {
   const [structureSections, setStructureSections] = useState<QuestionSetSection[]>(STRUCTURE_SECTIONS)
@@ -130,6 +164,19 @@ export function QuestionSetsLabClient() {
           ปุ่มนำเข้า ดาวน์โหลด ลบ และลิงก์สร้าง/แก้ไขยังเป็น action จริง จึงไม่ใช้ปุ่มเหล่านี้ในห้องทดลอง
         </p>
       </Card>
+      <Card padding="md" radius="md" className="space-y-1">
+        <h2 className="font-semibold">ห้องทดลองบันทึกแฟ้มอัตโนมัติ</h2>
+        <p className="text-sm text-muted-foreground">
+          การบันทึกในส่วนนี้จำลองในหน่วยความจำ ไม่อ่านหรือเขียน Supabase
+        </p>
+      </Card>
+      <CreateQuestionSetForm
+        questions={AUTOSAVE_QUESTIONS}
+        initialSet={AUTOSAVE_SET}
+        initialCardData={STRUCTURE_CARD_DATA}
+        saveExistingSet={saveAutosaveFixture}
+        teamOptions={[]}
+      />
       <QuestionSetsClient
         mySets={MY_SETS}
         teamSets={TEAM_SETS}

@@ -65,7 +65,7 @@ interface Props {
   myTeams: { id: string; name: string }[]
   /** The แฟ้ม's id, absent while it is still being created. */
   setId?: string
-  /** Writes the แฟ้ม draft down before a card leaves for the โจทย์ editor. */
+  /** Flushes the แฟ้ม's newest autosave before leaving for the โจทย์ editor. */
   onSaveBeforeEdit?: () => Promise<boolean>
   /** Card data for the แฟ้ม's first page, fetched with the page. */
   initialCardData?: QuestionCardData
@@ -140,13 +140,13 @@ export function SetStructurePanel({
     if (isNewSection) {
       const section = { id: newSectionId(), title, question_ids: ordered }
       apply(normalizeSetSections([...sections, section], questionIds))
-      toast.success(`สร้างแฟ้มย่อย “${title || UNNAMED}” แล้ว — อย่าลืมกดบันทึกการแก้ไข`)
+      toast.success(`สร้างแฟ้มย่อย “${title || UNNAMED}” และบันทึกแล้ว`)
     } else if (dialogSectionId) {
       apply(normalizeSetSections(
         sections.map(s => (s.id === dialogSectionId ? { ...s, title, question_ids: ordered } : s)),
         questionIds
       ))
-      toast.success('บันทึกแฟ้มย่อยแล้ว — อย่าลืมกดบันทึกการแก้ไข')
+      toast.success('บันทึกแฟ้มย่อยแล้ว')
     }
     setDialogSectionId(null)
   }
@@ -167,7 +167,7 @@ export function SetStructurePanel({
   function removeQuestions(ids: string[]) {
     apply(removeQuestionsFromSet(sections, questionIds, ids))
     setSelected(prev => prev.filter(id => !ids.includes(id)))
-    toast.success(`เอาออกจากแฟ้ม ${ids.length} ข้อแล้ว — อย่าลืมกดบันทึกการแก้ไข`)
+    toast.success(`เอาออกจากแฟ้ม ${ids.length} ข้อและบันทึกแล้ว`)
   }
 
   const allSelected = questionIds.length > 0 && questionIds.every(id => selected.includes(id))
@@ -430,7 +430,7 @@ function SectionDialog({
   onConfirm: (title: string, memberIds: string[]) => void
   /** The แฟ้ม's id, absent while it is still being created. */
   setId?: string
-  /** Writes the แฟ้ม draft down before leaving for the โจทย์ editor. */
+  /** Flushes the แฟ้ม's newest autosave before leaving for the โจทย์ editor. */
   onSaveBeforeEdit?: () => Promise<boolean>
 }) {
   const router = useRouter()
