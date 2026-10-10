@@ -269,7 +269,7 @@ export function ClassroomSettingsDialog({
           {/* ── Enrollment ── */}
           <div className="space-y-3">
             <Label className="text-sm font-medium">ประเภทการเข้าร่วม</Label>
-            <AccessTypePicker value={meta.accessType} onChange={v => set('accessType', v)} />
+            <AccessTypePicker value={meta.accessType} onChange={v => set('accessType', v)} compact />
           </div>
 
           <Card padding="lg" className="space-y-4">

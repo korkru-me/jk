@@ -3,7 +3,8 @@
 import { useCallback, useState } from 'react'
 import { CreateCourseWizard, type CreateCourseWizardActions } from '@/app/(app)/classrooms/new/_components/create-course-wizard'
 import { ClassroomContextNavigation } from '@/app/(app)/classrooms/[id]/_components/classroom-context-sidebar'
-import { composeDescription, EMPTY_META, parseDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
+import { composeDescription, EMPTY_META, parseDescription, type AccessType } from '@/app/(app)/classrooms/_components/classroom-meta'
+import { AccessTypePicker } from '@/app/(app)/classrooms/_components/classroom-meta-fields'
 import { ClassroomCard } from '@/app/(app)/classrooms/_components/classroom-card'
 import { TeacherDashboard } from '@/app/(app)/dashboard/_components/teacher-dashboard'
 import { ShellClient } from '@/components/layout/shell-client'
@@ -42,6 +43,7 @@ function LabContent({ initialCoverPattern }: { initialCoverPattern: ClassroomCov
   const [room, setRoom] = useState(DEFAULT)
   const [created, setCreated] = useState(false)
   const [formKey, setFormKey] = useState(0)
+  const [accessType, setAccessType] = useState<AccessType>('open')
   const render = useCallback((onClose?: () => void) => <ClassroomContextNavigation
     classroom={room} switchableClassrooms={[DEFAULT, OTHER]} backHref="/exam-screen-lab/classroom-icons"
     navigationItems={classroomNavigationFor('subject', true)} studentCount={0}
@@ -95,6 +97,10 @@ function LabContent({ initialCoverPattern }: { initialCoverPattern: ClassroomCov
       </div>
       <p role="status">{created ? 'สร้างห้องจำลองสำเร็จ' : 'ยังไม่บันทึกห้องจำลอง'}</p>
       <Button variant="outline" onClick={() => { setCreated(false); setFormKey(key => key + 1) }}>เปิดสำเนาห้องจำลอง</Button>
+    </Card>
+    <Card padding="lg" className="flex flex-col gap-3" data-lab-access-type-picker>
+      <h2 className="font-semibold">ประเภทการเข้าร่วมแบบกะทัดรัด</h2>
+      <AccessTypePicker value={accessType} onChange={setAccessType} compact />
     </Card>
     <CreateCourseWizard
       key={formKey}
