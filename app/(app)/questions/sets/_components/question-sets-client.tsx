@@ -4,21 +4,16 @@ import { useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Plus, Search, Layers, Trash2, Send, Download, Users, ChevronDown } from 'lucide-react'
+import { Plus, Search, Layers, Trash2, Download, Users, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { IconButton } from '@/components/ui/icon-button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input } from '@/components/ui/input'
-import { Separator } from '@/components/ui/separator'
 import { deleteQuestionSet } from '@/lib/actions/question-sets'
 import { exportQuestionSet } from '@/lib/actions/question-export'
 import { downloadTextFile, cn } from '@/lib/utils'
 import { ImportQuestionsButton } from '@/components/questions/import-questions-button'
-import {
-  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
-  DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator,
-} from '@/components/ui/dropdown-menu'
 import { parseSections } from '@/lib/question-set-sections'
 import type {
   QuestionSetSummary,
@@ -179,11 +174,13 @@ function SetCard({ set, currentUserId }: { set: QuestionSetSummaryWithCreator; c
   const isOwner = set.created_by === currentUserId
   const sections = parseSections(set.sections)
   const questionCount = set.valid_question_count ?? set.question_ids.length
-  const assignHref = `/assignments/new?set=${set.id}`
-  // Clicking the card goes where the teacher can actually act: their own set
-  // opens for editing, a teammate's set (which /edit refuses) goes to มอบหมาย.
-  const cardHref = isOwner ? `/questions/sets/${set.id}/edit` : assignHref
-  const cardAction = isOwner ? 'แก้ไขแฟ้มโจทย์' : 'มอบหมายแฟ้มโจทย์'
+  // This is the filing workspace, not an assignment launcher. Owners edit
+  // their แฟ้ม; a teammate's read-only แฟ้ม opens its questions in the
+  // library below instead of sending the teacher into assignment creation.
+  const cardHref = isOwner
+    ? `/questions/sets/${set.id}/edit`
+    : `/questions/sets?qscope=${encodeURIComponent(set.id)}`
+  const cardAction = isOwner ? 'แก้ไขแฟ้มโจทย์' : 'ดูโจทย์ในแฟ้ม'
 
   function handleDelete() {
     startTransition(async () => {
@@ -252,92 +249,54 @@ function SetCard({ set, currentUserId }: { set: QuestionSetSummaryWithCreator; c
         </div>
       </div>
 
-      <div className="relative flex flex-1 flex-col justify-center gap-1.5 p-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <p className="min-w-0 flex-1 truncate text-sm leading-snug text-muted-foreground">
-            {set.description
-              || (isOwner ? 'เปิดแฟ้มเพื่อเพิ่มรายละเอียดและจัดลำดับโจทย์' : 'แฟ้มที่ทีมแชร์ไว้ พร้อมนำไปมอบหมายให้ห้องเรียน')}
-          </p>
+      <div className="relative flex flex-1 items-center gap-2 p-3">
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <div className="flex min-w-0 items-center gap-2">
+            <p className="min-w-0 flex-1 truncate text-sm leading-snug text-muted-foreground">
+              {set.description
+                || (isOwner ? 'เปิดแฟ้มเพื่อเพิ่มรายละเอียดและจัดลำดับโจทย์' : 'เปิดดูโจทย์ในแฟ้มที่ทีมแชร์ไว้')}
+            </p>
 
-          {sections.length > 0 && (
-            <div className="flex max-w-[52%] shrink-0 items-center gap-1 overflow-hidden">
-              {sections.slice(0, 1).map(section => (
-                <Badge key={section.id} variant="secondary" className="min-w-0 max-w-24 truncate">
-                  {section.title || 'ไม่ได้ตั้งชื่อ'}
+            {sections.length > 0 && (
+              <div className="flex max-w-[52%] shrink-0 items-center gap-1 overflow-hidden">
+                {sections.slice(0, 1).map(section => (
+                  <Badge key={section.id} variant="secondary" className="min-w-0 max-w-24 truncate">
+                    {section.title || 'ไม่ได้ตั้งชื่อ'}
+                  </Badge>
+                ))}
+                {sections.length > 1 && (
+                  <Badge variant="outline">+{sections.length - 1}</Badge>
+                )}
+              </div>
+            )}
+          </div>
+
+          {(set.organizations?.name || set.shared_org_names?.length || (!isOwner && set.users?.full_name)) && (
+            <div className="flex flex-wrap items-center gap-1">
+              {set.organizations?.name && (
+                <Badge variant="outline">
+                  {set.organizations.name}
+                </Badge>
+              )}
+              {set.shared_org_names?.map((name) => (
+                <Badge key={name} variant="secondary">
+                  + {name}
                 </Badge>
               ))}
-              {sections.length > 1 && (
-                <Badge variant="outline">+{sections.length - 1}</Badge>
+              {!isOwner && set.users?.full_name && (
+                <span className="text-xs text-muted-foreground">โดย {set.users.full_name}</span>
               )}
             </div>
           )}
         </div>
 
-        {(set.organizations?.name || set.shared_org_names?.length || (!isOwner && set.users?.full_name)) && (
-          <div className="flex flex-wrap items-center gap-1">
-            {set.organizations?.name && (
-              <Badge variant="outline">
-                {set.organizations.name}
-              </Badge>
-            )}
-            {set.shared_org_names?.map((name) => (
-              <Badge key={name} variant="secondary">
-                + {name}
-              </Badge>
-            ))}
-            {!isOwner && set.users?.full_name && (
-              <span className="text-xs text-muted-foreground">โดย {set.users.full_name}</span>
-            )}
-          </div>
-        )}
-      </div>
-
-      <Separator />
-      <div className="relative z-20 flex items-center gap-1.5 bg-muted/30 p-2">
-        <div className="flex flex-1 min-w-0">
-          <Button
-            render={<Link href={assignHref} />}
-            aria-label={`มอบหมายแฟ้มโจทย์ ${set.title}`}
-            className={cn('flex-1 min-w-0 gap-1.5', sections.length > 0 && 'rounded-r-none')}
-          >
-            <Send data-icon="inline-start" /> มอบหมาย
-          </Button>
-          {sections.length > 0 && (
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={<Button className="rounded-l-none border-l border-primary-foreground/20 px-2" aria-label={`เลือกแฟ้มย่อยจาก ${set.title} ที่จะมอบหมาย`} />}
-              >
-                <ChevronDown />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel>มอบหมายเฉพาะแฟ้มย่อย</DropdownMenuLabel>
-                  {sections.map(section => (
-                    <DropdownMenuItem
-                      key={section.id}
-                      render={<Link href={`/assignments/new?set=${set.id}&sections=${section.id}`} />}
-                    >
-                      {section.title || 'แฟ้มย่อยที่ยังไม่ตั้งชื่อ'} ({section.question_ids.length} ข้อ)
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuGroup>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem render={<Link href={assignHref} />}>
-                  ทั้งแฟ้ม ({questionCount} ข้อ)
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </div>
-
         {isOwner && (
-          <>
-            {/* Keeps ดาวน์โหลด/ลบ from reading as one control with มอบหมาย. */}
-            <Separator orientation="vertical" className="mx-0.5" />
+          <div className="relative z-20 flex shrink-0 items-center gap-1">
             <IconButton
               label={`ดาวน์โหลดแฟ้มโจทย์ ${set.title} เป็นไฟล์`}
               onClick={handleExport}
               disabled={isPending}
+              size="xs"
               className="text-muted-foreground hover:text-primary"
             >
               <Download />
@@ -346,11 +305,12 @@ function SetCard({ set, currentUserId }: { set: QuestionSetSummaryWithCreator; c
               label={`ลบแฟ้มโจทย์ ${set.title}`}
               onClick={() => setConfirmingDelete(true)}
               disabled={isPending}
+              size="xs"
               className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
             >
               <Trash2 />
             </IconButton>
-          </>
+          </div>
         )}
       </div>
 
@@ -382,7 +342,7 @@ function EmptyState() {
       </div>
       <h3 className="text-lg font-semibold text-foreground mb-1">ยังไม่มีแฟ้มโจทย์ในคลัง</h3>
       <p className="text-sm text-muted-foreground mb-6 max-w-xs mx-auto">
-        รวมโจทย์จากคลังไว้ในแฟ้ม แล้วนำไปมอบหมายให้ห้องเรียนได้ทีหลัง
+        รวมโจทย์จากคลังไว้เป็นแฟ้ม เพื่อจัดหมวดหมู่และนำกลับมาใช้ได้ง่าย
       </p>
       <Button render={<Link href="/questions/sets/new" />} className="shadow-sm">
         <Plus data-icon="inline-start" /> สร้างแฟ้มโจทย์แรก
