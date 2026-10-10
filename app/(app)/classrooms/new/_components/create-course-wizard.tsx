@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -84,14 +84,40 @@ function CoverDesignSection({
   onIconChange: (key: ClassroomIconKey) => void
   onCoverChange: (id: string) => void
 }) {
+  const iconPickerRef = useRef<HTMLDivElement>(null)
+  const themePickerRef = useRef<HTMLDivElement>(null)
+  const [iconPickerOpen, setIconPickerOpen] = useState(false)
   const [themePickerOpen, setThemePickerOpen] = useState(false)
   const selectedPreset = COVER_PRESETS.find(preset => preset.id === cover) ?? COVER_PRESETS[0]
 
-  return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      <ClassroomIconPicker value={iconKey} onValueChange={onIconChange} compact />
+  useEffect(() => {
+    if (!iconPickerOpen && !themePickerOpen) return
 
-      <div className="space-y-1.5">
+    function closePickersOnOutsidePointerDown(event: PointerEvent) {
+      const target = event.target
+      if (!(target instanceof Node)) return
+      if (iconPickerRef.current?.contains(target) || themePickerRef.current?.contains(target)) return
+      setIconPickerOpen(false)
+      setThemePickerOpen(false)
+    }
+
+    document.addEventListener('pointerdown', closePickersOnOutsidePointerDown, true)
+    return () => document.removeEventListener('pointerdown', closePickersOnOutsidePointerDown, true)
+  }, [iconPickerOpen, themePickerOpen])
+
+  return (
+    <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
+      <div ref={iconPickerRef}>
+        <ClassroomIconPicker
+          value={iconKey}
+          onValueChange={onIconChange}
+          compact
+          open={iconPickerOpen}
+          onOpenChange={setIconPickerOpen}
+        />
+      </div>
+
+      <div ref={themePickerRef} className="space-y-1.5">
         <Label className="text-sm font-medium">ธีมสี</Label>
         <Collapsible open={themePickerOpen} onOpenChange={setThemePickerOpen}>
           <CollapsibleTrigger
