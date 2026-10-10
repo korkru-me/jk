@@ -37,7 +37,7 @@ export function Topbar({ user, initialUnreadCount, onMenuToggle, sidebarCollapse
   useEffect(() => setThemeMounted(true), [])
 
   return (
-    <header className="h-16 border-b bg-card flex items-center justify-between gap-2 pl-3 pr-2 sm:pr-6 shrink-0">
+    <header className="h-14 border-b bg-card flex items-center justify-between gap-2 pl-3 pr-2 sm:pr-6 shrink-0">
       <div className="flex shrink-0 items-center gap-2">
         <IconButton
           className="size-11 md:hidden"
@@ -59,7 +59,7 @@ export function Topbar({ user, initialUnreadCount, onMenuToggle, sidebarCollapse
         </IconButton>
 
         <Link href="/dashboard" onClick={onLogoNavigate} title="KorKru · หน้าหลัก" className="shrink-0">
-          <BrandLogo layout="stacked" />
+          <BrandLogo layout="stacked" compact />
         </Link>
       </div>
 
