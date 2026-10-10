@@ -14,9 +14,10 @@ import { ClassroomIcon } from '@/components/classrooms/classroom-icon'
 import { ClassroomCoverPattern } from '@/components/classrooms/classroom-cover-pattern'
 
 interface Props {
-  classroom: Classroom
+  classroom: Pick<Classroom, 'id' | 'name' | 'description' | 'classroom_type'>
   studentCount: number
   assignmentCount: number
+  backHref?: string
   isSelecting?: boolean
   isSelected?: boolean
   onToggle?: () => void
@@ -27,6 +28,7 @@ interface Props {
 
 export function ClassroomCard({
   classroom, studentCount, assignmentCount,
+  backHref = '/classrooms',
   isSelecting = false, isSelected = false, onToggle,
   onDuplicate, onDelete, dragHandle,
 }: Props) {
@@ -173,7 +175,7 @@ export function ClassroomCard({
       )}
     >
       <Link
-        href={withBackHref(`/classrooms/${classroom.id}`, '/classrooms')}
+        href={withBackHref(`/classrooms/${classroom.id}`, backHref)}
         aria-label={`เปิดห้องเรียน ${classroom.name}`}
         className="absolute inset-0 z-10 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       />

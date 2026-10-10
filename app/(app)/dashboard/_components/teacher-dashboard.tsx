@@ -16,18 +16,13 @@ import {
   Table2,
   TextCursorInput,
   ToggleLeft,
-  Users,
 } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { TYPE_LABEL } from '@/lib/question-display'
-import type { ClassroomIconKey } from '@/lib/classroom-icons'
-import type { ClassroomCoverPatternKey } from '@/lib/classroom-cover-patterns'
-import { ClassroomIcon } from '@/components/classrooms/classroom-icon'
-import { ClassroomCoverPattern } from '@/components/classrooms/classroom-cover-pattern'
-import { COVER_PRESETS, type CoverPreset } from '@/app/(app)/classrooms/_components/classroom-meta'
+import type { Classroom } from '@/lib/types'
+import { ClassroomCard } from '@/app/(app)/classrooms/_components/classroom-card'
 
 /**
  * Decorative accents distinguish the three kinds of work without claiming a
@@ -70,15 +65,10 @@ const TYPE_ICON: Record<string, React.ElementType> = {
   classify: Table2,
 }
 
-export interface DashboardClassroom {
-  id: string
-  name: string
-  classroom_type: string
-  cover?: string
-  coverPattern?: ClassroomCoverPatternKey
-  iconKey?: ClassroomIconKey
-  gradeLevel?: string
-  academicTerm?: string
+export type DashboardClassroom = Pick<
+  Classroom,
+  'id' | 'name' | 'description' | 'classroom_type'
+> & {
   studentCount: number
   assignmentCount: number
 }
@@ -159,9 +149,16 @@ export function TeacherDashboard({
         emptyText="ยังไม่มีห้องเรียน"
         emptyAction={{ href: '/classrooms/new', label: 'สร้างห้องเรียนแรก' }}
       >
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
           {classrooms.map(classroom => (
-            <ClassroomDashboardCard key={classroom.id} classroom={classroom} />
+            <div key={classroom.id} data-dashboard-classroom-card>
+              <ClassroomCard
+                classroom={classroom}
+                studentCount={classroom.studentCount}
+                assignmentCount={classroom.assignmentCount}
+                backHref="/dashboard"
+              />
+            </div>
           ))}
         </div>
       </DashboardSection>
@@ -312,58 +309,6 @@ function DashboardSection({
   )
 }
 
-function ClassroomDashboardCard({ classroom }: { classroom: DashboardClassroom }) {
-  const cover = dashboardCover(classroom)
-  const isHomeroom = classroom.classroom_type === 'homeroom'
-
-  return (
-    <Card radius="md" className="group overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-      <Link href={`/classrooms/${classroom.id}`} className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        <span className={cn('relative block h-20 overflow-hidden border-b', cover.surface, cover.text)}>
-          <ClassroomCoverPattern
-            patternKey={classroom.coverPattern}
-            placement="end"
-            className="absolute inset-0 size-full opacity-65 transition-transform duration-300 group-hover:scale-[1.03]"
-          />
-        </span>
-        <span className="relative flex min-h-36 flex-col gap-3 px-4 pb-4 pt-8">
-          <span className={cn(
-            'absolute -top-6 left-4 flex size-12 items-center justify-center rounded-2xl border-4 border-card bg-card shadow-sm',
-            cover.text,
-          )}>
-            <ClassroomIcon iconKey={classroom.iconKey} className="size-6" />
-          </span>
-          <span className="flex min-w-0 items-center gap-2">
-            <strong className="min-w-0 flex-1 truncate text-base">{classroom.name}</strong>
-            {isHomeroom && <Badge variant="warning">ที่ปรึกษา</Badge>}
-          </span>
-          {(classroom.gradeLevel || classroom.academicTerm) && (
-            <span className="-mt-2 block truncate text-xs text-muted-foreground">
-              {[classroom.gradeLevel, classroom.academicTerm].filter(Boolean).join(' • ')}
-            </span>
-          )}
-          <span className="flex flex-wrap items-center gap-2">
-            <Badge variant="secondary">
-              <Users aria-hidden="true" />
-              {classroom.studentCount} คน
-            </Badge>
-            {!isHomeroom && (
-              <Badge variant="secondary">
-                <FileText aria-hidden="true" />
-                {classroom.assignmentCount} ชุดข้อสอบ
-              </Badge>
-            )}
-          </span>
-          <span className={cn(buttonVariants({ size: 'sm' }), 'mt-auto w-full')}>
-            เข้าห้องเรียน
-            <ChevronRight data-icon="inline-end" />
-          </span>
-        </span>
-      </Link>
-    </Card>
-  )
-}
-
 function CompactResourceCard({
   href,
   title,
@@ -391,18 +336,6 @@ function CompactResourceCard({
       </Link>
     </Card>
   )
-}
-
-function dashboardCover(classroom: DashboardClassroom): CoverPreset {
-  const saved = COVER_PRESETS.find(preset => preset.id === classroom.cover)
-  if (saved) return saved
-
-  // Legacy rooms with no chosen colour still get a stable automatic colour.
-  // Persisted metadata is untouched; the same room simply hashes to the same
-  // visual every time until the teacher explicitly chooses a theme.
-  let hash = 0
-  for (const character of classroom.id) hash = ((hash << 5) - hash + character.charCodeAt(0)) | 0
-  return COVER_PRESETS[Math.abs(hash) % Math.min(8, COVER_PRESETS.length)]
 }
 
 function GettingStarted() {

@@ -18,7 +18,6 @@ import { formatThaiDate, thaiHour } from '@/lib/thai-time'
 import { filterAssignmentsForStudent } from '@/lib/classroom-groups-server'
 import { Clock, BookOpen, School, ChevronRight, TrendingUp, AlertCircle, Megaphone } from 'lucide-react'
 import { Card } from '@/components/ui/card'
-import { parseDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
 
 export const metadata = { title: 'หน้าหลัก — KorKru' }
 
@@ -83,21 +82,14 @@ export default async function DashboardPage() {
     const liveQuestionIds = new Set((liveQuestions ?? []).map(q => q.id))
 
     const classroomRows = (classroomsRes.data ?? []) as any[]
-    const classrooms: DashboardClassroom[] = classroomRows.map(row => {
-      const meta = parseDescription(row.description)
-      return {
-        id: row.id,
-        name: row.name,
-        classroom_type: row.classroom_type,
-        cover: meta.cover,
-        coverPattern: meta.coverPattern,
-        iconKey: meta.iconKey,
-        gradeLevel: meta.gradeLevel,
-        academicTerm: meta.academicTerm,
-        studentCount: row.classroom_students?.[0]?.count ?? 0,
-        assignmentCount: row.assignment_classrooms?.[0]?.count ?? 0,
-      }
-    })
+    const classrooms: DashboardClassroom[] = classroomRows.map(row => ({
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      classroom_type: row.classroom_type,
+      studentCount: row.classroom_students?.[0]?.count ?? 0,
+      assignmentCount: row.assignment_classrooms?.[0]?.count ?? 0,
+    }))
 
     return (
       <TeacherDashboard

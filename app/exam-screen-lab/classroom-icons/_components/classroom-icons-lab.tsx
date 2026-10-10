@@ -67,11 +67,11 @@ function LabContent({ initialCoverPattern }: { initialCoverPattern: ClassroomCov
         setsCount={8}
         studentsCount={210}
         classrooms={[
-          { id: ROOM_ID, name: 'กลศาสตร์ 2', classroom_type: 'subject', cover: 'blue', coverPattern: 'physics', iconKey: 'physics', studentCount: 0, assignmentCount: 0 },
-          { id: `${ROOM_ID}-2`, name: 'เคมี 1/2569', classroom_type: 'subject', cover: 'mint', coverPattern: 'chemistry', iconKey: 'chemistry', studentCount: 143, assignmentCount: 1 },
-          { id: `${ROOM_ID}-3`, name: 'ชีววิทยาเพิ่มเติม', classroom_type: 'subject', cover: 'green', coverPattern: 'biology', iconKey: 'plant-biology', studentCount: 63, assignmentCount: 5 },
-          { id: `${ROOM_ID}-4`, name: 'ม.4/1', classroom_type: 'homeroom', cover: 'sky', coverPattern: 'classroom', iconKey: 'school', studentCount: 1, assignmentCount: 0 },
-          { id: `${ROOM_ID}-5`, name: 'ดาราศาสตร์', classroom_type: 'subject', cover: 'purple', coverPattern: 'korkru-deer', iconKey: 'astronomy', studentCount: 3, assignmentCount: 13 },
+          { id: ROOM_ID, name: 'กลศาสตร์ 2', classroom_type: 'subject', description: composeDescription({ ...EMPTY_META, cover: 'blue', coverPattern: 'physics', iconKey: 'physics', gradeLevel: 'ม.4', academicTerm: '1/2569' }), studentCount: 0, assignmentCount: 0 },
+          { id: `${ROOM_ID}-2`, name: 'เคมี 1/2569', classroom_type: 'subject', description: composeDescription({ ...EMPTY_META, cover: 'mint', coverPattern: 'chemistry', iconKey: 'chemistry', gradeLevel: 'ม.4', academicTerm: '1/2569' }), studentCount: 143, assignmentCount: 1 },
+          { id: `${ROOM_ID}-3`, name: 'ชีววิทยาเพิ่มเติม', classroom_type: 'subject', description: composeDescription({ ...EMPTY_META, cover: 'green', coverPattern: 'biology', iconKey: 'plant-biology', gradeLevel: 'ม.4', academicTerm: '1/2569' }), studentCount: 63, assignmentCount: 5 },
+          { id: `${ROOM_ID}-4`, name: 'ม.4/1', classroom_type: 'homeroom', description: composeDescription({ ...EMPTY_META, cover: 'sky', coverPattern: 'classroom', iconKey: 'school', gradeLevel: 'ม.4/1', academicTerm: '1/2569' }), studentCount: 1, assignmentCount: 0 },
+          { id: `${ROOM_ID}-5`, name: 'ดาราศาสตร์', classroom_type: 'subject', description: composeDescription({ ...EMPTY_META, cover: 'purple', coverPattern: 'korkru-deer', iconKey: 'astronomy', gradeLevel: 'ม.4', academicTerm: '1/2569' }), studentCount: 3, assignmentCount: 13 },
         ]}
         questionSets={[
           { id: 'set-1', title: 'การเคลื่อนที่แบบโปรเจกไทล์', questionCount: 22 },
