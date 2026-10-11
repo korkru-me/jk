@@ -5,6 +5,7 @@ import { STREAK_TARGET_DEFAULT, defaultQuestionCap } from '@/lib/streak-completi
 
 export const ASSIGNMENT_PRESET_LIMIT = 3
 export const ASSIGNMENT_PRESET_SCHEMA_VERSION = 1
+export const DEFAULT_QUESTIONS_PER_PAGE = 5
 export const assignmentPresetTypeSchema = z.enum(['exercise', 'exam'])
 const positiveNumber = z.number().finite().gt(0).max(1_000_000)
 const integer = (max: number) => z.number().int().min(1).max(max)
@@ -86,7 +87,7 @@ export function assignmentPresetDefaults(type: AssignmentType): AssignmentPreset
     duration_minutes: null, shuffle_questions: false, shuffle_options: true,
     shared_random_values: false, show_results: 'immediate', show_solutions: false,
     max_attempts: Number(defaults.maxAttempts), score_strategy: 'best', retry_scope: defaults.retryScope,
-    questions_per_page: 1, instant_check: true, instant_check_answer_key: false,
+    questions_per_page: DEFAULT_QUESTIONS_PER_PAGE, instant_check: true, instant_check_answer_key: false,
     calculator_enabled: defaults.calculatorEnabled, scratchpad_enabled: defaults.scratchpadEnabled,
     proctoring_enabled: false, fullscreen_required: false, block_clipboard: false,
     exam_watermark_enabled: false, secure_browser_mode: 'browser', android_exam_mode: 'blocked',
