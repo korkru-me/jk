@@ -33,6 +33,7 @@ import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/native-select'
 import { Toggle } from '@/components/ui/toggle'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { useDismissOnOutsideClick } from '@/hooks/use-dismiss-on-outside-click'
 
 export interface AssignmentPresetActions {
   save: typeof saveAssignmentSettingPreset
@@ -133,12 +134,14 @@ export function AssignmentSettingPresetsProvider({
   const [error, setError] = useState<string | null>(data.error)
   const [isPending, startTransition] = useTransition()
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
+  const [recallOpen, setRecallOpen] = useState(false)
   const [confirmingClose, setConfirmingClose] = useState(false)
   const [name, setName] = useState('')
   const [nameError, setNameError] = useState<string | null>(null)
   const [needsReload, setNeedsReload] = useState(false)
   const busyRef = useRef(false)
   const dialogContentRef = useRef<HTMLDivElement>(null)
+  const recallRef = useRef<HTMLDivElement>(null)
   const saveTriggerRef = useRef<HTMLButtonElement>(null)
   const [confirm, confirmation] = useConfirm()
   const selected = data.presets.find(preset => preset.id === selectedId) ?? null
@@ -160,6 +163,8 @@ export function AssignmentSettingPresetsProvider({
       : selected
         ? `${selected.name}${data.defaultPresetId === selected.id ? ' · ค่าเริ่มต้น' : ''}`
         : `ค่าระบบ${data.defaultPresetId === null ? ' · ค่าเริ่มต้น' : ''}`
+
+  useDismissOnOutsideClick(recallOpen, recallRef, () => setRecallOpen(false))
 
   function reconcileLoadedData(next: AssignmentPresetBootstrap) {
     setData(next)
@@ -370,8 +375,8 @@ export function AssignmentSettingPresetsProvider({
   </>
 
   const recall = (
-    <Card padding="md" className="min-w-0" aria-busy={isPending}>
-      <Collapsible>
+    <Card ref={recallRef} padding="md" className="min-w-0" aria-busy={isPending}>
+      <Collapsible open={recallOpen} onOpenChange={setRecallOpen}>
         <CollapsibleTrigger className="group flex w-full items-center justify-between gap-3 text-left">
           <span className="flex min-w-0 flex-col items-start gap-1">
             <span className="text-sm font-semibold">

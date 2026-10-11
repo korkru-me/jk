@@ -1,6 +1,6 @@
 'use client'
 
-import { useId, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -8,6 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { FieldLegend, FieldSet } from '@/components/ui/field'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { cn } from '@/lib/utils'
+import { useDismissOnOutsideClick } from '@/hooks/use-dismiss-on-outside-click'
 import {
   CLASSROOM_COVER_PATTERN_OPTIONS,
   classroomCoverPatternKey,
@@ -30,11 +31,13 @@ export function ClassroomCoverPatternPicker({
 }) {
   const labelId = useId()
   const [open, setOpen] = useState(false)
+  const pickerRef = useRef<HTMLFieldSetElement>(null)
   const selectedKey = classroomCoverPatternKey(value)
   const selectedIndex = CLASSROOM_COVER_PATTERN_OPTIONS.findIndex(option => option.key === selectedKey)
+  useDismissOnOutsideClick(open, pickerRef, () => setOpen(false))
 
   return (
-    <FieldSet disabled={disabled} className={compact ? 'gap-2' : undefined}>
+    <FieldSet ref={pickerRef} disabled={disabled} className={compact ? 'gap-2' : undefined}>
       <FieldLegend id={labelId} variant="label">ภาพปกห้องเรียน</FieldLegend>
       <Collapsible open={open} onOpenChange={setOpen} disabled={disabled}>
         <CollapsibleTrigger

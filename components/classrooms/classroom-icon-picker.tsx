@@ -1,6 +1,6 @@
 'use client'
 
-import { useId, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -8,6 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { FieldDescription, FieldLegend, FieldSet } from '@/components/ui/field'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { CLASSROOM_ICON_OPTIONS, classroomIconKey, type ClassroomIconKey } from '@/lib/classroom-icons'
+import { useDismissOnOutsideClick } from '@/hooks/use-dismiss-on-outside-click'
 import { ClassroomIcon } from './classroom-icon'
 
 export function ClassroomIconPicker({
@@ -28,6 +29,7 @@ export function ClassroomIconPicker({
   const labelId = useId()
   const descriptionId = useId()
   const [internalOpen, setInternalOpen] = useState(false)
+  const pickerRef = useRef<HTMLFieldSetElement>(null)
   const open = controlledOpen ?? internalOpen
   const selected = CLASSROOM_ICON_OPTIONS.find(option => option.key === classroomIconKey(value)) ?? CLASSROOM_ICON_OPTIONS[0]
 
@@ -36,8 +38,10 @@ export function ClassroomIconPicker({
     onOpenChange?.(nextOpen)
   }
 
+  useDismissOnOutsideClick(open, pickerRef, () => handleOpenChange(false))
+
   return (
-    <FieldSet disabled={disabled} className={compact ? 'gap-2' : undefined}>
+    <FieldSet ref={pickerRef} disabled={disabled} className={compact ? 'gap-2' : undefined}>
       <FieldLegend id={labelId} variant="label">ไอคอนห้องเรียน (ไม่บังคับ)</FieldLegend>
       <FieldDescription id={descriptionId} className={compact ? 'sr-only' : undefined}>
         เลือกแบบที่ชอบ ถ้าไม่เปลี่ยนจะใช้อาคารเรียนเดิม

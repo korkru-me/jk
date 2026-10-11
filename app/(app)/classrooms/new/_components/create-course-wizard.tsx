@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -95,23 +95,8 @@ function CoverDesignSection({
   onCoverChange: (id: string) => void
   onCoverPatternChange: (key: ClassroomCoverPatternKey) => void
 }) {
-  const iconPickerRef = useRef<HTMLDivElement>(null)
   const [iconPickerOpen, setIconPickerOpen] = useState(false)
   const selectedPreset = COVER_PRESETS.find(preset => preset.id === cover) ?? COVER_PRESETS[0]
-
-  useEffect(() => {
-    if (!iconPickerOpen) return
-
-    function closeIconPickerOnOutsidePointerDown(event: PointerEvent) {
-      const target = event.target
-      if (!(target instanceof Node)) return
-      if (iconPickerRef.current?.contains(target)) return
-      setIconPickerOpen(false)
-    }
-
-    document.addEventListener('pointerdown', closeIconPickerOnOutsidePointerDown, true)
-    return () => document.removeEventListener('pointerdown', closeIconPickerOnOutsidePointerDown, true)
-  }, [iconPickerOpen])
 
   return (
     <div className="flex flex-col gap-4">
@@ -122,7 +107,7 @@ function CoverDesignSection({
       />
 
       <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
-        <div ref={iconPickerRef}>
+        <div>
           <ClassroomIconPicker
             value={iconKey}
             onValueChange={onIconChange}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useTheme } from 'next-themes'
@@ -8,6 +8,7 @@ import { Moon, Sun, Menu, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { IconButton } from '@/components/ui/icon-button'
 import { BrandLogo } from '@/components/brand-logo'
+import { useDismissOnOutsideClick } from '@/hooks/use-dismiss-on-outside-click'
 
 const NAV_LINKS: { href: string; label: string }[] = []
 
@@ -16,11 +17,13 @@ export function LandingNavbar() {
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const navRef = useRef<HTMLElement>(null)
 
   useEffect(() => setMounted(true), [])
+  useDismissOnOutsideClick(mobileOpen, navRef, () => setMobileOpen(false))
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-border/80 bg-card/90 backdrop-blur-md">
+    <nav ref={navRef} className="sticky top-0 z-50 border-b border-border/80 bg-card/90 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5">
