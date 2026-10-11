@@ -47,6 +47,7 @@ function LabContent({ initialCoverPattern }: { initialCoverPattern: ClassroomCov
   const [accessType, setAccessType] = useState<AccessType>('open')
   const render = useCallback((onClose?: () => void) => <ClassroomContextNavigation
     classroom={room} switchableClassrooms={[DEFAULT, OTHER]} backHref="/exam-screen-lab/classroom-icons"
+    overviewHref="/exam-screen-lab/classroom-icons?view=overview"
     navigationItems={classroomNavigationFor('subject', true)} studentCount={0}
     onNavigate={() => undefined} onClose={onClose}
     onSwitchClassroom={id => setRoom(id === ROOM_ID ? DEFAULT : OTHER)}

@@ -9,9 +9,10 @@ import {
   School,
 } from 'lucide-react'
 import type { Classroom } from '@/lib/types'
-import type {
-  ClassroomNavigationItem,
-  ClassroomNavigationKey,
+import {
+  classroomNavigationPath,
+  type ClassroomNavigationItem,
+  type ClassroomNavigationKey,
 } from '@/lib/classroom-navigation'
 import { coverOf, parseDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
 import { Badge } from '@/components/ui/badge'
@@ -36,6 +37,8 @@ interface ClassroomContextSidebarProps {
   classroom: Pick<Classroom, 'id' | 'name' | 'description' | 'classroom_type'>
   switchableClassrooms?: Array<Pick<Classroom, 'id' | 'name' | 'description'>>
   backHref: string
+  /** Local fixtures may keep this link inside their synthetic route. */
+  overviewHref?: string
   navigationItems: readonly ClassroomNavigationItem[]
   activeItem?: ClassroomNavigationKey
   assignmentCreationActive?: boolean
@@ -49,6 +52,7 @@ export function ClassroomContextNavigation({
   classroom,
   switchableClassrooms = [],
   backHref,
+  overviewHref,
   navigationItems,
   activeItem,
   assignmentCreationActive = false,
@@ -67,6 +71,7 @@ export function ClassroomContextNavigation({
   const otherClassrooms = switchableClassrooms.filter(option => option.id !== classroom.id)
   const canSwitchClassroom = onSwitchClassroom && otherClassrooms.length > 0
   const switcherId = useId()
+  const classroomOverviewHref = overviewHref ?? classroomNavigationPath(classroom.id, 'overview')
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
@@ -80,102 +85,101 @@ export function ClassroomContextNavigation({
       </SidebarButton>
 
       <DropdownMenu>
-      <div className={cn(
-        'flex items-center gap-3 rounded-lg border p-3',
-        compact && 'md:relative md:justify-center',
-        cover ? cn(cover.surface, cover.text) : 'border-primary/20 bg-primary/5',
-      )} title={classroom.name}>
         <div className={cn(
-          'flex size-12 shrink-0 items-center justify-center rounded-xl shadow-sm',
-          compact && 'md:size-8',
-          compact && canSwitchClassroom && 'md:hidden',
-          cover ? 'bg-current/10' : 'bg-primary text-primary-foreground',
-        )}>
-          <ClassroomIcon iconKey={meta.iconKey} className={cn('size-6', compact && 'md:size-5')} />
-        </div>
-        {compact && canSwitchClassroom && (
-          <DropdownMenuTrigger
-            id={`${switcherId}-icon`}
-            render={<Button type="button" variant="ghost" size="icon" className="hidden transition-colors md:absolute md:left-1/2 md:top-1/2 md:inline-flex md:-translate-x-1/2 md:-translate-y-1/2" aria-label="สลับไปห้องเรียนอื่น" title="สลับไปห้องเรียนอื่น" />}
+          'flex items-center gap-3 rounded-lg border p-3',
+          cover ? cn(cover.surface, cover.text) : 'border-primary/20 bg-primary/5',
+        )} title={classroom.name}>
+          <Link
+            href={classroomOverviewHref}
+            onClick={onClose}
+            aria-current={activeItem === 'overview' ? 'page' : undefined}
+            aria-label={`ไปยังภาพรวมของห้องเรียน ${classroom.name}`}
+            title={`ไปยังภาพรวมของห้องเรียน ${classroom.name}`}
+            className={cn(
+              'flex min-w-0 flex-1 items-center gap-3 rounded-md outline-none transition-opacity hover:opacity-80 focus-visible:ring-3 focus-visible:ring-ring/50',
+              compact && 'md:justify-center',
+            )}
           >
-            <ClassroomIcon iconKey={meta.iconKey} />
-          </DropdownMenuTrigger>
-        )}
-        <div className={cn('min-w-0 flex-1', compact && 'md:sr-only')}>
-          <p className={cn('text-xs font-medium', cover ? cover.textMuted : 'text-primary')}>ห้องเรียนปัจจุบัน</p>
-          <p className={cn('truncate text-lg font-bold leading-tight', cover ? cover.text : 'text-foreground')}>{classroom.name}</p>
-          <p className={cn('truncate text-xs', cover ? cover.textMuted : 'text-muted-foreground')}>
-            {subtitle || (classroom.classroom_type === 'homeroom' ? 'ห้องโฮมรูม' : 'ห้องเรียนวิชา')}
-          </p>
-        </div>
-        {compact && (
-          <div aria-hidden="true" className="hidden h-12 w-0 shrink-0 md:block" />
-        )}
-        {canSwitchClassroom && (
-          <>
-            <DropdownMenuTrigger
-              id={`${switcherId}-arrows`}
-              render={(
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon-sm"
-                  className={cn('transition-colors', compact && 'md:hidden')}
-                  aria-label="สลับไปห้องเรียนอื่น"
-                  title="สลับไปห้องเรียนอื่น"
-                />
-              )}
-            >
-              <ChevronsUpDown />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-64">
-              <DropdownMenuGroup>
-                <DropdownMenuLabel>ไปห้องเรียนอื่น</DropdownMenuLabel>
-                {otherClassrooms.map(option => {
-                  const optionMeta = parseDescription(option.description)
-                  const optionCover = coverOf(optionMeta)
-                  const optionSubtitle = [optionMeta.gradeLevel, optionMeta.academicTerm]
-                    .filter(Boolean)
-                    .join(' • ')
+            <div className={cn(
+              'flex size-12 shrink-0 items-center justify-center rounded-xl shadow-sm',
+              compact && 'md:size-8',
+              cover ? 'bg-current/10' : 'bg-primary text-primary-foreground',
+            )}>
+              <ClassroomIcon iconKey={meta.iconKey} className={cn('size-6', compact && 'md:size-5')} />
+            </div>
+            <div className={cn('min-w-0 flex-1', compact && 'md:sr-only')}>
+              <p className={cn('text-xs font-medium', cover ? cover.textMuted : 'text-primary')}>ห้องเรียนปัจจุบัน</p>
+              <p className={cn('truncate text-lg font-bold leading-tight', cover ? cover.text : 'text-foreground')}>{classroom.name}</p>
+              <p className={cn('truncate text-xs', cover ? cover.textMuted : 'text-muted-foreground')}>
+                {subtitle || (classroom.classroom_type === 'homeroom' ? 'ห้องโฮมรูม' : 'ห้องเรียนวิชา')}
+              </p>
+            </div>
+          </Link>
+          {canSwitchClassroom && (
+            <>
+              <DropdownMenuTrigger
+                id={`${switcherId}-arrows`}
+                render={(
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon-sm"
+                    className={cn('shrink-0 transition-colors', compact && 'md:hidden')}
+                    aria-label="สลับไปห้องเรียนอื่น"
+                    title="สลับไปห้องเรียนอื่น"
+                  />
+                )}
+              >
+                <ChevronsUpDown />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-64">
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>ไปห้องเรียนอื่น</DropdownMenuLabel>
+                  {otherClassrooms.map(option => {
+                    const optionMeta = parseDescription(option.description)
+                    const optionCover = coverOf(optionMeta)
+                    const optionSubtitle = [optionMeta.gradeLevel, optionMeta.academicTerm]
+                      .filter(Boolean)
+                      .join(' • ')
 
-                  return (
-                    <DropdownMenuItem
-                      key={option.id}
-                      className="py-2"
-                      onClick={() => {
-                        onSwitchClassroom?.(option.id)
-                        onClose?.()
-                      }}
-                    >
-                      <span className={cn(
-                        'flex size-8 shrink-0 items-center justify-center rounded-lg border',
-                        optionCover ? cn(optionCover.surface, optionCover.text) : 'bg-muted text-muted-foreground',
-                      )}>
-                        <ClassroomIcon iconKey={optionMeta.iconKey} />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate font-medium">{option.name}</span>
-                        {optionSubtitle && (
-                          <span className="block truncate text-xs text-muted-foreground">
-                            {optionSubtitle}
-                          </span>
-                        )}
-                      </span>
-                    </DropdownMenuItem>
-                  )
-                })}
-              </DropdownMenuGroup>
-              <DropdownMenuSeparator />
-              <DropdownMenuGroup>
-                <DropdownMenuItem render={<Link href={backHref} onClick={onClose} />}>
-                  <School />
-                  ดูห้องเรียนทั้งหมด
-                </DropdownMenuItem>
-              </DropdownMenuGroup>
-            </DropdownMenuContent>
-          </>
-        )}
-      </div>
+                    return (
+                      <DropdownMenuItem
+                        key={option.id}
+                        className="py-2"
+                        onClick={() => {
+                          onSwitchClassroom?.(option.id)
+                          onClose?.()
+                        }}
+                      >
+                        <span className={cn(
+                          'flex size-8 shrink-0 items-center justify-center rounded-lg border',
+                          optionCover ? cn(optionCover.surface, optionCover.text) : 'bg-muted text-muted-foreground',
+                        )}>
+                          <ClassroomIcon iconKey={optionMeta.iconKey} />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-medium">{option.name}</span>
+                          {optionSubtitle && (
+                            <span className="block truncate text-xs text-muted-foreground">
+                              {optionSubtitle}
+                            </span>
+                          )}
+                        </span>
+                      </DropdownMenuItem>
+                    )
+                  })}
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  <DropdownMenuItem render={<Link href={backHref} onClick={onClose} />}>
+                    <School />
+                    ดูห้องเรียนทั้งหมด
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </>
+          )}
+        </div>
       </DropdownMenu>
 
       <Separator />

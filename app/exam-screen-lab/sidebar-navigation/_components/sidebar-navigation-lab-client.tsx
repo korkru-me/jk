@@ -40,6 +40,7 @@ function LabSidebar({ ready = false, onClose }: { ready?: boolean; onClose?: () 
       classroom={{ id: CLASSROOM_ID, name: ready ? 'แถบหน้ามอบหมายงานพร้อมแล้ว' : 'ฟิสิกส์ ห้องจำลอง', description: '', classroom_type: 'subject' }}
       switchableClassrooms={[{ id: 'other', name: 'ห้องจำลองอื่น', description: '' }]}
       backHref={SOURCE}
+      overviewHref={`${SOURCE}?view=overview`}
       navigationItems={classroomNavigationFor('subject', true)}
       activeItem={activeItem}
       studentCount={63}
