@@ -600,6 +600,16 @@ export function CreateAssignmentForm({
   const defaultPointsById = new Map(questions.map(q => [q.id, q.default_points]))
   const pointsDraft = (id: string) => questionPointDrafts[id] ?? String(defaultPointsById.get(id) ?? 1)
 
+  function setAllQuestionPoints(pointsFor: (question: AssignmentQuestionOption) => number) {
+    setQuestionPointDrafts(prev => ({
+      ...prev,
+      ...Object.fromEntries(previewQuestions.map(question => [
+        question.id,
+        String(pointsFor(question)),
+      ])),
+    }))
+  }
+
   const pointsSum = Math.round(
     previewQuestions.reduce((sum, q) => sum + (Number.parseFloat(pointsDraft(q.id)) || 0), 0) * 100
   ) / 100
@@ -1055,6 +1065,27 @@ export function CreateAssignmentForm({
               กดรูปตาเพื่อดูตัวอย่างข้อนั้นแบบที่นักเรียนเห็น
               และถ้าเจอข้อซ้ำหรือข้อที่ไม่เอาแล้ว กดกากบาทท้ายแถวเอาออกได้เลย ไม่ต้องเลื่อนกลับไปเลือกโจทย์
             </p>
+
+            <div role="group" aria-label="ปรับคะแนนทุกข้อ" className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={previewQuestions.length === 0}
+                onClick={() => setAllQuestionPoints(() => 1)}
+              >
+                ทุกข้อ 1 คะแนน
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={previewQuestions.length === 0}
+                onClick={() => setAllQuestionPoints(question => question.default_points)}
+              >
+                คะแนนตามข้อย่อย
+              </Button>
+            </div>
 
             <DndContext
               id={`assignment-question-order-${questionOrderDndId}`}
