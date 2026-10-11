@@ -156,7 +156,7 @@ export function SetStructurePanel({
   const previewSection = sections.find(s => s.id === previewSectionId) ?? null
 
   useEffect(() => {
-    if (!questionsOpen) return
+    if (setId || !questionsOpen) return
 
     // Use click rather than pointerdown so an outside control receives the
     // complete gesture before this long panel folds and shifts the page.
@@ -168,7 +168,7 @@ export function SetStructurePanel({
 
     document.addEventListener('click', closeQuestionsOnOutsideClick)
     return () => document.removeEventListener('click', closeQuestionsOnOutsideClick)
-  }, [questionsOpen])
+  }, [questionsOpen, setId])
 
   function apply(next: { sections: QuestionSetSection[]; question_ids: string[] }) {
     onChange({ sections: next.sections, questionIds: next.question_ids })
@@ -237,162 +237,197 @@ export function SetStructurePanel({
 
   const allSelected = questionIds.length > 0 && questionIds.every(id => selected.includes(id))
 
-  return (
-    <div className="space-y-4">
-      {/* ── โจทย์ทั้งหมดในแฟ้ม ───────────────────────────────────── */}
-      <Card ref={questionsPanelRef} className="overflow-hidden">
-        <Collapsible open={questionsOpen} onOpenChange={setQuestionsOpen}>
-          <div className="flex min-h-[72px] items-center gap-2 p-5">
-            <CollapsibleTrigger
-              render={(
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="group h-auto min-w-0 flex-1 justify-start gap-2 p-0 text-left hover:bg-transparent"
-                />
-              )}
-            >
-              <Layers className="size-4 shrink-0 text-primary" aria-hidden="true" />
-              <span className="font-semibold text-foreground whitespace-nowrap">โจทย์ในแฟ้มนี้</span>
-              <span className="text-xs text-muted-foreground whitespace-nowrap">{questionIds.length} ข้อ</span>
-              <ChevronDown
-                className="ml-auto size-4 shrink-0 text-muted-foreground transition-transform group-data-panel-open:rotate-180 motion-reduce:transition-none"
-                aria-hidden="true"
-              />
-            </CollapsibleTrigger>
-            <Button type="button" size="sm" onClick={onAddQuestions} className="shrink-0 gap-1.5">
-              <Plus data-icon="inline-start" aria-hidden="true" />
-              <span className="hidden sm:inline">เพิ่มโจทย์จากคลัง</span>
-              <span className="sm:hidden">เพิ่มโจทย์</span>
-            </Button>
-          </div>
+  function renderQuestionList(compact: boolean) {
+    return (
+      <>
+        {questionIds.length === 0 ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            ยังไม่มีโจทย์ในแฟ้มนี้ — กด “เพิ่มโจทย์จากคลัง” เพื่อเลือกโจทย์เข้ามา
+          </p>
+        ) : (
+          <SetQuestionList
+            byId={byId}
+            questionIds={questionIds}
+            sectionTitlesById={sectionTitlesById}
+            selected={selected}
+            onToggleSelected={toggleSelected}
+            onSelectAll={all => setSelected(all ? [...questionIds] : [])}
+            onMove={(id, delta) => apply(moveQuestionInSet(sections, questionIds, id, delta))}
+            onRemove={ids => setRemoveIds(ids)}
+            allTags={allTags}
+            myTeams={myTeams}
+            setId={setId}
+            onSaveBeforeEdit={onSaveBeforeEdit}
+            initialCardData={initialCardData}
+          />
+        )}
 
-          <CollapsibleContent className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 ease-out data-ending-style:h-0 data-starting-style:h-0 motion-reduce:transition-none">
-            <div className="border-t border-border px-5 pb-5 pt-4">
-              {questionIds.length === 0 ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">
-                  ยังไม่มีโจทย์ในแฟ้มนี้ — กด “เพิ่มโจทย์จากคลัง” เพื่อเลือกโจทย์เข้ามา
-                </p>
-              ) : (
-                <SetQuestionList
-                  byId={byId}
-                  questionIds={questionIds}
-                  sectionTitlesById={sectionTitlesById}
-                  selected={selected}
-                  onToggleSelected={toggleSelected}
-                  onSelectAll={all => setSelected(all ? [...questionIds] : [])}
-                  onMove={(id, delta) => apply(moveQuestionInSet(sections, questionIds, id, delta))}
-                  onRemove={ids => setRemoveIds(ids)}
-                  allTags={allTags}
-                  myTeams={myTeams}
-                  setId={setId}
-                  onSaveBeforeEdit={onSaveBeforeEdit}
-                  initialCardData={initialCardData}
-                />
-              )}
-
-              {selected.length > 0 && (
-                <div className="sticky bottom-0 -mx-5 -mb-5 mt-3 flex flex-wrap items-center gap-2 rounded-b-2xl border-t border-border bg-muted/80 px-5 py-3 backdrop-blur-sm">
-                  <span className="text-sm font-medium text-foreground">เลือก {selected.length} ข้อ</span>
-                  <div className="ml-auto flex flex-wrap items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={sections.length === 0}
-                      title={sections.length === 0 ? 'สร้างแฟ้มย่อยก่อนจึงจะเพิ่มโจทย์ได้' : undefined}
-                      onClick={() => setBulkSectionOpen(true)}
-                    >
-                      <FolderPlus data-icon="inline-start" aria-hidden="true" />
-                      เพิ่มเข้าแฟ้มย่อย
-                    </Button>
-                    <Button type="button" variant="destructive" size="sm" onClick={() => setRemoveIds(selected)}>
-                      เอาออกจากแฟ้ม
-                    </Button>
-                    <Button type="button" variant="ghost" size="sm" onClick={() => setSelected([])}>
-                      ยกเลิก
-                    </Button>
-                  </div>
-                </div>
-              )}
+        {selected.length > 0 && (
+          <div className={cn(
+            'sticky bottom-0 mt-3 flex flex-wrap items-center gap-2 rounded-b-2xl border-t border-border bg-muted/80 py-3 backdrop-blur-sm',
+            compact ? '-mx-5 -mb-5 px-5' : '-mx-6 -mb-6 px-6',
+          )}>
+            <span className="text-sm font-medium text-foreground">เลือก {selected.length} ข้อ</span>
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={sections.length === 0}
+                title={sections.length === 0 ? 'สร้างแฟ้มย่อยก่อนจึงจะเพิ่มโจทย์ได้' : undefined}
+                onClick={() => setBulkSectionOpen(true)}
+              >
+                <FolderPlus data-icon="inline-start" aria-hidden="true" />
+                เพิ่มเข้าแฟ้มย่อย
+              </Button>
+              <Button type="button" variant="destructive" size="sm" onClick={() => setRemoveIds(selected)}>
+                เอาออกจากแฟ้ม
+              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setSelected([])}>
+                ยกเลิก
+              </Button>
             </div>
-          </CollapsibleContent>
-        </Collapsible>
-      </Card>
-
-      {/* ── แฟ้มย่อย ─────────────────────────────────────────────── */}
-      <Card padding="lg" className="flex flex-col gap-2.5">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-2 flex-wrap min-w-0">
-            <Folder className="w-4 h-4 text-primary shrink-0" />
-            <h2 className="font-semibold text-foreground whitespace-nowrap">แฟ้มย่อย</h2>
-            {sections.length > 0 && (
-              <span className="text-xs text-muted-foreground whitespace-nowrap">
-                {sections.length} แฟ้มย่อย · {grouped} ข้อ
-              </span>
-            )}
           </div>
-          {sections.length > 0 && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setDialogSectionId(NEW_SECTION)}
-              className="gap-1.5 shrink-0"
-            >
-              <Plus className="w-3.5 h-3.5" /> สร้างแฟ้มย่อย
-            </Button>
-          )}
+        )}
+      </>
+    )
+  }
+
+  const questionsPanel = setId ? (
+    <Card padding="xl" className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <Layers className="size-4 shrink-0 text-primary" aria-hidden="true" />
+          <h2 className="whitespace-nowrap font-semibold text-foreground">โจทย์ในแฟ้มนี้</h2>
+          <span className="whitespace-nowrap text-xs text-muted-foreground">{questionIds.length} ข้อ</span>
+        </div>
+        <Button type="button" size="sm" onClick={onAddQuestions}>
+          <Plus data-icon="inline-start" aria-hidden="true" />
+          เพิ่มโจทย์จากคลัง
+        </Button>
+      </div>
+      {renderQuestionList(false)}
+    </Card>
+  ) : (
+    <Card ref={questionsPanelRef} className="overflow-hidden">
+      <Collapsible open={questionsOpen} onOpenChange={setQuestionsOpen}>
+        <div className="flex min-h-[72px] items-center gap-2 p-5">
+          <CollapsibleTrigger
+            render={(
+              <Button
+                type="button"
+                variant="ghost"
+                className="group h-auto min-w-0 flex-1 justify-start gap-2 p-0 text-left hover:bg-transparent"
+              />
+            )}
+          >
+            <Layers className="size-4 shrink-0 text-primary" aria-hidden="true" />
+            <span className="whitespace-nowrap font-semibold text-foreground">โจทย์ในแฟ้มนี้</span>
+            <span className="whitespace-nowrap text-xs text-muted-foreground">{questionIds.length} ข้อ</span>
+            <ChevronDown
+              className="ml-auto size-4 shrink-0 text-muted-foreground transition-transform group-data-panel-open:rotate-180 motion-reduce:transition-none"
+              aria-hidden="true"
+            />
+          </CollapsibleTrigger>
+          <Button type="button" size="sm" onClick={onAddQuestions} className="shrink-0">
+            <Plus data-icon="inline-start" aria-hidden="true" />
+            <span className="hidden sm:inline">เพิ่มโจทย์จากคลัง</span>
+            <span className="sm:hidden">เพิ่มโจทย์</span>
+          </Button>
         </div>
 
-        {sections.length === 0 ? (
-          <Card edge="dashed" padding="lg" className="text-center space-y-3">
-            <p className="text-sm text-muted-foreground">
-              ยังไม่มีแฟ้มย่อย — ถ้าแฟ้มนี้มีหลายเรื่อง แบ่งโจทย์เป็นแฟ้มย่อยได้ (ไม่บังคับ)
-            </p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setDialogSectionId(NEW_SECTION)}
-              className="gap-1.5"
-            >
-              <Plus className="w-3.5 h-3.5" /> สร้างแฟ้มย่อย
-            </Button>
-          </Card>
-        ) : (
-          <DndContext
-            id={`question-set-sections-${sectionDndId}`}
-            sensors={sectionSensors}
-            collisionDetection={closestCenter}
-            onDragEnd={reorderSections}
-          >
-            <SortableContext items={sections.map(section => section.id)} strategy={rectSortingStrategy}>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {sections.map(section => (
-                  <SectionCard
-                    key={section.id}
-                    section={section}
-                    onOpen={() => setDialogSectionId(section.id)}
-                    onPreview={() => setPreviewSectionId(section.id)}
-                    onDelete={() => setDeleteSectionId(section.id)}
-                  />
-                ))}
+        <CollapsibleContent className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 ease-out data-ending-style:h-0 data-starting-style:h-0 motion-reduce:transition-none">
+          <div className="border-t border-border px-5 pb-5 pt-4">
+            {renderQuestionList(true)}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+    </Card>
+  )
 
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => setDialogSectionId(NEW_SECTION)}
-                  className="h-auto min-h-[62px] gap-2 rounded-2xl border border-dashed border-border text-muted-foreground hover:border-primary/40 hover:bg-primary/[0.03] hover:text-primary"
-                >
-                  <Plus className="w-5 h-5" />
-                  <span className="text-sm font-medium">สร้างแฟ้มย่อย</span>
-                </Button>
-              </div>
-            </SortableContext>
-          </DndContext>
+  const sectionsPanel = (
+    <Card padding="lg" className="flex flex-col gap-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <Folder className="size-4 shrink-0 text-primary" aria-hidden="true" />
+          <h2 className="whitespace-nowrap font-semibold text-foreground">แฟ้มย่อย</h2>
+          {sections.length > 0 && (
+            <span className="whitespace-nowrap text-xs text-muted-foreground">
+              {sections.length} แฟ้มย่อย · {grouped} ข้อ
+            </span>
+          )}
+        </div>
+        {sections.length > 0 && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setDialogSectionId(NEW_SECTION)}
+            className="shrink-0"
+          >
+            <Plus data-icon="inline-start" aria-hidden="true" />
+            สร้างแฟ้มย่อย
+          </Button>
         )}
-      </Card>
+      </div>
+
+      {sections.length === 0 ? (
+        <Card edge="dashed" padding="lg" className="flex flex-col items-center gap-3 text-center">
+          <p className="text-sm text-muted-foreground">
+            ยังไม่มีแฟ้มย่อย — ถ้าแฟ้มนี้มีหลายเรื่อง แบ่งโจทย์เป็นแฟ้มย่อยได้ (ไม่บังคับ)
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setDialogSectionId(NEW_SECTION)}
+          >
+            <Plus data-icon="inline-start" aria-hidden="true" />
+            สร้างแฟ้มย่อย
+          </Button>
+        </Card>
+      ) : (
+        <DndContext
+          id={`question-set-sections-${sectionDndId}`}
+          sensors={sectionSensors}
+          collisionDetection={closestCenter}
+          onDragEnd={reorderSections}
+        >
+          <SortableContext items={sections.map(section => section.id)} strategy={rectSortingStrategy}>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {sections.map(section => (
+                <SectionCard
+                  key={section.id}
+                  section={section}
+                  onOpen={() => setDialogSectionId(section.id)}
+                  onPreview={() => setPreviewSectionId(section.id)}
+                  onDelete={() => setDeleteSectionId(section.id)}
+                />
+              ))}
+
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setDialogSectionId(NEW_SECTION)}
+                className="h-auto min-h-[62px] gap-2 rounded-2xl border border-dashed border-border text-muted-foreground hover:border-primary/40 hover:bg-primary/[0.03] hover:text-primary"
+              >
+                <Plus data-icon="inline-start" aria-hidden="true" />
+                <span className="text-sm font-medium">สร้างแฟ้มย่อย</span>
+              </Button>
+            </div>
+          </SortableContext>
+        </DndContext>
+      )}
+    </Card>
+  )
+
+  return (
+    <div className="space-y-4">
+      {setId ? (
+        <>{sectionsPanel}{questionsPanel}</>
+      ) : (
+        <>{questionsPanel}{sectionsPanel}</>
+      )}
 
       <SectionDialog
         open={dialogSectionId !== null}
