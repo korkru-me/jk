@@ -175,7 +175,7 @@ export function SetStructurePanel({
   return (
     <div className="space-y-4">
       {/* ── แฟ้มย่อย ─────────────────────────────────────────────── */}
-      <Card padding="xl" className="space-y-3">
+      <Card padding="lg" className="flex flex-col gap-2.5">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2 flex-wrap min-w-0">
             <Folder className="w-4 h-4 text-primary shrink-0" />
@@ -215,35 +215,29 @@ export function SetStructurePanel({
             </Button>
           </Card>
         ) : (
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
-              {sections.map((section, index) => (
-                <SectionCard
-                  key={section.id}
-                  section={section}
-                  index={index}
-                  total={sections.length}
-                  onOpen={() => setDialogSectionId(section.id)}
-                  onMove={delta => apply(moveSection(sections, section.id, delta, questionIds))}
-                  onDelete={() => setDeleteSectionId(section.id)}
-                />
-              ))}
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {sections.map((section, index) => (
+              <SectionCard
+                key={section.id}
+                section={section}
+                index={index}
+                total={sections.length}
+                onOpen={() => setDialogSectionId(section.id)}
+                onMove={delta => apply(moveSection(sections, section.id, delta, questionIds))}
+                onDelete={() => setDeleteSectionId(section.id)}
+              />
+            ))}
 
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setDialogSectionId(NEW_SECTION)}
-                className="h-auto min-h-[62px] gap-2 rounded-2xl border border-dashed border-border text-muted-foreground hover:text-primary hover:border-primary/40 hover:bg-primary/[0.03]"
-              >
-                <Plus className="w-5 h-5" />
-                <span className="text-sm font-medium">สร้างแฟ้มย่อย</span>
-              </Button>
-            </div>
-
-            <p className="text-xs text-muted-foreground">
-              โจทย์ข้อเดียวอยู่ได้หลายแฟ้มย่อย · ลำดับเลขข้อที่นักเรียนเห็นมาจากรายการโจทย์ด้านล่าง ไม่ใช่ลำดับแฟ้มย่อย
-            </p>
-          </>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setDialogSectionId(NEW_SECTION)}
+              className="h-auto min-h-[62px] gap-2 rounded-2xl border border-dashed border-border text-muted-foreground hover:border-primary/40 hover:bg-primary/[0.03] hover:text-primary"
+            >
+              <Plus className="w-5 h-5" />
+              <span className="text-sm font-medium">สร้างแฟ้มย่อย</span>
+            </Button>
+          </div>
         )}
       </Card>
 

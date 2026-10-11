@@ -22,10 +22,17 @@ export function QuestionSectionBadges({
   if (titles.length === 0) {
     if (!showEmpty) return null
     return (
-      <p className={cn('flex items-center gap-1.5 text-xs text-muted-foreground', className)}>
-        <Folder className="size-3.5 shrink-0" aria-hidden="true" />
-        ยังไม่อยู่ในแฟ้มย่อย
-      </p>
+      <div
+        role="group"
+        className={cn('flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-muted-foreground', className)}
+        aria-label="อยู่ในแฟ้มย่อย: ไม่มี"
+      >
+        <span className="flex shrink-0 items-center gap-1">
+          <Folder className="size-3.5" aria-hidden="true" />
+          อยู่ในแฟ้มย่อย:
+        </span>
+        <span aria-hidden="true">-</span>
+      </div>
     )
   }
 
@@ -37,13 +44,13 @@ export function QuestionSectionBadges({
     >
       <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
         <Folder className="size-3.5" aria-hidden="true" />
-        แฟ้มย่อย:
+        อยู่ในแฟ้มย่อย:
       </span>
       {titles.map((title, index) => (
         <Badge
           key={`${index}:${title}`}
           variant="outline"
-          className="h-auto max-w-full whitespace-normal break-words text-left"
+          className="h-auto max-w-full whitespace-normal break-words border-primary/20 bg-primary/10 text-left text-foreground"
         >
           {title}
         </Badge>
