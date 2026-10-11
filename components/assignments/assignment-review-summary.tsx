@@ -25,10 +25,10 @@ export function AssignmentReviewSummary({ mode, rows }: AssignmentReviewSummaryP
     >
       <div className="min-w-0">
         <h3 className="text-sm font-semibold text-foreground">
-          {isCopy ? 'สรุปก่อนทำสำเนา' : 'สรุปก่อนสร้าง'}
+          {isCopy ? 'ตรวจสอบรายละเอียดก่อนทำสำเนา' : 'ตรวจสอบรายละเอียดก่อนสร้าง'}
         </h3>
         <p data-assignment-description className="text-xs leading-5 text-muted-foreground">
-          ตรวจรายละเอียดทั้งหมดอีกครั้งก่อนบันทึกงาน
+          ตรวจสอบข้อมูลและการตั้งค่าทั้งหมดก่อนยืนยัน
         </p>
       </div>
 

@@ -35,13 +35,15 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import {
-  Check, ChevronRight, ChevronLeft, ChevronDown, Eye, CircleHelp,
+  Check, ChevronRight, ChevronLeft, ChevronDown, Eye,
   X, Save, FileText,
 } from 'lucide-react'
 import {
@@ -102,10 +104,7 @@ import {
   INSTANT_CHECK_SETTING_LABEL,
 } from '@/components/assignments/instant-check-setting-label'
 import { AssignmentSettingHoverLabel } from '@/components/assignments/assignment-setting-hover-label'
-import {
-  RESULT_VISIBILITY_OPTIONS,
-  ResultVisibilityOptionHoverCard,
-} from '@/components/assignments/result-visibility-options'
+import { RESULT_VISIBILITY_OPTIONS } from '@/components/assignments/result-visibility-options'
 
 const QuestionPicker = dynamic(
   () => import('@/components/assignments/question-picker').then(mod => mod.QuestionPicker),
@@ -114,7 +113,7 @@ const QuestionPicker = dynamic(
 
 const STEPS = ['รายละเอียด โจทย์ และคะแนน', 'ตั้งค่า', 'กำหนดการสอบ']
 
-// สรุปก่อนสร้าง used to read the two original values only, so a งาน set to
+// The final review used to read the two original values only, so a งาน set to
 // แสดงคะแนนแต่ไม่แสดงเฉลย or ไม่แสดงผลลัพธ์ was summarised as
 // "หลังพ้นกำหนดส่ง" — the wrong promise, on the last screen before creating.
 const SHOW_RESULTS_SUMMARY: Record<ShowResultsMode, string> = {
@@ -279,8 +278,12 @@ export function CreateAssignmentForm({
     if (!questionPickerOpen) return
 
     function closeQuestionPickerOnOutsideClick(event: MouseEvent) {
+      const container = questionPickerRef.current
       const target = event.target
-      if (!(target instanceof Node) || questionPickerRef.current?.contains(target)) return
+      if (!container || !(target instanceof Node)) return
+      // The trigger can be replaced while Base UI updates its open state.
+      // The original event path still proves that the click began inside.
+      if (container.contains(target) || event.composedPath().includes(container)) return
       // The preview dialog is rendered in a portal, outside questionPickerRef,
       // but interacting with it must not silently close the picker behind it.
       if (target instanceof Element && target.closest('[role="dialog"]')) return
@@ -365,6 +368,7 @@ export function CreateAssignmentForm({
   const [calculatorEnabled, setCalculatorEnabled] = useState(copySource?.calculator_enabled ?? initialSettings.calculator_enabled)
   const [scratchpadEnabled, setScratchpadEnabled] = useState(copySource?.scratchpad_enabled ?? initialSettings.scratchpad_enabled)
   const [accessCode, setAccessCode] = useState(copySource?.access_code ?? '')
+  const [accessCodeEnabled, setAccessCodeEnabled] = useState(Boolean(copySource?.access_code?.trim()))
   const [proctoringEnabled, setProctoringEnabled] = useState(copySource?.proctoring_enabled ?? initialSettings.proctoring_enabled)
   const [fullscreenRequired, setFullscreenRequired] = useState(copySource?.fullscreen_required ?? initialSettings.fullscreen_required)
   const [blockClipboard, setBlockClipboard] = useState(copySource?.block_clipboard ?? initialSettings.block_clipboard)
@@ -716,6 +720,7 @@ export function CreateAssignmentForm({
       ? parsedManualDisplayMax
       : null
   const displayMaxInvalid = displayMaxScore.trim() !== '' && manualDisplayMax === null
+  const accessCodeInvalid = accessCodeEnabled && accessCode.trim().length === 0
   const automaticDisplayMax = randomDrawOn && !randomDrawInvalid ? questionsPerAttempt : null
   const showQuestionDelivery = selectedIds.length > 0
   const displayMaxScoreField = (
@@ -760,6 +765,7 @@ export function CreateAssignmentForm({
         && !randomDrawInvalid && !displayMaxInvalid
     }
     if (step === 1) {
+      if (accessCodeInvalid) return false
       if (assignmentType === 'exam' && secureBrowserMode === 'seb_required') {
         return getSebQuitPasswordClientError(sebQuitPassword, sebQuitPasswordConfirmation) === null
       }
@@ -812,6 +818,11 @@ export function CreateAssignmentForm({
     if (displayMaxInvalid) {
       toast.error('คะแนนเต็มที่แสดงผลต้องมากกว่า 0 หรือเว้นว่างเพื่อใช้ค่าอัตโนมัติ')
       setStep(0)
+      return
+    }
+    if (accessCodeInvalid) {
+      toast.error('กรุณากรอกรหัสผ่านเข้าทำ')
+      setStep(1)
       return
     }
     if (completionChoice === 'threshold' && (passingValue.trim() === '' || !Number.isFinite(Number(passingValue)) || Number(passingValue) < 0 || (passingType === 'percent' && Number(passingValue) > 100))) {
@@ -890,7 +901,7 @@ export function CreateAssignmentForm({
         questions_per_page: Number(questionsPerPage) || 1,
         instant_check: instantCheck,
         instant_check_answer_key: instantCheckAnswerKey,
-        access_code: accessCode.trim() || null,
+        access_code: accessCodeEnabled ? accessCode.trim() || null : null,
         completion_rule: completionRule,
         streak_target: completionRule === 'streak' ? Number(streakTarget) : null,
         streak_question_cap: completionRule === 'streak' ? streakCapValue : null,
@@ -1568,6 +1579,35 @@ export function CreateAssignmentForm({
                 ) : null) as React.ReactNode,
               }] : []),
               {
+                label: 'กำหนดรหัสผ่านเข้าทำ',
+                desc: 'กำหนดให้นักเรียนกรอกรหัสผ่านที่ครูตั้งไว้ก่อนเริ่มทำแบบฝึกหัดหรือข้อสอบ',
+                descriptionOnHover: true,
+                value: accessCodeEnabled,
+                set: setAccessCodeEnabled,
+                footer: (accessCodeEnabled ? (
+                  <div className="pl-3">
+                    <Field data-invalid={accessCodeInvalid} className="gap-1.5">
+                      <FieldLabel htmlFor="create-access-code">รหัสผ่านเข้าทำ</FieldLabel>
+                      <Input
+                        id="create-access-code"
+                        value={accessCode}
+                        onChange={event => setAccessCode(event.target.value)}
+                        placeholder="กรอกรหัสผ่านที่นักเรียนต้องใช้"
+                        aria-invalid={accessCodeInvalid}
+                        aria-describedby="create-access-code-description"
+                        className="max-w-sm"
+                      />
+                      <FieldDescription id="create-access-code-description" className="text-xs">
+                        นักเรียนต้องกรอกรหัสนี้ให้ถูกต้องก่อนเริ่มทำงาน
+                      </FieldDescription>
+                      {accessCodeInvalid && (
+                        <FieldError className="text-xs">กรุณากรอกรหัสผ่านเข้าทำ</FieldError>
+                      )}
+                    </Field>
+                  </div>
+                ) : null) as React.ReactNode,
+              },
+              {
                 label: 'เครื่องคิดเลขวิทยาศาสตร์',
                 desc: 'เปิดให้นักเรียนใช้เครื่องคิดเลขวิทยาศาสตร์ภายในเว็บไซต์ระหว่างทำแบบฝึกหัดหรือข้อสอบ',
                 descriptionOnHover: true,
@@ -1884,19 +1924,6 @@ export function CreateAssignmentForm({
             </Collapsible>
           </Card>
 
-          <Card padding="md">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="code">รหัสผ่านเข้าทำ (ถ้ามี)</Label>
-              <Input
-                id="code"
-                value={accessCode}
-                onChange={e => setAccessCode(e.target.value)}
-                placeholder="ไม่บังคับ — เว้นว่างถ้าไม่ต้องใช้รหัส"
-                className="max-w-[200px]"
-              />
-            </div>
-          </Card>
-
           {preselectedClassroomId && (
             <Card ref={additionalClassroomsRef} padding="md" className="flex flex-col gap-3">
               <ClassroomPicker
@@ -1924,41 +1951,40 @@ export function CreateAssignmentForm({
             </Card>
           )}
 
-          <Card padding="md" className="flex flex-col gap-2.5">
-            <h2 className="text-sm font-semibold text-foreground">แสดงผลลัพธ์</h2>
-            <ToggleGroup
-              value={[showResults]}
-              onValueChange={values => {
-                const next = values.at(-1)
-                if (next === 'immediate' || next === 'score_only' || next === 'after_due' || next === 'never') {
-                  setShowResults(next)
-                }
-              }}
-              aria-label="เลือกการแสดงผลลัพธ์"
-              variant="outline"
-              orientation="vertical"
-              spacing={2}
-              className="w-full items-stretch"
-            >
-              {RESULT_VISIBILITY_OPTIONS.map(option => (
-                <ResultVisibilityOptionHoverCard
-                  key={option.key}
-                  description={option.description}
-                  trigger={<ToggleGroupItem
-                    value={option.key}
-                    className="min-h-10 w-full min-w-0 justify-start whitespace-normal rounded-lg border border-border px-3 py-2 aria-pressed:bg-primary/10 aria-pressed:text-foreground data-[state=on]:bg-primary/10 data-[state=on]:text-foreground"
-                  >
-                    <span className="flex w-full items-center gap-3">
-                      <span className="flex min-w-0 flex-1 items-center gap-1.5 text-left">
-                        <span className="text-sm font-medium text-foreground">{option.label}</span>
-                        <CircleHelp aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
-                      </span>
-                      {showResults === option.key && <Check className="mt-0.5 shrink-0 text-primary" aria-hidden="true" />}
-                    </span>
-                  </ToggleGroupItem>}
-                />
-              ))}
-            </ToggleGroup>
+          <Card padding="md">
+            <Field className="gap-1.5">
+              <FieldLabel htmlFor="show-results">แสดงผลลัพธ์</FieldLabel>
+              <Select
+                value={showResults}
+                onValueChange={value => {
+                  if (value && RESULT_VISIBILITY_OPTIONS.some(option => option.key === value)) {
+                    setShowResults(value as ShowResultsMode)
+                  }
+                }}
+              >
+                <SelectTrigger
+                  id="show-results"
+                  aria-label="เลือกเวลาแสดงผลลัพธ์"
+                  className="w-full sm:max-w-md"
+                >
+                  <SelectValue>
+                    {RESULT_VISIBILITY_OPTIONS.find(option => option.key === showResults)?.label}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent align="start" alignItemWithTrigger={false}>
+                  <SelectGroup>
+                    {RESULT_VISIBILITY_OPTIONS.map(option => (
+                      <SelectItem key={option.key} value={option.key}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              <FieldDescription className="text-xs leading-5">
+                {RESULT_VISIBILITY_OPTIONS.find(option => option.key === showResults)?.description}
+              </FieldDescription>
+            </Field>
           </Card>
 
           <AssignmentReviewSummary
@@ -2012,7 +2038,10 @@ export function CreateAssignmentForm({
               ...(perPageValue > 1
                 ? [{ label: 'ข้อต่อหน้า', value: `${perPageValue} ข้อ` }]
                 : []),
-              ...(accessCode.trim() ? [{ label: 'รหัสผ่าน', value: accessCode.trim() }] : []),
+              {
+                label: 'รหัสผ่านเข้าทำ',
+                value: accessCodeEnabled && accessCode.trim() ? accessCode.trim() : 'ไม่ได้กำหนด',
+              },
               ...(assignmentType === 'exam' && proctoringEnabled
                 ? [{ label: 'คุมสอบสด', value: fullscreenRequired ? 'เปิด · บังคับเต็มจอ' : 'เปิด' }]
                 : []),

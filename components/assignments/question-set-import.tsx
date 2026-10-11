@@ -63,8 +63,12 @@ export function QuestionSetImport({ sets, bankIds, selectedIds, onToggle, onPrev
     if (!open) return
 
     function closeOnOutsideClick(event: MouseEvent) {
+      const container = containerRef.current
       const target = event.target
-      if (!(target instanceof Node) || containerRef.current?.contains(target)) return
+      if (!container || !(target instanceof Node)) return
+      // Opening or selecting can replace a nested control before this document
+      // listener runs. The original path still identifies the click as inside.
+      if (container.contains(target) || event.composedPath().includes(container)) return
       // Preview dialogs are portalled outside this DOM subtree but still belong
       // to the picker interaction that opened them. Keep the picker as-is while
       // the teacher reads or tries a question inside that dialog.
