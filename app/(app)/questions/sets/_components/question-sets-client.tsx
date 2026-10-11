@@ -358,7 +358,7 @@ function SetCard({
             <h3 title={set.title} className="truncate text-base leading-snug font-semibold text-foreground transition-colors group-hover:text-primary">
               {set.title}
             </h3>
-            <div className="mt-1.5 flex flex-wrap items-center gap-1">
+            <div className="mt-1.5 flex flex-nowrap items-center gap-1">
               <Badge variant="secondary">{questionCount} ข้อ</Badge>
               {sections.length > 0 && (
                 <Badge variant="outline">{sections.length} แฟ้มย่อย</Badge>
