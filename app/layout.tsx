@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { IBM_Plex_Sans_Thai, Geist_Mono } from 'next/font/google'
 import { Toaster } from '@/components/ui/sonner'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { ThemeProvider } from 'next-themes'
 import { StagingIndicator } from '@/components/layout/staging-indicator'
 import { assertDeploymentEnvironment } from '@/lib/deployment-environment.mjs'
@@ -47,9 +48,11 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <ThemeProvider attribute="class" defaultTheme="light" disableTransitionOnChange>
-          {isStaging ? <StagingIndicator /> : null}
-          {children}
-          <Toaster richColors position="top-right" />
+          <TooltipProvider>
+            {isStaging ? <StagingIndicator /> : null}
+            {children}
+            <Toaster richColors position="top-right" />
+          </TooltipProvider>
         </ThemeProvider>
       </body>
     </html>

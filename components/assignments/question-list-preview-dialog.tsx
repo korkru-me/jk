@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { NativeSelect } from '@/components/ui/native-select'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 interface Props {
   ids: readonly string[]
@@ -86,18 +87,27 @@ export function QuestionListPreviewDialog({
               <Card key={id} padding="md" className="flex shrink-0 flex-col gap-3" role="region" aria-label={`โจทย์ข้อ ${index + 1}`}>
                 {onMoveQuestion ? (
                   <div className="flex min-w-0 items-center gap-2">
-                    <NativeSelect
-                      value={String(index + 1)}
-                      aria-label={questionTitle
-                        ? `ย้าย “${questionTitle}” ไปลำดับที่`
-                        : `ย้ายโจทย์ข้อ ${index + 1} ไปลำดับที่`}
-                      className="w-auto shrink-0"
-                      onChange={event => onMoveQuestion(id, Number(event.target.value))}
-                    >
-                      {orderedIds.map((_, position) => (
-                        <option key={position} value={position + 1}>ข้อ {position + 1}</option>
-                      ))}
-                    </NativeSelect>
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={(
+                          <NativeSelect
+                            value={String(index + 1)}
+                            aria-label={questionTitle
+                              ? `ย้าย “${questionTitle}” ไปลำดับที่`
+                              : `ย้ายโจทย์ข้อ ${index + 1} ไปลำดับที่`}
+                            className="w-auto shrink-0"
+                            onChange={event => onMoveQuestion(id, Number(event.target.value))}
+                          >
+                            {orderedIds.map((_, position) => (
+                              <option key={position} value={position + 1}>ข้อ {position + 1}</option>
+                            ))}
+                          </NativeSelect>
+                        )}
+                      />
+                      <TooltipContent align="start" side="top">
+                        เลือกเพื่อย้ายโจทย์ไปยังลำดับที่ต้องการ
+                      </TooltipContent>
+                    </Tooltip>
                     <h3 className="min-w-0 truncate text-sm font-semibold">
                       {questionTitle || `โจทย์ข้อ ${index + 1}`}
                     </h3>
