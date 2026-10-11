@@ -2014,7 +2014,6 @@ export function CreateAssignmentForm({
               { label: 'เฉลยวิธีทำ', value: showSolutions ? 'ให้ดูเมื่อทำเสร็จ' : 'ไม่ให้ดู' },
             ]}
           />
-          <AssignmentSettingPresetsSave />
         </div>
       )}
 
@@ -2056,6 +2055,7 @@ export function CreateAssignmentForm({
           </Button>
         ) : (
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <AssignmentSettingPresetsSave />
             <Button
               type="button"
               variant="outline"
