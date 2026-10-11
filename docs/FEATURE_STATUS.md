@@ -2,7 +2,7 @@
 
 ### อธิบายตัวเลือกเปลี่ยนลำดับในหน้าดูโจทย์ทั้งหมด (11 ตุลาคม 2026)
 
-- **UI-093** — ช่องเลขข้อในหน้าต่าง “ตัวอย่างโจทย์ทั้งหมดตามลำดับ” แสดงคำอธิบาย “เลือกเพื่อย้ายโจทย์ไปยังลำดับที่ต้องการ” เมื่อครูวางเมาส์หรือโฟกัสด้วยแป้นพิมพ์ เพื่อสื่อว่าช่องดังกล่าวกดเลือกตำแหน่งใหม่ได้โดยไม่ต้องลองเปิดดรอปดาวน์ก่อน; คำอธิบายใช้ Tooltip มาตรฐานของระบบและไม่เปลี่ยนพฤติกรรมการย้ายลำดับหรือข้อมูล · local fixture `/exam-screen-lab/assignment-creation?type=exercise` ยืนยัน Tooltip เปิดทั้งด้วย hover และการกด Tab, การย้ายข้อ 1 ไปข้อ 3 ยังได้ลำดับ 2 → 3 → 1, viewport 390px ไม่ล้นแนวนอน, axe ไม่พบ violation (มี modal focus/contrast incomplete เดิมที่ต้องตรวจด้วยสายตา) และ browser console/Next MCP compilation/runtime ไม่พบ error · TypeScript, design-token lint และ production build ผ่าน; ไม่มี migration
+- **UI-093** — ช่องเลขข้อในหน้าต่าง “ตัวอย่างโจทย์ทั้งหมดตามลำดับ” แสดงคำอธิบาย “เลือกเพื่อย้ายโจทย์ไปยังลำดับที่ต้องการ” เมื่อครูวางเมาส์หรือโฟกัสด้วยแป้นพิมพ์ เพื่อสื่อว่าช่องดังกล่าวกดเลือกตำแหน่งใหม่ได้โดยไม่ต้องลองเปิดดรอปดาวน์ก่อน; คำอธิบายใช้ Tooltip มาตรฐานของระบบและไม่เปลี่ยนพฤติกรรมการย้ายลำดับหรือข้อมูล · local fixture `/exam-screen-lab/assignment-creation?type=exercise` ยืนยัน Tooltip เปิดทั้งด้วย hover และการกด Tab, การย้ายข้อ 1 ไปข้อ 3 ยังได้ลำดับ 2 → 3 → 1, viewport 390px ไม่ล้นแนวนอน, axe ไม่พบ violation (มี modal focus/contrast incomplete ที่ตรวจด้วยสายตา) และ browser console/Next MCP compilation/runtime ไม่พบ error · TypeScript, design-token lint และ production build ผ่าน; ไม่มี migration
 
 ### โหมดสุ่มคิดคะแนนข้อละ 1 คะแนน (11 ตุลาคม 2026)
 
