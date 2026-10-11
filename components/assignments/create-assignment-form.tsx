@@ -486,6 +486,101 @@ export function CreateAssignmentForm({
       color: band.color,
     })),
   )
+  // A reload or closed tab is the one exit path where the app cannot show its
+  // own dialog. Track only values that can become part of the assignment: UI
+  // state such as the current step, an open disclosure, search, and previews
+  // must not turn a pristine form into an "unsaved" one.
+  const defaultPointsById = useMemo(
+    () => new Map(questions.map(question => [question.id, question.default_points])),
+    [questions],
+  )
+  const draftFingerprint = useMemo(
+    () => JSON.stringify({
+      title,
+      description,
+      classroomIds: [...classroomIds].sort(),
+      groupTargets: [...classroomIds]
+        .sort()
+        .map(classroomId => [classroomId, groupTargets[classroomId] === null
+          ? null
+          : [...(groupTargets[classroomId] ?? [])].sort()]),
+      requireWorkImage,
+      selectedIds,
+      sections: filterSectionsToQuestions(sections, selectedIds),
+      showSections,
+      randomQuestionCount,
+      questionPoints: selectedIds.map(id => [
+        id,
+        questionPointDrafts[id] ?? String(defaultPointsById.get(id) ?? 1),
+      ]),
+      displayMaxScore,
+      duration,
+      shuffleQ,
+      shuffleA,
+      sharedRandomValues,
+      showResults,
+      showSolutions,
+      maxAttempts,
+      scoreStrategy,
+      retryScope,
+      questionsPerPage,
+      instantCheck,
+      instantCheckAnswerKey,
+      calculatorEnabled,
+      scratchpadEnabled,
+      accessCode,
+      accessCodeEnabled,
+      proctoringEnabled,
+      fullscreenRequired,
+      blockClipboard,
+      examWatermarkEnabled,
+      secureBrowserMode,
+      androidExamMode,
+      sebQuitPassword,
+      sebQuitPasswordConfirmation,
+      completionRule,
+      streakTarget,
+      streakCapEnabled,
+      streakCap,
+      streakRecycle,
+      passingEnabled,
+      passingType,
+      passingValue,
+      startAt,
+      dueAt,
+      endAt,
+      lateBands,
+    }),
+    [
+      title, description, classroomIds, groupTargets, requireWorkImage,
+      selectedIds, sections, showSections, randomQuestionCount, questionPointDrafts,
+      defaultPointsById, displayMaxScore, duration, shuffleQ, shuffleA,
+      sharedRandomValues, showResults, showSolutions, maxAttempts, scoreStrategy,
+      retryScope, questionsPerPage, instantCheck, instantCheckAnswerKey,
+      calculatorEnabled, scratchpadEnabled, accessCode, accessCodeEnabled,
+      proctoringEnabled, fullscreenRequired, blockClipboard, examWatermarkEnabled,
+      secureBrowserMode, androidExamMode, sebQuitPassword, sebQuitPasswordConfirmation,
+      completionRule, streakTarget, streakCapEnabled, streakCap, streakRecycle,
+      passingEnabled, passingType, passingValue, startAt, dueAt, endAt, lateBands,
+    ],
+  )
+  const initialDraftFingerprintRef = useRef(draftFingerprint)
+  const hasUnsavedAssignmentChanges = draftFingerprint !== initialDraftFingerprintRef.current
+
+  useEffect(() => {
+    if (!hasUnsavedAssignmentChanges) return
+
+    function warnBeforeLeaving(event: BeforeUnloadEvent) {
+      event.preventDefault()
+      // Browsers deliberately replace this value with their own localized
+      // confirmation text. Assigning it is still required by older engines.
+      event.returnValue = ''
+    }
+
+    window.addEventListener('beforeunload', warnBeforeLeaving)
+    return () => window.removeEventListener('beforeunload', warnBeforeLeaving)
+  }, [hasUnsavedAssignmentChanges])
+
   const scheduleRef = useRef<HTMLDivElement>(null)
   const additionalClassroomsRef = useRef<HTMLDivElement>(null)
   const [scheduleOpen, setScheduleOpen] = useState(Boolean(startAt || dueAt || endAt))
@@ -645,7 +740,6 @@ export function CreateAssignmentForm({
   // the ดูตัวอย่าง dialog must page through exactly what is shown.
   const previewIds = previewQuestions.map(q => q.id)
   // What a question is worth until the teacher types over it.
-  const defaultPointsById = new Map(questions.map(q => [q.id, q.default_points]))
   const pointsDraft = (id: string) => questionPointDrafts[id] ?? String(defaultPointsById.get(id) ?? 1)
 
   function setAllQuestionPoints(
