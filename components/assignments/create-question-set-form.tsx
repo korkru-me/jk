@@ -94,6 +94,8 @@ export function CreateQuestionSetForm({
   const [teams, setTeams] = useState<{ id: string; name: string }[]>([])
   const [teamChecked, setTeamChecked] = useState(false)
   const [autosaveStatus, setAutosaveStatus] = useState<AutosaveStatus>('saved')
+  const [infoCardHeight, setInfoCardHeight] = useState<number>()
+  const infoCardRef = useRef<HTMLDivElement>(null)
   const infoTouchedRef = useRef(false)
   const infoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const latestPayloadRef = useRef<QuestionSetData | null>(null)
@@ -333,6 +335,20 @@ export function CreateQuestionSetForm({
     return () => window.removeEventListener('beforeunload', warnBeforeLeaving)
   }, [autosaveStatus, initialSet])
 
+  // On the create screen, the compact question list deliberately mirrors the
+  // information card's current height. ResizeObserver keeps the two surfaces
+  // balanced when team options or responsive wrapping make that card taller.
+  useEffect(() => {
+    if (initialSet || !editingInfo || !infoCardRef.current) return
+    const card = infoCardRef.current
+    const updateHeight = () => setInfoCardHeight(Math.ceil(card.getBoundingClientRect().height))
+    updateHeight()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(updateHeight)
+    observer.observe(card)
+    return () => observer.disconnect()
+  }, [editingInfo, initialSet])
+
   // Suggestions for the add-a-tag control on each card, ranked by how much of
   // the คลัง already uses them. Read off the rows the picker loaded, so it
   // costs no query of its own.
@@ -418,7 +434,7 @@ export function CreateQuestionSetForm({
       </header>
 
       {editingInfo && (
-        <Card padding="md">
+        <Card ref={infoCardRef} padding="md">
           <FieldGroup className="gap-4">
             <Field>
               <FieldLabel htmlFor="set-title">
@@ -510,6 +526,7 @@ export function CreateQuestionSetForm({
         onSaveBeforeEdit={initialSet ? saveBeforeEdit : undefined}
         initialCardData={initialCardData}
         loadQuestionPreviews={loadQuestionPreviews}
+        compactQuestionsHeight={infoCardHeight}
       />
 
       <Dialog open={pickerOpen} onOpenChange={handlePickerOpenChange}>

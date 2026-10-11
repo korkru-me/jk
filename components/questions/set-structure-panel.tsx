@@ -19,9 +19,6 @@ import { IconButton } from '@/components/ui/icon-button'
 import { Input } from '@/components/ui/input'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Card } from '@/components/ui/card'
-import {
-  Collapsible, CollapsibleContent, CollapsibleTrigger,
-} from '@/components/ui/collapsible'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
@@ -83,6 +80,8 @@ interface Props {
   initialCardData?: QuestionCardData
   /** Local visual fixtures may supply synthetic previews without Supabase. */
   loadQuestionPreviews?: typeof getQuestionPreviewDetails
+  /** Height of the information card above this workflow on the create page. */
+  compactQuestionsHeight?: number
 }
 
 const UNNAMED = 'แฟ้มย่อยที่ยังไม่ตั้งชื่อ'
@@ -121,14 +120,16 @@ function namesPreview(ids: readonly string[], byId: Map<string, PanelQuestion>):
 export function SetStructurePanel({
   questions, questionIds, sections, onChange, onAddQuestions,
   allTags, myTeams, setId, onSaveBeforeEdit, initialCardData, loadQuestionPreviews,
+  compactQuestionsHeight,
 }: Props) {
   // The แฟ้มย่อย whose dialog is open — an id, or NEW_SECTION while creating.
   const [dialogSectionId, setDialogSectionId] = useState<string | null>(null)
   const [selected, setSelected] = useState<string[]>([])
   const [bulkSectionOpen, setBulkSectionOpen] = useState(false)
   const [previewSectionId, setPreviewSectionId] = useState<string | null>(null)
-  const [questionsOpen, setQuestionsOpen] = useState(false)
+  const [questionsExpanded, setQuestionsExpanded] = useState(false)
   const questionsPanelRef = useRef<HTMLDivElement>(null)
+  const questionsRegionId = useId()
   // Pending confirmations.
   const [removeIds, setRemoveIds] = useState<string[] | null>(null)
   const [deleteSectionId, setDeleteSectionId] = useState<string | null>(null)
@@ -156,19 +157,19 @@ export function SetStructurePanel({
   const previewSection = sections.find(s => s.id === previewSectionId) ?? null
 
   useEffect(() => {
-    if (setId || !questionsOpen) return
+    if (setId || !questionsExpanded) return
 
     // Use click rather than pointerdown so an outside control receives the
     // complete gesture before this long panel folds and shifts the page.
     function closeQuestionsOnOutsideClick(event: MouseEvent) {
       const target = event.target
       if (!(target instanceof Node) || questionsPanelRef.current?.contains(target)) return
-      setQuestionsOpen(false)
+      setQuestionsExpanded(false)
     }
 
     document.addEventListener('click', closeQuestionsOnOutsideClick)
     return () => document.removeEventListener('click', closeQuestionsOnOutsideClick)
-  }, [questionsOpen, setId])
+  }, [questionsExpanded, setId])
 
   function apply(next: { sections: QuestionSetSection[]; question_ids: string[] }) {
     onChange({ sections: next.sections, questionIds: next.question_ids })
@@ -309,39 +310,61 @@ export function SetStructurePanel({
       {renderQuestionList(false)}
     </Card>
   ) : (
-    <Card ref={questionsPanelRef} className="overflow-hidden">
-      <Collapsible open={questionsOpen} onOpenChange={setQuestionsOpen}>
-        <div className="flex min-h-[72px] items-center gap-2 p-5">
-          <CollapsibleTrigger
-            render={(
-              <Button
-                type="button"
-                variant="ghost"
-                className="group h-auto min-w-0 flex-1 justify-start gap-2 p-0 text-left hover:bg-transparent"
-              />
+    <Card
+      ref={questionsPanelRef}
+      data-question-list-panel
+      data-expanded={questionsExpanded}
+      className={cn(
+        'overflow-hidden',
+        questionIds.length > 0 && !questionsExpanded && 'flex flex-col',
+      )}
+      style={questionIds.length > 0 && !questionsExpanded
+        ? { height: compactQuestionsHeight ?? 360 }
+        : undefined}
+    >
+      <div className="flex min-h-[72px] shrink-0 items-center gap-2 p-5">
+        <Button
+          type="button"
+          variant="ghost"
+          aria-expanded={questionsExpanded}
+          aria-controls={questionIds.length > 0 || questionsExpanded ? questionsRegionId : undefined}
+          aria-label={questionsExpanded
+            ? 'ย่อรายการโจทย์ให้เลื่อนภายในกรอบ'
+            : 'ขยายรายการโจทย์ทั้งหมด'}
+          title={questionsExpanded ? 'ย่อรายการโจทย์' : 'ขยายรายการโจทย์ทั้งหมด'}
+          onClick={() => setQuestionsExpanded(expanded => !expanded)}
+          className="group h-auto min-w-0 flex-1 justify-start gap-2 p-0 text-left hover:bg-transparent"
+        >
+          <Layers className="size-4 shrink-0 text-primary" aria-hidden="true" />
+          <span className="whitespace-nowrap font-semibold text-foreground">โจทย์ในแฟ้มนี้</span>
+          <span className="whitespace-nowrap text-xs text-muted-foreground">{questionIds.length} ข้อ</span>
+          <ChevronDown
+            className={cn(
+              'ml-auto size-4 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none',
+              questionsExpanded && 'rotate-180',
             )}
-          >
-            <Layers className="size-4 shrink-0 text-primary" aria-hidden="true" />
-            <span className="whitespace-nowrap font-semibold text-foreground">โจทย์ในแฟ้มนี้</span>
-            <span className="whitespace-nowrap text-xs text-muted-foreground">{questionIds.length} ข้อ</span>
-            <ChevronDown
-              className="ml-auto size-4 shrink-0 text-muted-foreground transition-transform group-data-panel-open:rotate-180 motion-reduce:transition-none"
-              aria-hidden="true"
-            />
-          </CollapsibleTrigger>
-          <Button type="button" size="sm" onClick={onAddQuestions} className="shrink-0">
-            <Plus data-icon="inline-start" aria-hidden="true" />
-            <span className="hidden sm:inline">เพิ่มโจทย์จากคลัง</span>
-            <span className="sm:hidden">เพิ่มโจทย์</span>
-          </Button>
-        </div>
+            aria-hidden="true"
+          />
+        </Button>
+        <Button type="button" size="sm" onClick={onAddQuestions} className="shrink-0">
+          <Plus data-icon="inline-start" aria-hidden="true" />
+          <span className="hidden sm:inline">เพิ่มโจทย์จากคลัง</span>
+          <span className="sm:hidden">เพิ่มโจทย์</span>
+        </Button>
+      </div>
 
-        <CollapsibleContent className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 ease-out data-ending-style:h-0 data-starting-style:h-0 motion-reduce:transition-none">
-          <div className="border-t border-border px-5 pb-5 pt-4">
-            {renderQuestionList(true)}
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
+      {(questionIds.length > 0 || questionsExpanded) && (
+        <div
+          id={questionsRegionId}
+          data-question-list-region
+          className={cn(
+            'border-t border-border px-5 pb-5 pt-4',
+            questionIds.length > 0 && !questionsExpanded && 'min-h-0 flex-1 overflow-y-auto overscroll-contain',
+          )}
+        >
+          {renderQuestionList(true)}
+        </div>
+      )}
     </Card>
   )
 
