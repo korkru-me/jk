@@ -482,7 +482,29 @@ export function CreateAssignmentForm({
       color: band.color,
     })),
   )
+  const scheduleRef = useRef<HTMLDivElement>(null)
+  const additionalClassroomsRef = useRef<HTMLDivElement>(null)
   const [scheduleOpen, setScheduleOpen] = useState(Boolean(startAt || dueAt || endAt))
+
+  useEffect(() => {
+    if (!scheduleOpen) return
+
+    function closeScheduleOnOutsideClick(event: MouseEvent) {
+      const container = scheduleRef.current
+      const target = event.target
+      if (!container || !(target instanceof Node)) return
+      // A selected value can move or replace a nested control before this
+      // document listener runs. The original event path still proves that the
+      // click began inside the schedule card in that case.
+      if (container.contains(target) || event.composedPath().includes(container)) return
+      setScheduleOpen(false)
+    }
+
+    // Waiting for click keeps the outside target in place through pointerup,
+    // so one click can both close this panel and activate the next control.
+    document.addEventListener('click', closeScheduleOnOutsideClick)
+    return () => document.removeEventListener('click', closeScheduleOnOutsideClick)
+  }, [scheduleOpen])
 
   // Every โจทย์ this teacher can actually assign. Kept as a set because both
   // the แฟ้ม shortcut and importSet ask "is this id real?" once per ข้อ in a
@@ -1825,7 +1847,7 @@ export function CreateAssignmentForm({
       {/* ── Step 3: กำหนดการสอบ ─────────────────────────────────────── */}
       {step === 2 && (
         <div className="space-y-3">
-          <Card padding="md">
+          <Card ref={scheduleRef} padding="md">
             <Collapsible open={scheduleOpen} onOpenChange={setScheduleOpen}>
               <CollapsibleTrigger className="group flex w-full items-center justify-between gap-3 text-left">
                 <span className="flex min-w-0 flex-col gap-1">
@@ -1876,12 +1898,13 @@ export function CreateAssignmentForm({
           </Card>
 
           {preselectedClassroomId && (
-            <Card padding="md" className="flex flex-col gap-3">
+            <Card ref={additionalClassroomsRef} padding="md" className="flex flex-col gap-3">
               <ClassroomPicker
                 classrooms={classrooms}
                 selectedIds={classroomIds}
                 onToggle={toggleClassroom}
                 primaryClassroomId={preselectedClassroomId}
+                outsideClickBoundaryRef={additionalClassroomsRef}
               />
               {classroomIds.some(id => id !== preselectedClassroomId) && (
                 <div className="flex flex-col gap-1.5">

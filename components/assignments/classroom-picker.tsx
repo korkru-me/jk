@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import { Check, ChevronDown, Search } from 'lucide-react'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
 import {
   Collapsible,
   CollapsibleContent,
@@ -26,6 +26,10 @@ interface Props {
   /** The room the teacher came from. It stays selected while other rooms are
    *  tucked behind an explicit "assign elsewhere too" disclosure. */
   primaryClassroomId?: string
+  /** A larger visual section that should still count as "inside" the picker.
+   *  The contextual assignment flow keeps its group-target controls in the
+   *  same card, just below this disclosure. */
+  outsideClickBoundaryRef?: RefObject<HTMLElement | null>
 }
 
 interface Row {
@@ -46,8 +50,36 @@ interface Row {
  * rest of the form. It is now a fixed-height, scrollable list of compact rows
  * with a search box once there are enough rooms to need one.
  */
-export function ClassroomPicker({ classrooms, selectedIds, onToggle, primaryClassroomId }: Props) {
+export function ClassroomPicker({
+  classrooms,
+  selectedIds,
+  onToggle,
+  primaryClassroomId,
+  outsideClickBoundaryRef,
+}: Props) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
+
+  useEffect(() => {
+    if (!open) return
+
+    function closeOnOutsideClick(event: MouseEvent) {
+      const container = outsideClickBoundaryRef?.current ?? containerRef.current
+      const target = event.target
+      if (!container || !(target instanceof Node)) return
+      // Selecting a room moves its row to the top. Keep the disclosure open
+      // even if React moves or replaces the original target before bubbling
+      // reaches this document listener.
+      if (container.contains(target) || event.composedPath().includes(container)) return
+      setOpen(false)
+    }
+
+    // Collapse only after the outside control receives its click, so switching
+    // sections or choosing a group works on the first click.
+    document.addEventListener('click', closeOnOutsideClick)
+    return () => document.removeEventListener('click', closeOnOutsideClick)
+  }, [open, outsideClickBoundaryRef])
 
   const rows: Row[] = classrooms.map(classroom => {
     // `description` carries the create wizard's whole form flattened into text
@@ -125,13 +157,16 @@ export function ClassroomPicker({ classrooms, selectedIds, onToggle, primaryClas
   )
 
   return (
-    <div className="flex flex-col gap-2">
+    <div ref={containerRef} className="flex flex-col gap-2">
       {primaryRow && selectableRows.length > 0 ? (
-        <Collapsible>
+        <Collapsible open={open} onOpenChange={setOpen}>
           <CollapsibleTrigger
-            className={cn(
-              buttonVariants({ variant: 'outline' }),
-              'group h-auto w-full justify-between rounded-xl p-3 text-left',
+            render={(
+              <Button
+                type="button"
+                variant="outline"
+                className="group h-auto w-full justify-between rounded-xl p-3 text-left aria-expanded:bg-background aria-expanded:hover:bg-background dark:aria-expanded:bg-input/30 dark:aria-expanded:hover:bg-input/30"
+              />
             )}
           >
             <span className="flex min-w-0 flex-col items-start gap-0.5 whitespace-normal">
@@ -142,7 +177,7 @@ export function ClassroomPicker({ classrooms, selectedIds, onToggle, primaryClas
                   : 'หากไม่เลือกเพิ่ม งานจะอยู่ในห้องนี้เท่านั้น'}
               </span>
             </span>
-            <ChevronDown className="size-4 shrink-0 transition-transform group-data-panel-open:rotate-180" />
+            <ChevronDown className="size-4 shrink-0 transition-transform group-data-panel-open:rotate-180" aria-hidden="true" />
           </CollapsibleTrigger>
           <CollapsibleContent className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 ease-out data-ending-style:h-0 data-starting-style:h-0">
             <div className="flex flex-col gap-2 pt-2">
