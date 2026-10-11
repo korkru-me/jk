@@ -300,7 +300,11 @@ export function CreateAssignmentForm({
   // Which row's มุมมองนักเรียน is open, as an index into selectedIds so the
   // dialog's ข้อถัดไป walks the teacher's own order. null = closed.
   const [previewIndex, setPreviewIndex] = useState<number | null>(null)
-  const [listPreview, setListPreview] = useState<{ ids: string[]; title: string } | null>(null)
+  const [listPreview, setListPreview] = useState<{
+    ids: string[]
+    title: string
+    reorderable?: boolean
+  } | null>(null)
   // Independent of the per-question points above — rescales what's
   // *reported* only (never the underlying structure), and can be changed
   // any time later from the edit page too, even after students finish.
@@ -1051,6 +1055,7 @@ export function CreateAssignmentForm({
                 onClick={() => setListPreview({
                   ids: previewIds,
                   title: 'ตัวอย่างโจทย์ทั้งหมดตามลำดับ',
+                  reorderable: true,
                 })}
               >
                 <Eye data-icon="inline-start" />
@@ -1990,10 +1995,11 @@ export function CreateAssignmentForm({
       )}
 
       <QuestionListPreviewDialog
-        ids={listPreview?.ids ?? []}
+        ids={listPreview?.reorderable ? previewIds : (listPreview?.ids ?? [])}
         title={listPreview?.title}
         open={listPreview !== null}
         onOpenChange={open => { if (!open) setListPreview(null) }}
+        onMoveQuestion={listPreview?.reorderable ? moveQuestionTo : undefined}
         loadQuestions={actions?.getQuestionPreviewDetails}
       />
       <QuestionPreviewDialog
