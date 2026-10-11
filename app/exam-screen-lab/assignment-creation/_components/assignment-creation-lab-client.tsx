@@ -54,9 +54,22 @@ export function AssignmentCreationLabClient({ contextual, type }: { contextual: 
         }}
         questions={questions}
         questionSets={[
-          { id: 'lab-all', title: 'แฟ้มจำลองสามข้อ', description: null, question_ids: questions.map(q => q.id), sections: [] },
+          {
+            id: 'lab-all',
+            title: 'แฟ้มจำลองสามข้อ',
+            description: null,
+            question_ids: questions.map(q => q.id),
+            sections: [
+              { id: 'lab-force', title: 'แรงและการเคลื่อนที่', question_ids: [questions[0].id, questions[1].id] },
+              { id: 'lab-energy', title: 'งานและพลังงาน', question_ids: [questions[1].id, questions[2].id] },
+              { id: 'lab-empty-section', title: 'แฟ้มย่อยว่าง', question_ids: [] },
+            ],
+          },
           { id: 'lab-overlap', title: 'แฟ้มจำลองข้อซ้ำ', description: null, question_ids: [questions[0].id, questions[1].id], sections: [] },
           { id: 'lab-missing', title: 'แฟ้มจำลองมีข้อที่หายไป', description: null, question_ids: [questions[2].id, '00000000-0000-4000-8100-000000000099'], sections: [] },
+          { id: 'lab-one', title: 'แฟ้มทบทวนก่อนเรียน', description: null, question_ids: [questions[0].id], sections: [] },
+          { id: 'lab-two', title: 'แฟ้มแบบฝึกหัดท้ายบท', description: null, question_ids: [questions[1].id], sections: [] },
+          { id: 'lab-three', title: 'แฟ้มข้อสอบเก็บคะแนน', description: null, question_ids: [questions[2].id], sections: [] },
           { id: 'lab-empty', title: 'แฟ้มจำลองว่าง', description: null, question_ids: [], sections: [] },
         ]}
         preselectedClassroomId={contextual ? ROOM_ONE : undefined}

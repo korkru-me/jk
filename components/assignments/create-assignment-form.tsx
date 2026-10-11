@@ -65,7 +65,10 @@ import { QuestionPreviewDialog } from '@/components/assignments/question-preview
 import { QuestionListPreviewDialog } from '@/components/assignments/question-list-preview-dialog'
 import type { getQuestionPreviewDetails } from '@/lib/actions/question-previews'
 import { toggleQuestionSetSelection } from '@/lib/question-set-selection'
-import { QuestionSetImport } from '@/components/assignments/question-set-import'
+import {
+  QuestionSetImport,
+  type QuestionSetImportChoice,
+} from '@/components/assignments/question-set-import'
 import { ClassroomPicker } from '@/components/assignments/classroom-picker'
 import { AssignmentReviewSummary } from '@/components/assignments/assignment-review-summary'
 import {
@@ -481,33 +484,44 @@ export function CreateAssignmentForm({
     setSelectedIds(prev => prev.filter(i => i !== id))
   }
 
-  function importSet(set: AssignmentQuestionSetOption) {
-    const validIds = [...new Set(set.question_ids)].filter(id => bankIds.has(id))
-    const missingCount = new Set(set.question_ids).size - validIds.length
+  function importSet(choice: QuestionSetImportChoice) {
+    const validIds = [...new Set(choice.questionIds)].filter(id => bankIds.has(id))
+    const validIdSet = new Set(validIds)
+    const missingCount = new Set(choice.questionIds).size - validIds.length
     const removing = validIds.length > 0 && validIds.every(id => selectedIds.includes(id))
-    setSelectedIds(prev => toggleQuestionSetSelection(prev, set.question_ids, bankIds))
+    setSelectedIds(prev => toggleQuestionSetSelection(prev, choice.questionIds, bankIds))
     if (removing) {
       // As with unticking one question, retain section/point drafts for re-selection.
-      toast.success(`เอา ${validIds.length} ข้อจากแฟ้ม "${set.title}" ออกจากรายการที่เลือกแล้ว`)
+      toast.success(`เอา ${validIds.length} ข้อจาก${choice.toastLabel} ออกจากรายการที่เลือกแล้ว`)
       return
     }
     // What the click actually changed. Re-importing a แฟ้ม the teacher already
     // pulled in used to claim it added all 22 ข้อ again.
     const addedCount = validIds.filter(id => !selectedIds.includes(id)).length
-    // Sections follow their questions in. Ids already claimed by an earlier
-    // แฟ้ม stay where they are, so two แฟ้ม can be merged without a question
-    // showing up under two แฟ้มย่อย.
+    // Sections follow their questions in. Re-importing the same แฟ้ม or one
+    // แฟ้มย่อย merges by section id instead of appending duplicate headings.
+    // A question may intentionally belong to several แฟ้มย่อย, so membership
+    // is not stripped merely because another section already carries it.
     setSections(prev => {
-      const claimed = new Set(prev.flatMap(sec => sec.question_ids))
-      const incoming = parseSections(set.sections)
-        .map(sec => ({ ...sec, question_ids: sec.question_ids.filter(id => validIds.includes(id) && !claimed.has(id)) }))
+      const incoming = choice.sections
+        .map(sec => ({ ...sec, question_ids: sec.question_ids.filter(id => validIdSet.has(id)) }))
         .filter(sec => sec.question_ids.length > 0)
-      return [...prev, ...incoming]
+      const incomingById = new Map(incoming.map(section => [section.id, section]))
+      const merged = prev.map(section => {
+        const addition = incomingById.get(section.id)
+        if (!addition) return section
+        incomingById.delete(section.id)
+        return {
+          ...section,
+          question_ids: [...new Set([...section.question_ids, ...addition.question_ids])],
+        }
+      })
+      return [...merged, ...incomingById.values()]
     })
     if (missingCount > 0) {
-      toast.success(`เพิ่ม ${addedCount} ข้อจากแฟ้ม "${set.title}" (ข้าม ${missingCount} ข้อที่ถูกลบไปแล้ว)`)
+      toast.success(`เพิ่ม ${addedCount} ข้อจาก${choice.toastLabel} (ข้าม ${missingCount} ข้อที่ถูกลบไปแล้ว)`)
     } else {
-      toast.success(`เพิ่ม ${addedCount} ข้อจากแฟ้ม "${set.title}"`)
+      toast.success(`เพิ่ม ${addedCount} ข้อจาก${choice.toastLabel}`)
     }
   }
 
@@ -966,7 +980,10 @@ export function CreateAssignmentForm({
               bankIds={bankIds}
               selectedIds={selectedIds}
               onToggle={importSet}
-              onPreview={set => setListPreview({ ids: set.question_ids.filter(id => bankIds.has(id)), title: `โจทย์ในแฟ้ม ${set.title}` })}
+              onPreview={choice => setListPreview({
+                ids: choice.questionIds.filter(id => bankIds.has(id)),
+                title: `โจทย์ใน${choice.toastLabel}`,
+              })}
             />
 
             <Collapsible>
