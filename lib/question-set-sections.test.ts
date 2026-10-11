@@ -13,6 +13,7 @@ import {
   moveQuestionOrder,
   moveQuestionOrderToIndex,
   setQuestionInSection,
+  addQuestionsToSections,
   clearQuestionSections,
   sectionsByQuestionId,
   removeQuestionsFromSet,
@@ -200,6 +201,27 @@ describe('section membership', () => {
     const result = setQuestionInSection(both.sections, both.question_ids, 'a', 's1', false)
     expect(result.sections[0].question_ids).toEqual(['b'])
     expect(result.sections[1].question_ids).toEqual(['c', 'a'])
+  })
+
+  it('adds several questions to several sections without removing existing memberships', () => {
+    const result = addQuestionsToSections(
+      [s('s1', 'A', ['a', 'b']), s('s2', 'B', ['c']), s('s3', 'C', [])],
+      ['a', 'b', 'c', 'd'],
+      ['d', 'a'],
+      ['s2', 's3'],
+    )
+
+    expect(result.sections).toEqual([
+      s('s1', 'A', ['a', 'b']),
+      s('s2', 'B', ['a', 'c', 'd']),
+      s('s3', 'C', ['a', 'd']),
+    ])
+    expect(result.question_ids).toEqual(['a', 'b', 'c', 'd'])
+  })
+
+  it('ignores unknown questions and section ids during a bulk add', () => {
+    const result = addQuestionsToSections(sections, ids, ['a', 'ghost'], ['s2', 'missing'])
+    expect(result.sections).toEqual([s('s1', 'A', ['a', 'b']), s('s2', 'B', ['a', 'c'])])
   })
 
   it('reports every section a question belongs to', () => {

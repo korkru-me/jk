@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import {
-  Plus, ChevronUp, ChevronDown, MoreVertical, Folder, FolderOpen, X, Layers, Search, Eye, Edit2,
+  Plus, ChevronUp, ChevronDown, MoreVertical, Folder, FolderOpen, FolderPlus,
+  X, Layers, Search, Eye, Edit2, Check,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { IconButton } from '@/components/ui/icon-button'
@@ -21,10 +22,11 @@ import {
 import { cn } from '@/lib/utils'
 import { questionExcerpt } from '@/lib/question-display'
 import {
-  moveQuestionInSet, moveSection, newSectionId, normalizeSetSections,
+  addQuestionsToSections, moveQuestionInSet, moveSection, newSectionId, normalizeSetSections,
   removeQuestionsFromSet, sectionsByQuestionId, ungroupedQuestionIds,
   type QuestionSetSection,
 } from '@/lib/question-set-sections'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { getQuestionClientDetail } from '@/lib/actions/questions'
@@ -110,6 +112,7 @@ export function SetStructurePanel({
   // The แฟ้มย่อย whose dialog is open — an id, or NEW_SECTION while creating.
   const [dialogSectionId, setDialogSectionId] = useState<string | null>(null)
   const [selected, setSelected] = useState<string[]>([])
+  const [bulkSectionOpen, setBulkSectionOpen] = useState(false)
   // Pending confirmations.
   const [removeIds, setRemoveIds] = useState<string[] | null>(null)
   const [deleteSectionId, setDeleteSectionId] = useState<string | null>(null)
@@ -168,6 +171,13 @@ export function SetStructurePanel({
     apply(removeQuestionsFromSet(sections, questionIds, ids))
     setSelected(prev => prev.filter(id => !ids.includes(id)))
     toast.success(`เอาออกจากแฟ้ม ${ids.length} ข้อและบันทึกแล้ว`)
+  }
+
+  function addSelectedToSections(sectionIds: string[]) {
+    apply(addQuestionsToSections(sections, questionIds, selected, sectionIds))
+    toast.success(`เพิ่มโจทย์ ${selected.length} ข้อเข้าแฟ้มย่อย ${sectionIds.length} แฟ้มและบันทึกแล้ว`)
+    setSelected([])
+    setBulkSectionOpen(false)
   }
 
   const allSelected = questionIds.length > 0 && questionIds.every(id => selected.includes(id))
@@ -280,6 +290,17 @@ export function SetStructurePanel({
           <div className="sticky bottom-0 -mx-6 -mb-6 px-6 py-3 border-t border-border bg-muted/80 backdrop-blur-sm rounded-b-2xl flex items-center gap-2 flex-wrap">
             <span className="text-sm font-medium text-foreground">เลือก {selected.length} ข้อ</span>
             <div className="flex items-center gap-2 ml-auto flex-wrap">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={sections.length === 0}
+                title={sections.length === 0 ? 'สร้างแฟ้มย่อยก่อนจึงจะเพิ่มโจทย์ได้' : undefined}
+                onClick={() => setBulkSectionOpen(true)}
+              >
+                <FolderPlus data-icon="inline-start" aria-hidden="true" />
+                เพิ่มเข้าแฟ้มย่อย
+              </Button>
               <Button type="button" variant="destructive" size="sm" onClick={() => setRemoveIds(selected)}>
                 เอาออกจากแฟ้ม
               </Button>
@@ -302,6 +323,14 @@ export function SetStructurePanel({
         onConfirm={applySectionDraft}
         setId={setId}
         onSaveBeforeEdit={onSaveBeforeEdit}
+      />
+
+      <BulkAddToSectionsDialog
+        open={bulkSectionOpen}
+        sections={sections}
+        selectedQuestionIds={selected}
+        onCancel={() => setBulkSectionOpen(false)}
+        onConfirm={addSelectedToSections}
       />
 
       <ConfirmDialog
@@ -333,6 +362,137 @@ export function SetStructurePanel({
         onConfirm={() => deleteSectionId && deleteSection(deleteSectionId)}
       />
     </div>
+  )
+}
+
+/**
+ * Adds one bulk selection to one or more แฟ้มย่อย. This is intentionally an
+ * add-only dialog: choosing another destination must not erase any labels the
+ * selected questions already carry.
+ */
+function BulkAddToSectionsDialog({
+  open, sections, selectedQuestionIds, onCancel, onConfirm,
+}: {
+  open: boolean
+  sections: QuestionSetSection[]
+  selectedQuestionIds: string[]
+  onCancel: () => void
+  onConfirm: (sectionIds: string[]) => void
+}) {
+  const [targetSectionIds, setTargetSectionIds] = useState<string[]>([])
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false)
+  const selectedKey = selectedQuestionIds.join(',')
+
+  useEffect(() => {
+    if (!open) return
+    setTargetSectionIds([])
+    setConfirmingDiscard(false)
+  }, [open, selectedKey])
+
+  function requestClose() {
+    if (targetSectionIds.length > 0) {
+      setConfirmingDiscard(true)
+      return
+    }
+    onCancel()
+  }
+
+  function discardDraft() {
+    setConfirmingDiscard(false)
+    setTargetSectionIds([])
+    onCancel()
+  }
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={nextOpen => { if (!nextOpen) requestClose() }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FolderPlus aria-hidden="true" />
+              เพิ่มโจทย์เข้าแฟ้มย่อย
+            </DialogTitle>
+            <DialogDescription>
+              เลือกแฟ้มย่อยสำหรับโจทย์ {selectedQuestionIds.length} ข้อ เลือกได้มากกว่าหนึ่งแฟ้ม และโจทย์จะยังอยู่ในแฟ้มย่อยเดิม
+            </DialogDescription>
+          </DialogHeader>
+
+          <ToggleGroup
+            value={targetSectionIds}
+            onValueChange={setTargetSectionIds}
+            orientation="vertical"
+            spacing={2}
+            variant="outline"
+            aria-label="เลือกแฟ้มย่อยที่จะเพิ่มโจทย์เข้าไป"
+            className="w-full items-stretch"
+          >
+            {sections.map(section => {
+              const alreadyCount = selectedQuestionIds.filter(id => section.question_ids.includes(id)).length
+              const allAlreadyMembers = alreadyCount === selectedQuestionIds.length
+              const remainingCount = selectedQuestionIds.length - alreadyCount
+              const status = allAlreadyMembers
+                ? 'อยู่ในแฟ้มย่อยนี้ครบแล้ว'
+                : alreadyCount > 0
+                  ? `อยู่แล้ว ${alreadyCount} ข้อ · จะเพิ่มอีก ${remainingCount} ข้อ`
+                  : `จะเพิ่ม ${selectedQuestionIds.length} ข้อ`
+              const active = targetSectionIds.includes(section.id)
+
+              return (
+                <ToggleGroupItem
+                  key={section.id}
+                  value={section.id}
+                  disabled={allAlreadyMembers}
+                  aria-label={`${section.title || UNNAMED} — ${status}`}
+                  className="h-auto min-h-11 w-full min-w-0 justify-start whitespace-normal rounded-xl border border-border px-3 py-2.5 text-left aria-pressed:border-primary/30 aria-pressed:bg-primary/10 aria-pressed:text-foreground data-[state=on]:border-primary/30 data-[state=on]:bg-primary/10 data-[state=on]:text-foreground"
+                >
+                  <span className="flex w-full min-w-0 items-center gap-3">
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <Folder aria-hidden="true" />
+                    </span>
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="truncate text-sm font-medium text-foreground">
+                        {section.title || UNNAMED}
+                      </span>
+                      <span className="text-xs text-muted-foreground">{status}</span>
+                    </span>
+                    {active && <Check className="shrink-0 text-primary" aria-hidden="true" />}
+                  </span>
+                </ToggleGroupItem>
+              )
+            })}
+          </ToggleGroup>
+
+          <DialogFooter className="sm:items-center sm:justify-between">
+            <span className="text-sm text-muted-foreground">
+              {targetSectionIds.length > 0
+                ? `เลือก ${targetSectionIds.length} แฟ้มย่อย`
+                : 'เลือกอย่างน้อย 1 แฟ้มย่อย'}
+            </span>
+            <span className="flex items-center gap-2">
+              <Button type="button" variant="outline" onClick={requestClose}>ยกเลิก</Button>
+              <Button
+                type="button"
+                disabled={targetSectionIds.length === 0}
+                onClick={() => onConfirm(targetSectionIds)}
+              >
+                ยืนยัน
+              </Button>
+            </span>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={confirmingDiscard}
+        onOpenChange={setConfirmingDiscard}
+        title="ออกโดยไม่เพิ่มเข้าแฟ้มย่อย?"
+        description="แฟ้มย่อยที่เลือกไว้ยังไม่ได้กด “ยืนยัน” หากออกตอนนี้ รายการที่เลือกครั้งนี้จะหายไป"
+        confirmLabel="ออกโดยไม่บันทึก"
+        cancelLabel="กลับไปเลือกต่อ"
+        variant="destructive"
+        onConfirm={discardDraft}
+      />
+    </>
   )
 }
 
