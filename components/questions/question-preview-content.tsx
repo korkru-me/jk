@@ -946,7 +946,7 @@ export function QuestionPreviewContent({
                 )
               })}
               <div className="mt-2">
-                <WorkImageUpload value={workImages[0] ?? null} onChange={url => setWorkImage(0, url)} localOnly />
+                <WorkImageUpload value={workImages[0] ?? null} onChange={url => setWorkImage(0, url)} localOnly showPreviewHelp />
               </div>
             </div>
           )}
@@ -990,30 +990,10 @@ export function QuestionPreviewContent({
                     </div>
                   </>
                 )}
-                <WorkImageUpload value={workImages[i] ?? null} onChange={url => setWorkImage(i, url)} localOnly />
+                <WorkImageUpload value={workImages[i] ?? null} onChange={url => setWorkImage(i, url)} localOnly showPreviewHelp />
               </div>
             )
           })}
-
-          {/* อธิบายช่องแนบรูปวิธีทำ — สวิตช์ไม่ได้อยู่ในหน้าสร้างโจทย์ ครูจึงหาไม่เจอถ้าไม่บอก */}
-          <div className="text-xs text-muted-foreground bg-muted rounded-lg px-3 py-2 leading-relaxed space-y-1">
-            <p className="font-medium text-foreground">ช่องแนบรูปวิธีทำคืออะไร</p>
-            <p>
-              เป็นช่องให้นักเรียน<span className="font-medium text-foreground">ถ่ายรูปกระดาษทดที่แสดงวิธีทำ</span>แนบมาพร้อมคำตอบ
-              (เปิดกล้องหลังของมือถือโดยตรง ย่อรูปให้เองก่อนส่ง — เป็นรูปภาพ ไม่ใช่ไฟล์ PDF)
-              ระบบไม่ตรวจรูป ครูเป็นคนเปิดดูเองตอนตรวจ จึงใช้ดูว่านักเรียนคิดมาอย่างไร ไม่ใช่แค่ตอบเลขถูก
-            </p>
-            <p>
-              สวิตช์อยู่ที่ <span className="font-medium text-foreground">ขั้นตั้งค่าของหน้าสร้างงาน</span> ชื่อ “ให้นักเรียนแนบรูปแสดงวิธีทำ”
-              ไม่ได้อยู่ในหน้าสร้างโจทย์ — เปิดครั้งเดียวมีผลกับข้อเติมคำตอบตัวเลขทุกข้อในงานนั้น
-              ค่าเริ่มต้นคือปิด และเมื่อเปิด นักเรียนต้องแนบให้ครบทุกข้อย่อยก่อนจึงจะกดส่งได้
-            </p>
-            <p>
-              ในหน้าตัวอย่างนี้แนบไฟล์จริงจากเครื่องได้ เพื่อดูว่าหน้าตาเป็นอย่างไรและรูปจะไปโผล่ตรงไหนตอนครูตรวจ
-              — แต่<span className="font-medium text-foreground">ไฟล์ไม่ถูกอัปโหลด</span> อยู่ในเบราว์เซอร์ของคุณเท่านั้น
-              และหายไปเองเมื่อปิดตัวอย่าง จึงไม่มีไฟล์ค้างในระบบให้ต้องตามลบ
-            </p>
-          </div>
 
           {!writtenChecked ? (
             <button
