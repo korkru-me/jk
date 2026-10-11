@@ -140,7 +140,7 @@ export function QuestionSetImport({ sets, bankIds, selectedIds, onToggle, onPrev
       {open && (
         <div className="flex flex-col gap-2 border-t border-border p-3">
           <p data-assignment-description className="text-xs text-muted-foreground">
-            กดแฟ้มแล้วเลือก “ทุกข้อในแฟ้ม” หรือเลือกเฉพาะแฟ้มย่อย — ปรับทีละข้อได้ด้านล่าง
+            กดแฟ้มแล้วเลือกเฉพาะแฟ้มย่อย หรือเลือก “ทุกข้อในแฟ้ม” ด้านล่างสุด — ปรับทีละข้อได้ด้านล่าง
           </p>
 
           {sets.length > SEARCH_THRESHOLD && (
@@ -206,7 +206,6 @@ export function QuestionSetImport({ sets, bankIds, selectedIds, onToggle, onPrev
 
                   {expanded && (
                     <div className="ml-3 flex flex-col gap-2 border-l border-border pl-3">
-                      <ChoiceAction row={row.whole} onToggle={onToggle} onPreview={onPreview} />
                       <p className="text-xs font-medium text-muted-foreground">แฟ้มย่อย</p>
                       {row.sections.map(section => (
                         <ChoiceAction
@@ -216,6 +215,7 @@ export function QuestionSetImport({ sets, bankIds, selectedIds, onToggle, onPrev
                           onPreview={onPreview}
                         />
                       ))}
+                      <ChoiceAction row={row.whole} onToggle={onToggle} onPreview={onPreview} />
                     </div>
                   )}
                 </div>
