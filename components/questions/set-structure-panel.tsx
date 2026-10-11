@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import {
   Plus, ChevronUp, ChevronDown, MoreVertical, Folder, FolderOpen, FolderPlus,
@@ -589,6 +589,9 @@ function SectionDialog({
 }) {
   const router = useRouter()
   const titleInputRef = useRef<HTMLInputElement>(null)
+  const questionListRef = useRef<HTMLUListElement>(null)
+  const bankRowRefs = useRef(new Map<string, HTMLLIElement>())
+  const pendingAnchorRef = useRef<{ id: string; top: number } | null>(null)
   const [search, setSearch] = useState('')
   const [draftTitle, setDraftTitle] = useState('')
   const [draftIds, setDraftIds] = useState<string[]>([])
@@ -678,9 +681,110 @@ function SectionDialog({
   const visibleIds = term
     ? questionIds.filter(id => questionLabel(byId.get(id)).toLowerCase().includes(term))
     : questionIds
+  const visibleIdSet = new Set(visibleIds)
+  const selectedVisibleIds = draftIds.filter(id => visibleIdSet.has(id))
+
+  // Adding a review copy above the bank must not move the original row under
+  // the teacher's pointer. Keep the bank row at the same visual Y position,
+  // matching the behaviour of the shared คลังโจทย์ picker.
+  useLayoutEffect(() => {
+    const pendingAnchor = pendingAnchorRef.current
+    const list = questionListRef.current
+    const row = pendingAnchor ? bankRowRefs.current.get(pendingAnchor.id) : null
+    if (pendingAnchor && list && row) {
+      list.scrollTop += row.getBoundingClientRect().top - pendingAnchor.top
+    }
+    pendingAnchorRef.current = null
+  }, [draftIds])
 
   function toggle(id: string) {
     setDraftIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]))
+  }
+
+  function toggleFromBank(id: string) {
+    const row = bankRowRefs.current.get(id)
+    if (row) pendingAnchorRef.current = { id, top: row.getBoundingClientRect().top }
+    toggle(id)
+  }
+
+  function questionRow(id: string, location: 'selected' | 'bank') {
+    const isMember = draftIds.includes(id)
+    const wasMember = baselineIds.includes(id)
+    const pending = isMember && !wasMember ? 'add' : !isMember && wasMember ? 'remove' : null
+    const ownerTitles = (owners.get(id) ?? []).map(owner => owner.title || UNNAMED)
+    const q = byId.get(id)
+
+    return (
+      <div
+        className={cn(
+          'flex items-start gap-3 p-2.5 rounded-xl border transition-colors min-w-0',
+          pending === 'add' ? 'bg-success/10 border-success/30'
+            : pending === 'remove' ? 'bg-destructive/10 border-destructive/30'
+            : isMember ? 'bg-primary/10 border-primary/20'
+            : 'border-transparent hover:bg-muted'
+        )}
+      >
+        {/* Ticking is still the whole row, so the target stays large. The
+            preview/edit controls sit outside the label and never toggle it. */}
+        <label className="flex flex-1 items-start gap-3 min-w-0 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={isMember}
+            onChange={() => location === 'bank' ? toggleFromBank(id) : toggle(id)}
+            aria-label={`${isMember ? 'เอาออกจาก' : 'เพิ่มเข้า'}แฟ้มย่อย ${questionLabel(q)}${location === 'selected' ? ' จากกลุ่มโจทย์ในแฟ้มย่อยนี้' : ''}`}
+            className="mt-0.5 accent-primary shrink-0"
+          />
+          <span className="flex-1 min-w-0">
+            <span className="flex items-center gap-1.5 flex-wrap mb-0.5">
+              {q && (
+                <>
+                  <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${DIFF_META[q.difficulty]?.badge}`}>
+                    {DIFF_META[q.difficulty]?.label}
+                  </span>
+                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                    {TYPE_LABEL[q.question_type] ?? q.question_type}
+                  </span>
+                </>
+              )}
+            </span>
+            <span className="block text-sm text-foreground truncate">
+              {questionLabel(q)}
+            </span>
+            {pending === 'remove' && (
+              <span className="block text-[11px] font-medium mt-0.5 text-destructive">
+                − จะเอาออกจากแฟ้มย่อยนี้
+              </span>
+            )}
+            <QuestionSectionBadges
+              titles={ownerTitles}
+              showEmpty
+              className="mt-1"
+            />
+          </span>
+        </label>
+
+        <span className="flex items-center shrink-0">
+          <IconButton
+            label={`ดูตัวอย่างโจทย์ ${questionLabel(q)}`}
+            size="2xs"
+            disabled={!q}
+            onClick={() => void openPreview(id)}
+          >
+            <Eye className="w-3.5 h-3.5" />
+          </IconButton>
+          <IconButton
+            label={hasPendingChanges
+              ? 'กดยืนยันก่อน จึงจะไปแก้ไขโจทย์ได้'
+              : `แก้ไขโจทย์ ${questionLabel(q)}`}
+            size="2xs"
+            disabled={!q || !canEditQuestions || hasPendingChanges || leavingId !== null}
+            onClick={() => void editQuestion(id)}
+          >
+            <Edit2 className="w-3.5 h-3.5" />
+          </IconButton>
+        </span>
+      </div>
+    )
   }
 
   return (
@@ -737,91 +841,34 @@ function SectionDialog({
               {visibleIds.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-6 text-center">ไม่พบโจทย์ที่ตรงกัน</p>
               ) : (
-                <ul className="max-h-72 overflow-y-auto space-y-1 pr-1 min-w-0">
-                  {visibleIds.map(id => {
-                    const isMember = draftIds.includes(id)
-                    const wasMember = baselineIds.includes(id)
-                    const pending = isMember && !wasMember ? 'add' : !isMember && wasMember ? 'remove' : null
-                    const ownerTitles = (owners.get(id) ?? []).map(owner => owner.title || UNNAMED)
-                    const q = byId.get(id)
-
-                    return (
-                      <li key={id} className="min-w-0">
-                        <div
-                          className={cn(
-                            'flex items-start gap-3 p-2.5 rounded-xl border transition-colors min-w-0',
-                            pending === 'add' ? 'bg-success/10 border-success/30'
-                              : pending === 'remove' ? 'bg-destructive/10 border-destructive/30'
-                              : isMember ? 'bg-primary/10 border-primary/20'
-                              : 'border-transparent hover:bg-muted'
-                          )}
-                        >
-                          {/* Ticking is still the whole row, so the target stays
-                              as big as it was — only the two controls on the
-                              right sit outside the label. */}
-                          <label className="flex flex-1 items-start gap-3 min-w-0 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={isMember}
-                              onChange={() => toggle(id)}
-                              className="mt-0.5 accent-primary shrink-0"
-                            />
-                            <span className="flex-1 min-w-0">
-                              <span className="flex items-center gap-1.5 flex-wrap mb-0.5">
-                                {q && (
-                                  <>
-                                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${DIFF_META[q.difficulty]?.badge}`}>
-                                      {DIFF_META[q.difficulty]?.label}
-                                    </span>
-                                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                                      {TYPE_LABEL[q.question_type] ?? q.question_type}
-                                    </span>
-                                  </>
-                                )}
-                              </span>
-                              <span className="block text-sm text-foreground truncate">
-                                {questionLabel(q)}
-                              </span>
-                              {pending && (
-                                <span className={cn(
-                                  'block text-[11px] font-medium mt-0.5',
-                                  pending === 'add' ? 'text-success' : 'text-destructive'
-                                )}>
-                                  {pending === 'add' ? '+ จะเพิ่มเข้าแฟ้มย่อยนี้' : '− จะเอาออกจากแฟ้มย่อยนี้'}
-                                </span>
-                              )}
-                              <QuestionSectionBadges
-                                titles={ownerTitles}
-                                showEmpty
-                                className="mt-1"
-                              />
-                            </span>
-                          </label>
-
-                          <span className="flex items-center shrink-0">
-                            <IconButton
-                              label="ดูตัวอย่าง"
-                              size="2xs"
-                              disabled={!q}
-                              onClick={() => void openPreview(id)}
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                            </IconButton>
-                            <IconButton
-                              label={hasPendingChanges
-                                ? 'กดยืนยันก่อน จึงจะไปแก้ไขโจทย์ได้'
-                                : 'แก้ไขโจทย์ข้อนี้'}
-                              size="2xs"
-                              disabled={!q || !canEditQuestions || hasPendingChanges || leavingId !== null}
-                              onClick={() => void editQuestion(id)}
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </IconButton>
-                          </span>
-                        </div>
+                <ul ref={questionListRef} className="max-h-72 overflow-y-auto space-y-1 pr-1 min-w-0">
+                  {selectedVisibleIds.length > 0 && (
+                    <>
+                      <li className="px-1 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        อยู่ในแฟ้มย่อยนี้ ({selectedVisibleIds.length} ข้อ)
                       </li>
-                    )
-                  })}
+                      {selectedVisibleIds.map(id => (
+                        <li key={`selected-${id}`} className="min-w-0">
+                          {questionRow(id, 'selected')}
+                        </li>
+                      ))}
+                      <li className="px-1 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        โจทย์ทั้งหมด
+                      </li>
+                    </>
+                  )}
+                  {visibleIds.map(id => (
+                    <li
+                      key={`bank-${id}`}
+                      ref={node => {
+                        if (node) bankRowRefs.current.set(id, node)
+                        else bankRowRefs.current.delete(id)
+                      }}
+                      className="min-w-0"
+                    >
+                      {questionRow(id, 'bank')}
+                    </li>
+                  ))}
                 </ul>
               )}
             </>

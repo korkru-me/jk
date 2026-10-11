@@ -1,13 +1,16 @@
 'use client'
 
-import { useLayoutEffect, useRef } from 'react'
-import { Search } from 'lucide-react'
+import { useLayoutEffect, useRef, useState } from 'react'
+import { Eye, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { IconButton } from '@/components/ui/icon-button'
 import { Input } from '@/components/ui/input'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { DIFF_META, TYPE_SHORT, questionExcerpt } from '@/lib/question-display'
 import { filterQuestions, tagsMatchingTerm } from '@/lib/question-search'
 import type { AssignmentQuestionOption } from '@/components/assignments/create-assignment-form'
+import { QuestionListPreviewDialog } from '@/components/assignments/question-list-preview-dialog'
+import type { getQuestionPreviewDetails } from '@/lib/actions/question-previews'
 import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 
@@ -46,13 +49,16 @@ interface Props {
   baselineIds?: string[]
   /** What the picks go into, for the pending-removal note on each row. */
   collectionNoun?: string
+  /** Local visual fixtures may supply synthetic details without reading Supabase. */
+  loadPreviewQuestions?: typeof getQuestionPreviewDetails
 }
 
 export function QuestionPicker({
   questions, selectedIds, onToggle, search, onSearchChange, diffFilter, onDiffFilterChange,
   title = 'เลือกโจทย์', toolbar, banner, showSelectedFooter = true, showHeader = true, surface = 'card',
-  baselineIds, collectionNoun = 'แฟ้ม',
+  baselineIds, collectionNoun = 'แฟ้ม', loadPreviewQuestions,
 }: Props) {
+  const [previewId, setPreviewId] = useState<string | null>(null)
   const allTags = Array.from(new Set(questions.flatMap(q => q.tags ?? []))).sort()
   // The tags the last word typed points at — shown as shortcuts, not as a
   // filter of their own: one box searches names, bodies and tags together,
@@ -120,48 +126,59 @@ export function QuestionPicker({
     const orderNumber = isSelected ? selectedIds.indexOf(q.id) + 1 : null
 
     return (
-      <label
+      <div
         className={cn(
-          'flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-all',
+          'flex items-start gap-2 rounded-xl border p-3 transition-all',
           pending === 'add' && 'border-success/30 bg-success/10',
           pending === 'remove' && 'border-destructive/30 bg-destructive/10',
           !pending && isSelected && 'border-border bg-primary/10',
           !pending && !isSelected && 'border-transparent hover:bg-muted',
         )}
       >
-        <input
-          type="checkbox"
-          checked={isSelected}
-          onChange={toggle}
-          aria-label={`${isSelected ? 'ยกเลิกการเลือก' : 'เลือก'}โจทย์ ${q.title}${location === 'selected' ? ' จากกลุ่มโจทย์ที่เลือก' : ''}`}
-          className="mt-0.5 accent-primary"
-        />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-foreground">
-            {orderNumber !== null && (
-              <span className="mr-1.5 font-semibold text-primary">ข้อ {orderNumber}</span>
-            )}
-            {q.title}
-          </p>
-          {pending === 'remove' ? (
-            <p className="mt-0.5 text-xs font-medium text-destructive">
-              − จะเอาออกจาก{collectionNoun}
+        <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-3">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={toggle}
+            aria-label={`${isSelected ? 'ยกเลิกการเลือก' : 'เลือก'}โจทย์ ${q.title}${location === 'selected' ? ' จากกลุ่มโจทย์ที่เลือก' : ''}`}
+            className="mt-0.5 shrink-0 accent-primary"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-foreground">
+              {orderNumber !== null && (
+                <span className="mr-1.5 font-semibold text-primary">ข้อ {orderNumber}</span>
+              )}
+              {q.title}
             </p>
-          ) : (
-            <p className="mt-0.5 truncate text-xs text-muted-foreground">{questionExcerpt(q.question_text)}</p>
-          )}
-        </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          <span className={cn('rounded border px-1.5 py-0.5 text-xs', diff ? `${diff.badge} ${diff.border}` : 'border-border bg-muted text-muted-foreground')}>
-            {diff?.label ?? q.difficulty}
-          </span>
-          <span className="text-xs text-muted-foreground">{TYPE_SHORT[q.question_type] ?? q.question_type}</span>
-        </div>
-      </label>
+            {pending === 'remove' ? (
+              <p className="mt-0.5 text-xs font-medium text-destructive">
+                − จะเอาออกจาก{collectionNoun}
+              </p>
+            ) : (
+              <p className="mt-0.5 truncate text-xs text-muted-foreground">{questionExcerpt(q.question_text)}</p>
+            )}
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <span className={cn('rounded border px-1.5 py-0.5 text-xs', diff ? `${diff.badge} ${diff.border}` : 'border-border bg-muted text-muted-foreground')}>
+              {diff?.label ?? q.difficulty}
+            </span>
+            <span className="text-xs text-muted-foreground">{TYPE_SHORT[q.question_type] ?? q.question_type}</span>
+          </div>
+        </label>
+        <IconButton
+          type="button"
+          size="2xs"
+          label={`ดูตัวอย่างโจทย์ ${q.title}`}
+          onClick={() => setPreviewId(q.id)}
+        >
+          <Eye className="h-3.5 w-3.5" />
+        </IconButton>
+      </div>
     )
   }
 
   return (
+    <>
     <Surface>
       {showHeader && (
         <div className="flex items-center justify-between">
@@ -320,6 +337,14 @@ export function QuestionPicker({
         </div>
       )}
     </Surface>
+    <QuestionListPreviewDialog
+      ids={previewId ? [previewId] : []}
+      open={previewId !== null}
+      title="ตัวอย่างโจทย์"
+      onOpenChange={open => { if (!open) setPreviewId(null) }}
+      loadQuestions={loadPreviewQuestions}
+    />
+    </>
   )
 }
 

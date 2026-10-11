@@ -14,6 +14,7 @@ import { CreateQuestionSetForm } from '@/components/assignments/create-question-
 import type { BankQuestion } from '@/lib/question-bank'
 import type { QuestionSet } from '@/lib/types'
 import type { QuestionSetData } from '@/lib/actions/question-sets'
+import type { QuestionPreviewDetail } from '@/lib/actions/question-previews'
 
 const LAB_USER = '00000000-0000-4000-8000-000000000001'
 
@@ -150,6 +151,25 @@ async function saveAutosaveFixture(_id: string, _data: QuestionSetData) {
   return { ok: true as const }
 }
 
+async function loadAutosaveQuestionPreviews(ids: readonly string[]): Promise<{ data: QuestionPreviewDetail[] }> {
+  return {
+    data: AUTOSAVE_QUESTIONS.filter(question => ids.includes(question.id)).map(question => ({
+      id: question.id,
+      title: question.title,
+      question_text: question.question_text,
+      question_type: question.question_type,
+      is_random: false,
+      variables: [],
+      answer_parts: [],
+      image_urls: [],
+      extra_data: {},
+      mcq_options: question.question_type === 'mcq'
+        ? [{ text: 'ตัวเลือกจำลอง ก', is_correct: true }, { text: 'ตัวเลือกจำลอง ข', is_correct: false }]
+        : [],
+    })),
+  }
+}
+
 export function QuestionSetsLabClient() {
   const [structureSections, setStructureSections] = useState<QuestionSetSection[]>(STRUCTURE_SECTIONS)
 
@@ -176,6 +196,7 @@ export function QuestionSetsLabClient() {
         initialCardData={STRUCTURE_CARD_DATA}
         saveExistingSet={saveAutosaveFixture}
         teamOptions={[]}
+        loadQuestionPreviews={loadAutosaveQuestionPreviews}
       />
       <QuestionSetsClient
         mySets={MY_SETS}

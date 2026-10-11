@@ -38,6 +38,7 @@ import { rankCountedTags } from '@/lib/tag-suggest'
 import type { QuestionSet, Visibility } from '@/lib/types'
 import { Card } from '@/components/ui/card'
 import { createLatestSaveQueue } from '@/lib/latest-save-queue'
+import type { getQuestionPreviewDetails } from '@/lib/actions/question-previews'
 
 type AutosaveUiStatus =
   | { state: 'saved' }
@@ -62,6 +63,8 @@ interface Props {
   saveExistingSet?: (id: string, data: QuestionSetData) => Promise<{ ok: true } | { error: string }>
   /** Supplied by local visual fixtures so mounting them does not read Supabase. */
   teamOptions?: { id: string; name: string }[]
+  /** Supplied by local visual fixtures so previewing does not read Supabase. */
+  loadQuestionPreviews?: typeof getQuestionPreviewDetails
 }
 
 export function CreateQuestionSetForm({
@@ -70,6 +73,7 @@ export function CreateQuestionSetForm({
   initialCardData,
   saveExistingSet = saveQuestionSet,
   teamOptions,
+  loadQuestionPreviews,
 }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -565,6 +569,7 @@ export function CreateQuestionSetForm({
             showSelectedFooter={false}
             showHeader={false}
             surface="plain"
+            loadPreviewQuestions={loadQuestionPreviews}
           />
 
           <DialogFooter className="sm:items-center sm:justify-between">

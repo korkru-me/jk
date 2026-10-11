@@ -993,6 +993,7 @@ export function CreateAssignmentForm({
                     showHeader={false}
                     showSelectedFooter={false}
                     surface="plain"
+                    loadPreviewQuestions={actions?.getQuestionPreviewDetails}
                   />
                 </div>
               </CollapsibleContent>
