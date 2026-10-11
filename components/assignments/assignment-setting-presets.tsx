@@ -296,7 +296,7 @@ export function AssignmentSettingPresetsProvider({
         </CollapsibleTrigger>
         <CollapsibleContent className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 ease-out data-ending-style:h-0 data-starting-style:h-0">
           <div className="flex flex-col gap-3 pt-3">
-            <FieldGroup className="gap-3">
+            <FieldGroup className="max-w-xl gap-3">
               <Field data-disabled={busy || unavailable}>
                 <FieldLabel htmlFor={`${id}-selection`}>ใช้การตั้งค่า</FieldLabel>
                 <NativeSelect id={`${id}-selection`} value={currentOrigin ? '__current' : selectedId ?? '__system'}
@@ -340,7 +340,7 @@ export function AssignmentSettingPresetsProvider({
         <CollapsibleContent className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 ease-out data-ending-style:h-0 data-starting-style:h-0">
           <div className="flex flex-col gap-3 pt-3">
             <p data-assignment-description className="text-sm text-muted-foreground">เก็บเฉพาะการตั้งค่า{typeLabel}ในบัญชีคุณ ไม่เก็บชื่องาน โจทย์ คะแนนรายข้อ ผู้รับ วันส่ง หรือรหัสผ่าน ข้ามส่วนนี้แล้วสร้างงานได้ตามปกติ</p>
-            <FieldGroup className="gap-3">
+            <FieldGroup className="max-w-xl gap-3">
               <Field data-disabled={busy || unavailable}>
                 <FieldLabel htmlFor={`${id}-save-target`}>บันทึกการตั้งค่าเป็น</FieldLabel>
                 <NativeSelect id={`${id}-save-target`} value={saveTargetId ?? '__new'} disabled={busy || unavailable}
