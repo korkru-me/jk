@@ -966,7 +966,10 @@ export function CreateAssignmentForm({
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-foreground">เลือกโจทย์</h3>
+              <h3 className="text-sm font-semibold text-foreground">
+                เลือกโจทย์ <span aria-hidden="true" className="text-destructive">*</span>
+                <span className="sr-only"> จำเป็น</span>
+              </h3>
               {selectedIds.length > 0 && (
                 <Button type="button" variant="outline" size="sm" onClick={() => setListPreview({ ids: previewIds, title: 'ตัวอย่างโจทย์ที่เลือก' })}>
                   <Eye data-icon="inline-start" />
