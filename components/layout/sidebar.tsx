@@ -26,6 +26,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { isClassroomSectionPath } from '@/lib/classroom-navigation'
+import { isAssignmentStudentPreviewPath } from '@/lib/assignment-preview-navigation'
 import { Separator } from '@/components/ui/separator'
 import { sidebarSearchKey, useSidebarContext } from './sidebar-context'
 import { SidebarDisplayProvider, SidebarLabel, SidebarSectionLabel, useSidebarCompact } from './sidebar-display'
@@ -50,8 +51,10 @@ function isGroup(entry: NavEntry): entry is NavGroup {
   return 'children' in entry
 }
 
+const homeNav: NavItem = { href: '/dashboard', label: 'หน้าหลัก', icon: House }
+
 const teacherNav: NavEntry[] = [
-  { href: '/dashboard', label: 'หน้าหลัก', icon: House },
+  homeNav,
   {
     label: 'จัดการโจทย์',
     icon: NotebookPen,
@@ -74,7 +77,7 @@ const teacherNav: NavEntry[] = [
 ]
 
 const studentNav: NavEntry[] = [
-  { href: '/dashboard', label: 'หน้าหลัก', icon: House },
+  homeNav,
   { href: '/classrooms', label: 'ห้องเรียนของฉัน', icon: School },
   { href: '/my-submissions', label: 'สรุปงานของฉัน', icon: ClipboardList },
   { href: '/settings/profile', label: 'ข้อมูลส่วนตัว', icon: UserRound },
@@ -266,23 +269,39 @@ interface SidebarProps {
   isOpen?: boolean
   onClose?: () => void
   collapsed?: boolean
+  previewNavigationOnly?: boolean
 }
 
-export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = false }: SidebarProps) {
+export function Sidebar({
+  role,
+  fullName,
+  isOpen = false,
+  onClose,
+  collapsed = false,
+  previewNavigationOnly: previewNavigationOnlyOverride,
+}: SidebarProps) {
   const [desktop, setDesktop] = useState(false)
   const [desktopPreviewOpen, setDesktopPreviewOpen] = useState(false)
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const search = sidebarSearchKey(searchParams.toString())
-  const navItems = role === 'teacher' || role === 'admin' ? teacherNav : studentNav
+  const previewNavigationOnly = previewNavigationOnlyOverride ?? isAssignmentStudentPreviewPath(pathname)
+  const navItems = previewNavigationOnly
+    ? [homeNav]
+    : role === 'teacher' || role === 'admin'
+      ? teacherNav
+      : studentNav
   const { contextualSidebar, pendingSidebar, clearPendingSidebar } = useSidebarContext()
   const usesTeacherNavigation = role === 'teacher' || role === 'admin'
-  const usesClassroomSidebar = usesTeacherNavigation && isClassroomSectionPath(pathname)
+  const usesClassroomSidebar = !previewNavigationOnly
+    && usesTeacherNavigation
+    && isClassroomSectionPath(pathname)
   const pendingMatches = pendingSidebar?.pathname === pathname && pendingSidebar.search === search
   const sidebarEntry = pendingMatches ? pendingSidebar.entry : contextualSidebar
   const contextualMatches = sidebarEntry?.pathname === pathname
     && (pathname !== '/assignments/new' || sidebarEntry.classroomId === searchParams.get('classroom'))
-  const contextualContent = usesTeacherNavigation
+  const contextualContent = !previewNavigationOnly
+    && usesTeacherNavigation
     && (pendingMatches || contextualMatches)
     ? sidebarEntry?.render(onClose)
     : null
@@ -377,7 +396,7 @@ export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = f
         )}
 
         {/* Admin link */}
-        {role === 'admin' && !usesClassroomSidebar && !contextualContent && (
+        {role === 'admin' && !previewNavigationOnly && !usesClassroomSidebar && !contextualContent && (
           <div className={cn('px-3 pb-2', compactOnDesktop && 'md:px-2')}>
             <Link
               href="/admin"
