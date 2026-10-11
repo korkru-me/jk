@@ -915,7 +915,7 @@ export function CreateAssignmentForm({
       return
     }
     if (accessCodeInvalid) {
-      toast.error('กรุณากรอกรหัสผ่านเข้าทำ')
+      toast.error('โปรดตรวจสอบข้อมูลที่จำเป็นให้ครบถ้วน')
       setStep(1)
       return
     }
@@ -1694,9 +1694,6 @@ export function CreateAssignmentForm({
                       <FieldDescription id="create-access-code-description" className="text-xs">
                         นักเรียนต้องกรอกรหัสนี้ให้ถูกต้องก่อนเริ่มทำงาน
                       </FieldDescription>
-                      {accessCodeInvalid && (
-                        <FieldError className="text-xs">กรุณากรอกรหัสผ่านเข้าทำ</FieldError>
-                      )}
                     </Field>
                   </div>
                 ) : null) as React.ReactNode,
