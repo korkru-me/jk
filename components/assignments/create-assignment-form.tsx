@@ -1,10 +1,18 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { toast } from 'sonner'
+import {
+  DndContext, MouseSensor, TouchSensor, closestCenter,
+  useSensor, useSensors, type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext, useSortable, verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { createAssignment } from '@/lib/actions/assignments'
 import { createQuestionSet } from '@/lib/actions/question-sets'
 import { assignmentCopyTitle, assignmentCreationTitle } from '@/lib/assignment-creation'
@@ -33,11 +41,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
-  Check, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Eye, CircleHelp,
+  Check, ChevronRight, ChevronLeft, ChevronDown, Eye, CircleHelp,
   X, Save, FileText,
 } from 'lucide-react'
 import {
-  filterSectionsToQuestions, moveQuestionOrder, moveQuestionOrderToIndex, parseSections,
+  filterSectionsToQuestions, moveQuestionOrderToIndex, parseSections,
   type QuestionSetSection,
 } from '@/lib/question-set-sections'
 import type {
@@ -204,6 +212,11 @@ export function CreateAssignmentForm({
   actions,
 }: Props) {
   const router = useRouter()
+  const questionOrderDndId = useId()
+  const questionOrderSensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
+  )
   const assignmentType = preselectedAssignmentType
   const assignmentNoun = assignmentType === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'
   const completionSectionLabel = `เงื่อนไขการทำ${assignmentNoun}เสร็จ`
@@ -466,18 +479,25 @@ export function CreateAssignmentForm({
   // will see (unless สลับลำดับข้อแบบสุ่ม is turned on in ตั้งค่า). `sections`
   // is deliberately left alone: it still carries แฟ้มย่อย for questions that
   // are currently unticked, and is trimmed to the real selection at submit.
-  function moveQuestion(id: string, delta: number) {
-    setSelectedIds(prev => moveQuestionOrder(prev, id, delta))
-  }
-
   function moveQuestionTo(id: string, position: number) {
     setSelectedIds(prev => moveQuestionOrderToIndex(prev, id, position - 1))
   }
 
+  function reorderQuestions(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    setSelectedIds(prev => {
+      const nextIndex = prev.indexOf(String(over.id))
+      if (nextIndex < 0) return prev
+      return moveQuestionOrderToIndex(prev, String(active.id), nextIndex)
+    })
+  }
+
   // Same effect as unticking the ข้อ back in เลือกโจทย์, so a duplicate spotted
   // here doesn't cost a trip backwards. `sections` is left alone for the same
-  // reason as in moveQuestion: it keeps this question's แฟ้มย่อย, so re-ticking
-  // it later puts it back under the same one. The last remaining ข้อ can't go —
+  // reason as in the reorder handlers: it keeps this question's แฟ้มย่อย, so
+  // re-ticking it later puts it back under the same one. The last remaining ข้อ can't go —
   // the server refuses a งาน with no โจทย์, and one built from a แฟ้ม would
   // quietly get the whole แฟ้ม back instead.
   function removeQuestion(id: string) {
@@ -965,18 +985,10 @@ export function CreateAssignmentForm({
               </span>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-foreground">
-                เลือกโจทย์ <span aria-hidden="true" className="text-destructive">*</span>
-                <span className="sr-only"> จำเป็น</span>
-              </h3>
-              {selectedIds.length > 0 && (
-                <Button type="button" variant="outline" size="sm" onClick={() => setListPreview({ ids: previewIds, title: 'ตัวอย่างโจทย์ที่เลือก' })}>
-                  <Eye data-icon="inline-start" />
-                  ดูตัวอย่างโจทย์ที่เลือก
-                </Button>
-              )}
-            </div>
+            <h3 className="text-sm font-semibold text-foreground">
+              เลือกโจทย์ <span aria-hidden="true" className="text-destructive">*</span>
+              <span className="sr-only"> จำเป็น</span>
+            </h3>
 
             <QuestionSetImport
               sets={questionSets}
@@ -1019,82 +1031,55 @@ export function CreateAssignmentForm({
               </CollapsibleContent>
             </Collapsible>
             <Separator />
-            <h3 className="text-sm font-semibold text-foreground">คะแนนแต่ละข้อ</h3>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-foreground">คะแนนแต่ละข้อ</h3>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={previewIds.length === 0}
+                onClick={() => setListPreview({
+                  ids: previewIds,
+                  title: 'ตัวอย่างโจทย์ทั้งหมดตามลำดับ',
+                })}
+              >
+                <Eye data-icon="inline-start" />
+                ดูโจทย์ทั้งหมด
+              </Button>
+            </div>
             <p data-assignment-description className="text-xs text-muted-foreground">
               ค่าเริ่มต้นคิดตามจำนวนข้อย่อยในโจทย์ — ข้อย่อย 1 ข้อ = 1 คะแนน
               แก้ไขคะแนนข้อไหนก็ได้ ระบบจะรวมคะแนนทั้งหมดให้อัตโนมัติ
-              สลับลำดับข้อได้ที่นี่ — ย้ายทีละขั้นด้วยลูกศร หรือพิมพ์เลขข้อที่ต้องการลงในช่องซ้ายมือแล้วกด Enter
+              สลับลำดับข้อได้ที่นี่ — กดค้างที่หมายเลขหรือชื่อโจทย์แล้วลาก
+              หรือพิมพ์เลขข้อที่ต้องการลงในช่องซ้ายมือแล้วกด Enter
               กดรูปตาเพื่อดูตัวอย่างข้อนั้นแบบที่นักเรียนเห็น
               และถ้าเจอข้อซ้ำหรือข้อที่ไม่เอาแล้ว กดกากบาทท้ายแถวเอาออกได้เลย ไม่ต้องเลื่อนกลับไปเลือกโจทย์
             </p>
 
-            <div className="space-y-1.5 max-h-[420px] overflow-y-auto pr-1">
-              {previewQuestions.map((q, i) => (
-                <div key={q.id} className="flex flex-wrap items-center gap-2 p-2.5 rounded-xl border border-border sm:flex-nowrap">
-                  <div className="flex min-w-0 flex-1 basis-full items-center gap-2 sm:basis-auto">
-                    <OrderNumberInput
+            <DndContext
+              id={`assignment-question-order-${questionOrderDndId}`}
+              sensors={questionOrderSensors}
+              collisionDetection={closestCenter}
+              onDragEnd={reorderQuestions}
+            >
+              <SortableContext items={previewIds} strategy={verticalListSortingStrategy}>
+                <div className="flex max-h-[420px] flex-col gap-1.5 overflow-y-auto pr-1">
+                  {previewQuestions.map((q, i) => (
+                    <SortableQuestionScoreRow
+                      key={q.id}
+                      question={q}
                       position={i + 1}
                       total={previewQuestions.length}
+                      points={pointsDraft(q.id)}
                       onMove={to => moveQuestionTo(q.id, to)}
+                      onPreview={() => setPreviewIndex(i)}
+                      onPointsChange={value => setQuestionPointDrafts(d => ({ ...d, [q.id]: value }))}
+                      onRemove={() => removeQuestion(q.id)}
                     />
-                    <div className="flex flex-col shrink-0">
-                      <IconButton
-                        label="ย้ายขึ้น"
-                        size="2xs"
-                        disabled={i === 0}
-                        onClick={() => moveQuestion(q.id, -1)}
-                      >
-                        <ChevronUp className="w-3.5 h-3.5" />
-                      </IconButton>
-                      <IconButton
-                        label="ย้ายลง"
-                        size="2xs"
-                        disabled={i === previewQuestions.length - 1}
-                        onClick={() => moveQuestion(q.id, 1)}
-                      >
-                        <ChevronDown className="w-3.5 h-3.5" />
-                      </IconButton>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{q.title}</p>
-                      <p className="text-xs text-muted-foreground truncate">{questionExcerpt(q.question_text)}</p>
-                    </div>
-                  </div>
-                  {q.sub_question_count > 1 && (
-                    <span className="text-xs text-muted-foreground shrink-0">
-                      {q.sub_question_count} {subQuestionUnit(q.question_type)}
-                    </span>
-                  )}
-                  <IconButton
-                    label={`ดูตัวอย่างข้อ ${i + 1}`}
-                    size="2xs"
-                    className="shrink-0"
-                    onClick={() => setPreviewIndex(i)}
-                  >
-                    <Eye className="w-3.5 h-3.5" />
-                  </IconButton>
-                  <Input
-                    type="number"
-                    min={0}
-                    step="any"
-                    value={pointsDraft(q.id)}
-                    aria-label={`คะแนนข้อ ${i + 1}`}
-                    onChange={e => setQuestionPointDrafts(d => ({ ...d, [q.id]: e.target.value }))}
-                    className="w-16 text-center shrink-0 sm:w-20"
-                  />
-                  <span className="text-xs text-muted-foreground shrink-0">คะแนน</span>
-                  <IconButton
-                    label="เอาข้อนี้ออก"
-                    size="2xs"
-                    className="shrink-0 hover:text-destructive"
-                    disabled={previewQuestions.length <= 1}
-                    onClick={() => removeQuestion(q.id)}
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </IconButton>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </SortableContext>
+            </DndContext>
             <Separator />
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="flex min-w-0 flex-col gap-1.5">
@@ -2096,5 +2081,96 @@ export function CreateAssignmentForm({
       )}
     </div>
     </AssignmentSettingPresetsProvider>
+  )
+}
+
+interface SortableQuestionScoreRowProps {
+  question: AssignmentQuestionOption
+  position: number
+  total: number
+  points: string
+  onMove: (position: number) => void
+  onPreview: () => void
+  onPointsChange: (value: string) => void
+  onRemove: () => void
+}
+
+function SortableQuestionScoreRow({
+  question,
+  position,
+  total,
+  points,
+  onMove,
+  onPreview,
+  onPointsChange,
+  onRemove,
+}: SortableQuestionScoreRowProps) {
+  const {
+    listeners,
+    setActivatorNodeRef,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: question.id })
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={cn(
+        'flex flex-wrap items-center gap-2 rounded-xl border border-border p-2.5 sm:flex-nowrap',
+        isDragging && 'z-10 border-primary/40 bg-card opacity-80 shadow-lg ring-2 ring-primary/20',
+      )}
+    >
+      <div
+        ref={setActivatorNodeRef}
+        {...listeners}
+        title="กดค้างแล้วลากเพื่อสลับลำดับ"
+        className="flex min-w-0 flex-1 basis-full cursor-grab touch-manipulation items-center gap-2 active:cursor-grabbing sm:basis-auto"
+      >
+        <OrderNumberInput
+          position={position}
+          total={total}
+          onMove={onMove}
+        />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-foreground">{question.title}</p>
+          <p className="truncate text-xs text-muted-foreground">{questionExcerpt(question.question_text)}</p>
+        </div>
+      </div>
+      {question.sub_question_count > 1 && (
+        <span className="shrink-0 text-xs text-muted-foreground">
+          {question.sub_question_count} {subQuestionUnit(question.question_type)}
+        </span>
+      )}
+      <IconButton
+        label={`ดูตัวอย่างข้อ ${position}`}
+        size="2xs"
+        className="shrink-0"
+        onClick={onPreview}
+      >
+        <Eye className="h-3.5 w-3.5" />
+      </IconButton>
+      <Input
+        type="number"
+        min={0}
+        step="any"
+        value={points}
+        aria-label={`คะแนนข้อ ${position}`}
+        onChange={event => onPointsChange(event.target.value)}
+        className="w-16 shrink-0 text-center sm:w-20"
+      />
+      <span className="shrink-0 text-xs text-muted-foreground">คะแนน</span>
+      <IconButton
+        label="เอาข้อนี้ออก"
+        size="2xs"
+        className="shrink-0 hover:text-destructive"
+        disabled={total <= 1}
+        onClick={onRemove}
+      >
+        <X className="h-3.5 w-3.5" />
+      </IconButton>
+    </div>
   )
 }
