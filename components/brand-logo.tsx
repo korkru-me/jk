@@ -35,7 +35,7 @@ export function BrandLogo({ layout = 'horizontal', subtitle, compact = false, cl
           'font-bold leading-none tracking-tight text-brand-foreground',
           stacked
             ? (compact ? 'text-xs' : 'text-sm')
-            : (compact ? 'text-sm' : 'text-lg'),
+            : (compact ? 'text-base' : 'text-lg'),
         )}>
           K<span className="text-brand-accent">o</span>rKru
         </span>
