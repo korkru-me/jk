@@ -1,5 +1,9 @@
 # แผนปิดงาน Safe Exam Browser หลัง Drawing Board
 
+## คำขอเพิ่มเติม 11 ตุลาคม 2026 — ทำหน้ารอให้ครบก่อน W7
+
+เจ้าของขอพัก W7 และปรับ “ดูตัวอย่างนักเรียน” ของข้อสอบ Browser ให้เริ่มที่หน้ารอ/อ่านกติกาเหมือนทางเข้าสอบจริงแล้ว จึงแก้ใน narrowed candidate branch นี้ โดยใช้ shared waiting presentation ไม่สร้าง attempt จริงใน preview และไม่แตะ native seed/final/enrollment/keys/activation ตัวอย่างแบบฝึกหัดไม่เปลี่ยน ผลใหม่ 217 files / 2,913 tests, TypeScript/token lint/guarded TEST build และ local shared-view browser QA ผ่าน; hosted authenticated journey และ W7 ยังไม่ทดสอบ ไม่ Deploy/merge เว็บจริงในรอบนี้ ขั้นถัดไปให้เจ้าของตรวจหน้ารอและผ่าน permission gate ของ isolated Preview ก่อน hosted QA แล้วค่อยอนุมัติกลับ W7 ใหม่ ไม่ใช้ผล UI แทน native proof
+
 ## ส่วนเพิ่มหน้ารอสอบสำหรับเว็บจริง — 10 ตุลาคม 2026 / pending release
 
 เจ้าของอนุมัติให้นำเฉพาะส่วนที่เสร็จขึ้น Production แล้ว และยืนยัน Vercel CLI ใหม่สำเร็จ แต่ไม่ได้อนุมัติข้าม native W7 แยก candidate `codex/exam-waiting-production` จาก master `8d54184` ที่ live Production ใช้อยู่ โดย port หน้ารอสอบ Browser/legacy verified SEB/approved Android จาก `326ead6` เท่านั้น ไม่รวม `/exam/{assignment}/r/{revision}` pilot, atomic-start migration, operator scripts, native artifact/keys/release/activation ของ W1–W6 ซึ่งยังอยู่ `codex/seb-exam-only-waiting-room` ที่ `b8a6b57` ขอบเขตนี้ไม่เปลี่ยนแบบฝึกหัดหรือสูตรคะแนน และรักษา score adjustment ของ master

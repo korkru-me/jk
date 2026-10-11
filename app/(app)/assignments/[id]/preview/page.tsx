@@ -9,13 +9,16 @@ import type { Assignment, MCQOption, Question, MatchingConfig, MatchingPair } fr
 import { canManageAssignment } from '@/lib/auth/assignment-access'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { loadAssignmentQuestionsByProvenance } from '@/lib/assignment-question-access.server'
+import { ExamWaitingPreviewClient } from '@/components/exam/exam-waiting-preview'
 
 export const metadata = { title: 'ตัวอย่างมุมมองนักเรียน — KorKru' }
 
 export default async function AssignmentPreviewPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ preview?: string | string[] }>
 }) {
   const { id } = await params
   const user = await getAuthUser()
@@ -36,6 +39,26 @@ export default async function AssignmentPreviewPage({
   // only an owner or admin/manage co-teacher may open it.
   if (!assignment || !canManage) notFound()
   const a = assignment as Assignment
+
+  // Teacher-only preview has the same question-free entrance as a real exam.
+  // Do not build/load answer-bearing preview props until the teacher explicitly
+  // opens the simulated exam. This query is presentation, never student access.
+  const query = await searchParams
+  if (a.type === 'exam' && query.preview !== 'exam') {
+    return <ExamWaitingPreviewClient assignmentId={id} summary={{
+      title: a.title,
+      description: a.description,
+      durationMinutes: a.duration_minutes,
+      questionCount: a.completion_rule === 'streak' ? null
+        : a.random_question_count ?? a.question_ids.length,
+      endAt: a.end_at,
+      accessMode: a.secure_browser_mode === 'seb_required' ? 'seb' : 'browser',
+      requiresAccessCode: Boolean(a.access_code),
+      previousSubmissionId: null, activeSubmissionId: null, completedSubmissionId: null,
+      expired: false, startedAt: null,
+      blockedReason: a.question_ids.length === 0 ? 'ชุดข้อสอบนี้ยังไม่มีโจทย์' : null,
+    }} />
+  }
 
   if (a.question_ids.length === 0) {
     return (

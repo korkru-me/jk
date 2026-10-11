@@ -1,5 +1,12 @@
 # Feature status
 
+### หน้ารอสอบใน “ดูตัวอย่างนักเรียน” — 11 ตุลาคม 2026 / W7 พักตามคำขอ
+
+- แก้ `/assignments/[id]/preview` สำหรับ `exam`: เปิดหน้ารอเข้าห้องสอบก่อนด้วย `ExamWaitingRoom` ชุดเดียวกับทางเข้าสอบจริง ไม่โหลดโจทย์ ไม่สร้าง skeleton/เฉลยหรือเริ่มเวลาตัวอย่างจนกด “เข้าห้องสอบตัวอย่าง”; `?preview=exam` เป็น presentation hint สำหรับครูเท่านั้น ทุก request ยังตรวจ session + `canManageAssignment` ก่อนอ่านข้อมูลเฉลย ไม่เปิด preview ให้นักเรียน/ครูคนนอก แบบฝึกหัดคง preview ตรงตามเดิม
+- หน้ารอทั้งสองเส้นทางแยก “กติกาก่อนเข้าห้องสอบ” กับคำชี้แจงจากครู บอกการเริ่มเวลา/เวลาเดิมเมื่อ resume/การส่งคำตอบอย่างชัดเจน ใช้ Card/Field/Button/Separator เดิมและข้อความคำชี้แจงแบบ escaped plain text โหมดตัวอย่างบอกว่าไม่สร้าง attempt/ไม่บันทึกคะแนนจริง/ไม่ตรวจ SEB หรือรหัสจริง ส่งเพียง code-required boolean ไม่ส่งค่ารหัส การกด Enter ไม่ข้าม busy/blocked/completed/empty-code states
+- เพิ่ม 21 route/view regressions; focused waiting/preview 4 files / 54 cases และ full suite 217 files / 2,913 tests ผ่าน TypeScript/token lint/guarded TEST-only webpack build ผ่าน Local Chrome shared preview presentation lab ยืนยัน idle 0/no question inputs, explicit simulated start, simulated code-required state, active receipt copy, 320px ไม่ล้น, axe 0 violations/0 incomplete/28 passes และ Next compilation/runtime ไม่มี errors React tree ใช้ shared waiting view ไม่พบ ExamClient/timer ไม่ใช่ authenticated hosted preview-route-to-DB หรือ native W7 proof
+- ไม่มี migration/DB/Auth/score/SEB file/key/flag/alias change ไม่ import atomic pilot หรือแก้ latest master exam-navigation/question-layout งานของ agent อื่น Browser waiting candidate ยังอยู่ branch นี้ ไม่ merge/deploy Production; Preview deployment ยังรอ permission gate ที่บันทึกด้านล่าง เจ้าของขอทำหน้ารอให้เรียบร้อยก่อน W7 จึง **W7 HOLD** และไม่ขอให้เปิด/บันทึก seed ต่อในรอบนี้
+
 ### หน้ารอสอบ — Production candidate (10 ตุลาคม 2026; Staging schema พร้อม / hosted deploy รออนุมัติ)
 
 - แยก `codex/exam-waiting-production` จาก master `8d54184dd2224e7a4771c65a482c7efb505eb220` (Production alias `korkru.com` READY และ source ตรง ณ preflight) แล้ว port เฉพาะหน้ารอสอบจาก `326ead6` ไม่รวม canonical SEB waiting pilot/SQL/operator/native artifacts ที่รอ W7

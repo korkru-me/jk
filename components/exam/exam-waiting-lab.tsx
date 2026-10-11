@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { ExamWaitingFlow } from '@/components/exam/exam-waiting-client'
+import { ExamWaitingPreviewRoom } from '@/components/exam/exam-waiting-preview'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { NativeSelect } from '@/components/ui/native-select'
 import type { ExamWaitingSummary } from '@/lib/exam-waiting-room'
@@ -25,6 +26,8 @@ const cases: Record<string, ExamWaitingSummary> = {
   android: { ...base, accessMode: 'android_monitored' },
   failure: base,
   lost: base,
+  preview: base,
+  preview_code: { ...base, requiresAccessCode: true },
 }
 
 export function ExamWaitingLab() {
@@ -42,7 +45,11 @@ export function ExamWaitingLab() {
       </NativeSelect>
     </Field></FieldGroup>
     <p role="status">คำขอเริ่มที่จำลอง: {starts} · {entered}</p>
-    <ExamWaitingFlow key={mode} summary={cases[mode]} requestStart={async code => {
+    {mode.startsWith('preview') ? <ExamWaitingPreviewRoom key={mode} summary={cases[mode]}
+      onReload={() => setEntered('โหลดตัวอย่างใหม่เท่านั้น ไม่เริ่มรอบจริง')}
+      returnHref="/exam-screen-lab/exam-waiting" onStartPreview={() => {
+        setStarts(count => count + 1); setEntered('เปิดตัวอย่างหลังอ่านกติกา · ไม่มีรอบสอบจริง')
+      }} /> : <ExamWaitingFlow key={mode} summary={cases[mode]} requestStart={async code => {
       setStarts(count => count + 1)
       await new Promise(resolve => setTimeout(resolve, 250))
       if (mode === 'lost') throw new Error('simulated lost response')
@@ -50,6 +57,6 @@ export function ExamWaitingLab() {
       if (mode === 'code' && code !== 'TEST') return { error: 'รหัสผ่านไม่ถูกต้อง' }
       return { submissionId: receipt, alreadySubmitted: mode === 'expired' }
     }} onEntered={result => setEntered(`ยืนยัน receipt เดิม · ${result.alreadySubmitted ? 'ไปหน้าผลรอบสอบ' : 'ไปหน้าทำข้อสอบ'}`)}
-      onReload={() => setEntered('โหลดข้อมูลใหม่เท่านั้น ไม่ส่งคำขอเริ่ม')} />
+      onReload={() => setEntered('โหลดข้อมูลใหม่เท่านั้น ไม่ส่งคำขอเริ่ม')} />}
   </div>
 }

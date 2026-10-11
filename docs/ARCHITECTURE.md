@@ -135,6 +135,10 @@ Vercel รันโค้ดฝั่ง server ด้วยเขตเวล�
 12. RLS คืนคะแนน/เฉลยให้นักเรียนตาม `show_results` เท่านั้น ส่วนการแสดงคะแนนผ่าน per-question override, display rescaling, teacher score adjustment และ attempt strategy ตามลำดับเดียวกันทุกหน้า; adjustment เก็บแยกจาก raw answer total และ clamp 0–คะแนนเต็ม
 13. สถานะส่งช้าใช้ first completed attempt ต่อ student แล้วจัดเทียบ `due_at`/`late_bands` ที่เลื่อนด้วย extension ส่วนบุคคล สีซ้ำรวมเป็นกลุ่มเดียวกันได้ หน้าผลและ Server Action ใช้ pure helper เดียวกัน Action รับเพียง assignment+color+replacement adjustment ตรวจสิทธิ์ใหม่ แล้วให้ service-role-only RPC เขียนทุก attempt กับ append-only batch/item audit ใน transaction เดียว
 
+### ตัวอย่างมุมมองนักเรียนก่อนสอบ
+
+`/assignments/[id]/preview` ตรวจ session และ `canManageAssignment` ทั้งก่อนแสดง waiting metadata และก่อนอ่าน answer-bearing preview (11 ตุลาคม 2026) งานประเภท exam ที่ไม่มี scalar `preview=exam` แสดง `ExamWaitingPreviewClient` → shared `ExamWaitingRoom` เท่านั้น และ return ก่อน `loadAssignmentQuestionsByProvenance`/`buildAssignmentAttempt`/admin started-receipt read ปุ่มตัวอย่างนำทางไป query นี้โดยตรงเมื่อกด ไม่ใช้ Link prefetch และไม่เรียก submission action Query ไม่ใช่ permission หรือทางเข้าของนักเรียน หลังผ่าน teacher gate แล้วจึงเปิด ExamClient `previewMode` เดิมและเริ่มเวลาจำลอง ไม่ persist attempt/answers/score แบบฝึกหัดคงเปิด preview โดยตรง Shared waiting view แสดงกติกา/คำชี้แจง escaped plain text และแยกข้อความเวลาเดิมของ resume/expired/completed ไม่อ้าง UI เป็น authorization boundary
+
 ### โฮมรูม
 
 1. ห้อง `homeroom` ใช้ roster ของตัวเอง
