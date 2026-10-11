@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { CheckCircle2, CloudAlert, LoaderCircle, Pencil, Save, Trash2 } from 'lucide-react'
+import { Pencil, Save, Trash2 } from 'lucide-react'
 import {
   createQuestionSet,
   saveQuestionSet,
@@ -40,11 +40,7 @@ import { Card } from '@/components/ui/card'
 import { createLatestSaveQueue } from '@/lib/latest-save-queue'
 import type { getQuestionPreviewDetails } from '@/lib/actions/question-previews'
 
-type AutosaveUiStatus =
-  | { state: 'saved' }
-  | { state: 'waiting' }
-  | { state: 'saving' }
-  | { state: 'error'; error: string }
+type AutosaveStatus = 'saved' | 'waiting' | 'saving' | 'error'
 
 interface Props {
   /** The whole คลัง, as the picker needs it — including `tags`, which it
@@ -97,7 +93,7 @@ export function CreateQuestionSetForm({
   const [sharedOrgIds, setSharedOrgIds] = useState<string[]>(initialSet?.shared_org_ids ?? [])
   const [teams, setTeams] = useState<{ id: string; name: string }[]>([])
   const [teamChecked, setTeamChecked] = useState(false)
-  const [autosaveStatus, setAutosaveStatus] = useState<AutosaveUiStatus>({ state: 'saved' })
+  const [autosaveStatus, setAutosaveStatus] = useState<AutosaveStatus>('saved')
   const infoTouchedRef = useRef(false)
   const infoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const latestPayloadRef = useRef<QuestionSetData | null>(null)
@@ -108,13 +104,20 @@ export function CreateQuestionSetForm({
       save: data => saveExistingSet(initialSet.id, data),
       onStatusChange: status => {
         if (status.state === 'saving') {
-          setAutosaveStatus({ state: 'saving' })
+          setAutosaveStatus('saving')
         } else if (status.state === 'saved') {
-          setAutosaveStatus({ state: 'saved' })
+          setAutosaveStatus('saved')
         } else if (status.state === 'error') {
           const message = 'บันทึกแฟ้มไม่สำเร็จ กรุณาลองใหม่'
-          setAutosaveStatus({ state: 'error', error: message })
-          toast.error(message)
+          setAutosaveStatus('error')
+          toast.error(message, {
+            action: {
+              label: 'ลองใหม่',
+              onClick: () => {
+                if (latestPayloadRef.current) saveQueueRef.current?.enqueue(latestPayloadRef.current)
+              },
+            },
+          })
         }
       },
     })
@@ -173,13 +176,13 @@ export function CreateQuestionSetForm({
   function markInfoChanged() {
     if (!initialSet) return
     infoTouchedRef.current = true
-    setAutosaveStatus({ state: 'waiting' })
+    setAutosaveStatus('waiting')
   }
 
   function queueExistingSetSave(data: QuestionSetData) {
     if (!initialSet || !saveQueueRef.current) return
     if (!data.title.trim()) {
-      setAutosaveStatus({ state: 'error', error: 'กรุณาตั้งชื่อแฟ้มโจทย์' })
+      setAutosaveStatus('error')
       return
     }
     saveQueueRef.current.enqueue(data)
@@ -289,7 +292,7 @@ export function CreateQuestionSetForm({
 
   function finishEditingInfo() {
     if (!canSave) {
-      setAutosaveStatus({ state: 'error', error: 'กรุณาตั้งชื่อแฟ้มโจทย์' })
+      setAutosaveStatus('error')
       toast.error('กรุณาตั้งชื่อแฟ้มโจทย์')
       return
     }
@@ -300,20 +303,15 @@ export function CreateQuestionSetForm({
     setEditingInfo(false)
   }
 
-  function retryAutosave() {
-    if (!latestPayloadRef.current) return
-    queueExistingSetSave(latestPayloadRef.current)
-  }
-
   useEffect(() => {
     if (!initialSet || !infoTouchedRef.current) return
     clearInfoSaveTimer()
     if (!title.trim()) {
-      setAutosaveStatus({ state: 'error', error: 'กรุณาตั้งชื่อแฟ้มโจทย์' })
+      setAutosaveStatus('error')
       return
     }
 
-    setAutosaveStatus({ state: 'waiting' })
+    setAutosaveStatus('waiting')
     infoSaveTimerRef.current = setTimeout(() => {
       infoSaveTimerRef.current = null
       if (latestPayloadRef.current) queueExistingSetSave(latestPayloadRef.current)
@@ -326,14 +324,14 @@ export function CreateQuestionSetForm({
   }, [title, description, visibility, teamOrgId, sharedOrgIds, initialSet])
 
   useEffect(() => {
-    if (!initialSet || autosaveStatus.state === 'saved') return
+    if (!initialSet || autosaveStatus === 'saved') return
     const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
       event.preventDefault()
       event.returnValue = true
     }
     window.addEventListener('beforeunload', warnBeforeLeaving)
     return () => window.removeEventListener('beforeunload', warnBeforeLeaving)
-  }, [autosaveStatus.state, initialSet])
+  }, [autosaveStatus, initialSet])
 
   // Suggestions for the add-a-tag control on each card, ranked by how much of
   // the คลัง already uses them. Read off the rows the picker loaded, so it
@@ -388,42 +386,7 @@ export function CreateQuestionSetForm({
             </p>
           </div>
           {initialSet && (
-            <div className="flex w-full shrink-0 flex-wrap items-center justify-between gap-2 sm:w-auto sm:justify-end">
-              <div
-                role="status"
-                aria-live="polite"
-                className="flex min-h-8 items-center gap-1.5 text-sm text-muted-foreground"
-              >
-                {autosaveStatus.state === 'saved' && (
-                  <>
-                    <CheckCircle2 className="size-4 text-success" aria-hidden="true" />
-                    บันทึกอัตโนมัติแล้ว
-                  </>
-                )}
-                {autosaveStatus.state === 'waiting' && (
-                  <>
-                    <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
-                    รอบันทึกอัตโนมัติ…
-                  </>
-                )}
-                {autosaveStatus.state === 'saving' && (
-                  <>
-                    <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
-                    กำลังบันทึก…
-                  </>
-                )}
-                {autosaveStatus.state === 'error' && (
-                  <>
-                    <CloudAlert className="size-4 text-destructive" aria-hidden="true" />
-                    <span className="text-destructive">{autosaveStatus.error}</span>
-                    {canSave && (
-                      <Button type="button" variant="link" size="xs" onClick={retryAutosave} className="h-auto px-1">
-                        ลองใหม่
-                      </Button>
-                    )}
-                  </>
-                )}
-              </div>
+            <div className="flex w-full shrink-0 justify-end sm:w-auto">
               <Button
                 type="button"
                 variant={editingInfo ? 'ghost' : 'outline'}
