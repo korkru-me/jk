@@ -18,6 +18,7 @@ import { GroupTargetPicker, type GroupTargets } from '@/components/assignments/g
 import { GROUP_COLOR_IDS, type ClassroomGroup } from '@/lib/classroom-groups'
 import { nextStudentSortRules, type StudentSortRule } from '@/lib/student-sort'
 import { ClassroomAccessPanel } from '@/app/(app)/classrooms/[id]/_components/classroom-access-panel'
+import { ClassroomOverview } from '@/app/(app)/classrooms/[id]/_components/classroom-overview'
 import { JoinClassroomForm } from '@/components/classrooms/join-classroom-form'
 import type { AssignmentCategory } from '@/lib/assignment-categories'
 
@@ -150,7 +151,15 @@ function initial(scenario: GroupsLabScenario) {
 
 const wait = () => new Promise(resolve => setTimeout(resolve, 350))
 
-export function ClassroomGroupsLabClient({ scenario, fail }: { scenario: GroupsLabScenario; fail: boolean }) {
+export function ClassroomGroupsLabClient({
+  scenario,
+  fail,
+  overviewOnly = false,
+}: {
+  scenario: GroupsLabScenario
+  fail: boolean
+  overviewOnly?: boolean
+}) {
   const seed = useMemo(() => initial(scenario), [scenario])
   const [state, setState] = useState<GroupState>(seed.state)
   const [targets, setTargets] = useState<GroupTargets>({})
@@ -245,6 +254,34 @@ export function ClassroomGroupsLabClient({ scenario, fail }: { scenario: GroupsL
     guardians: [],
   } as StudentProfileRow]))
 
+  const overviewFixture = (
+    <section className="flex flex-col gap-3">
+      <div>
+        <h2 className="text-lg font-bold text-foreground">ตัวอย่างหน้าหลักของห้องเรียน</h2>
+        <p className="text-sm text-muted-foreground">
+          งานที่มีโจทย์ต้องเปิดดูในมุมมองนักเรียนได้ โดยไม่สร้างข้อมูลการส่งงานจริง
+        </p>
+      </div>
+      <ClassroomOverview
+        classroomId={CLASSROOM_ID}
+        isHomeroom={false}
+        students={roster.slice(0, 3)}
+        assignments={LAB_ASSIGNMENTS}
+        homeroomAssignments={[]}
+        submissions={[]}
+        posts={[]}
+        seenByPost={{}}
+        crossPostTargets={[]}
+        canManage
+        onNavigate={() => undefined}
+      />
+    </section>
+  )
+
+  if (overviewOnly) {
+    return <div className="mx-auto max-w-5xl p-4 sm:p-6">{overviewFixture}</div>
+  }
+
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
       <div>
@@ -308,6 +345,8 @@ export function ClassroomGroupsLabClient({ scenario, fail }: { scenario: GroupsL
           className="w-full justify-start"
         />
       </Card>
+
+      {overviewFixture}
 
       <section className="flex flex-col gap-3">
         <div>

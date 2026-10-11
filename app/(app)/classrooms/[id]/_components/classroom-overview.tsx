@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { ChevronRight, Printer } from 'lucide-react'
+import { ChevronRight, Eye, Printer } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { AssignmentCreationMenu } from '@/components/assignments/assignment-creation-menu'
 import { ClassroomStream } from './classroom-stream'
@@ -48,6 +48,7 @@ interface OverviewItem {
   endAt: string | null
   createdAt: string | null
   closed: boolean
+  canPreview: boolean
   progress: AssignmentProgress
 }
 
@@ -61,7 +62,7 @@ function formatDay(iso: string): string {
  * instead of borrowing a colour that means something else.
  */
 function describeDue(endAt: string | null, missing: number, now: number): { label: string; badge: string } {
-  if (!endAt) return { label: 'ไม่มีกำหนดส่ง', badge: 'bg-muted text-muted-foreground' }
+  if (!endAt) return { label: 'ไม่มีกำหนดส่ง', badge: 'bg-muted text-foreground' }
   const diff = new Date(endAt).getTime() - now
   if (missing === 0) return { label: `ส่งครบแล้ว · ${formatDay(endAt)}`, badge: SEVERITY_BADGE.done }
   if (diff < 0) return { label: `เลยกำหนด ${formatDay(endAt)}`, badge: SEVERITY_BADGE.overdue }
@@ -104,6 +105,11 @@ export function ClassroomOverview({
     // Nothing can land in a closed งาน any more, so it never shows up as
     // upcoming and no one gets chased over it.
     closed: !isHomeroom && (a as ClassroomAssignmentRow).status === 'closed',
+    // A preview needs questions to render. Homeroom aggregation may include
+    // another teacher's work, so it must not surface a preview action across
+    // that permission boundary.
+    canPreview: !isHomeroom
+      && (a as ClassroomAssignmentRow).question_ids.length > 0,
     progress: summary.byAssignment.get(a.id) ?? {
       attempted: 0, submitted: 0, completed: 0, passed: 0, inProgress: 0,
       missing: (isHomeroom ? null : audienceByAssignment?.get(a.id)?.size) ?? students.length,
@@ -291,24 +297,45 @@ function AssignmentRow({ item, studentCount, now }: { item: OverviewItem; studen
   const rate = studentCount > 0 ? Math.round((item.progress.submitted / studentCount) * 100) : 0
 
   return (
-    <Link href={`/assignments/${item.id}`} className="block px-4 py-3 hover:bg-muted/50 transition-colors">
-      <div className="flex items-center gap-2">
-        <p className="text-sm font-medium text-foreground truncate flex-1 min-w-0">{item.title}</p>
-        <span className="text-xs text-muted-foreground shrink-0">
-          ส่งแล้ว {item.progress.submitted}/{studentCount}
-        </span>
-      </div>
-      <div className="h-1.5 rounded-full bg-muted overflow-hidden my-2">
-        <div className={cn('h-full rounded-full', rateTone(rate))} style={{ width: `${rate}%` }} />
-      </div>
-      <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
-        <span className="truncate">{item.subtitle}</span>
-        {/* A closed งาน sits at the bottom of the list and takes no more
-            hand-ins — say so, or its position looks arbitrary. */}
-        {item.closed && <span className="font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">ปิดแล้ว</span>}
-        <span className={cn('font-medium px-2 py-0.5 rounded-full', due.badge)}>{due.label}</span>
-        {item.progress.inProgress > 0 && <span>กำลังทำอยู่ {item.progress.inProgress} คน</span>}
-      </div>
-    </Link>
+    <div className="flex flex-col gap-2 px-4 py-3 transition-colors hover:bg-muted/50 sm:flex-row sm:items-center">
+      <Link
+        href={`/assignments/${item.id}`}
+        className="min-w-0 flex-1 rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+      >
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-medium text-foreground truncate flex-1 min-w-0">{item.title}</p>
+          <span className="text-xs text-muted-foreground shrink-0">
+            ส่งแล้ว {item.progress.submitted}/{studentCount}
+          </span>
+        </div>
+        <div className="h-1.5 rounded-full bg-muted overflow-hidden my-2">
+          <div className={cn('h-full rounded-full', rateTone(rate))} style={{ width: `${rate}%` }} />
+        </div>
+        <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
+          <span className="truncate">{item.subtitle}</span>
+          {/* A closed งาน sits at the bottom of the list and takes no more
+              hand-ins — say so, or its position looks arbitrary. */}
+          {item.closed && <span className="font-medium px-2 py-0.5 rounded-full bg-muted text-foreground">ปิดแล้ว</span>}
+          <span className={cn('font-medium px-2 py-0.5 rounded-full', due.badge, 'text-foreground')}>{due.label}</span>
+          {item.progress.inProgress > 0 && <span>กำลังทำอยู่ {item.progress.inProgress} คน</span>}
+        </div>
+      </Link>
+      {item.canPreview && (
+        <Link
+          href={`/assignments/${item.id}/preview`}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`ดู ${item.title} ในมุมมองนักเรียน (เปิดในแท็บใหม่)`}
+          title="เปิดมุมมองนักเรียนในแท็บใหม่"
+          className={cn(
+            buttonVariants({ variant: 'outline', size: 'sm' }),
+            'shrink-0 self-start whitespace-nowrap sm:self-center',
+          )}
+        >
+          <Eye data-icon="inline-start" />
+          ดูในมุมมองนักเรียน
+        </Link>
+      )}
+    </div>
   )
 }
