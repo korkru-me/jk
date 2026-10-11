@@ -19,6 +19,9 @@ import { IconButton } from '@/components/ui/icon-button'
 import { Input } from '@/components/ui/input'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Card } from '@/components/ui/card'
+import {
+  Collapsible, CollapsibleContent, CollapsibleTrigger,
+} from '@/components/ui/collapsible'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
@@ -124,6 +127,8 @@ export function SetStructurePanel({
   const [selected, setSelected] = useState<string[]>([])
   const [bulkSectionOpen, setBulkSectionOpen] = useState(false)
   const [previewSectionId, setPreviewSectionId] = useState<string | null>(null)
+  const [questionsOpen, setQuestionsOpen] = useState(false)
+  const questionsPanelRef = useRef<HTMLDivElement>(null)
   // Pending confirmations.
   const [removeIds, setRemoveIds] = useState<string[] | null>(null)
   const [deleteSectionId, setDeleteSectionId] = useState<string | null>(null)
@@ -149,6 +154,21 @@ export function SetStructurePanel({
   const dialogSection = isNewSection ? null : sections.find(s => s.id === dialogSectionId) ?? null
   const sectionToDelete = sections.find(s => s.id === deleteSectionId) ?? null
   const previewSection = sections.find(s => s.id === previewSectionId) ?? null
+
+  useEffect(() => {
+    if (!questionsOpen) return
+
+    // Use click rather than pointerdown so an outside control receives the
+    // complete gesture before this long panel folds and shifts the page.
+    function closeQuestionsOnOutsideClick(event: MouseEvent) {
+      const target = event.target
+      if (!(target instanceof Node) || questionsPanelRef.current?.contains(target)) return
+      setQuestionsOpen(false)
+    }
+
+    document.addEventListener('click', closeQuestionsOnOutsideClick)
+    return () => document.removeEventListener('click', closeQuestionsOnOutsideClick)
+  }, [questionsOpen])
 
   function apply(next: { sections: QuestionSetSection[]; question_ids: string[] }) {
     onChange({ sections: next.sections, questionIds: next.question_ids })
@@ -219,6 +239,87 @@ export function SetStructurePanel({
 
   return (
     <div className="space-y-4">
+      {/* ── โจทย์ทั้งหมดในแฟ้ม ───────────────────────────────────── */}
+      <Card ref={questionsPanelRef} className="overflow-hidden">
+        <Collapsible open={questionsOpen} onOpenChange={setQuestionsOpen}>
+          <div className="flex min-h-[72px] items-center gap-2 p-5">
+            <CollapsibleTrigger
+              render={(
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="group h-auto min-w-0 flex-1 justify-start gap-2 p-0 text-left hover:bg-transparent"
+                />
+              )}
+            >
+              <Layers className="size-4 shrink-0 text-primary" aria-hidden="true" />
+              <span className="font-semibold text-foreground whitespace-nowrap">โจทย์ในแฟ้มนี้</span>
+              <span className="text-xs text-muted-foreground whitespace-nowrap">{questionIds.length} ข้อ</span>
+              <ChevronDown
+                className="ml-auto size-4 shrink-0 text-muted-foreground transition-transform group-data-panel-open:rotate-180 motion-reduce:transition-none"
+                aria-hidden="true"
+              />
+            </CollapsibleTrigger>
+            <Button type="button" size="sm" onClick={onAddQuestions} className="shrink-0 gap-1.5">
+              <Plus data-icon="inline-start" aria-hidden="true" />
+              <span className="hidden sm:inline">เพิ่มโจทย์จากคลัง</span>
+              <span className="sm:hidden">เพิ่มโจทย์</span>
+            </Button>
+          </div>
+
+          <CollapsibleContent className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 ease-out data-ending-style:h-0 data-starting-style:h-0 motion-reduce:transition-none">
+            <div className="border-t border-border px-5 pb-5 pt-4">
+              {questionIds.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  ยังไม่มีโจทย์ในแฟ้มนี้ — กด “เพิ่มโจทย์จากคลัง” เพื่อเลือกโจทย์เข้ามา
+                </p>
+              ) : (
+                <SetQuestionList
+                  byId={byId}
+                  questionIds={questionIds}
+                  sectionTitlesById={sectionTitlesById}
+                  selected={selected}
+                  onToggleSelected={toggleSelected}
+                  onSelectAll={all => setSelected(all ? [...questionIds] : [])}
+                  onMove={(id, delta) => apply(moveQuestionInSet(sections, questionIds, id, delta))}
+                  onRemove={ids => setRemoveIds(ids)}
+                  allTags={allTags}
+                  myTeams={myTeams}
+                  setId={setId}
+                  onSaveBeforeEdit={onSaveBeforeEdit}
+                  initialCardData={initialCardData}
+                />
+              )}
+
+              {selected.length > 0 && (
+                <div className="sticky bottom-0 -mx-5 -mb-5 mt-3 flex flex-wrap items-center gap-2 rounded-b-2xl border-t border-border bg-muted/80 px-5 py-3 backdrop-blur-sm">
+                  <span className="text-sm font-medium text-foreground">เลือก {selected.length} ข้อ</span>
+                  <div className="ml-auto flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={sections.length === 0}
+                      title={sections.length === 0 ? 'สร้างแฟ้มย่อยก่อนจึงจะเพิ่มโจทย์ได้' : undefined}
+                      onClick={() => setBulkSectionOpen(true)}
+                    >
+                      <FolderPlus data-icon="inline-start" aria-hidden="true" />
+                      เพิ่มเข้าแฟ้มย่อย
+                    </Button>
+                    <Button type="button" variant="destructive" size="sm" onClick={() => setRemoveIds(selected)}>
+                      เอาออกจากแฟ้ม
+                    </Button>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setSelected([])}>
+                      ยกเลิก
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      </Card>
+
       {/* ── แฟ้มย่อย ─────────────────────────────────────────────── */}
       <Card padding="lg" className="flex flex-col gap-2.5">
         <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -290,67 +391,6 @@ export function SetStructurePanel({
               </div>
             </SortableContext>
           </DndContext>
-        )}
-      </Card>
-
-      {/* ── โจทย์ทั้งหมดในแฟ้ม ───────────────────────────────────── */}
-      <Card padding="xl" className="space-y-3">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-2 flex-wrap min-w-0">
-            <Layers className="w-4 h-4 text-primary shrink-0" />
-            <h2 className="font-semibold text-foreground whitespace-nowrap">โจทย์ในแฟ้มนี้</h2>
-            <span className="text-xs text-muted-foreground whitespace-nowrap">{questionIds.length} ข้อ</span>
-          </div>
-          <Button type="button" size="sm" onClick={onAddQuestions} className="gap-1.5">
-            <Plus className="w-3.5 h-3.5" /> เพิ่มโจทย์จากคลัง
-          </Button>
-        </div>
-
-        {questionIds.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-8 text-center">
-            ยังไม่มีโจทย์ในแฟ้มนี้ — กด “เพิ่มโจทย์จากคลัง” เพื่อเลือกโจทย์เข้ามา
-          </p>
-        ) : (
-          <SetQuestionList
-            byId={byId}
-            questionIds={questionIds}
-            sectionTitlesById={sectionTitlesById}
-            selected={selected}
-            onToggleSelected={toggleSelected}
-            onSelectAll={all => setSelected(all ? [...questionIds] : [])}
-            onMove={(id, delta) => apply(moveQuestionInSet(sections, questionIds, id, delta))}
-            onRemove={ids => setRemoveIds(ids)}
-            allTags={allTags}
-            myTeams={myTeams}
-            setId={setId}
-            onSaveBeforeEdit={onSaveBeforeEdit}
-            initialCardData={initialCardData}
-          />
-        )}
-
-        {selected.length > 0 && (
-          <div className="sticky bottom-0 -mx-6 -mb-6 px-6 py-3 border-t border-border bg-muted/80 backdrop-blur-sm rounded-b-2xl flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-medium text-foreground">เลือก {selected.length} ข้อ</span>
-            <div className="flex items-center gap-2 ml-auto flex-wrap">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={sections.length === 0}
-                title={sections.length === 0 ? 'สร้างแฟ้มย่อยก่อนจึงจะเพิ่มโจทย์ได้' : undefined}
-                onClick={() => setBulkSectionOpen(true)}
-              >
-                <FolderPlus data-icon="inline-start" aria-hidden="true" />
-                เพิ่มเข้าแฟ้มย่อย
-              </Button>
-              <Button type="button" variant="destructive" size="sm" onClick={() => setRemoveIds(selected)}>
-                เอาออกจากแฟ้ม
-              </Button>
-              <Button type="button" variant="ghost" size="sm" onClick={() => setSelected([])}>
-                ยกเลิก
-              </Button>
-            </div>
-          </div>
         )}
       </Card>
 

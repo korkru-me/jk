@@ -1,10 +1,18 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useId, useMemo, useState, useTransition, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Plus, Search, Layers, Trash2, Download, Users, ChevronDown } from 'lucide-react'
+import { Plus, Search, Layers, Trash2, Download, Users, ChevronDown, GripVertical } from 'lucide-react'
+import {
+  DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter,
+  useSensor, useSensors, type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext, arrayMove, rectSortingStrategy, sortableKeyboardCoordinates, useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { IconButton } from '@/components/ui/icon-button'
@@ -37,12 +45,58 @@ interface Props {
   libraryPanel: React.ReactNode
 }
 
+function questionSetOrderStorageKey(userId: string) {
+  return `korkru.question-set-order.v1:${userId}`
+}
+
+/** Keep every live set exactly once, following a saved browser order first. */
+function applyStoredOrder<T extends { id: string }>(sets: T[], savedIds: readonly string[]): T[] {
+  const byId = new Map(sets.map(set => [set.id, set]))
+  const ordered: T[] = []
+  for (const id of savedIds) {
+    const set = byId.get(id)
+    if (!set) continue
+    ordered.push(set)
+    byId.delete(id)
+  }
+  for (const set of sets) {
+    if (byId.delete(set.id)) ordered.push(set)
+  }
+  return ordered
+}
+
+/** Reorder only the visible search results without disturbing hidden cards. */
+function mergeVisibleOrder<T extends { id: string }>(all: T[], visible: T[]): T[] {
+  const visibleIds = new Set(visible.map(set => set.id))
+  let visibleIndex = 0
+  return all.map(set => visibleIds.has(set.id) ? visible[visibleIndex++] : set)
+}
+
 export function QuestionSetsClient({
   mySets, teamSets, currentUserId, libraryPanel,
 }: Props) {
   const router = useRouter()
   const [search, setSearch] = useState('')
   const [scope, setScope] = useState<'all' | 'mine' | 'team'>('all')
+  const [orderedMine, setOrderedMine] = useState(mySets)
+  const mineDndId = useId()
+  const mineSensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+
+  useEffect(() => {
+    let savedIds: string[] = []
+    try {
+      const stored = window.localStorage.getItem(questionSetOrderStorageKey(currentUserId))
+      const parsed: unknown = stored ? JSON.parse(stored) : []
+      if (Array.isArray(parsed)) savedIds = parsed.filter((id): id is string => typeof id === 'string')
+    } catch {
+      // A corrupt or blocked preference should never hide a teacher's sets.
+    }
+    setOrderedMine(applyStoredOrder(mySets, savedIds))
+  }, [currentUserId, mySets])
 
   const totalCount = mySets.length + teamSets.length
 
@@ -52,8 +106,28 @@ export function QuestionSetsClient({
     return !search || s.title.toLowerCase().includes(search.toLowerCase())
   }
 
-  const filteredMine = useMemo(() => mySets.filter(matches), [mySets, search])
+  const filteredMine = useMemo(() => orderedMine.filter(matches), [orderedMine, search])
   const filteredTeam = useMemo(() => teamSets.filter(matches), [teamSets, search])
+
+  function handleMineDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIndex = filteredMine.findIndex(set => set.id === active.id)
+    const newIndex = filteredMine.findIndex(set => set.id === over.id)
+    if (oldIndex < 0 || newIndex < 0) return
+
+    const reorderedVisible = arrayMove(filteredMine, oldIndex, newIndex)
+    const next = mergeVisibleOrder(orderedMine, reorderedVisible)
+    setOrderedMine(next)
+    try {
+      window.localStorage.setItem(
+        questionSetOrderStorageKey(currentUserId),
+        JSON.stringify(next.map(set => set.id)),
+      )
+    } catch {
+      toast.error('จัดลำดับบนหน้าจอแล้ว แต่เบราว์เซอร์นี้ไม่อนุญาตให้จดจำลำดับ')
+    }
+  }
 
   return (
     <div className="flex max-w-[1200px] flex-col gap-4">
@@ -131,9 +205,20 @@ export function QuestionSetsClient({
                   <p className="text-muted-foreground font-medium">ไม่พบแฟ้มโจทย์ที่ตรงกัน</p>
                 </Card>
               ) : (
-                <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-3">
-                  {filteredMine.map(set => <SetCard key={set.id} set={set} currentUserId={currentUserId} />)}
-                </div>
+                <DndContext
+                  id={`question-set-cards-${mineDndId}`}
+                  sensors={mineSensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleMineDragEnd}
+                >
+                  <SortableContext items={filteredMine.map(set => set.id)} strategy={rectSortingStrategy}>
+                    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-3">
+                      {filteredMine.map(set => (
+                        <SortableSetCard key={set.id} set={set} currentUserId={currentUserId} />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
               )}
             </div>
           )}
@@ -167,7 +252,45 @@ export function QuestionSetsClient({
   )
 }
 
-function SetCard({ set, currentUserId }: { set: QuestionSetSummaryWithCreator; currentUserId: string }) {
+function SortableSetCard({ set, currentUserId }: { set: QuestionSetSummary; currentUserId: string }) {
+  const {
+    attributes, listeners, setNodeRef, transform, transition, isDragging,
+  } = useSortable({ id: set.id })
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={cn(isDragging && 'relative z-30 opacity-80')}
+    >
+      <SetCard
+        set={set}
+        currentUserId={currentUserId}
+        dragHandle={(
+          <IconButton
+            type="button"
+            label={`กดค้างแล้วลากเพื่อจัดลำดับแฟ้มโจทย์ ${set.title}`}
+            title="กดค้างแล้วลากเพื่อจัดลำดับแฟ้มโจทย์"
+            size="xs"
+            className="relative z-20 cursor-grab touch-none text-muted-foreground hover:bg-card hover:text-foreground active:cursor-grabbing"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical aria-hidden="true" />
+          </IconButton>
+        )}
+      />
+    </div>
+  )
+}
+
+function SetCard({
+  set, currentUserId, dragHandle,
+}: {
+  set: QuestionSetSummaryWithCreator
+  currentUserId: string
+  dragHandle?: ReactNode
+}) {
   const [isPending, startTransition] = useTransition()
   const [deleted, setDeleted] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
@@ -242,6 +365,7 @@ function SetCard({ set, currentUserId }: { set: QuestionSetSummaryWithCreator; c
               )}
             </div>
           </div>
+          {dragHandle}
           <ChevronDown
             aria-hidden="true"
             className="mt-1 size-4 shrink-0 -rotate-90 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary"
