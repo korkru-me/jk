@@ -278,6 +278,26 @@ export function CreateAssignmentForm({
   const [showSections, setShowSections] = useState(copySource?.show_sections ?? initialSettings.show_question_sections)
   const [search, setSearch] = useState('')
   const [diffFilter, setDiffFilter] = useState('all')
+  const questionPickerRef = useRef<HTMLDivElement>(null)
+  const [questionPickerOpen, setQuestionPickerOpen] = useState(false)
+
+  useEffect(() => {
+    if (!questionPickerOpen) return
+
+    function closeQuestionPickerOnOutsideClick(event: MouseEvent) {
+      const target = event.target
+      if (!(target instanceof Node) || questionPickerRef.current?.contains(target)) return
+      // The preview dialog is rendered in a portal, outside questionPickerRef,
+      // but interacting with it must not silently close the picker behind it.
+      if (target instanceof Element && target.closest('[role="dialog"]')) return
+      setQuestionPickerOpen(false)
+    }
+
+    // Using click preserves the target through pointerup when this tall panel
+    // collapses, so the teacher can switch to the แฟ้ม picker in one click.
+    document.addEventListener('click', closeQuestionPickerOnOutsideClick)
+    return () => document.removeEventListener('click', closeQuestionPickerOnOutsideClick)
+  }, [questionPickerOpen])
   // How much of the คลัง above each student actually receives. Empty = all of
   // it, which is what every งาน did before this setting existed. It lives here
   // rather than in ตั้งค่า because "ให้เด็กทำกี่ข้อ" is the thought that comes
@@ -1023,35 +1043,37 @@ export function CreateAssignmentForm({
               })}
             />
 
-            <Collapsible>
-              <CollapsibleTrigger
-                className={cn(
-                  buttonVariants({ variant: 'outline' }),
-                  'group h-auto w-full justify-start gap-2 rounded-xl px-3 py-2.5 text-left',
-                )}
-              >
-                <span className="text-foreground">เลือกโจทย์รายข้อ</span>
-                <span className="text-xs font-normal text-muted-foreground">{questions.length} ข้อในคลัง</span>
-                <ChevronDown className="ml-auto text-muted-foreground transition-transform group-data-panel-open:rotate-180" />
-              </CollapsibleTrigger>
-              <CollapsibleContent className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 ease-out data-ending-style:h-0 data-starting-style:h-0">
-                <div className="pt-4">
-                  <QuestionPicker
-                    questions={questions}
-                    selectedIds={selectedIds}
-                    onToggle={toggleQ}
-                    search={search}
-                    onSearchChange={setSearch}
-                    diffFilter={diffFilter}
-                    onDiffFilterChange={setDiffFilter}
-                    showHeader={false}
-                    showSelectedFooter={false}
-                    surface="plain"
-                    loadPreviewQuestions={actions?.getQuestionPreviewDetails}
-                  />
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
+            <div ref={questionPickerRef}>
+              <Collapsible open={questionPickerOpen} onOpenChange={setQuestionPickerOpen}>
+                <CollapsibleTrigger
+                  className={cn(
+                    buttonVariants({ variant: 'outline' }),
+                    'group h-auto w-full justify-start gap-2 rounded-xl px-3 py-2.5 text-left',
+                  )}
+                >
+                  <span className="text-foreground">เลือกโจทย์รายข้อ</span>
+                  <span className="text-xs font-normal text-muted-foreground">{questions.length} ข้อในคลัง</span>
+                  <ChevronDown className="ml-auto text-muted-foreground transition-transform group-data-panel-open:rotate-180" />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 ease-out data-ending-style:h-0 data-starting-style:h-0">
+                  <div className="pt-4">
+                    <QuestionPicker
+                      questions={questions}
+                      selectedIds={selectedIds}
+                      onToggle={toggleQ}
+                      search={search}
+                      onSearchChange={setSearch}
+                      diffFilter={diffFilter}
+                      onDiffFilterChange={setDiffFilter}
+                      showHeader={false}
+                      showSelectedFooter={false}
+                      surface="plain"
+                      loadPreviewQuestions={actions?.getQuestionPreviewDetails}
+                    />
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            </div>
             <Separator />
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-sm font-semibold text-foreground">คะแนนแต่ละข้อ</h3>

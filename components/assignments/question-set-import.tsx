@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Check, ChevronDown, Eye, Minus, Plus, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -54,9 +54,30 @@ interface SetRow {
  * remember that a card scrolled off the top is where แฟ้ม come from.
  */
 export function QuestionSetImport({ sets, bankIds, selectedIds, onToggle, onPreview }: Props) {
+  const containerRef = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [expandedSetIds, setExpandedSetIds] = useState<Set<string>>(() => new Set())
+
+  useEffect(() => {
+    if (!open) return
+
+    function closeOnOutsideClick(event: MouseEvent) {
+      const target = event.target
+      if (!(target instanceof Node) || containerRef.current?.contains(target)) return
+      // Preview dialogs are portalled outside this DOM subtree but still belong
+      // to the picker interaction that opened them. Keep the picker as-is while
+      // the teacher reads or tries a question inside that dialog.
+      if (target instanceof Element && target.closest('[role="dialog"]')) return
+      setOpen(false)
+    }
+
+    // Wait for click instead of pointerdown: collapsing this long panel on
+    // pointerdown moves the next trigger away before pointerup, so switching
+    // directly to “เลือกโจทย์รายข้อ” would require a second click.
+    document.addEventListener('click', closeOnOutsideClick)
+    return () => document.removeEventListener('click', closeOnOutsideClick)
+  }, [open])
 
   if (sets.length === 0) return null
 
@@ -122,7 +143,7 @@ export function QuestionSetImport({ sets, bankIds, selectedIds, onToggle, onPrev
   }
 
   return (
-    <div className="rounded-xl border border-border">
+    <div ref={containerRef} className="rounded-xl border border-border">
       <Button
         type="button"
         variant="ghost"
