@@ -18,6 +18,7 @@ import { formatThaiDate, thaiHour } from '@/lib/thai-time'
 import { filterAssignmentsForStudent } from '@/lib/classroom-groups-server'
 import { Clock, BookOpen, School, ChevronRight, TrendingUp, AlertCircle, Megaphone } from 'lucide-react'
 import { Card } from '@/components/ui/card'
+import { sortClassroomsByRecentViews } from '@/lib/classroom-recency'
 
 export const metadata = { title: 'หน้าหลัก — KorKru' }
 
@@ -44,7 +45,7 @@ export default async function DashboardPage() {
     // Everything shown to a teacher is their own real data. Counts come back
     // with the first page of rows (`count: 'exact'` alongside `limit`), so the
     // totals and the previews cost one query each rather than two.
-    const [classroomsRes, questionsRes, setsRes] = await Promise.all([
+    const [classroomsRes, questionsRes, setsRes, recentClassroomViewsRes] = await Promise.all([
       // Roster and assignment tallies ride along on the classroom relation,
       // the same way the classroom list page reads them.
       admin
@@ -69,6 +70,10 @@ export default async function DashboardPage() {
         .eq('created_by', user.id)
         .order('created_at', { ascending: false })
         .limit(RECENT_LIMIT),
+      supabase
+        .from('classroom_recent_views')
+        .select('classroom_id, viewed_at')
+        .eq('user_id', user.id),
     ])
 
     // A set's question_ids keep pointing at deleted questions, so the stored
@@ -81,7 +86,10 @@ export default async function DashboardPage() {
       : { data: [] as { id: string }[] }
     const liveQuestionIds = new Set((liveQuestions ?? []).map(q => q.id))
 
-    const classroomRows = (classroomsRes.data ?? []) as any[]
+    const classroomRows = sortClassroomsByRecentViews(
+      (classroomsRes.data ?? []) as any[],
+      (recentClassroomViewsRes.data ?? []) as { classroom_id: string; viewed_at: string }[],
+    )
     const classrooms: DashboardClassroom[] = classroomRows.map(row => ({
       id: row.id,
       name: row.name,
