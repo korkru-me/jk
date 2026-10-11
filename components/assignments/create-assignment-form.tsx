@@ -297,6 +297,7 @@ export function CreateAssignmentForm({
       Object.entries(copySource?.question_points ?? {}).map(([id, points]) => [id, String(points)]),
     ),
   )
+  const [questionPointsPreset, setQuestionPointsPreset] = useState<'one' | 'parts' | null>(null)
   // Which row's มุมมองนักเรียน is open, as an index into selectedIds so the
   // dialog's ข้อถัดไป walks the teacher's own order. null = closed.
   const [previewIndex, setPreviewIndex] = useState<number | null>(null)
@@ -475,6 +476,7 @@ export function CreateAssignmentForm({
   const bankIds = useMemo(() => new Set(questions.map(q => q.id)), [questions])
 
   function toggleQ(id: string) {
+    setQuestionPointsPreset(null)
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
   }
 
@@ -505,6 +507,7 @@ export function CreateAssignmentForm({
   // the server refuses a งาน with no โจทย์, and one built from a แฟ้ม would
   // quietly get the whole แฟ้ม back instead.
   function removeQuestion(id: string) {
+    setQuestionPointsPreset(null)
     setSelectedIds(prev => prev.filter(i => i !== id))
   }
 
@@ -513,6 +516,7 @@ export function CreateAssignmentForm({
     const validIdSet = new Set(validIds)
     const missingCount = new Set(choice.questionIds).size - validIds.length
     const removing = validIds.length > 0 && validIds.every(id => selectedIds.includes(id))
+    setQuestionPointsPreset(null)
     setSelectedIds(prev => toggleQuestionSetSelection(prev, choice.questionIds, bankIds))
     if (removing) {
       // As with unticking one question, retain section/point drafts for re-selection.
@@ -604,7 +608,10 @@ export function CreateAssignmentForm({
   const defaultPointsById = new Map(questions.map(q => [q.id, q.default_points]))
   const pointsDraft = (id: string) => questionPointDrafts[id] ?? String(defaultPointsById.get(id) ?? 1)
 
-  function setAllQuestionPoints(pointsFor: (question: AssignmentQuestionOption) => number) {
+  function setAllQuestionPoints(
+    preset: 'one' | 'parts',
+    pointsFor: (question: AssignmentQuestionOption) => number,
+  ) {
     setQuestionPointDrafts(prev => ({
       ...prev,
       ...Object.fromEntries(previewQuestions.map(question => [
@@ -612,6 +619,7 @@ export function CreateAssignmentForm({
         String(pointsFor(question)),
       ])),
     }))
+    setQuestionPointsPreset(preset)
   }
 
   const pointsSum = Math.round(
@@ -1074,22 +1082,33 @@ export function CreateAssignmentForm({
             <div role="group" aria-label="ปรับคะแนนทุกข้อ" className="flex flex-wrap gap-2">
               <Button
                 type="button"
-                variant="outline"
+                variant={questionPointsPreset === 'one' ? 'default' : 'outline'}
                 size="sm"
+                aria-pressed={questionPointsPreset === 'one'}
                 disabled={previewQuestions.length === 0}
-                onClick={() => setAllQuestionPoints(() => 1)}
+                onClick={() => setAllQuestionPoints('one', () => 1)}
               >
+                {questionPointsPreset === 'one' && <Check data-icon="inline-start" />}
                 ทุกข้อ 1 คะแนน
               </Button>
               <Button
                 type="button"
-                variant="outline"
+                variant={questionPointsPreset === 'parts' ? 'default' : 'outline'}
                 size="sm"
+                aria-pressed={questionPointsPreset === 'parts'}
                 disabled={previewQuestions.length === 0}
-                onClick={() => setAllQuestionPoints(question => question.default_points)}
+                onClick={() => setAllQuestionPoints('parts', question => question.default_points)}
               >
+                {questionPointsPreset === 'parts' && <Check data-icon="inline-start" />}
                 คะแนนตามข้อย่อย
               </Button>
+              <span role="status" aria-live="polite" className="sr-only">
+                {questionPointsPreset === 'one'
+                  ? `ตั้งคะแนนทั้งหมด ${previewQuestions.length} ข้อเป็นข้อละ 1 คะแนนแล้ว`
+                  : questionPointsPreset === 'parts'
+                    ? `ตั้งคะแนนทั้งหมด ${previewQuestions.length} ข้อตามข้อย่อยแล้ว`
+                    : ''}
+              </span>
             </div>
 
             <DndContext
@@ -1109,7 +1128,10 @@ export function CreateAssignmentForm({
                       points={pointsDraft(q.id)}
                       onMove={to => moveQuestionTo(q.id, to)}
                       onPreview={() => setPreviewIndex(i)}
-                      onPointsChange={value => setQuestionPointDrafts(d => ({ ...d, [q.id]: value }))}
+                      onPointsChange={value => {
+                        setQuestionPointsPreset(null)
+                        setQuestionPointDrafts(d => ({ ...d, [q.id]: value }))
+                      }}
                       onRemove={() => removeQuestion(q.id)}
                     />
                   ))}
