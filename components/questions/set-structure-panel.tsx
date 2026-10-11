@@ -12,7 +12,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import {
   Plus, ChevronUp, ChevronDown, MoreVertical, Folder, FolderOpen, FolderPlus,
-  X, Layers, Search, Eye, Edit2, Check,
+  X, Layers, Search, Eye, Trash2, Check,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { IconButton } from '@/components/ui/icon-button'
@@ -35,11 +35,8 @@ import {
   type QuestionSetSection,
 } from '@/lib/question-set-sections'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { getQuestionClientDetail } from '@/lib/actions/questions'
-import { getQuestionCardData } from '@/lib/actions/question-card-data'
-import { questionEditHref, RETURN_SET_PARAM } from '@/lib/question-return'
 import { SetQuestionList, type SetListQuestion } from './set-question-list'
 import { QuestionSectionBadges } from './question-section-badges'
 import type { QuestionDetailWithCategory as PreviewQuestion } from './preview-modal'
@@ -351,8 +348,7 @@ export function SetStructurePanel({
         byId={byId}
         onCancel={() => setDialogSectionId(null)}
         onConfirm={applySectionDraft}
-        setId={setId}
-        onSaveBeforeEdit={onSaveBeforeEdit}
+        onDelete={dialogSection ? () => setDeleteSectionId(dialogSection.id) : undefined}
       />
 
       <BulkAddToSectionsDialog
@@ -608,8 +604,7 @@ function SectionCard({
  * creating, the แฟ้มย่อย itself.
  */
 function SectionDialog({
-  open, isNew, section, sections, questionIds, byId, onCancel, onConfirm,
-  setId, onSaveBeforeEdit,
+  open, isNew, section, sections, questionIds, byId, onCancel, onConfirm, onDelete,
 }: {
   open: boolean
   isNew: boolean
@@ -619,14 +614,11 @@ function SectionDialog({
   byId: Map<string, PanelQuestion>
   onCancel: () => void
   onConfirm: (title: string, memberIds: string[]) => void
-  /** The แฟ้ม's id, absent while it is still being created. */
-  setId?: string
-  /** Flushes the แฟ้ม's newest autosave before leaving for the โจทย์ editor. */
-  onSaveBeforeEdit?: () => Promise<boolean>
+  /** Existing แฟ้มย่อย only; deletion is confirmed by the parent dialog. */
+  onDelete?: () => void
 }) {
-  const router = useRouter()
   const titleInputRef = useRef<HTMLInputElement>(null)
-  const questionListRef = useRef<HTMLUListElement>(null)
+  const questionListRef = useRef<HTMLDivElement>(null)
   const bankRowRefs = useRef(new Map<string, HTMLLIElement>())
   const pendingAnchorRef = useRef<{ id: string; top: number } | null>(null)
   const [search, setSearch] = useState('')
@@ -635,7 +627,6 @@ function SectionDialog({
   const [confirmingDiscard, setConfirmingDiscard] = useState(false)
   const [previewQ, setPreviewQ] = useState<PreviewQuestion | null>(null)
   const [previewLoadingId, setPreviewLoadingId] = useState<string | null>(null)
-  const [leavingId, setLeavingId] = useState<string | null>(null)
 
   const baselineTitle = section?.title ?? ''
   const baselineIds = useMemo(() => section?.question_ids ?? [], [section])
@@ -661,18 +652,6 @@ function SectionDialog({
   const draftDirty = draftTitle !== baselineTitle || added.length > 0 || removed.length > 0
   const canConfirm = isNew || added.length > 0 || removed.length > 0 || titleChanged
 
-  /**
-   * Ticking in here is a draft too, and แก้ไข leaves the page.
-   *
-   * Rather than saving the ticks behind the teacher's back — which would
-   * quietly create an unnamed แฟ้มย่อย when they were only browsing — แก้ไข is
-   * simply unavailable until ยืนยัน has settled what this แฟ้มย่อย holds.
-   * ดูตัวอย่าง opens over the dialog and navigates nowhere, so it is always
-   * offered.
-   */
-  const hasPendingChanges = isNew || added.length > 0 || removed.length > 0 || titleChanged
-  const canEditQuestions = !!setId && !!onSaveBeforeEdit
-
   function requestClose() {
     if (draftDirty) {
       setConfirmingDiscard(true)
@@ -694,32 +673,10 @@ function SectionDialog({
     setPreviewQ(result.data as unknown as PreviewQuestion)
   }
 
-  /**
-   * A โจทย์หลายขั้นตอน is edited by its group, not by its row, and nothing in
-   * this dialog knows which rows are one. Asked for the single โจทย์ being
-   * opened, on the click that opens it.
-   */
-  async function editQuestion(id: string) {
-    if (!setId || !onSaveBeforeEdit) return
-    setLeavingId(id)
-    const [data, saved] = await Promise.all([
-      getQuestionCardData([id]),
-      onSaveBeforeEdit(),
-    ])
-    if (!saved) { setLeavingId(null); return }
-    const detail = data.details[id]
-    const path = detail?.order_in_group === 0 && detail.group_id
-      ? `/questions/multi/${detail.group_id}`
-      : `/questions/${id}/edit`
-    router.push(questionEditHref(path, '', { [RETURN_SET_PARAM]: setId }))
-  }
-
   const term = search.trim().toLowerCase()
   const visibleIds = term
     ? questionIds.filter(id => questionLabel(byId.get(id)).toLowerCase().includes(term))
     : questionIds
-  const visibleIdSet = new Set(visibleIds)
-  const selectedVisibleIds = draftIds.filter(id => visibleIdSet.has(id))
 
   // Adding a review copy above the bank must not move the original row under
   // the teacher's pointer. Keep the bank row at the same visual Y position,
@@ -762,7 +719,7 @@ function SectionDialog({
         )}
       >
         {/* Ticking is still the whole row, so the target stays large. The
-            preview/edit controls sit outside the label and never toggle it. */}
+            preview control sits outside the label and never toggles it. */}
         <label className="flex flex-1 items-start gap-3 min-w-0 cursor-pointer">
           <input
             type="checkbox"
@@ -800,26 +757,15 @@ function SectionDialog({
           </span>
         </label>
 
-        <span className="flex items-center shrink-0">
-          <IconButton
-            label={`ดูตัวอย่างโจทย์ ${questionLabel(q)}`}
-            size="2xs"
-            disabled={!q}
-            onClick={() => void openPreview(id)}
-          >
-            <Eye className="w-3.5 h-3.5" />
-          </IconButton>
-          <IconButton
-            label={hasPendingChanges
-              ? 'กดยืนยันก่อน จึงจะไปแก้ไขโจทย์ได้'
-              : `แก้ไขโจทย์ ${questionLabel(q)}`}
-            size="2xs"
-            disabled={!q || !canEditQuestions || hasPendingChanges || leavingId !== null}
-            onClick={() => void editQuestion(id)}
-          >
-            <Edit2 className="w-3.5 h-3.5" />
-          </IconButton>
-        </span>
+        <IconButton
+          label={`ดูตัวอย่างโจทย์ ${questionLabel(q)}`}
+          size="2xs"
+          disabled={!q}
+          onClick={() => void openPreview(id)}
+          className="shrink-0"
+        >
+          <Eye className="w-3.5 h-3.5" />
+        </IconButton>
       </div>
     )
   }
@@ -862,7 +808,22 @@ function SectionDialog({
               ยังไม่มีโจทย์ในแฟ้มนี้ — ปิดหน้าต่างนี้แล้วกด “เพิ่มโจทย์จากคลัง” ก่อน
             </p>
           ) : (
-            <>
+            <div ref={questionListRef} className="max-h-72 overflow-y-auto space-y-2 pr-1 min-w-0">
+              {draftIds.length > 0 && (
+                <div className="space-y-1 min-w-0">
+                  <p className="px-1 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    อยู่ในแฟ้มย่อยนี้ ({draftIds.length} ข้อ)
+                  </p>
+                  <ul className="space-y-1 min-w-0">
+                    {draftIds.map(id => (
+                      <li key={`selected-${id}`} className="min-w-0">
+                        {questionRow(id, 'selected')}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {questionIds.length > 8 && (
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -870,30 +831,19 @@ function SectionDialog({
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     placeholder="ค้นหาโจทย์ในแฟ้มนี้..."
+                    aria-label="ค้นหาโจทย์ทั้งหมดในแฟ้มนี้"
                     className="pl-9"
                   />
                 </div>
               )}
 
+              <p className="px-1 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                โจทย์ทั้งหมด{term ? ` (${visibleIds.length} ข้อที่พบ)` : ''}
+              </p>
               {visibleIds.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-6 text-center">ไม่พบโจทย์ที่ตรงกัน</p>
               ) : (
-                <ul ref={questionListRef} className="max-h-72 overflow-y-auto space-y-1 pr-1 min-w-0">
-                  {selectedVisibleIds.length > 0 && (
-                    <>
-                      <li className="px-1 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                        อยู่ในแฟ้มย่อยนี้ ({selectedVisibleIds.length} ข้อ)
-                      </li>
-                      {selectedVisibleIds.map(id => (
-                        <li key={`selected-${id}`} className="min-w-0">
-                          {questionRow(id, 'selected')}
-                        </li>
-                      ))}
-                      <li className="px-1 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                        โจทย์ทั้งหมด
-                      </li>
-                    </>
-                  )}
+                <ul className="space-y-1 min-w-0">
                   {visibleIds.map(id => (
                     <li
                       key={`bank-${id}`}
@@ -908,16 +858,20 @@ function SectionDialog({
                   ))}
                 </ul>
               )}
-            </>
+            </div>
           )}
         </div>
 
         <DialogFooter className="min-w-0 sm:items-center sm:justify-between">
-          <span className="text-sm min-w-0">
+          <span className="flex items-center gap-2 text-sm min-w-0 flex-wrap">
+            {!isNew && onDelete && (
+              <Button type="button" variant="destructive" onClick={onDelete}>
+                <Trash2 data-icon="inline-start" aria-hidden="true" />
+                ลบแฟ้มย่อย
+              </Button>
+            )}
             {added.length === 0 && removed.length === 0 ? (
-              <span className="text-muted-foreground">
-                {isNew ? 'ตั้งชื่อแล้วติ๊กโจทย์ที่ต้องการ' : 'โจทย์ที่เอาออกจากแฟ้มย่อยจะยังอยู่ในแฟ้ม'}
-              </span>
+              isNew && <span className="text-muted-foreground">ตั้งชื่อแล้วติ๊กโจทย์ที่ต้องการ</span>
             ) : (
               <span className="flex items-center gap-2 flex-wrap">
                 {added.length > 0 && <span className="text-success font-medium">+ เพิ่ม {added.length} ข้อ</span>}

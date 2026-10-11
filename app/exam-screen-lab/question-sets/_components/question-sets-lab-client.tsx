@@ -99,6 +99,14 @@ const STRUCTURE_QUESTIONS: PanelQuestion[] = [
     difficulty: 'easy',
     tags: [],
   },
+  ...Array.from({ length: 6 }, (_, index): PanelQuestion => ({
+    id: `00000000-0000-4000-8000-${String(94 + index).padStart(12, '0')}`,
+    title: `โจทย์ค้นหาตัวอย่าง ${index + 1}`,
+    question_text: `<p>ข้อมูลจำลองสำหรับตรวจตำแหน่งและผลลัพธ์ของช่องค้นหา ลำดับ ${index + 1}</p>`,
+    question_type: 'written',
+    difficulty: 'medium',
+    tags: ['ค้นหา'],
+  })),
 ]
 
 const STRUCTURE_CARD_DATA: QuestionCardData = {
