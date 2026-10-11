@@ -36,6 +36,7 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -694,6 +695,39 @@ export function CreateAssignmentForm({
       : null
   const displayMaxInvalid = displayMaxScore.trim() !== '' && manualDisplayMax === null
   const automaticDisplayMax = randomDrawOn && !randomDrawInvalid ? questionsPerAttempt : null
+  const showQuestionDelivery = selectedIds.length > 0
+  const displayMaxScoreField = (
+    <Field data-invalid={displayMaxInvalid} className="gap-1.5">
+      <FieldLabel htmlFor="display-max-score">คะแนนเต็มที่แสดงผล</FieldLabel>
+      <div className="flex items-center gap-2">
+        <Input
+          id="display-max-score"
+          type="number"
+          min={0.1}
+          step="any"
+          value={displayMaxScore}
+          aria-describedby="display-max-score-description"
+          aria-invalid={displayMaxInvalid}
+          onChange={event => setDisplayMaxScore(event.target.value)}
+          placeholder={automaticDisplayMax !== null
+            ? `อัตโนมัติ (${automaticDisplayMax})`
+            : `ไม่ปรับ (${pointsSum})`}
+          className="w-32 sm:w-36"
+        />
+        <span className="text-sm text-muted-foreground">คะแนน</span>
+      </div>
+      <FieldDescription id="display-max-score-description" className="text-xs">
+        {automaticDisplayMax !== null
+          ? `เว้นว่างเพื่อใช้ ${automaticDisplayMax} คะแนนตามจำนวนข้อที่สุ่ม หรือกรอกค่าเพื่อปรับสเกลคะแนนรวม`
+          : `เว้นว่างเพื่อใช้คะแนนจริงรวม ${pointsSum} คะแนน หรือกรอกค่าที่ต้องการให้แสดง`}
+      </FieldDescription>
+      {displayMaxInvalid && (
+        <FieldError className="text-xs">
+          กรอกคะแนนเต็มที่มากกว่า 0 หรือเว้นว่างเพื่อใช้ค่าอัตโนมัติ
+        </FieldError>
+      )}
+    </Field>
+  )
 
   function canNext() {
     if (step === 0) {
@@ -1188,8 +1222,8 @@ export function CreateAssignmentForm({
 
           </Card>
 
-          {(canDrawRandomSubset || randomQuestionCount.trim() !== '') && (
-            <Card padding="md" className="space-y-3">
+          {showQuestionDelivery && (
+            <Card padding="md" className="flex flex-col gap-3">
               <div>
                 <h2 className="text-sm font-semibold text-foreground">ชุดโจทย์ที่นักเรียนได้รับ</h2>
                 <p data-assignment-description className="text-xs text-muted-foreground">
@@ -1231,77 +1265,54 @@ export function CreateAssignmentForm({
                 </button>
               </div>
 
+              <Separator />
+
               {randomDrawOn && (
-                <div className="space-y-3 rounded-xl border border-border p-4">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Label htmlFor="random-question-count" className="text-sm text-muted-foreground">
-                      ให้นักเรียนทำ
-                    </Label>
-                    <Input
-                      id="random-question-count"
-                      type="number"
-                      min={1}
-                      max={maxRandomDraw}
-                      value={randomQuestionCount}
-                      onChange={event => {
-                        const nextValue = event.target.value
-                        setRandomQuestionCount(nextValue)
-                        if (nextValue.trim() === '' && completionRule === 'streak') {
-                          setCompletionRule('fixed')
-                          setPassingEnabled(false)
-                        }
-                      }}
-                      className="max-w-[110px]"
-                    />
-                    <span className="text-sm text-muted-foreground">
-                      ข้อ จากคลัง {selectedIds.length} ข้อ
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    ระบบคิดคะแนนตามจำนวนข้อที่ตอบถูก โดยโจทย์ทุกข้อมีค่า 1 คะแนน
-                    คะแนนเต็มจึงเท่ากับจำนวนข้อที่สุ่มให้นักเรียนทำ
-                  </p>
-                  <p data-assignment-description className="text-xs text-muted-foreground">
-                    ชุดที่สุ่มได้จะถูกตรึงไว้ตลอดรอบนั้น — ปิดหน้าจอแล้วกลับมาทำต่อได้ชุดเดิม ส่วนรอบใหม่สุ่มชุดใหม่
-                  </p>
-                </div>
+                <FieldGroup className="grid gap-3 sm:grid-cols-2">
+                  <Field className="gap-1.5">
+                    <FieldLabel htmlFor="random-question-count">ให้นักเรียนทำ</FieldLabel>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Input
+                        id="random-question-count"
+                        type="number"
+                        min={1}
+                        max={maxRandomDraw}
+                        value={randomQuestionCount}
+                        onChange={event => {
+                          const nextValue = event.target.value
+                          setRandomQuestionCount(nextValue)
+                          if (nextValue.trim() === '' && completionRule === 'streak') {
+                            setCompletionRule('fixed')
+                            setPassingEnabled(false)
+                          }
+                        }}
+                        className="w-20"
+                      />
+                      <span className="text-sm text-muted-foreground">
+                        ข้อ จากคลัง {selectedIds.length} ข้อ
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      ทุกข้อมีค่า 1 คะแนน และคิดคะแนนตามจำนวนข้อที่ตอบถูก
+                    </p>
+                  </Field>
+                  {displayMaxScoreField}
+                </FieldGroup>
+              )}
+
+              {!randomDrawOn && (
+                <FieldGroup className="max-w-md">
+                  {displayMaxScoreField}
+                </FieldGroup>
+              )}
+
+              {randomDrawOn && (
+                <p data-assignment-description className="text-xs text-muted-foreground">
+                  ชุดที่สุ่มได้จะถูกตรึงไว้ตลอดรอบนั้น — ปิดหน้าจอแล้วกลับมาทำต่อได้ชุดเดิม ส่วนรอบใหม่สุ่มชุดใหม่
+                </p>
               )}
             </Card>
           )}
-
-          <Card radius="md" padding="sm" className="space-y-2.5">
-            <div>
-              <h2 className="text-sm font-semibold text-foreground">คะแนนเต็มที่แสดงผล</h2>
-              <p id="display-max-score-description" data-assignment-description className="text-xs text-muted-foreground">
-                {automaticDisplayMax !== null
-                  ? `เว้นว่างเพื่อใช้คะแนนเต็ม ${automaticDisplayMax} คะแนนตามจำนวนข้อที่สุ่ม หรือกรอกคะแนนเต็มที่ต้องการเพื่อปรับสเกลคะแนนรวม`
-                  : `เว้นว่างเพื่อใช้คะแนนจริงรวม ${pointsSum} คะแนน หรือกรอกคะแนนเต็มที่ต้องการให้แสดง`}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Input
-                id="display-max-score"
-                type="number"
-                min={0.1}
-                step="any"
-                value={displayMaxScore}
-                aria-label="คะแนนเต็มที่แสดงผล"
-                aria-describedby="display-max-score-description"
-                aria-invalid={displayMaxInvalid}
-                onChange={event => setDisplayMaxScore(event.target.value)}
-                placeholder={automaticDisplayMax !== null
-                  ? `อัตโนมัติ (${automaticDisplayMax})`
-                  : `ไม่ปรับ (${pointsSum})`}
-                className="max-w-[200px]"
-              />
-              <span className="text-sm text-muted-foreground">คะแนน</span>
-            </div>
-            {displayMaxInvalid && (
-              <p role="alert" className="text-xs text-destructive">
-                กรอกคะแนนเต็มที่มากกว่า 0 หรือเว้นว่างเพื่อใช้ค่าอัตโนมัติ
-              </p>
-            )}
-          </Card>
 
           <Card radius="md" padding="sm" className="space-y-2.5">
             <div>
