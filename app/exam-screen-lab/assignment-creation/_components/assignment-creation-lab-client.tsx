@@ -20,13 +20,8 @@ const questions: AssignmentQuestionOption[] = [1, 2, 3].map(i => ({
 }))
 
 export function AssignmentCreationLabClient({ contextual, type }: { contextual: boolean; type: AssignmentType }) {
-  const [savedSetName, setSavedSetName] = useState('')
   const [receivedAssignment, setReceivedAssignment] = useState('')
   const actions = useMemo<NonNullable<ComponentProps<typeof CreateAssignmentForm>['actions']>>(() => ({
-    async createQuestionSet(data) {
-      setSavedSetName(data.title)
-      return { id: '00000000-0000-4000-8200-000000000001' }
-    },
     async createAssignment(data) {
       setReceivedAssignment(`${data.title} · ${data.classroom_ids?.length ?? 0} ห้อง · ${data.random_question_count ?? 'ทุก'} ข้อ · จำนวนครั้ง: ${data.max_attempts ?? 'ไม่จำกัด'} · คะแนน: ${data.score_strategy} · จบ: ${data.completion_rule} · เกณฑ์: ${data.passing_value ?? 'ไม่มี'}`)
       return { error: '(ห้องทดลอง) รับข้อมูลแล้ว ไม่มีการบันทึกฐานข้อมูล' }
@@ -76,10 +71,9 @@ export function AssignmentCreationLabClient({ contextual, type }: { contextual: 
         preselectedAssignmentType={type}
         actions={actions}
       />
-      {(savedSetName || receivedAssignment) && (
+      {receivedAssignment && (
         <Card padding="md" className="space-y-2">
           <p className="text-sm font-semibold">ข้อมูลที่รับในหน่วยความจำ (จำลอง)</p>
-          <output aria-label="ชื่อแฟ้มที่รับ">{savedSetName}</output>
           <output aria-label="งานที่รับ" className="block">{receivedAssignment}</output>
         </Card>
       )}

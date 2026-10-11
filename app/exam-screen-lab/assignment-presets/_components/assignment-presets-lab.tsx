@@ -128,7 +128,6 @@ export function AssignmentPresetsLab() {
   }, [])
 
   const assignmentActions = useMemo<NonNullable<ComponentProps<typeof CreateAssignmentForm>['actions']>>(() => ({
-    async createQuestionSet() { return { error: '(จำลอง) ไม่บันทึกแฟ้มในฐานข้อมูล' } },
     async createAssignment(input) {
       setCaptured(JSON.stringify(input, null, 2))
       return { error: '(จำลอง) รับข้อมูลแล้ว ไม่มีการมอบหมายหรือบันทึกฐานข้อมูล' }

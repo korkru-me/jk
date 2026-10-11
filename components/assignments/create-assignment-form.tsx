@@ -14,7 +14,6 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { createAssignment } from '@/lib/actions/assignments'
-import { createQuestionSet } from '@/lib/actions/question-sets'
 import { assignmentCopyTitle, assignmentCreationTitle } from '@/lib/assignment-creation'
 import {
   assignmentPresetDefaults, type AssignmentPresetBootstrap, type AssignmentPresetSettings,
@@ -191,7 +190,6 @@ interface Props {
   presetActions?: AssignmentPresetActions
   /** Local QA can capture submissions without writing synthetic data. */
   actions?: {
-    createQuestionSet: typeof createQuestionSet
     createAssignment: typeof createAssignment
     getQuestionPreviewDetails?: typeof getQuestionPreviewDetails
   }
@@ -257,11 +255,6 @@ export function CreateAssignmentForm({
   // every เติมคำตอบตัวเลข answer carries a photo, and a งาน that starts out
   // able to block students is not a safe default.
   const [requireWorkImage, setRequireWorkImage] = useState(copySource?.require_work_image ?? initialSettings.require_work_image)
-  // When not starting from an existing set, offer to save the picked
-  // questions back into the library as a new reusable set.
-  const [saveAsSet, setSaveAsSet] = useState(false)
-  const [questionSetTitle, setQuestionSetTitle] = useState('')
-
   // Step 1 (continued) — filter out any question_ids that no longer resolve to a real
   // question (e.g. deleted since the set was saved). Otherwise a dangling id
   // sails through into selectedIds, gets silently dropped later by
@@ -708,7 +701,7 @@ export function CreateAssignmentForm({
     if (step === 0) {
       return title.trim().length > 0 && classroomIds.length > 0 && classrooms.length > 0
         && groupTargetsComplete(groupTargets, preselectedClassroomId ? [preselectedClassroomId] : classroomIds)
-        && selectedIds.length > 0 && (!saveAsSet || questionSetTitle.trim().length > 0)
+        && selectedIds.length > 0
         && !(streakOn && (!streakAvailable || streakBlocked))
         && !randomDrawInvalid && !displayMaxInvalid
     }
@@ -772,33 +765,12 @@ export function CreateAssignmentForm({
       setStep(0)
       return
     }
-    if (!preselectedSet && saveAsSet && !questionSetTitle.trim()) {
-      toast.error('กรุณากรอกชื่อแฟ้มโจทย์')
-      setStep(0)
-      return
-    }
     if (!groupTargetsComplete(groupTargets, classroomIds)) {
       toast.error('กรุณาเลือกกลุ่มนักเรียนที่ต้องการมอบหมายให้ครบทุกห้อง')
       setStep(2)
       return
     }
     startTransition(async () => {
-      let setId = preselectedSet?.id
-
-      if (!preselectedSet && saveAsSet) {
-        const setRes = await (actions?.createQuestionSet ?? createQuestionSet)({
-          title: questionSetTitle.trim(),
-          description: description.trim(),
-          question_ids: selectedIds,
-          visibility: 'private',
-        })
-        if ('error' in setRes) {
-          toast.error(`บันทึกแฟ้มโจทย์ลงคลังไม่สำเร็จ: ${setRes.error} (จะมอบหมายต่อโดยไม่บันทึกลงคลัง)`)
-        } else {
-          setId = setRes.id
-        }
-      }
-
       // Every question gets an explicit point value — its own structural value
       // unless the teacher edited it, and 1 for invalid input.
       const questionPoints = Object.fromEntries(
@@ -833,7 +805,7 @@ export function CreateAssignmentForm({
         show_sections: showSections,
         question_points: questionPoints,
         display_max_score: displayMax,
-        set_id: setId,
+        set_id: preselectedSet?.id,
         start_at: thaiLocalDateTimeToIso(effectiveStartAt),
         due_at: thaiLocalDateTimeToIso(dueAt),
         late_bands: lateBands.map(band => ({
@@ -1208,31 +1180,6 @@ export function CreateAssignmentForm({
               </div>
             </div>
 
-            {!preselectedSet && (
-              <>
-                <label className="flex min-h-10 cursor-pointer items-center justify-between gap-3 rounded-xl border border-border px-3 py-2">
-                  <p className="min-w-0 text-sm font-medium text-foreground">บันทึกโจทย์ที่เลือกไว้ในแฟ้มเพื่อใช้ซ้ำ</p>
-                  <input
-                    type="checkbox"
-                    checked={saveAsSet}
-                    onChange={event => setSaveAsSet(event.target.checked)}
-                    className="size-4 shrink-0 accent-primary"
-                  />
-                </label>
-                {saveAsSet && (
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="question-set-title">ชื่อแฟ้มโจทย์ <span className="text-destructive">*</span></Label>
-                    <Input
-                      id="question-set-title"
-                      value={questionSetTitle}
-                      onChange={event => setQuestionSetTitle(event.target.value)}
-                      placeholder="เช่น แฟ้มโจทย์เรื่องแรงและการเคลื่อนที่"
-                      required
-                    />
-                  </div>
-                )}
-              </>
-            )}
           </Card>
 
           {(canDrawRandomSubset || randomQuestionCount.trim() !== '') && (
