@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useId, useRef, useState, useTransition, type ReactNode } from 'react'
 import type { DialogRootChangeEventDetails } from '@base-ui/react/dialog'
-import { BookmarkPlus, ChevronDown, RotateCcw, Star, Trash2 } from 'lucide-react'
+import { BookmarkPlus, Check, ChevronDown, Star, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   assignmentPresetDefaults, assignmentPresetSettingsSchema, ASSIGNMENT_PRESET_LIMIT,
@@ -25,12 +25,14 @@ import {
 } from '@/components/ui/collapsible'
 import { ConfirmDialog, useConfirm } from '@/components/ui/confirm-dialog'
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter,
+  Dialog, DialogContent, DialogFooter,
   DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/native-select'
+import { Toggle } from '@/components/ui/toggle'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 
 export interface AssignmentPresetActions {
   save: typeof saveAssignmentSettingPreset
@@ -124,7 +126,8 @@ export function AssignmentSettingPresetsProvider({
     isCopy ? null : bootstrap?.defaultPresetId ?? null,
   )
   // A save destination is not a recalled source: choosing it must not apply settings.
-  const [saveTargetId, setSaveTargetId] = useState<string | null>(null)
+  const [saveSlot, setSaveSlot] = useState<number | null>(null)
+  const [saveAsDefault, setSaveAsDefault] = useState(false)
   const [currentOrigin, setCurrentOrigin] = useState<'copy' | 'current' | null>(isCopy ? 'copy' : null)
   const [baseline, setBaseline] = useState(settings)
   const [error, setError] = useState<string | null>(data.error)
@@ -139,9 +142,13 @@ export function AssignmentSettingPresetsProvider({
   const saveTriggerRef = useRef<HTMLButtonElement>(null)
   const [confirm, confirmation] = useConfirm()
   const selected = data.presets.find(preset => preset.id === selectedId) ?? null
-  const saveTarget = data.presets.find(preset => preset.id === saveTargetId) ?? null
+  const saveTarget = data.presets.find(preset => preset.slot === saveSlot) ?? null
+  const nextAvailableSlot = Array.from({ length: ASSIGNMENT_PRESET_LIMIT }, (_, index) => index + 1)
+    .find(slot => !data.presets.some(preset => preset.slot === slot)) ?? null
   const saveTargetDirty = saveTarget !== null && changedKeys(settings, saveTarget.settings).length > 0
   const saveTargetNameDirty = saveTarget !== null && name.trim() !== saveTarget.name
+  const saveTargetDefaultDirty = saveSlot !== null
+    && saveAsDefault !== (saveTarget !== null && data.defaultPresetId === saveTarget.id)
   const dirty = changedKeys(settings, baseline).length > 0
   const busy = disabled || isPending
   const unavailable = data.error !== null || needsReload
@@ -154,11 +161,39 @@ export function AssignmentSettingPresetsProvider({
         ? `${selected.name}${data.defaultPresetId === selected.id ? ' · ค่าเริ่มต้น' : ''}`
         : `ค่าระบบ${data.defaultPresetId === null ? ' · ค่าเริ่มต้น' : ''}`
 
+  function reconcileLoadedData(next: AssignmentPresetBootstrap) {
+    setData(next)
+    if (selectedId && !next.presets.some(preset => preset.id === selectedId)) {
+      setSelectedId(null)
+      setCurrentOrigin('current')
+    }
+    if (saveSlot !== null) {
+      const refreshedTarget = next.presets.find(preset => preset.slot === saveSlot)
+      if (!refreshedTarget && saveSlot !== nextAvailableSlot) {
+        setSaveSlot(null)
+        setName('')
+        setSaveAsDefault(false)
+      }
+    }
+  }
+
+  async function refreshAfterError(message: string) {
+    setError(message)
+    setNeedsReload(true)
+    try {
+      const refreshed = await actions.load(type)
+      if ('error' in refreshed || refreshed.data.error) return
+      reconcileLoadedData(refreshed.data)
+      setNeedsReload(false)
+    } catch {
+      // Keep the draft and the explicit error. A later open retries automatically.
+    }
+  }
+
   function run(
     operation: () => Promise<AssignmentPresetActionResult>,
     successMessage: string,
     after?: (next: AssignmentPresetBootstrap) => void,
-    isReload = false,
   ) {
     if (busy || busyRef.current) return
     busyRef.current = true
@@ -166,15 +201,14 @@ export function AssignmentSettingPresetsProvider({
     startTransition(async () => {
       try {
         const result = await operation()
-        if ('error' in result) { setError(result.error); setNeedsReload(true); return }
-        if (result.data.error) { setData(result.data); setError(result.data.error); setNeedsReload(true); return }
-        setData(result.data)
-        if (isReload) setNeedsReload(false)
+        if ('error' in result) { await refreshAfterError(result.error); return }
+        if (result.data.error) { await refreshAfterError(result.data.error); return }
+        reconcileLoadedData(result.data)
+        setNeedsReload(false)
         after?.(result.data)
         if (successMessage) toast.success(successMessage)
       } catch {
-        setError('เชื่อมต่อไม่สำเร็จ ผลการบันทึกยังไม่ยืนยัน ข้อมูลที่กรอกยังอยู่ กรุณาโหลดรายการใหม่ก่อนลองบันทึกซ้ำ')
-        setNeedsReload(true)
+        await refreshAfterError('เชื่อมต่อไม่สำเร็จ ผลการบันทึกยังไม่ยืนยัน ข้อมูลที่กรอกยังอยู่ กรุณารอสักครู่แล้วลองอีกครั้ง')
       } finally {
         busyRef.current = false
       }
@@ -184,7 +218,10 @@ export function AssignmentSettingPresetsProvider({
   async function applySelection(nextId: string | null) {
     if (busy || unavailable) return
     const preset = nextId ? data.presets.find(item => item.id === nextId) : null
-    if (nextId && !preset) { setError('ไม่พบชุดนี้ กรุณาโหลดรายการใหม่'); return }
+    if (nextId && !preset) {
+      void refreshAfterError('ไม่พบชุดการตั้งค่านี้ ระบบกำลังตรวจสอบข้อมูลล่าสุด กรุณาลองอีกครั้ง')
+      return
+    }
     const next = preset?.settings ?? assignmentPresetDefaults(type)
     const keys = changedKeys(settings, next)
     if (dirty && keys.length > 0) {
@@ -204,7 +241,8 @@ export function AssignmentSettingPresetsProvider({
     }
     onApply(next)
     setSelectedId(nextId)
-    setSaveTargetId(null)
+    setSaveSlot(null)
+    setSaveAsDefault(false)
     setCurrentOrigin(null)
     setBaseline(next)
     setError(null)
@@ -219,10 +257,11 @@ export function AssignmentSettingPresetsProvider({
     return parsed.data
   }
 
-  function selectSaveTarget(nextId: string | null) {
-    const preset = nextId ? data.presets.find(item => item.id === nextId) ?? null : null
-    setSaveTargetId(preset?.id ?? null)
+  function selectSaveSlot(slot: number) {
+    const preset = data.presets.find(item => item.slot === slot) ?? null
+    setSaveSlot(slot)
     setName(preset?.name ?? '')
+    setSaveAsDefault(preset !== null && data.defaultPresetId === preset.id)
     setNameError(null)
     setError(null)
   }
@@ -238,11 +277,12 @@ export function AssignmentSettingPresetsProvider({
       return
     }
     if (open) {
-      const preset = data.presets.find(item => item.id === saveTargetId) ?? null
-      if (saveTargetId && !preset) setSaveTargetId(null)
-      setName(preset?.name ?? '')
+      setSaveSlot(null)
+      setName('')
+      setSaveAsDefault(false)
       setNameError(null)
       setConfirmingClose(false)
+      if (unavailable) void refreshAfterError(error ?? 'ยังตรวจสอบชุดการตั้งค่าล่าสุดไม่ได้ กรุณารอสักครู่แล้วลองอีกครั้ง')
     }
     setSaveDialogOpen(open)
   }
@@ -264,52 +304,50 @@ export function AssignmentSettingPresetsProvider({
     return cleanName
   }
 
-  function submitSave() {
+  async function saveSelectedSlot() {
     const cleanName = validatedName()
-    if (!cleanName) return
-    if (saveTarget) {
-      if (!saveTargetNameDirty) return
-      const keepOpen = saveTargetDirty
-      run(() => actions.rename({
-        type, id: saveTarget.id, expectedRevision: saveTarget.revision, name: cleanName,
-      }), 'เปลี่ยนชื่อชุดแล้ว', next => {
-        const updated = next.presets.find(preset => preset.id === saveTarget.id)
-        setName(updated?.name ?? cleanName)
-        if (!keepOpen) setSaveDialogOpen(false)
-      })
-      return
-    }
+    if (!cleanName || saveSlot === null) return
     const snapshot = validatedSettings()
     if (!snapshot) return
-    if (data.presets.length >= ASSIGNMENT_PRESET_LIMIT) return
-    run(() => actions.save({ type, name: cleanName, settings: snapshot }), 'บันทึกชุดการตั้งค่าแล้ว', next => {
-      const created = next.presets.find(preset => !data.presets.some(old => old.id === preset.id))
-      setSelectedId(created?.id ?? null)
-      setSaveTargetId(created?.id ?? null)
-      setName(created?.name ?? cleanName)
+    if (!saveTarget && saveSlot !== nextAvailableSlot) return
+    if (saveTarget && !(await confirm({
+      title: `บันทึกทับช่องที่ ${saveTarget.slot}?`,
+      description: `ชื่อและการตั้งค่าในชุด “${saveTarget.name}” จะถูกแทนที่ งานที่สร้างไปแล้ว โจทย์ และคะแนนนักเรียนจะไม่เปลี่ยนแปลง`,
+      confirmLabel: 'บันทึกทับช่องนี้',
+    }))) return
+
+    run(async () => {
+      let result: AssignmentPresetActionResult = saveTarget
+        ? await actions.save({
+          type, id: saveTarget.id, expectedRevision: saveTarget.revision,
+          name: cleanName, settings: snapshot,
+        })
+        : await actions.save({ type, name: cleanName, settings: snapshot })
+      if ('error' in result || result.data.error) return result
+
+      const saved = saveTarget
+        ? result.data.presets.find(preset => preset.id === saveTarget.id)
+        : result.data.presets.find(preset => !data.presets.some(old => old.id === preset.id))
+      if (!saved) return { error: 'บันทึกแล้ว แต่ยังยืนยันช่องบันทึกไม่ได้ ระบบกำลังตรวจสอบข้อมูลล่าสุด' }
+
+      if (saveAsDefault && result.data.defaultPresetId !== saved.id) {
+        result = await actions.setDefault({ type, id: saved.id, expectedRevision: saved.revision })
+      } else if (!saveAsDefault && result.data.defaultPresetId === saved.id) {
+        result = await actions.setDefault({ type, id: null })
+      }
+      return result
+    }, `บันทึกการตั้งค่าในช่องที่ ${saveSlot} แล้ว`, next => {
+      const saved = saveTarget
+        ? next.presets.find(preset => preset.id === saveTarget.id)
+        : next.presets.find(preset => !data.presets.some(old => old.id === preset.id))
+      setSelectedId(saved?.id ?? selectedId)
+      setSaveSlot(saved?.slot ?? saveSlot)
+      setName(saved?.name ?? cleanName)
+      setSaveAsDefault(saved ? next.defaultPresetId === saved.id : saveAsDefault)
       setCurrentOrigin(null)
       setBaseline(snapshot)
       setSaveDialogOpen(false)
     })
-  }
-
-  async function updateSaveTarget() {
-    if (busy || unavailable || !saveTarget || !saveTargetDirty) return
-    const snapshot = validatedSettings()
-    if (!snapshot) return
-    const keepOpen = saveTargetNameDirty
-    if (!(await confirm({
-      title: `อัปเดตชุด “${saveTarget.name}”?`,
-      description: 'แทนการตั้งค่าในชุดนี้ด้วยค่าที่กรอกอยู่ โดยไม่เปลี่ยนชื่อชุด งานเดิมที่สร้างไปแล้ว โจทย์ และคะแนนนักเรียนไม่เปลี่ยน',
-      confirmLabel: 'อัปเดตการตั้งค่า',
-    }))) return
-    run(() => actions.save({ type, id: saveTarget.id, expectedRevision: saveTarget.revision,
-      name: saveTarget.name, settings: snapshot }), 'อัปเดตชุดการตั้งค่าแล้ว', () => {
-        setSelectedId(saveTarget.id)
-        setCurrentOrigin(null)
-        setBaseline(snapshot)
-        if (!keepOpen) setSaveDialogOpen(false)
-      })
   }
 
   async function removeSelected(preset: AssignmentSettingPreset) {
@@ -319,26 +357,15 @@ export function AssignmentSettingPresetsProvider({
       confirmLabel: 'ลบชุดการตั้งค่า', variant: 'destructive',
     }))) return
     run(() => actions.delete({ type, id: preset.id, expectedRevision: preset.revision }), 'ลบชุดการตั้งค่าแล้ว', () => {
-      setSaveTargetId(null)
+      setSaveSlot(preset.slot)
       setName('')
+      setSaveAsDefault(false)
       if (selectedId === preset.id) { setSelectedId(null); setCurrentOrigin('current') }
     })
   }
 
-  function reload() {
-    run(() => actions.load(type), 'โหลดรายการแล้ว', next => {
-      // Refresh metadata only, never replace the current assignment draft.
-      if (selectedId && !next.presets.some(preset => preset.id === selectedId)) { setSelectedId(null); setCurrentOrigin('current') }
-      if (saveTargetId) {
-        const refreshedTarget = next.presets.find(preset => preset.id === saveTargetId)
-        if (refreshedTarget) setName(refreshedTarget.name)
-        else { setSaveTargetId(null); setName('') }
-      }
-    }, true)
-  }
-
   const status = <>
-    {isPending && <p role="status" className="text-sm text-muted-foreground">กำลังบันทึกหรือโหลดชุดการตั้งค่า…</p>}
+    {isPending && <p role="status" className="text-sm text-muted-foreground">กำลังดำเนินการกับชุดการตั้งค่า…</p>}
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
   </>
 
@@ -370,11 +397,6 @@ export function AssignmentSettingPresetsProvider({
             </FieldGroup>
             {currentOrigin === 'copy' && <p data-assignment-description className="text-sm text-muted-foreground">สำเนาใช้การตั้งค่าจากงานต้นฉบับ ไม่โหลดชุดเริ่มต้นทับ</p>}
             {dirty && <p data-assignment-description className="text-sm text-muted-foreground" role="status">ปรับการตั้งค่าสำหรับงานนี้แล้ว · ชุดที่บันทึกไว้ยังไม่เปลี่ยน</p>}
-            <div className="flex flex-wrap gap-2">
-              {selected && <Button type="button" variant="outline" size="sm" disabled={busy || unavailable} onClick={() => void applySelection(selected.id)}><RotateCcw data-icon="inline-start" />เรียกชุดนี้อีกครั้ง</Button>}
-              <Button type="button" variant="outline" size="sm" disabled={busy || unavailable} onClick={() => void applySelection(null)}><RotateCcw data-icon="inline-start" />ใช้ค่าระบบ</Button>
-              <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={reload}>โหลดรายการใหม่</Button>
-            </div>
             {status}
           </div>
         </CollapsibleContent>
@@ -400,66 +422,79 @@ export function AssignmentSettingPresetsProvider({
                 <DialogTitle>บันทึกการตั้งค่าไว้ใช้ครั้งต่อไป</DialogTitle>
                 {!unavailable && <Badge variant="secondary" className="shrink-0">{data.presets.length}/{ASSIGNMENT_PRESET_LIMIT} ชุด</Badge>}
               </div>
-              <DialogDescription>เก็บเฉพาะการตั้งค่า{typeLabel}ในบัญชีของคุณ ไม่เก็บชื่องาน โจทย์ คะแนนรายข้อ ผู้รับ กำหนดการ หรือรหัสผ่าน และยังไม่บันทึกหรือสร้างงานนี้</DialogDescription>
             </DialogHeader>
-            <form onSubmit={event => { event.preventDefault(); void submitSave() }} className="flex flex-col gap-4">
+            <form onSubmit={event => { event.preventDefault(); void saveSelectedSlot() }} className="flex flex-col gap-4">
               <FieldGroup className="gap-4">
                 <Field data-disabled={busy || unavailable}>
-                  <FieldLabel htmlFor={`${id}-save-target`}>บันทึกเป็น</FieldLabel>
-                  <NativeSelect id={`${id}-save-target`} value={saveTargetId ?? '__new'} disabled={busy || unavailable}
-                    onChange={event => selectSaveTarget(event.target.value === '__new' ? null : event.target.value)}>
-                    <option value="__new">ชุดใหม่</option>
-                    {data.presets.map(preset => <option key={preset.id} value={preset.id}>{preset.name}{data.defaultPresetId === preset.id ? ' · ค่าเริ่มต้น' : ''}</option>)}
-                  </NativeSelect>
-                  <FieldDescription>เลือกชุดเดิมเพื่ออัปเดตจากค่าที่กรอกอยู่ การเลือกตรงนี้ไม่เรียกค่าเก่ามาทับแบบร่าง</FieldDescription>
+                  <FieldLabel id={`${id}-slot-label`}>เลือกช่องบันทึก</FieldLabel>
+                  <ToggleGroup
+                    value={saveSlot === null ? [] : [String(saveSlot)]}
+                    onValueChange={values => {
+                      const slot = Number(values[0])
+                      if (Number.isInteger(slot)) selectSaveSlot(slot)
+                    }}
+                    disabled={busy || unavailable}
+                    variant="outline"
+                    aria-labelledby={`${id}-slot-label`}
+                    className="grid w-full grid-cols-1 gap-2 sm:grid-cols-3"
+                  >
+                    {Array.from({ length: ASSIGNMENT_PRESET_LIMIT }, (_, index) => index + 1).map(slot => {
+                      const preset = data.presets.find(item => item.slot === slot) ?? null
+                      const isAvailable = preset !== null || slot === nextAvailableSlot
+                      const isDefault = preset !== null && data.defaultPresetId === preset.id
+                      return (
+                        <ToggleGroupItem
+                          key={slot}
+                          value={String(slot)}
+                          disabled={!isAvailable}
+                          aria-label={preset
+                            ? `ช่องที่ ${slot} ${preset.name}${isDefault ? ' ค่าเริ่มต้น' : ''}`
+                            : `ช่องที่ ${slot} ว่าง`}
+                          className="h-auto min-h-14 w-full min-w-0 items-center justify-start whitespace-normal rounded-xl border-border px-3 py-2 text-left aria-pressed:border-primary/30 aria-pressed:bg-primary/10 aria-pressed:text-foreground data-[state=on]:border-primary/30 data-[state=on]:bg-primary/10 data-[state=on]:text-foreground"
+                        >
+                          <span className="flex w-full min-w-0 items-center justify-between gap-2">
+                            <span className="flex min-w-0 flex-col items-start gap-0.5">
+                              <span className="text-[11px] leading-none text-muted-foreground">ช่องที่ {slot}</span>
+                              <span className="max-w-full truncate text-sm font-medium leading-tight text-foreground">{preset?.name ?? 'ว่าง'}</span>
+                            </span>
+                            {isDefault
+                              ? <Star className="shrink-0 fill-current text-primary" aria-label="ค่าเริ่มต้น" />
+                              : saveSlot === slot && <Check className="shrink-0 text-primary" aria-hidden="true" />}
+                          </span>
+                        </ToggleGroupItem>
+                      )
+                    })}
+                  </ToggleGroup>
                 </Field>
-                <Field data-invalid={nameError !== null}
-                  data-disabled={busy || unavailable || (!saveTarget && data.presets.length >= ASSIGNMENT_PRESET_LIMIT)}>
-                  <FieldLabel htmlFor={`${id}-name`}>ชื่อชุดการตั้งค่า</FieldLabel>
-                  <Input id={`${id}-name`} value={name} maxLength={60} autoFocus
-                    disabled={busy || unavailable || (!saveTarget && data.presets.length >= ASSIGNMENT_PRESET_LIMIT)}
-                    aria-invalid={nameError !== null}
-                    onChange={event => { setName(event.target.value); setNameError(null) }} placeholder="เช่น ฝึกทีละข้อ หรือสอบกลางภาค" />
-                  <FieldDescription>{saveTarget ? 'บันทึกชื่อใหม่ได้โดยไม่เปลี่ยนค่าภายในชุด ส่วนการอัปเดตการตั้งค่าใช้คำสั่งแยกด้านล่าง' : 'ตั้งชื่อที่ช่วยให้ค้นหาและเรียกใช้การตั้งค่านี้ได้ง่ายในครั้งต่อไป'}</FieldDescription>
-                  <FieldError>{nameError}</FieldError>
-                </Field>
-              </FieldGroup>
-              <div className="flex flex-wrap gap-2">
-                {saveTarget && <>
-                  <Button type="button" variant="outline" size="sm" disabled={busy || unavailable || data.defaultPresetId === saveTarget.id}
-                    onClick={() => run(() => actions.setDefault({ type, id: saveTarget.id, expectedRevision: saveTarget.revision }), 'ตั้งเป็นค่าเริ่มต้นสำหรับงานใหม่แล้ว')}>
-                    <Star data-icon="inline-start" />ตั้งเป็นค่าเริ่มต้น
-                  </Button>
-                  <Button type="button" variant="outline" size="sm" disabled={busy || unavailable} onClick={() => void removeSelected(saveTarget)}>
-                    <Trash2 data-icon="inline-start" />ลบชุด
-                  </Button>
+                {saveSlot !== null && <>
+                  <Field data-invalid={nameError !== null} data-disabled={busy || unavailable}>
+                    <FieldLabel htmlFor={`${id}-name`}>ชื่อชุดการตั้งค่า</FieldLabel>
+                    <Input id={`${id}-name`} value={name} maxLength={60} autoFocus
+                      disabled={busy || unavailable}
+                      aria-invalid={nameError !== null}
+                      onChange={event => { setName(event.target.value); setNameError(null) }} placeholder="เช่น ฝึกทีละข้อ หรือสอบกลางภาค" />
+                    <FieldError>{nameError}</FieldError>
+                  </Field>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Toggle type="button" variant="primary" pressed={saveAsDefault}
+                      disabled={busy || unavailable} onPressedChange={setSaveAsDefault}>
+                      <Star data-icon="inline-start" />
+                      ตั้งเป็นค่าเริ่มต้น
+                    </Toggle>
+                    {saveTarget && <Button type="button" variant="outline" size="sm" disabled={busy || unavailable}
+                      onClick={() => void removeSelected(saveTarget)}>
+                      <Trash2 data-icon="inline-start" />ลบชุด
+                    </Button>}
+                  </div>
                 </>}
-                {data.defaultPresetId !== null && <Button type="button" variant="outline" size="sm" disabled={busy || unavailable}
-                  onClick={() => run(() => actions.setDefault({ type, id: null }), 'ใช้ค่าระบบเป็นค่าเริ่มต้นสำหรับงานใหม่แล้ว')}>
-                  <Star data-icon="inline-start" />ใช้ค่าระบบเป็นค่าเริ่มต้น
-                </Button>}
-                <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={reload}>โหลดรายการใหม่</Button>
-              </div>
-              {!unavailable && !saveTarget && data.presets.length >= ASSIGNMENT_PRESET_LIMIT && (
-                <p className="text-sm text-muted-foreground">ครบ {ASSIGNMENT_PRESET_LIMIT} ชุดแล้ว กรุณาเลือกอัปเดตชุดเดิม หรือลบชุดที่ไม่ใช้ก่อนบันทึกชุดใหม่ ระบบจะไม่ลบชุดให้โดยอัตโนมัติ</p>
-              )}
+              </FieldGroup>
               {status}
-              {needsReload && <Button type="button" variant="outline" disabled={isPending} onClick={reload}>โหลดรายการก่อนลองใหม่</Button>}
               <DialogFooter>
                 <Button type="button" variant="outline" disabled={isPending} onClick={() => setSaveDialogOpen(false)}>ยกเลิก</Button>
-                {saveTarget ? <>
-                  <Button type="submit" variant="outline" disabled={busy || unavailable || !name.trim() || !saveTargetNameDirty}>
-                    {isPending ? 'กำลังบันทึก…' : 'บันทึกชื่อใหม่'}
-                  </Button>
-                  <Button type="button" disabled={busy || unavailable || !saveTargetDirty} onClick={() => void updateSaveTarget()}>
-                    {isPending ? 'กำลังบันทึก…' : 'อัปเดตการตั้งค่า'}
-                  </Button>
-                </> : (
-                  <Button type="submit" disabled={busy || unavailable || !name.trim()
-                    || data.presets.length >= ASSIGNMENT_PRESET_LIMIT}>
-                    {isPending ? 'กำลังบันทึก…' : 'บันทึกเป็นชุดใหม่'}
-                  </Button>
-                )}
+                <Button type="submit" disabled={busy || unavailable || saveSlot === null || !name.trim()
+                  || (saveTarget !== null && !saveTargetDirty && !saveTargetNameDirty && !saveTargetDefaultDirty)}>
+                  {isPending ? 'กำลังบันทึก…' : saveTarget ? 'บันทึกทับช่องนี้' : 'บันทึกในช่องนี้'}
+                </Button>
               </DialogFooter>
             </form>
           </DialogContent>
