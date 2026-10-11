@@ -9,12 +9,16 @@ const rain = {
   title: 'ตามเกณฑ์ปริมาณฝนรายวันของประเทศไทย หากวัดปริมาณฝนได้ 50.5 มิลลิเมตร',
   question_text: '<pre class="question-text mat-title-medium">ตามเกณฑ์ปริมาณฝนรายวัน จะจัดอยู่ในเกณฑ์ใด?</pre>',
   difficulty: 'medium',
+  question_type: 'written',
+  subject: 'ฟิสิกส์',
   tags: ['อุตุนิยมวิทยา', 'ฝน'],
 }
 const work = {
   title: '*งาน ง่าย งานตั้งฉากกับการกระจัด',
   question_text: '<p>เด็กชายก้านกล้วยยกวัตถุมวล {m} กิโลกรัม</p>',
   difficulty: 'medium',
+  question_type: 'written',
+  subject: 'ฟิสิกส์',
   tags: null,
 }
 
@@ -33,6 +37,13 @@ describe('matchesSearch', () => {
   it('matches tags — the words a teacher files a question under', () => {
     expect(matchesSearch(rain, 'อุตุนิยมวิทยา')).toBe(true)
     expect(matchesSearch(work, 'อุตุนิยมวิทยา')).toBe(false)
+  })
+
+  it('matches the visible difficulty, question type and subject metadata', () => {
+    expect(matchesSearch(rain, 'ปานกลาง')).toBe(true)
+    expect(matchesSearch(rain, 'อัตนัย')).toBe(true)
+    expect(matchesSearch(rain, 'ฟิสิกส์')).toBe(true)
+    expect(matchesSearch(rain, 'ยาก')).toBe(false)
   })
 
   it('does not match the markup the body is wrapped in', () => {
@@ -128,7 +139,7 @@ describe('questionSearchOrClauses', () => {
     // search_text is title and body already joined and stripped of markup, so
     // one clause covers both — and matches what the browser side searches.
     expect(questionSearchOrClauses('ฝน', ['งาน'])).toEqual([
-      'search_text.ilike."%ฝน%"',
+      'search_text.ilike."%ฝน%",subject.ilike."%ฝน%"',
     ])
   })
 
@@ -140,8 +151,14 @@ describe('questionSearchOrClauses', () => {
 
   it('adds the tags a word points at, by substring', () => {
     expect(questionSearchOrClauses('พลัง', ['พลังงาน', 'งาน', 'พลังงานกล'])).toEqual([
-      'search_text.ilike."%พลัง%",tags.ov.{"พลังงาน","พลังงานกล"}',
+      'search_text.ilike."%พลัง%",tags.ov.{"พลังงาน","พลังงานกล"},subject.ilike."%พลัง%"',
     ])
+  })
+
+  it('searches visible difficulty, type and subject metadata server-side', () => {
+    expect(questionSearchOrClauses('ปานกลาง')[0]).toContain('difficulty.in.(medium)')
+    expect(questionSearchOrClauses('อัตนัย')[0]).toContain('question_type.in.(written)')
+    expect(questionSearchOrClauses('ฟิสิกส์')[0]).toContain('subject.ilike."%ฟิสิกส์%"')
   })
 
   it('gives one clause per word — chained .or() calls AND them', () => {

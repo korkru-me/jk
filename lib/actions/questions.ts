@@ -12,6 +12,7 @@ import { releaseQuestionFiles } from '@/lib/storage-release'
 import { sanitizeRichTextForStorage } from '@/lib/rich-text-sanitize'
 import type { Variable, LogicRule, MCQOption, AnswerPart, Question, QuestionType, Difficulty, Visibility, MatchingPair, TrueFalseConfig, FillBlankConfig, OrderingConfig, RandomQuestionConfig, FileUploadConfig, CompositeConfig, MatchingConfig, ClassifyConfig, ImageLabelConfig } from '@/lib/types'
 import { safeQuestionsRedirect } from '@/lib/question-return'
+import { questionSearchOrClauses } from '@/lib/question-search'
 
 export interface QuestionFormData {
   title: string
@@ -434,13 +435,22 @@ export async function searchQuestions(query: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return []
 
-  const { data } = await supabase
+  const { data: tagRows } = await supabase
+    .from('questions')
+    .select('tags')
+    .eq('created_by', user.id)
+    .eq('is_research_snapshot', false)
+  const tagUniverse = [...new Set((tagRows ?? []).flatMap(row => row.tags ?? []).filter(Boolean))]
+
+  let searchQuery = supabase
     .from('questions')
     .select('id, title, answer_formula, variables, answer_unit')
     .eq('created_by', user.id)
     .eq('is_research_snapshot', false)
-    .ilike('title', `%${query}%`)
-    .limit(10)
+  for (const clause of questionSearchOrClauses(query, tagUniverse)) {
+    searchQuery = searchQuery.or(clause)
+  }
+  const { data } = await searchQuery.limit(10)
 
   return data ?? []
 }

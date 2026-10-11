@@ -40,7 +40,7 @@ export function MethodCopy({ variables, value, unit, onSelect }: MethodCopyProps
       <div className="space-y-1.5">
         <Label>🔍 ค้นหาโจทย์ที่มีสูตรคล้ายกัน</Label>
         <Input
-          placeholder="พิมพ์ชื่อโจทย์..."
+          placeholder="ค้นหาจากชื่อ เนื้อหา หรือแท็ก..."
           value={query}
           onChange={(e) => handleSearch(e.target.value)}
         />

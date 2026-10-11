@@ -9,6 +9,7 @@ import { IconButton } from '@/components/ui/icon-button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { questionExcerpt } from '@/lib/question-display'
+import { matchesSearch } from '@/lib/question-search'
 import { getQuestionClientDetail } from '@/lib/actions/questions'
 import { getQuestionCardData } from '@/lib/actions/question-card-data'
 import { EMPTY_CARD_DATA, type QuestionCardData } from '@/lib/question-card-data'
@@ -29,6 +30,7 @@ export interface SetListQuestion {
   question_text?: string | null
   question_type: Question['question_type']
   difficulty: Question['difficulty']
+  subject?: string | null
   tags?: string[] | null
   sub_question_count?: number
 }
@@ -130,10 +132,9 @@ export function SetQuestionList({
     if (!term) return questionIds
     return questionIds.filter(id => {
       const q = byId.get(id)
-      const haystack = [q?.title, q?.question_text, ...(q?.tags ?? [])].join(' ').toLowerCase()
-      return haystack.includes(term)
+      return q ? matchesSearch({ ...q, question_text: q.question_text ?? '' }, search) : false
     })
-  }, [term, questionIds, byId])
+  }, [term, questionIds, byId, search])
 
   const pageCount = Math.max(1, Math.ceil(matchingIds.length / PER_PAGE))
   const currentPage = Math.min(page, pageCount)
@@ -195,7 +196,7 @@ export function SetQuestionList({
       tags: q.tags ?? null,
       group_id: detail?.group_id ?? null,
       order_in_group: detail?.order_in_group ?? null,
-      subject: detail?.subject ?? null,
+      subject: detail?.subject ?? q.subject ?? null,
       question_categories: detail?.category ? { name: detail.category } : null,
     }
   }
@@ -210,7 +211,7 @@ export function SetQuestionList({
           <Input
             value={search}
             onChange={event => { setSearch(event.target.value); setPage(1) }}
-            placeholder="ค้นหาโจทย์ในแฟ้มนี้..."
+            placeholder="ค้นหาจากชื่อ เนื้อหา หรือแท็ก..."
             aria-label="ค้นหาโจทย์ในแฟ้มนี้"
             className="pl-9 pr-9 bg-card"
           />

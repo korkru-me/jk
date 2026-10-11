@@ -13,6 +13,7 @@ const questions: AssignmentQuestionOption[] = [1, 2, 3].map(i => ({
   question_text: `<p>คำถามจำลองข้อ ${i}</p>`,
   question_type: 'mcq',
   difficulty: 'easy',
+  subject: 'ฟิสิกส์',
   tags: [],
   sub_question_count: 1,
   default_points: 1,

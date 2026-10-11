@@ -19,7 +19,7 @@ const ROOM = '00000000-0000-4000-8000-000000000001'
 const questions: AssignmentQuestionOption[] = Array.from({ length: 6 }, (_, i) => ({
   id: `00000000-0000-4000-8100-${String(i + 1).padStart(12, '0')}`,
   title: `โจทย์จำลองข้อ ${i + 1}`, question_text: `<p>คำถามจำลองข้อ ${i + 1}</p>`,
-  question_type: 'mcq', difficulty: 'easy', tags: [], sub_question_count: 1,
+  question_type: 'mcq', difficulty: 'easy', subject: 'ฟิสิกส์', tags: [], sub_question_count: 1,
   default_points: 1, has_random_values: false,
 }))
 

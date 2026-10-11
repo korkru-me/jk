@@ -81,7 +81,8 @@ const STRUCTURE_QUESTIONS: PanelQuestion[] = [
     question_text: '<p>โจทย์จำลองเรื่องงานและพลังงาน</p>',
     question_type: 'written',
     difficulty: 'medium',
-    tags: ['อัตนัย'],
+    subject: 'ฟิสิกส์',
+    tags: ['อัตนัย', 'โมเมนตัม', 'ชน 2 มิติ', 'ยืดหยุ่น', 'ไม่ยืดหยุ่น'],
   },
   {
     id: '00000000-0000-4000-8000-000000000092',
@@ -89,6 +90,7 @@ const STRUCTURE_QUESTIONS: PanelQuestion[] = [
     question_text: '<p>โจทย์จำลองเรื่องกฎอนุรักษ์พลังงาน</p>',
     question_type: 'written',
     difficulty: 'medium',
+    subject: 'ฟิสิกส์',
     tags: ['อัตนัย'],
   },
   {
@@ -97,6 +99,7 @@ const STRUCTURE_QUESTIONS: PanelQuestion[] = [
     question_text: '<p>โจทย์จำลองเรื่องพลังงานจลน์</p>',
     question_type: 'mcq',
     difficulty: 'easy',
+    subject: 'ฟิสิกส์',
     tags: [],
   },
   ...Array.from({ length: 6 }, (_, index): PanelQuestion => ({
@@ -105,6 +108,7 @@ const STRUCTURE_QUESTIONS: PanelQuestion[] = [
     question_text: `<p>ข้อมูลจำลองสำหรับตรวจตำแหน่งและผลลัพธ์ของช่องค้นหา ลำดับ ${index + 1}</p>`,
     question_type: 'written',
     difficulty: 'medium',
+    subject: 'ฟิสิกส์',
     tags: ['ค้นหา'],
   })),
 ]
@@ -122,6 +126,7 @@ const AUTOSAVE_QUESTIONS: BankQuestion[] = STRUCTURE_QUESTIONS.map(question => (
   question_text: question.question_text ?? '',
   question_type: question.question_type,
   difficulty: question.difficulty,
+  subject: question.subject ?? null,
   tags: question.tags ?? [],
   sub_question_count: 1,
   default_points: 1,
@@ -232,6 +237,7 @@ export function QuestionSetsLabClient() {
         allTags={['อัตนัย']}
         myTeams={[]}
         initialCardData={STRUCTURE_CARD_DATA}
+        loadQuestionPreviews={loadAutosaveQuestionPreviews}
       />
     </main>
   )

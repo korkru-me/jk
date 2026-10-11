@@ -546,6 +546,7 @@ export function CreateQuestionSetForm({
         setId={initialSet?.id}
         onSaveBeforeEdit={initialSet ? saveBeforeEdit : undefined}
         initialCardData={initialCardData}
+        loadQuestionPreviews={loadQuestionPreviews}
       />
 
       <Dialog open={pickerOpen} onOpenChange={handlePickerOpenChange}>
