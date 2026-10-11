@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState, useTransition } from 'react'
 import type { DialogRootChangeEventDetails } from '@base-ui/react/dialog'
 import {
-  Settings, Users, CalendarDays, Clock, School, Home, Info, Palette,
+  Settings, Users, CalendarDays, Clock, School, Home, Palette,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -16,7 +16,7 @@ import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog'
 import { updateClassroom } from '@/lib/actions/classrooms'
 import type { Classroom } from '@/lib/types'
@@ -171,9 +171,6 @@ export function ClassroomSettingsDialog({
       >
         <DialogHeader>
           <DialogTitle>ตั้งค่าห้องเรียน</DialogTitle>
-          <DialogDescription>
-            แก้ไขได้ทุกอย่างที่กรอกตอนสร้างห้องเรียน ยกเว้นประเภทห้องเรียนและรหัสห้องเรียน
-          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-5 pt-1">
@@ -182,7 +179,7 @@ export function ClassroomSettingsDialog({
             padding="sm"
             radius="md"
             data-classroom-settings-identity
-            className="flex flex-wrap items-center gap-x-6 gap-y-2"
+            className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3"
           >
             <div className="flex items-center gap-2.5">
               <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted">
@@ -195,14 +192,10 @@ export function ClassroomSettingsDialog({
                 <p className="text-sm font-medium">{isHomeroom ? 'ห้อง Homeroom' : 'ห้องเรียน'}</p>
               </div>
             </div>
-            <div className="sm:ml-auto">
+            <div>
               <p className="text-xs text-muted-foreground">รหัสห้องเรียน</p>
               <p className="font-mono font-bold tracking-[0.2em]">{classroom.class_code}</p>
             </div>
-            <p className="flex basis-full items-start gap-1.5 text-xs leading-4 text-muted-foreground">
-              <Info className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
-              สองอย่างนี้เปลี่ยนไม่ได้ — นักเรียนใช้รหัสเข้าร่วมอยู่ และการเปลี่ยนประเภทจะทำให้งานที่มอบหมายไว้ใช้ไม่ได้
-            </p>
           </Card>
 
           {/* ── Cover ── */}
