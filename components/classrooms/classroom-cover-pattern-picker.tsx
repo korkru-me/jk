@@ -5,7 +5,7 @@ import { ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { FieldDescription, FieldLegend, FieldSet } from '@/components/ui/field'
+import { FieldLegend, FieldSet } from '@/components/ui/field'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { cn } from '@/lib/utils'
 import {
@@ -29,7 +29,6 @@ export function ClassroomCoverPatternPicker({
   previewClassName?: string
 }) {
   const labelId = useId()
-  const descriptionId = useId()
   const [open, setOpen] = useState(false)
   const selectedKey = classroomCoverPatternKey(value)
   const selectedIndex = CLASSROOM_COVER_PATTERN_OPTIONS.findIndex(option => option.key === selectedKey)
@@ -37,9 +36,6 @@ export function ClassroomCoverPatternPicker({
   return (
     <FieldSet disabled={disabled} className={compact ? 'gap-2' : undefined}>
       <FieldLegend id={labelId} variant="label">ภาพปกห้องเรียน</FieldLegend>
-      <FieldDescription id={descriptionId} className={compact ? 'sr-only' : undefined}>
-        ภาพปกออกแบบเฉพาะสำหรับ KorKru สีของภาพจะเปลี่ยนตามธีมสีห้อง
-      </FieldDescription>
       <Collapsible open={open} onOpenChange={setOpen} disabled={disabled}>
         <CollapsibleTrigger
           render={(
@@ -52,7 +48,6 @@ export function ClassroomCoverPatternPicker({
                 : 'h-20 w-full justify-start gap-3 overflow-hidden p-2 whitespace-normal'}
             />
           )}
-          aria-describedby={descriptionId}
           aria-label={`เลือกภาพปก ตอนนี้เลือกภาพปกแบบที่ ${selectedIndex + 1}`}
         >
           <span className={cn(
@@ -78,7 +73,6 @@ export function ClassroomCoverPatternPicker({
               }}
               disabled={disabled}
               aria-labelledby={labelId}
-              aria-describedby={descriptionId}
               variant="primary"
               className="grid w-full grid-cols-2 items-stretch gap-2 sm:grid-cols-3"
             >
