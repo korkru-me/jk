@@ -12,6 +12,7 @@ import { useSidebarCompact } from '@/components/layout/sidebar-display'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import {
@@ -299,18 +300,22 @@ export function ClassroomSettingsDialog({
           </div>
 
           {/* ── Enrollment ── */}
-          <div className="space-y-3">
+          <div data-classroom-settings-access className="flex flex-col gap-2">
             <Label className="text-sm font-medium">ประเภทการเข้าร่วม</Label>
             <AccessTypePicker value={meta.accessType} onChange={v => set('accessType', v)} compact />
           </div>
 
-          <Card padding="lg" className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                <Users className="w-4 h-4 text-primary" />
+          <Card
+            padding="md"
+            data-classroom-settings-capacity
+            className="flex flex-wrap items-center gap-x-4 gap-y-3"
+          >
+            <div className="flex min-w-0 flex-1 items-center gap-2.5">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                <Users className="size-4 text-primary" aria-hidden="true" />
               </div>
-              <div className="flex items-center gap-2">
-                <p id="settings-capacity-label" className="font-medium text-sm text-foreground">จำกัดจำนวนที่นั่ง</p>
+              <div className="flex items-center gap-2.5">
+                <p id="settings-capacity-label" className="text-sm font-medium text-foreground">จำกัดจำนวนที่นั่ง</p>
                 <ToggleSwitch
                   checked={meta.capacityEnabled}
                   onChange={v => set('capacityEnabled', v)}
@@ -319,60 +324,60 @@ export function ClassroomSettingsDialog({
               </div>
             </div>
             {meta.capacityEnabled && (
-              <div className="pt-1 space-y-1.5 border-t border-border">
-                <Label htmlFor="settings-cap" className="text-sm pt-3 block">จำนวนที่นั่งสูงสุด</Label>
-                <div className="flex items-center gap-3">
-                  <Input
-                    id="settings-cap"
-                    type="number"
-                    min={1}
-                    max={500}
-                    value={meta.maxCapacity}
-                    onChange={e => set('maxCapacity', e.target.value)}
-                    className="h-10 w-28 text-center text-base font-semibold"
-                    placeholder="30"
-                  />
-                  <span className="text-sm text-muted-foreground">คน</span>
-                </div>
+              <div className="flex basis-full items-center gap-2 sm:basis-auto">
+                <Label htmlFor="settings-cap" className="shrink-0 text-xs text-muted-foreground">จำนวนสูงสุด</Label>
+                <Input
+                  id="settings-cap"
+                  type="number"
+                  min={1}
+                  max={500}
+                  value={meta.maxCapacity}
+                  onChange={e => set('maxCapacity', e.target.value)}
+                  className="h-8 w-24 text-center font-semibold"
+                  placeholder="30"
+                />
+                <span className="text-sm text-muted-foreground">คน</span>
               </div>
             )}
           </Card>
 
-          <Card padding="lg" className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-warning/10 flex items-center justify-center shrink-0">
-                <CalendarDays className="w-4 h-4 text-warning" />
+          <Card
+            padding="md"
+            data-classroom-settings-duration
+            className="grid items-end gap-3 sm:grid-cols-[minmax(12rem,1.15fr)_minmax(0,1fr)_minmax(0,1fr)]"
+          >
+            <div className="flex min-w-0 items-center gap-2.5 sm:self-center">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-warning/10">
+                <CalendarDays className="size-4 text-warning" aria-hidden="true" />
               </div>
-              <div>
-                <p className="font-medium text-sm text-foreground">ระยะเวลาของห้องเรียน</p>
-                <p className="text-xs text-muted-foreground">ไม่บังคับ — หากไม่กำหนดวันสิ้นสุด ห้องเรียนจะเปิดตลอด</p>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">ระยะเวลาของห้องเรียน</p>
+                <p className="text-xs leading-snug text-muted-foreground">ไม่บังคับ — ไม่กำหนดวันสิ้นสุด ห้องเรียนจะเปิดตลอด</p>
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="settings-start" className="text-sm">วันเปิดคอร์ส</Label>
-                <Input
-                  id="settings-start"
-                  type="date"
-                  value={meta.startDate}
-                  onChange={e => set('startDate', e.target.value)}
-                  className="h-10"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="settings-end" className="text-sm">วันปิดคอร์ส</Label>
-                <Input
-                  id="settings-end"
-                  type="date"
-                  value={meta.endDate}
-                  onChange={e => set('endDate', e.target.value)}
-                  className="h-10"
-                />
-              </div>
+            <div className="flex min-w-0 flex-col gap-1">
+              <Label htmlFor="settings-start" className="text-xs">วันเปิดคอร์ส</Label>
+              <Input
+                id="settings-start"
+                type="date"
+                value={meta.startDate}
+                onChange={e => set('startDate', e.target.value)}
+                className="h-9 min-w-0"
+              />
+            </div>
+            <div className="flex min-w-0 flex-col gap-1">
+              <Label htmlFor="settings-end" className="text-xs">วันปิดคอร์ส</Label>
+              <Input
+                id="settings-end"
+                type="date"
+                value={meta.endDate}
+                onChange={e => set('endDate', e.target.value)}
+                className="h-9 min-w-0"
+              />
             </div>
             {(meta.startDate || meta.endDate) && (
-              <div className="flex items-start gap-2.5 text-xs text-warning bg-warning/10 rounded-xl px-3.5 py-3 border border-warning/20">
-                <Clock className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+              <div className="flex items-start gap-2 rounded-lg border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning sm:col-span-3">
+                <Clock className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
                 <p>เมื่อถึงวันปิดคอร์ส ระบบจะเปลี่ยนเป็น <strong>Read-only</strong> — นักเรียนดูประวัติได้แต่ส่งคำตอบไม่ได้</p>
               </div>
             )}
@@ -388,9 +393,9 @@ export function ClassroomSettingsDialog({
           </div>
         </form>
 
-        <div className="border-t border-border pt-4">
-          <p className="text-sm font-medium text-destructive">พื้นที่อันตราย</p>
-          <p className="mb-2 mt-0.5 text-xs text-muted-foreground">
+        <Separator />
+        <div className="flex flex-col items-start gap-2">
+          <p className="text-xs text-muted-foreground">
             ย้ายห้องเรียนไปถังขยะพร้อมข้อมูลภายในทั้งหมด และกู้คืนได้ภายใน 30 วันก่อนลบถาวร
           </p>
           <DeleteClassroomButton id={classroom.id} />

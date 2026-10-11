@@ -70,17 +70,18 @@ export function AccessTypePicker({
             type="button"
             onClick={() => onChange(type.value)}
             aria-pressed={isSelected}
+            aria-label={`${type.label}: ${type.desc}`}
             className={cn(
               'relative flex text-left transition-colors',
               compact
-                ? 'min-h-14 items-center gap-2.5 rounded-xl border p-3'
+                ? 'min-h-12 items-center gap-2 rounded-xl border px-2.5 py-2'
                 : 'flex-col items-start gap-3 rounded-2xl border-2 p-4',
               isSelected ? type.cardActive + ' shadow-sm' : 'border-border bg-card hover:border-muted-foreground/30',
             )}
           >
             <div className={cn('flex items-center justify-between', compact ? 'shrink-0' : 'w-full')}>
-              <div className={cn('flex items-center justify-center', compact ? 'size-8 rounded-lg' : 'size-9 rounded-xl', isSelected ? 'bg-card/60' : 'bg-muted')}>
-                <Icon className={cn('w-4 h-4', isSelected ? type.iconColor : 'text-muted-foreground')} />
+              <div className={cn('flex items-center justify-center', compact ? 'size-7 rounded-lg' : 'size-9 rounded-xl', isSelected ? 'bg-card/60' : 'bg-muted')}>
+                <Icon className={cn('size-4', isSelected ? type.iconColor : 'text-muted-foreground')} aria-hidden="true" />
               </div>
               {isSelected && !compact && (
                 <div className={cn('w-5 h-5 rounded-full flex items-center justify-center', type.chip)}>
@@ -89,8 +90,17 @@ export function AccessTypePicker({
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <p className={cn('font-semibold text-sm', isSelected ? type.iconColor : 'text-foreground')}>{type.label}</p>
-              <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{type.desc}</p>
+              <p className="text-sm font-semibold text-foreground">{type.label}</p>
+              <p
+                className={cn(
+                  'text-xs leading-snug text-muted-foreground',
+                  isSelected && 'text-foreground/80',
+                  compact && 'line-clamp-2 sm:line-clamp-1',
+                )}
+                title={compact ? type.desc : undefined}
+              >
+                {type.desc}
+              </p>
             </div>
             {isSelected && compact && <Check className={cn('size-4 shrink-0', type.iconColor)} aria-hidden="true" />}
           </button>
