@@ -1,5 +1,11 @@
 # แผนปิดงาน Safe Exam Browser หลัง Drawing Board
 
+## คำขอล่าสุด 11 ตุลาคม 2026 — พัก W7 และทำหน้ารอสอบก่อน
+
+เจ้าของยืนยัน **ยังไม่ทำ W7** และขอให้ “ดูตัวอย่างนักเรียน” ของข้อสอบที่ไม่ใช้ SEB เริ่มที่หน้ารอ/อ่านกติกาก่อน แก้เสร็จและ push ใน narrowed branch `codex/exam-waiting-production` ที่ `c270c40` โดยไม่รวม source นี้เข้ามาใน native pilot branch ปัจจุบัน เส้นทาง preview ตรวจ teacher authorization ก่อน waiting และ answer reads เปิด ExamClient จำลองเฉพาะหลังปุ่มเริ่ม ไม่สร้าง attempt/คำตอบ/คะแนนจริง ใช้ shared waiting presentation ของ candidate ซึ่งเพิ่มกติกาและเวลาเดิมเมื่อ resume แบบฝึกหัดคงเดิม
+
+Candidate ตรวจ 217 files / 2,913 tests (เพิ่ม preview/view 21 cases), TypeScript/token lint/guarded TEST build และ Chrome shared-view lab 320px/axe/Next runtime ผ่าน ไม่ใช่ hosted authenticated/native proof ยังไม่ merge/deploy เพราะ Preview permission gate ของ Staging server keys คง pending ตาม handoff เดิม ไม่เปลี่ยน seed/final/CK/BEK/release/flags/DB/alias ไม่ให้เจ้าของเปิดหรือบันทึก seed ต่อจนตรวจหน้ารอและอนุมัติกลับ W7 ใหม่ Future native candidate ต้องตรวจ source/deployment lock ใหม่ ไม่อ้างว่า `c270c40` อยู่บน dedicated UAT แล้ว
+
 อัปเดต: 9 ตุลาคม 2026
 
 เอกสารนี้กำหนดลำดับงาน SEB/Exam ต่อจาก `origin/master` ที่ commit
