@@ -646,10 +646,6 @@ export function CreateAssignmentForm({
     previewQuestions.reduce((sum, q) => sum + (Number.parseFloat(pointsDraft(q.id)) || 0), 0) * 100
   ) / 100
 
-  // Two students drawing different โจทย์ out of a คลัง whose ข้อ are worth
-  // different amounts end up graded out of different totals. คะแนนเต็มที่
-  // แสดงผล is the existing fix, so the warning offers it rather than only
-  // naming the problem.
   // ── เงื่อนไขจบงาน ────────────────────────────────────────────────────────
   // The same resolver createAssignment uses, asked with the same inputs, so a
   // streak the form shows as ready is a streak the server will accept — and a
@@ -699,7 +695,14 @@ export function CreateAssignmentForm({
 
   const pointValues = previewQuestions.map(q => Number.parseFloat(pointsDraft(q.id)) || 0)
   const drawnPointsVary = randomDrawOn && new Set(pointValues).size > 1
-  const displayMaxSet = displayMaxScore.trim() !== '' && Number(displayMaxScore) > 0
+  const parsedManualDisplayMax = Number.parseFloat(displayMaxScore)
+  const manualDisplayMax = displayMaxScore.trim() !== ''
+    && Number.isFinite(parsedManualDisplayMax)
+    && parsedManualDisplayMax > 0
+      ? parsedManualDisplayMax
+      : null
+  const displayMaxInvalid = displayMaxScore.trim() !== '' && manualDisplayMax === null
+  const automaticDisplayMax = randomDrawOn && !randomDrawInvalid ? questionsPerAttempt : null
 
   function canNext() {
     if (step === 0) {
@@ -707,7 +710,7 @@ export function CreateAssignmentForm({
         && groupTargetsComplete(groupTargets, preselectedClassroomId ? [preselectedClassroomId] : classroomIds)
         && selectedIds.length > 0 && (!saveAsSet || questionSetTitle.trim().length > 0)
         && !(streakOn && (!streakAvailable || streakBlocked))
-        && !randomDrawInvalid
+        && !randomDrawInvalid && !displayMaxInvalid
     }
     if (step === 1) {
       if (assignmentType === 'exam' && secureBrowserMode === 'seb_required') {
@@ -759,6 +762,11 @@ export function CreateAssignmentForm({
       setStep(0)
       return
     }
+    if (displayMaxInvalid) {
+      toast.error('คะแนนเต็มที่แสดงผลต้องมากกว่า 0 หรือเว้นว่างเพื่อใช้ค่าอัตโนมัติ')
+      setStep(0)
+      return
+    }
     if (completionChoice === 'threshold' && (passingValue.trim() === '' || !Number.isFinite(Number(passingValue)) || Number(passingValue) < 0 || (passingType === 'percent' && Number(passingValue) > 100))) {
       toast.error('กรุณากรอกเกณฑ์ผ่านให้ถูกต้อง')
       setStep(0)
@@ -800,10 +808,6 @@ export function CreateAssignmentForm({
         })
       )
 
-      const parsedDisplayMax = Number.parseFloat(displayMaxScore)
-      const displayMax = displayMaxScore.trim() !== '' && Number.isFinite(parsedDisplayMax) && parsedDisplayMax > 0
-        ? parsedDisplayMax
-        : null
       const parsedRandomCount = Number(randomQuestionCount)
       const selectedRandomCount = canDrawRandomSubset
         && randomQuestionCount.trim() !== ''
@@ -812,6 +816,11 @@ export function CreateAssignmentForm({
         && parsedRandomCount < selectedIds.length
           ? parsedRandomCount
           : null
+      // A random draw can have a different raw maximum for each student when
+      // question weights vary. Default its common display scale to the number
+      // of questions drawn; an explicit teacher value always wins. Keeping the
+      // all-questions default null preserves the existing raw-total behavior.
+      const displayMax = manualDisplayMax ?? selectedRandomCount
 
       const res = await (actions?.createAssignment ?? createAssignment)({
         copy_source_assignment_id: copySource?.id,
@@ -1161,25 +1170,7 @@ export function CreateAssignmentForm({
               </SortableContext>
             </DndContext>
             <Separator />
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="flex min-w-0 flex-col gap-1.5">
-                <Label htmlFor="display-max-score">คะแนนเต็มที่แสดงผล</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    id="display-max-score"
-                    type="number"
-                    min={0}
-                    step="any"
-                    value={displayMaxScore}
-                    aria-label="คะแนนเต็มที่แสดงผล"
-                    onChange={e => setDisplayMaxScore(e.target.value)}
-                    placeholder={`ไม่ปรับ (เท่ากับ ${pointsSum})`}
-                    className="max-w-[160px]"
-                  />
-                  <span className="text-sm text-muted-foreground">คะแนน</span>
-                </div>
-              </div>
-
+            <div className="grid gap-3 sm:grid-cols-2">
               {streakOn && (
                 <p data-assignment-description className="text-xs text-muted-foreground rounded-lg bg-muted px-3 py-2">
                   {completionSectionLabel}ตั้งไว้เป็น “ทำถูกติดต่อกัน {streakTarget} ข้อ” — หน้าทำโจทย์จึงแสดงทีละ 1 ข้อ
@@ -1316,25 +1307,49 @@ export function CreateAssignmentForm({
                   <p data-assignment-description className="text-xs text-muted-foreground">
                     ชุดที่สุ่มได้จะถูกตรึงไว้ตลอดรอบนั้น — ปิดหน้าจอแล้วกลับมาทำต่อได้ชุดเดิม ส่วนรอบใหม่สุ่มชุดใหม่
                   </p>
-                  {drawnPointsVary && !displayMaxSet && (
-                    <div className="flex items-start justify-between gap-3 rounded-lg bg-warning/10 px-3 py-2">
-                      <p className="text-xs text-foreground">
-                        คะแนนแต่ละข้อในคลังไม่เท่ากัน คนที่จับได้ข้อคะแนนสูงจะได้เปรียบ —
-                        ตั้ง “คะแนนเต็มที่แสดงผล” ให้ทุกคนเทียบกันได้
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => setDisplayMaxScore(String(questionsPerAttempt))}
-                        className="text-xs font-medium text-foreground underline shrink-0"
-                      >
-                        ตั้งเป็น {questionsPerAttempt}
-                      </button>
-                    </div>
-                  )}
                 </div>
               )}
             </Card>
           )}
+
+          <Card radius="md" padding="sm" className="space-y-2.5">
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">คะแนนเต็มที่แสดงผล</h2>
+              <p id="display-max-score-description" data-assignment-description className="text-xs text-muted-foreground">
+                {automaticDisplayMax !== null
+                  ? `เว้นว่างเพื่อใช้ ${automaticDisplayMax} คะแนนตามจำนวนข้อที่สุ่ม หรือกรอกคะแนนเต็มที่ต้องการเอง ระบบจะปรับคะแนนจริงของแต่ละคนให้อยู่บนคะแนนเต็มเดียวกัน`
+                  : `เว้นว่างเพื่อใช้คะแนนจริงรวม ${pointsSum} คะแนน หรือกรอกคะแนนเต็มที่ต้องการให้แสดง`}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Input
+                id="display-max-score"
+                type="number"
+                min={0.1}
+                step="any"
+                value={displayMaxScore}
+                aria-label="คะแนนเต็มที่แสดงผล"
+                aria-describedby="display-max-score-description"
+                aria-invalid={displayMaxInvalid}
+                onChange={event => setDisplayMaxScore(event.target.value)}
+                placeholder={automaticDisplayMax !== null
+                  ? `อัตโนมัติ (${automaticDisplayMax})`
+                  : `ไม่ปรับ (${pointsSum})`}
+                className="max-w-[200px]"
+              />
+              <span className="text-sm text-muted-foreground">คะแนน</span>
+            </div>
+            {displayMaxInvalid && (
+              <p role="alert" className="text-xs text-destructive">
+                กรอกคะแนนเต็มที่มากกว่า 0 หรือเว้นว่างเพื่อใช้ค่าอัตโนมัติ
+              </p>
+            )}
+            {drawnPointsVary && automaticDisplayMax !== null && (
+              <p data-assignment-description className="rounded-lg bg-warning/10 px-3 py-2 text-xs text-foreground">
+                คะแนนรายข้อในคลังไม่เท่ากัน ระบบยังคงน้ำหนักของแต่ละข้อไว้ และปรับเฉพาะคะแนนรวมให้ทุกคนมีคะแนนเต็ม {manualDisplayMax ?? automaticDisplayMax} คะแนนเท่ากัน
+              </p>
+            )}
+          </Card>
 
           <Card radius="md" padding="sm" className="space-y-2.5">
             <div>
@@ -1980,9 +1995,11 @@ export function CreateAssignmentForm({
               },
               {
                 label: 'คะแนนเต็ม',
-                value: displayMaxScore.trim() && Number(displayMaxScore) > 0
-                  ? `${displayMaxScore} คะแนน (จริง ${pointsSum})`
-                  : `${pointsSum} คะแนน`,
+                value: manualDisplayMax !== null
+                  ? `${manualDisplayMax} คะแนน (กำหนดเอง${randomDrawOn ? '' : ` · คะแนนจริง ${pointsSum}`})`
+                  : automaticDisplayMax !== null
+                    ? `${automaticDisplayMax} คะแนน (ตามจำนวนข้อที่สุ่ม)`
+                    : `${pointsSum} คะแนน`,
               },
               ...(duration ? [{ label: 'เวลา', value: `${duration} นาที` }] : []),
               ...(dueAt ? [{ label: 'ส่งตรงเวลา', value: new Date(thaiLocalDateTimeToIso(dueAt) ?? dueAt).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) }] : []),
