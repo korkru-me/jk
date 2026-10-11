@@ -1,7 +1,15 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
+import {
+  DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter,
+  useSensor, useSensors, type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext, arrayMove, rectSortingStrategy, sortableKeyboardCoordinates, useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import {
   Plus, ChevronUp, ChevronDown, MoreVertical, Folder, FolderOpen, FolderPlus,
   X, Layers, Search, Eye, Edit2, Check,
@@ -17,12 +25,12 @@ import {
 } from '@/components/ui/dialog'
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
-  DropdownMenuItem, DropdownMenuSeparator,
+  DropdownMenuItem,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import { questionExcerpt } from '@/lib/question-display'
 import {
-  addQuestionsToSections, moveQuestionInSet, moveSection, newSectionId, normalizeSetSections,
+  addQuestionsToSections, moveQuestionInSet, newSectionId, normalizeSetSections,
   removeQuestionsFromSet, sectionsByQuestionId, ungroupedQuestionIds,
   type QuestionSetSection,
 } from '@/lib/question-set-sections'
@@ -102,8 +110,9 @@ function namesPreview(ids: readonly string[], byId: Map<string, PanelQuestion>):
  * stray click used to drop one instantly — leaving the teacher to work out
  * which one vanished and hunt it down in the bank again.
  *
- * Reordering is buttons, not drag-and-drop: teachers arrange sets on phones
- * too, and a drag target that small is unusable there.
+ * The whole แฟ้มย่อย card is sortable: mouse users drag after moving 8px,
+ * touch users press briefly before dragging so a normal swipe still scrolls,
+ * and keyboard users can use the sortable button's Space + arrow controls.
  */
 export function SetStructurePanel({
   questions, questionIds, sections, onChange, onAddQuestions,
@@ -116,6 +125,12 @@ export function SetStructurePanel({
   // Pending confirmations.
   const [removeIds, setRemoveIds] = useState<string[] | null>(null)
   const [deleteSectionId, setDeleteSectionId] = useState<string | null>(null)
+  const sectionDndId = useId()
+  const sectionSensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
 
   const byId = useMemo(() => new Map(questions.map(q => [q.id, q])), [questions])
   const owners = useMemo(() => sectionsByQuestionId(sections), [sections])
@@ -180,6 +195,15 @@ export function SetStructurePanel({
     setBulkSectionOpen(false)
   }
 
+  function reorderSections(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIndex = sections.findIndex(section => section.id === active.id)
+    const newIndex = sections.findIndex(section => section.id === over.id)
+    if (oldIndex < 0 || newIndex < 0) return
+    apply(normalizeSetSections(arrayMove(sections, oldIndex, newIndex), questionIds))
+  }
+
   const allSelected = questionIds.length > 0 && questionIds.every(id => selected.includes(id))
 
   return (
@@ -225,29 +249,35 @@ export function SetStructurePanel({
             </Button>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {sections.map((section, index) => (
-              <SectionCard
-                key={section.id}
-                section={section}
-                index={index}
-                total={sections.length}
-                onOpen={() => setDialogSectionId(section.id)}
-                onMove={delta => apply(moveSection(sections, section.id, delta, questionIds))}
-                onDelete={() => setDeleteSectionId(section.id)}
-              />
-            ))}
+          <DndContext
+            id={`question-set-sections-${sectionDndId}`}
+            sensors={sectionSensors}
+            collisionDetection={closestCenter}
+            onDragEnd={reorderSections}
+          >
+            <SortableContext items={sections.map(section => section.id)} strategy={rectSortingStrategy}>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {sections.map(section => (
+                  <SectionCard
+                    key={section.id}
+                    section={section}
+                    onOpen={() => setDialogSectionId(section.id)}
+                    onDelete={() => setDeleteSectionId(section.id)}
+                  />
+                ))}
 
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setDialogSectionId(NEW_SECTION)}
-              className="h-auto min-h-[62px] gap-2 rounded-2xl border border-dashed border-border text-muted-foreground hover:border-primary/40 hover:bg-primary/[0.03] hover:text-primary"
-            >
-              <Plus className="w-5 h-5" />
-              <span className="text-sm font-medium">สร้างแฟ้มย่อย</span>
-            </Button>
-          </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setDialogSectionId(NEW_SECTION)}
+                  className="h-auto min-h-[62px] gap-2 rounded-2xl border border-dashed border-border text-muted-foreground hover:border-primary/40 hover:bg-primary/[0.03] hover:text-primary"
+                >
+                  <Plus className="w-5 h-5" />
+                  <span className="text-sm font-medium">สร้างแฟ้มย่อย</span>
+                </Button>
+              </div>
+            </SortableContext>
+          </DndContext>
         )}
       </Card>
 
@@ -505,29 +535,40 @@ function BulkAddToSectionsDialog({
  * themselves are one click away, in the dialog that can actually change them.
  */
 function SectionCard({
-  section, index, total, onOpen, onMove, onDelete,
+  section, onOpen, onDelete,
 }: {
   section: QuestionSetSection
-  index: number
-  total: number
   onOpen: () => void
-  onMove: (delta: number) => void
   onDelete: () => void
 }) {
+  const {
+    attributes, listeners, setNodeRef, setActivatorNodeRef,
+    transform, transition, isDragging,
+  } = useSortable({ id: section.id })
+
   return (
     <Card
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
       edge="ring"
       padding="sm"
-      className="group relative flex items-center gap-2.5 transition-colors hover:ring-primary/30"
+      className={cn(
+        'group relative flex items-center gap-2.5 transition-colors hover:ring-primary/30',
+        isDragging && 'z-10 opacity-70 ring-primary/40',
+      )}
     >
-      {/* The whole card opens the แฟ้มย่อย. It is laid over the content, not
-          wrapped around it, so the ⋮ menu keeps its own clicks (z-10). */}
+      {/* This transparent button is both the click target and the sortable
+          activator, so every non-menu part of the card can be held and dragged. */}
       <Button
+        ref={setActivatorNodeRef}
         type="button"
         variant="ghost"
         onClick={onOpen}
         aria-label={`เปิดแฟ้มย่อย ${section.title || UNNAMED}`}
-        className="absolute inset-0 h-auto rounded-2xl hover:bg-transparent"
+        title="กดเพื่อเปิด หรือกดค้างแล้วลากเพื่อสลับตำแหน่ง"
+        className="absolute inset-0 h-auto cursor-grab touch-manipulation rounded-2xl hover:bg-transparent active:cursor-grabbing"
+        {...attributes}
+        {...listeners}
       />
 
       <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -547,12 +588,8 @@ function SectionCard({
             <MoreVertical className="w-4 h-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={onOpen}>เปิดแฟ้มย่อย</DropdownMenuItem>
-            <DropdownMenuItem disabled={index === 0} onClick={() => onMove(-1)}>ย้ายไปก่อนหน้า</DropdownMenuItem>
-            <DropdownMenuItem disabled={index === total - 1} onClick={() => onMove(1)}>ย้ายไปถัดไป</DropdownMenuItem>
-            <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onClick={onDelete}>
-              ลบแฟ้มย่อย (โจทย์ยังอยู่ในแฟ้ม)
+              ลบแฟ้มย่อย
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
