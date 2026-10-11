@@ -23,7 +23,8 @@ export function AssignmentCreationLabClient({ contextual, type }: { contextual: 
   const [receivedAssignment, setReceivedAssignment] = useState('')
   const actions = useMemo<NonNullable<ComponentProps<typeof CreateAssignmentForm>['actions']>>(() => ({
     async createAssignment(data) {
-      setReceivedAssignment(`${data.title} · ${data.classroom_ids?.length ?? 0} ห้อง · ${data.random_question_count ?? 'ทุก'} ข้อ · จำนวนครั้ง: ${data.max_attempts ?? 'ไม่จำกัด'} · คะแนน: ${data.score_strategy} · จบ: ${data.completion_rule} · เกณฑ์: ${data.passing_value ?? 'ไม่มี'}`)
+      const pointValues = Object.values(data.question_points ?? {}).join(',') || 'ไม่มี'
+      setReceivedAssignment(`${data.title} · ${data.classroom_ids?.length ?? 0} ห้อง · ${data.random_question_count ?? 'ทุก'} ข้อ · คะแนนรายข้อ: ${pointValues} · จำนวนครั้ง: ${data.max_attempts ?? 'ไม่จำกัด'} · คะแนน: ${data.score_strategy} · จบ: ${data.completion_rule} · เกณฑ์: ${data.passing_value ?? 'ไม่มี'}`)
       return { error: '(ห้องทดลอง) รับข้อมูลแล้ว ไม่มีการบันทึกฐานข้อมูล' }
     },
     async getQuestionPreviewDetails(ids) {

@@ -686,8 +686,6 @@ export function CreateAssignmentForm({
     }
   }
 
-  const pointValues = previewQuestions.map(q => Number.parseFloat(pointsDraft(q.id)) || 0)
-  const drawnPointsVary = randomDrawOn && new Set(pointValues).size > 1
   const parsedManualDisplayMax = Number.parseFloat(displayMaxScore)
   const manualDisplayMax = displayMaxScore.trim() !== ''
     && Number.isFinite(parsedManualDisplayMax)
@@ -771,15 +769,6 @@ export function CreateAssignmentForm({
       return
     }
     startTransition(async () => {
-      // Every question gets an explicit point value — its own structural value
-      // unless the teacher edited it, and 1 for invalid input.
-      const questionPoints = Object.fromEntries(
-        selectedIds.map(id => {
-          const parsed = Number.parseFloat(pointsDraft(id))
-          return [id, Number.isFinite(parsed) && parsed > 0 ? parsed : 1] as const
-        })
-      )
-
       const parsedRandomCount = Number(randomQuestionCount)
       const selectedRandomCount = canDrawRandomSubset
         && randomQuestionCount.trim() !== ''
@@ -788,10 +777,20 @@ export function CreateAssignmentForm({
         && parsedRandomCount < selectedIds.length
           ? parsedRandomCount
           : null
-      // A random draw can have a different raw maximum for each student when
-      // question weights vary. Default its common display scale to the number
-      // of questions drawn; an explicit teacher value always wins. Keeping the
-      // all-questions default null preserves the existing raw-total behavior.
+      // A random draw scores the number of correct questions, so every
+      // question is explicitly worth 1 point. Keep the teacher's drafts in
+      // local state so switching back to all questions before submit restores
+      // them, but never send those weights for a random assignment.
+      const questionPoints = Object.fromEntries(
+        selectedIds.map(id => {
+          if (selectedRandomCount !== null) return [id, 1] as const
+          const parsed = Number.parseFloat(pointsDraft(id))
+          return [id, Number.isFinite(parsed) && parsed > 0 ? parsed : 1] as const
+        })
+      )
+
+      // The raw maximum is already the number of questions drawn. An explicit
+      // teacher value still rescales that total for the gradebook.
       const displayMax = manualDisplayMax ?? selectedRandomCount
 
       const res = await (actions?.createAssignment ?? createAssignment)({
@@ -1004,7 +1003,7 @@ export function CreateAssignmentForm({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-sm font-semibold text-foreground">โจทย์ คะแนน และเวลา</h2>
               <span className="shrink-0 text-sm font-semibold text-primary">
-                {previewQuestions.length} ข้อ · รวม {pointsSum} คะแนน
+                {previewQuestions.length} ข้อ · {randomDrawOn ? 'ข้อละ 1 คะแนน' : `รวม ${pointsSum} คะแนน`}
               </span>
             </div>
 
@@ -1033,7 +1032,7 @@ export function CreateAssignmentForm({
                   )}
                 >
                   <span className="text-foreground">เลือกโจทย์รายข้อ</span>
-                  <span className="text-xs font-normal text-muted-foreground">{questions.length} ข้อในคลัง</span>
+                  <span className="text-xs font-normal text-foreground">{questions.length} ข้อในคลัง</span>
                   <ChevronDown className="ml-auto text-muted-foreground transition-transform group-data-panel-open:rotate-180" />
                 </CollapsibleTrigger>
                 <CollapsibleContent className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 ease-out data-ending-style:h-0 data-starting-style:h-0">
@@ -1085,24 +1084,24 @@ export function CreateAssignmentForm({
             <div role="group" aria-label="ปรับคะแนนทุกข้อ" className="flex flex-wrap gap-2">
               <Button
                 type="button"
-                variant={questionPointsPreset === 'one' ? 'default' : 'outline'}
+                variant={!randomDrawOn && questionPointsPreset === 'one' ? 'default' : 'outline'}
                 size="sm"
-                aria-pressed={questionPointsPreset === 'one'}
-                disabled={previewQuestions.length === 0}
+                aria-pressed={!randomDrawOn && questionPointsPreset === 'one'}
+                disabled={previewQuestions.length === 0 || randomDrawOn}
                 onClick={() => setAllQuestionPoints('one', () => 1)}
               >
-                {questionPointsPreset === 'one' && <Check data-icon="inline-start" />}
+                {!randomDrawOn && questionPointsPreset === 'one' && <Check data-icon="inline-start" />}
                 ทุกข้อ 1 คะแนน
               </Button>
               <Button
                 type="button"
-                variant={questionPointsPreset === 'parts' ? 'default' : 'outline'}
+                variant={!randomDrawOn && questionPointsPreset === 'parts' ? 'default' : 'outline'}
                 size="sm"
-                aria-pressed={questionPointsPreset === 'parts'}
-                disabled={previewQuestions.length === 0}
+                aria-pressed={!randomDrawOn && questionPointsPreset === 'parts'}
+                disabled={previewQuestions.length === 0 || randomDrawOn}
                 onClick={() => setAllQuestionPoints('parts', question => question.default_points)}
               >
-                {questionPointsPreset === 'parts' && <Check data-icon="inline-start" />}
+                {!randomDrawOn && questionPointsPreset === 'parts' && <Check data-icon="inline-start" />}
                 คะแนนตามข้อย่อย
               </Button>
               <span role="status" aria-live="polite" className="sr-only">
@@ -1113,6 +1112,12 @@ export function CreateAssignmentForm({
                     : ''}
               </span>
             </div>
+            {randomDrawOn && (
+              <p className="text-xs text-muted-foreground">
+                เมื่อเลือกสุ่มโจทย์ ระบบจะกำหนดให้ทุกข้อมีค่า 1 คะแนนโดยอัตโนมัติ
+                ค่าคะแนนรายข้อที่ตั้งไว้จะไม่นำมาใช้ในโหมดนี้
+              </p>
+            )}
 
             <DndContext
               id={`assignment-question-order-${questionOrderDndId}`}
@@ -1128,7 +1133,8 @@ export function CreateAssignmentForm({
                       question={q}
                       position={i + 1}
                       total={previewQuestions.length}
-                      points={pointsDraft(q.id)}
+                      points={randomDrawOn ? '1' : pointsDraft(q.id)}
+                      pointsLockedToOne={randomDrawOn}
                       onMove={to => moveQuestionTo(q.id, to)}
                       onPreview={() => setPreviewIndex(i)}
                       onPointsChange={value => {
@@ -1206,7 +1212,7 @@ export function CreateAssignmentForm({
                 >
                   <p className="font-medium text-sm text-foreground">ให้ทำทุกข้อ</p>
                   <p data-assignment-description className={cn('mt-0.5 text-xs', !randomDrawOn ? 'text-foreground' : 'text-muted-foreground')}>
-                    ทุกคนได้โจทย์ชุดเดียวกัน
+                    นักเรียนทุกคนได้รับโจทย์ที่เลือกไว้ทั้งหมด
                   </p>
                 </button>
                 <button
@@ -1220,7 +1226,7 @@ export function CreateAssignmentForm({
                 >
                   <p className="font-medium text-sm text-foreground">สุ่มจากโจทย์ที่เลือกข้างต้น</p>
                   <p data-assignment-description className={cn('mt-0.5 text-xs', randomDrawOn ? 'text-foreground' : 'text-muted-foreground')}>
-                    แต่ละคน แต่ละรอบ ได้คนละชุด
+                    นักเรียนแต่ละคนและแต่ละรอบอาจได้รับชุดโจทย์ต่างกัน
                   </p>
                 </button>
               </div>
@@ -1251,6 +1257,10 @@ export function CreateAssignmentForm({
                       ข้อ จากคลัง {selectedIds.length} ข้อ
                     </span>
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    ระบบคิดคะแนนตามจำนวนข้อที่ตอบถูก โดยโจทย์ทุกข้อมีค่า 1 คะแนน
+                    คะแนนเต็มจึงเท่ากับจำนวนข้อที่สุ่มให้นักเรียนทำ
+                  </p>
                   <p data-assignment-description className="text-xs text-muted-foreground">
                     ชุดที่สุ่มได้จะถูกตรึงไว้ตลอดรอบนั้น — ปิดหน้าจอแล้วกลับมาทำต่อได้ชุดเดิม ส่วนรอบใหม่สุ่มชุดใหม่
                   </p>
@@ -1264,7 +1274,7 @@ export function CreateAssignmentForm({
               <h2 className="text-sm font-semibold text-foreground">คะแนนเต็มที่แสดงผล</h2>
               <p id="display-max-score-description" data-assignment-description className="text-xs text-muted-foreground">
                 {automaticDisplayMax !== null
-                  ? `เว้นว่างเพื่อใช้ ${automaticDisplayMax} คะแนนตามจำนวนข้อที่สุ่ม หรือกรอกคะแนนเต็มที่ต้องการเอง ระบบจะปรับคะแนนจริงของแต่ละคนให้อยู่บนคะแนนเต็มเดียวกัน`
+                  ? `เว้นว่างเพื่อใช้คะแนนเต็ม ${automaticDisplayMax} คะแนนตามจำนวนข้อที่สุ่ม หรือกรอกคะแนนเต็มที่ต้องการเพื่อปรับสเกลคะแนนรวม`
                   : `เว้นว่างเพื่อใช้คะแนนจริงรวม ${pointsSum} คะแนน หรือกรอกคะแนนเต็มที่ต้องการให้แสดง`}
               </p>
             </div>
@@ -1289,11 +1299,6 @@ export function CreateAssignmentForm({
             {displayMaxInvalid && (
               <p role="alert" className="text-xs text-destructive">
                 กรอกคะแนนเต็มที่มากกว่า 0 หรือเว้นว่างเพื่อใช้ค่าอัตโนมัติ
-              </p>
-            )}
-            {drawnPointsVary && automaticDisplayMax !== null && (
-              <p data-assignment-description className="rounded-lg bg-warning/10 px-3 py-2 text-xs text-foreground">
-                คะแนนรายข้อในคลังไม่เท่ากัน ระบบยังคงน้ำหนักของแต่ละข้อไว้ และปรับเฉพาะคะแนนรวมให้ทุกคนมีคะแนนเต็ม {manualDisplayMax ?? automaticDisplayMax} คะแนนเท่ากัน
               </p>
             )}
           </Card>
@@ -2134,6 +2139,7 @@ interface SortableQuestionScoreRowProps {
   position: number
   total: number
   points: string
+  pointsLockedToOne: boolean
   onMove: (position: number) => void
   onPreview: () => void
   onPointsChange: (value: string) => void
@@ -2145,6 +2151,7 @@ function SortableQuestionScoreRow({
   position,
   total,
   points,
+  pointsLockedToOne,
   onMove,
   onPreview,
   onPointsChange,
@@ -2203,6 +2210,8 @@ function SortableQuestionScoreRow({
         step="any"
         value={points}
         aria-label={`คะแนนข้อ ${position}`}
+        disabled={pointsLockedToOne}
+        title={pointsLockedToOne ? 'โหมดสุ่มกำหนดให้ทุกข้อมีค่า 1 คะแนน' : undefined}
         onChange={event => onPointsChange(event.target.value)}
         className="w-16 shrink-0 text-center sm:w-20"
       />

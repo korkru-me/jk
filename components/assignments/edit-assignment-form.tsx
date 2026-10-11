@@ -325,6 +325,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
   const pointsSum = Math.round(
     questionIds.reduce((sum, id) => sum + (Number.parseFloat(pointsDraft(id)) || 0), 0) * 100
   ) / 100
+  const automaticDisplayMax = randomDrawOn ? parsedRandomQuestionCount : pointsSum
 
   // Independent from the per-question points above — this only rescales
   // what's *reported* (gradebook, results, exports), never the underlying
@@ -343,6 +344,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
 
     const questionPoints = Object.fromEntries(
       questionIds.map(id => {
+        if (randomDrawOn) return [id, 1] as const
         const parsed = Number.parseFloat(pointsDraft(id))
         return [id, Number.isFinite(parsed) && parsed > 0 ? parsed : 1] as const
       })
@@ -585,11 +587,16 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-semibold text-foreground">ตั้งค่าคะแนน</h2>
           <span className="text-sm font-semibold text-primary shrink-0">
-            {questionIds.length} ข้อ · รวม {pointsSum} คะแนน
+            {questionIds.length} ข้อ · {randomDrawOn ? 'ข้อละ 1 คะแนน' : `รวม ${pointsSum} คะแนน`}
           </span>
         </div>
         <h3 className="text-sm font-semibold text-foreground">คะแนนแต่ละข้อ</h3>
-        {canEditQuestions ? (
+        {randomDrawOn ? (
+          <p className="text-xs text-muted-foreground">
+            งานที่สุ่มโจทย์คิดคะแนนตามจำนวนข้อที่ตอบถูก โดยกำหนดให้ทุกข้อมีค่า 1 คะแนน
+            จึงไม่ใช้คะแนนรายข้อที่ตั้งไว้ในโหมดนี้
+          </p>
+        ) : canEditQuestions ? (
           <p className="text-xs text-muted-foreground">
             เพิ่ม เอาออก และสลับลำดับข้อได้ เพราะยังไม่มีนักเรียนเริ่มทำชุดนี้ —
             ย้ายทีละขั้นด้วยลูกศร หรือพิมพ์เลขข้อที่ต้องการลงในช่องซ้ายมือแล้วกด Enter
@@ -648,8 +655,10 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
                 type="number"
                 min={0}
                 step="any"
-                value={pointsDraft(q.id)}
+                value={randomDrawOn ? '1' : pointsDraft(q.id)}
                 aria-label={`คะแนนข้อ ${i + 1}`}
+                disabled={randomDrawOn}
+                title={randomDrawOn ? 'โหมดสุ่มกำหนดให้ทุกข้อมีค่า 1 คะแนน' : undefined}
                 onChange={e => setQuestionPointDrafts(d => ({ ...d, [q.id]: e.target.value }))}
                 className="w-16 text-center shrink-0 sm:w-20"
               />
@@ -683,9 +692,10 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
             <div>
               <h3 className="font-semibold text-foreground">คะแนนเต็มที่แสดงผล</h3>
               <p className="text-xs text-muted-foreground">
-                ปรับแยกจากคะแนนแต่ละข้อด้านบน — ใช้ตอนอยากให้คะแนนที่บันทึก/แสดงในสมุดคะแนนไม่เท่ากับผลรวมคะแนนจริง
-                เช่น โจทย์รวม {pointsSum} คะแนน แต่อยากเก็บแค่ 10 คะแนน ระบบจะคูณสัดส่วนคะแนนของนักเรียนแต่ละคนให้อัตโนมัติ
-                ปรับได้ตลอด แม้นักเรียนจะทำเสร็จไปแล้วก็ตาม (คะแนนดิบที่ทำจริงไม่ถูกแก้ไข)
+                {randomDrawOn
+                  ? `เว้นว่างเพื่อใช้คะแนนเต็ม ${automaticDisplayMax} คะแนนตามจำนวนข้อที่สุ่ม หรือกรอกคะแนนเต็มที่ต้องการเพื่อปรับสเกลคะแนนรวม`
+                  : `ปรับแยกจากคะแนนแต่ละข้อด้านบน — เช่น โจทย์รวม ${pointsSum} คะแนน แต่อยากเก็บเพียง 10 คะแนน ระบบจะปรับสเกลคะแนนรวมให้อัตโนมัติ`}
+                {' '}ปรับได้ตลอด แม้นักเรียนจะทำเสร็จไปแล้วก็ตาม (คะแนนดิบที่ทำจริงไม่ถูกแก้ไข)
               </p>
             </div>
           </div>
@@ -697,7 +707,9 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
               value={displayMaxScore}
               aria-label="คะแนนเต็มที่แสดงผล"
               onChange={e => setDisplayMaxScore(e.target.value)}
-              placeholder={`ไม่ปรับ (เท่ากับ ${pointsSum})`}
+              placeholder={randomDrawOn
+                ? `อัตโนมัติ (${automaticDisplayMax})`
+                : `ไม่ปรับ (เท่ากับ ${pointsSum})`}
               className="max-w-[160px]"
             />
             <span className="text-sm text-muted-foreground">คะแนน</span>
@@ -784,6 +796,12 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
               ? 'ล็อกค่านี้แล้วเพราะมีนักเรียนเริ่มทำแล้ว — ชุดที่แต่ละคนได้ถูกตรึงไว้ตั้งแต่ตอนเริ่ม'
               : 'เว้นว่างเพื่อใช้ครบทุกข้อ และจะเปลี่ยนจำนวนนี้ไม่ได้หลังมีนักเรียนเริ่มทำแล้ว'}
           </p>
+          {randomDrawOn && (
+            <p className="text-xs text-muted-foreground pl-11">
+              ระบบคิดคะแนนตามจำนวนข้อที่ตอบถูก โดยโจทย์ทุกข้อมีค่า 1 คะแนน
+              คะแนนเต็มจึงเท่ากับจำนวนข้อที่สุ่มให้นักเรียนทำ
+            </p>
+          )}
         </Card>
       )}
 
