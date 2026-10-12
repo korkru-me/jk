@@ -7,12 +7,17 @@ export const metadata = { title: 'ห้องทดลองหน้ารา�
 export const dynamic = 'force-dynamic'
 
 /** Local/Staging-only fixture for the real teacher assignment-detail layout. */
-export default function AssignmentDetailLabPage() {
+export default async function AssignmentDetailLabPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ type?: string }>
+}) {
   if (!isExamScreenLabEnabled(process.env)) notFound()
+  const { type } = await searchParams
   return (
     <SidebarContextProvider>
       <main className="min-h-screen bg-background p-4 sm:p-6">
-        <AssignmentDetailLabClient />
+        <AssignmentDetailLabClient assignmentType={type === 'exam' ? 'exam' : 'exercise'} />
       </main>
     </SidebarContextProvider>
   )

@@ -6,8 +6,8 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   Users, FileText, Timer, Clock, CheckCircle2, TrendingUp,
-  AlertCircle, Activity, Pencil, LockKeyhole, Smartphone,
-  ClipboardCheck, ChevronDown, ChevronRight, ChevronUp, Globe,
+  AlertCircle, Activity, LockKeyhole, Smartphone,
+  ClipboardCheck, ChevronDown, ChevronRight, ChevronUp, Globe, Settings2,
 } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { updateAssignmentStatus, deleteAssignment } from '@/lib/actions/assignments'
@@ -31,6 +31,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { Progress, ProgressLabel } from '@/components/ui/progress'
 import { useContextualSidebar } from '@/components/layout/sidebar-context'
 import { assignmentSizeLabel } from '@/lib/assignment-size-label'
 import { cn } from '@/lib/utils'
@@ -39,7 +40,7 @@ import { AssignmentContextNavigation } from './assignment-context-sidebar'
 const STATUS_META = {
   draft:     { label: 'ร่าง',         color: 'bg-muted text-muted-foreground',   dot: 'bg-muted-foreground' },
   published: { label: 'เผยแพร่แล้ว',  color: 'bg-success/10 text-success', dot: 'bg-success' },
-  closed:    { label: 'ปิดแล้ว',      color: 'bg-destructive/10 text-destructive',     dot: 'bg-destructive' },
+  closed:    { label: 'ปิดแล้ว',      color: 'bg-background/80 text-destructive',     dot: 'bg-destructive' },
 } as const
 
 interface Props {
@@ -62,6 +63,7 @@ export function AssignmentDetailClient({
 
   const statusMeta = STATUS_META[a.status]
   const assignmentTypeLabel = a.type === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'
+  const settingsLabel = `ตั้งค่า${assignmentTypeLabel}`
   const pendingIdSet = new Set(pendingSubmissionIds)
   // Counted as hand-ins, not students — the same unit the classroom overview
   // and the "งานที่มอบหมาย" list use, so the three screens never disagree.
@@ -183,27 +185,37 @@ export function AssignmentDetailClient({
         padding="md"
         className="border-primary/20 bg-primary/10 text-foreground"
       >
-        <div className="min-w-0">
-          <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
-            <Badge variant="secondary" className={statusMeta.color}>
-              <span aria-hidden="true" className={`size-1.5 rounded-full ${statusMeta.dot}`} />
-              {statusMeta.label}
-            </Badge>
-            <Badge variant="outline">{assignmentTypeLabel}</Badge>
-            {a.secure_browser_mode === 'seb_required' && (
-              <Badge variant="outline" className="border-success/40 bg-success/10 text-success">
-                <LockKeyhole /> Safe Exam Browser
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+              <Badge variant="secondary" className={statusMeta.color}>
+                <span aria-hidden="true" className={`size-1.5 rounded-full ${statusMeta.dot}`} />
+                {statusMeta.label}
               </Badge>
-            )}
-            {a.android_exam_mode === 'monitored' && (
-              <Badge variant="warning">
-                <Smartphone /> Android ครูอนุมัติรายคน
-              </Badge>
-            )}
+              <Badge variant="outline">{assignmentTypeLabel}</Badge>
+              {a.secure_browser_mode === 'seb_required' && (
+                <Badge variant="outline" className="border-success/40 bg-success/10 text-success">
+                  <LockKeyhole /> Safe Exam Browser
+                </Badge>
+              )}
+              {a.android_exam_mode === 'monitored' && (
+                <Badge variant="warning">
+                  <Smartphone /> Android ครูอนุมัติรายคน
+                </Badge>
+              )}
+            </div>
+            <h1 className="text-xl font-bold leading-tight sm:text-2xl">{a.title}</h1>
+            {a.classrooms?.name && <p className="mt-1 text-sm text-foreground/70">ห้องหลัก · {a.classrooms.name}</p>}
+            {a.description && <p className="mt-1 text-sm text-foreground/70">{a.description}</p>}
           </div>
-          <h1 className="text-xl font-bold leading-tight sm:text-2xl">{a.title}</h1>
-          {a.classrooms?.name && <p className="mt-1 text-sm text-muted-foreground">ห้องหลัก · {a.classrooms.name}</p>}
-          {a.description && <p className="mt-1 text-sm text-muted-foreground">{a.description}</p>}
+          <Button
+            size="sm"
+            variant="outline"
+            render={<Link href={`/assignments/${a.id}/edit`} />}
+            className="shrink-0 bg-background/70 sm:self-start"
+          >
+            <Settings2 data-icon="inline-start" /> {settingsLabel}
+          </Button>
         </div>
 
         <Separator className="my-3 bg-primary/20" />
@@ -221,13 +233,25 @@ export function AssignmentDetailClient({
               >
                 <Icon aria-hidden="true" className="mt-0.5 size-3.5 shrink-0 text-primary" />
                 <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground">{detail.label}</p>
+                  <p className="text-xs text-foreground/70">{detail.label}</p>
                   <p className="text-sm font-medium leading-5 text-foreground">{detail.value}</p>
                 </div>
               </div>
             )
           })}
         </div>
+
+        {a.status !== 'draft' && (
+          <>
+            <Separator className="my-3 bg-primary/20" />
+            <AssignmentSubmissionSummary
+              submittedCount={submittedSubs.length}
+              inProgressCount={inProgressSubs.length}
+              totalSubs={submissions.length}
+              avgScore={avgScore}
+            />
+          </>
+        )}
       </Card>
 
       {a.status === 'draft' && a.secure_browser_mode === 'seb_required' && (
@@ -250,17 +274,13 @@ export function AssignmentDetailClient({
       <OverviewTab
         a={a}
         questions={questions}
-        submittedCount={submittedSubs.length}
-        inProgressCount={inProgressSubs.length}
         totalSubs={submissions.length}
-        avgScore={avgScore}
         pendingCount={pendingCount}
         pendingReviewCapped={pendingReviewCapped}
         gradeHref={gradeHref}
       />
 
       <QuestionsTab
-        assignmentId={a.id}
         questions={questions}
         sections={parseSections(a.sections)}
         showSections={a.show_sections !== false}
@@ -273,6 +293,55 @@ export function AssignmentDetailClient({
 }
 
 // ─── Overview ─────────────────────────────────────────────────────────────────
+
+function AssignmentSubmissionSummary({ submittedCount, inProgressCount, totalSubs, avgScore }: {
+  submittedCount: number
+  inProgressCount: number
+  totalSubs: number
+  avgScore: number | null
+}) {
+  const stats = [
+    { label: 'ส่งแล้ว', value: submittedCount, icon: CheckCircle2, color: 'text-success' },
+    { label: 'กำลังทำ', value: inProgressCount, icon: Activity, color: 'text-warning' },
+    { label: 'คะแนนเฉลี่ย', value: avgScore !== null ? `${avgScore}%` : '—', icon: TrendingUp, color: 'text-primary' },
+  ]
+  const progressValue = totalSubs > 0 ? (submittedCount / totalSubs) * 100 : 0
+
+  return (
+    <div
+      data-assignment-overview
+      className="grid grid-cols-3 gap-2 xl:grid-cols-[repeat(3,minmax(0,0.55fr))_minmax(18rem,1.55fr)]"
+    >
+      {stats.map(stat => {
+        const Icon = stat.icon
+        return (
+          <div key={stat.label} className="flex min-w-0 flex-col items-start gap-1.5 rounded-xl bg-background/60 px-2.5 py-2.5 sm:flex-row sm:items-center sm:gap-2.5 sm:px-3">
+            <span className={cn('flex size-8 shrink-0 items-center justify-center rounded-lg bg-background/80', stat.color)}>
+              <Icon aria-hidden="true" className="size-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-lg font-bold leading-none text-foreground">{stat.value}</p>
+              <p className="mt-1 text-xs leading-4 text-foreground/70">{stat.label}</p>
+            </div>
+          </div>
+        )
+      })}
+
+      <Progress
+        value={progressValue}
+        className="col-span-3 gap-x-3 gap-y-1.5 rounded-xl bg-background/60 px-3 py-2.5 xl:col-span-1 [&_[data-slot=progress-track]]:order-2 [&_[data-slot=progress-track]]:h-2 [&_[data-slot=progress-track]]:bg-background/80 [&_[data-slot=progress-indicator]]:bg-success"
+      >
+        <ProgressLabel className="text-xs font-medium text-foreground/70">ความคืบหน้าการส่ง</ProgressLabel>
+        <span className="ml-auto shrink-0 text-xs text-foreground/70 tabular-nums">
+          {submittedCount} / {totalSubs} คน
+        </span>
+        {inProgressCount > 0 && (
+          <p className="order-3 w-full text-xs text-foreground/70">{inProgressCount} คนกำลังทำอยู่</p>
+        )}
+      </Progress>
+    </div>
+  )
+}
 
 function DraftOverview({ a, questions, totalStudents }: {
   a: Assignment & { classrooms: { name: string } | null }
@@ -343,13 +412,10 @@ function DraftOverview({ a, questions, totalStudents }: {
   )
 }
 
-function OverviewTab({ a, questions, submittedCount, inProgressCount, totalSubs, avgScore, pendingCount, pendingReviewCapped, gradeHref }: {
+function OverviewTab({ a, questions, totalSubs, pendingCount, pendingReviewCapped, gradeHref }: {
   a: Assignment & { classrooms: { name: string } | null }
   questions: Question[]
-  submittedCount: number
-  inProgressCount: number
   totalSubs: number
-  avgScore: number | null
   pendingCount: number
   pendingReviewCapped: boolean
   gradeHref: string
@@ -358,89 +424,37 @@ function OverviewTab({ a, questions, submittedCount, inProgressCount, totalSubs,
     return <DraftOverview a={a} questions={questions} totalStudents={totalSubs} />
   }
 
-  const stats = [
-    { label: 'ส่งแล้ว',      value: submittedCount,  icon: CheckCircle2, color: 'text-success' },
-    { label: 'กำลังทำ',      value: inProgressCount, icon: Activity,     color: 'text-warning' },
-    { label: 'คะแนนเฉลี่ย', value: avgScore !== null ? `${avgScore}%` : '—', icon: TrendingUp, color: 'text-primary' },
-  ]
+  if (pendingCount === 0) return null
 
+  // งานที่ระบบตรวจเองไม่ได้ — ข้อเขียน ช่องเติมคำที่ครูตรวจเอง เหตุผลของ
+  // ถูก/ผิด — ค้างอยู่จนกว่าครูจะกรอกคะแนน คะแนนรวมของนักเรียนจึงยัง
+  // ไม่นิ่ง ปุ่มนี้พาไปที่หน้ากรอกคะแนนโดยตรง
   return (
-    <div className="flex flex-col gap-3">
-      {/* งานที่ระบบตรวจเองไม่ได้ — ข้อเขียน ช่องเติมคำที่ครูตรวจเอง เหตุผลของ
-          ถูก/ผิด — ค้างอยู่จนกว่าครูจะกรอกคะแนน คะแนนรวมของนักเรียนจึงยัง
-          ไม่นิ่ง ปุ่มนี้พาไปที่หน้ากรอกคะแนนโดยตรง */}
-      {pendingCount > 0 && (
-        <Link
-          href={gradeHref}
-          className="flex items-center gap-3 rounded-2xl border border-warning/30 bg-warning/10 px-4 py-3.5 transition-colors hover:bg-warning/15"
-        >
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-warning/20 text-warning">
-            <ClipboardCheck className="h-4 w-4" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-foreground">
-              มี {pendingCount}{pendingReviewCapped ? '+' : ''} ชิ้นที่ระบบตรวจให้ไม่ได้ รอครูกรอกคะแนนเอง
-            </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              คะแนนรวมของนักเรียนจะยังไม่ครบจนกว่าจะกรอกคะแนนข้อเหล่านี้
-            </p>
-          </div>
-          <span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-warning">
-            ตรวจให้คะแนน <ChevronRight className="h-3.5 w-3.5" />
-          </span>
-        </Link>
-      )}
-
-      <Card
-        data-assignment-overview
-        radius="md"
-        edge="ring"
-        padding="md"
-        className={cn(
-          'grid grid-cols-3 gap-3',
-          totalSubs > 0 && 'lg:grid-cols-[repeat(3,minmax(0,0.55fr))_minmax(18rem,1.5fr)]',
-        )}
-      >
-        {stats.map(s => {
-          const Icon = s.icon
-          return (
-            <div className="min-w-0" key={s.label}>
-              <div className="flex items-center gap-1.5">
-                <Icon aria-hidden="true" className={cn('size-3.5 shrink-0', s.color)} />
-                <p className="text-xl font-bold leading-none text-foreground">{s.value}</p>
-              </div>
-              <p className="mt-1 text-xs leading-4 text-muted-foreground">{s.label}</p>
-            </div>
-          )
-        })}
-
-        {/* Progress shares the same compact surface as the three headline stats. */}
-        {totalSubs > 0 && (
-          <div className="col-span-3 min-w-0 border-t border-border pt-3 lg:col-span-1 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
-            <div className="mb-1.5 flex items-center justify-between gap-3 text-xs">
-              <span className="font-medium text-muted-foreground">ความคืบหน้าการส่ง</span>
-              <span className="shrink-0 text-muted-foreground">{submittedCount} / {totalSubs} คน</span>
-            </div>
-            <div className="h-2 overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full rounded-full bg-success transition-all"
-                style={{ width: `${(submittedCount / totalSubs) * 100}%` }}
-              />
-            </div>
-            {inProgressCount > 0 && (
-              <p className="mt-1.5 text-xs text-muted-foreground">{inProgressCount} คนกำลังทำอยู่</p>
-            )}
-          </div>
-        )}
-      </Card>
-    </div>
+    <Link
+      href={gradeHref}
+      className="flex items-center gap-3 rounded-2xl border border-warning/30 bg-warning/10 px-4 py-3.5 transition-colors hover:bg-warning/15"
+    >
+      <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-warning/20 text-warning">
+        <ClipboardCheck className="size-4" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-foreground">
+          มี {pendingCount}{pendingReviewCapped ? '+' : ''} ชิ้นที่ระบบตรวจให้ไม่ได้ รอครูกรอกคะแนนเอง
+        </p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          คะแนนรวมของนักเรียนจะยังไม่ครบจนกว่าจะกรอกคะแนนข้อเหล่านี้
+        </p>
+      </div>
+      <span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-warning">
+        ตรวจให้คะแนน <ChevronRight className="size-3.5" />
+      </span>
+    </Link>
   )
 }
 
 // ─── Collapsible question table ───────────────────────────────────────────────
 
-function QuestionsTab({ assignmentId, questions, sections, showSections }: {
-  assignmentId: string
+function QuestionsTab({ questions, sections, showSections }: {
   questions: Question[]
   sections: QuestionSetSection[]
   showSections: boolean
@@ -468,13 +482,6 @@ function QuestionsTab({ assignmentId, questions, sections, showSections }: {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-1 sm:justify-end">
-            <Button
-              size="sm"
-              variant="ghost"
-              render={<Link href={`/assignments/${assignmentId}/edit`} />}
-            >
-              <Pencil data-icon="inline-start" /> แก้ไขโจทย์
-            </Button>
             <CollapsibleTrigger
               className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'group')}
             >
