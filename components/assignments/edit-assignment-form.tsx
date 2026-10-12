@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { Calendar, Clock, Layers, Target, FileText, Scale, Eye, ShieldCheck, Maximize, Fingerprint, ListFilter, ChevronUp, ChevronDown, X, Plus, Lock, Camera, LockKeyhole, Smartphone, RotateCcw, Dices, CircleCheck, Calculator, NotebookPen, Hash, CircleHelp } from 'lucide-react'
+import { ListFilter, ChevronUp, ChevronDown, X, Plus, Lock } from 'lucide-react'
 import { SolutionReleaseSetting } from '@/components/assignments/solution-release-setting'
 import {
   moveQuestionInSet, moveQuestionToIndex, normalizeSetSections, parseSections, removeQuestionsFromSet,
@@ -12,6 +12,10 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
+import {
+  Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
 import { updateAssignment } from '@/lib/actions/assignments'
 import { CompletionAttemptSettings } from '@/components/assignments/completion-attempt-settings'
 import {
@@ -40,12 +44,12 @@ import { SebQuitPasswordSettings } from '@/components/assignments/seb-quit-passw
 import type { SebQuitPasswordSetupState } from '@/lib/seb-quit-password-service.server'
 import {
   InstantCheckAnswerKeySettingLabel,
-  InstantCheckSettingLabel,
+  INSTANT_CHECK_SETTING_DESCRIPTION,
+  INSTANT_CHECK_SETTING_LABEL,
 } from '@/components/assignments/instant-check-setting-label'
-import { AssignmentSettingHoverLabel } from '@/components/assignments/assignment-setting-hover-label'
+import { AssignmentSettingToggle } from '@/components/assignments/assignment-setting-toggle'
 import {
   RESULT_VISIBILITY_OPTIONS,
-  ResultVisibilityOptionHoverCard,
 } from '@/components/assignments/result-visibility-options'
 import {
   LateSubmissionScheduleFields,
@@ -106,6 +110,9 @@ export type EditableAssignment = Pick<
   | 'show_solutions'
   | 'sections'
   | 'show_sections'
+  | 'shuffle_questions'
+  | 'shuffle_options'
+  | 'access_code'
   | 'proctoring_enabled'
   | 'fullscreen_required'
   | 'block_clipboard'
@@ -164,6 +171,10 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
   // เฉลย back until every class has sat it.
   const [showSolutions, setShowSolutions] = useState(a.show_solutions === true)
   const [showSections, setShowSections] = useState(a.show_sections !== false)
+  const [shuffleQuestions, setShuffleQuestions] = useState(a.shuffle_questions === true)
+  const [shuffleOptions, setShuffleOptions] = useState(a.shuffle_options === true)
+  const [accessCode, setAccessCode] = useState(a.access_code ?? '')
+  const [accessCodeEnabled, setAccessCodeEnabled] = useState(Boolean(a.access_code?.trim()))
   const [proctoringEnabled, setProctoringEnabled] = useState(a.proctoring_enabled)
   const [fullscreenRequired, setFullscreenRequired] = useState(a.fullscreen_required)
   const [blockClipboard, setBlockClipboard] = useState(a.block_clipboard)
@@ -195,6 +206,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
   const [passingEnabled, setPassingEnabled] = useState(a.passing_type != null && a.passing_value != null)
   const [passingType, setPassingType] = useState<'score' | 'percent'>(a.passing_type ?? 'percent')
   const [passingValue, setPassingValue] = useState(a.passing_value != null ? String(a.passing_value) : '')
+  const accessCodeInvalid = accessCodeEnabled && !accessCode.trim()
 
   // ── The question set ────────────────────────────────────────────────────
   // Editable only while no attempt exists: every attempt freezes the set (and
@@ -342,6 +354,11 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
 
     if (questionIds.length === 0) { toast.error('ชุดข้อสอบต้องมีโจทย์อย่างน้อย 1 ข้อ'); return }
 
+    if (accessCodeEnabled && !accessCode.trim()) {
+      toast.error('กรุณากรอกรหัสผ่านเข้าทำ')
+      return
+    }
+
     const questionPoints = Object.fromEntries(
       questionIds.map(id => {
         if (randomDrawOn) return [id, 1] as const
@@ -363,6 +380,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
       const res = await updateAssignment(a.id, {
         title: title.trim(),
         description,
+        access_code: accessCodeEnabled ? accessCode.trim() : null,
         start_at: thaiLocalDateTimeToIso(startAt),
         end_at: thaiLocalDateTimeToIso(endAt),
         ...(!hasSubmissions ? {
@@ -379,6 +397,10 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
         score_strategy: completionChoice === 'complete' ? scoreStrategy : 'best',
         retry_scope: retryScope,
         questions_per_page: Number(questionsPerPage) || 1,
+        ...(hasSubmissions ? {} : {
+          shuffle_questions: shuffleQuestions,
+          shuffle_options: shuffleOptions,
+        }),
         instant_check: instantCheck,
         instant_check_answer_key: instantCheckAnswerKey,
         completion_rule: completionRule,
@@ -420,175 +442,25 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <Card padding="xl" className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-3">
+      <Card padding="md" className="space-y-3">
+        <h2 className="text-sm font-semibold text-foreground">ข้อมูลพื้นฐาน</h2>
         <div className="space-y-1.5">
           <Label htmlFor="edit-title">ชื่องานที่มอบหมาย</Label>
           <Input id="edit-title" value={title} onChange={e => setTitle(e.target.value)} />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label>ชี้แจงรายละเอียดเพิ่มเติม</Label>
-          <p className="text-xs text-muted-foreground">
+          <p data-assignment-description className="text-xs text-muted-foreground">
             นักเรียนจะเห็นข้อความและรูปนี้ก่อนเข้าทำ{assignmentNoun} สามารถพิมพ์ วาง หรือลากรูปลงในช่องได้
           </p>
           <AssignmentAnnouncementEditor value={description} onChange={setDescription} />
         </div>
       </Card>
 
-      {a.mode === 'online' && a.type === 'exam' && (
-        <Card padding="xl" className="space-y-3">
-          <label className={`flex items-center justify-between gap-4 ${hasSubmissions ? '' : 'cursor-pointer'}`}>
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                <LockKeyhole className="w-4 h-4 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-foreground">บังคับใช้ Safe Exam Browser</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  ตรวจ Config Key + Browser Exam Key ที่เซิร์ฟเวอร์ทุกครั้งก่อนเข้าถึง attempt
-                </p>
-              </div>
-            </div>
-            <input
-              type="checkbox"
-              checked={secureBrowserMode === 'seb_required'}
-              disabled={hasSubmissions}
-              onChange={event => {
-                const enabled = event.target.checked
-                setSecureBrowserMode(enabled ? 'seb_required' : 'browser')
-                if (enabled) setProctoringEnabled(true)
-                else setAndroidExamMode('blocked')
-              }}
-              className="accent-primary w-4 h-4 shrink-0"
-            />
-          </label>
-          <p className="pl-11 text-xs leading-5 text-warning">
-            เผยแพร่ได้เมื่อรหัสออกและไฟล์ SEB เฉพาะข้อสอบ revision เดียวกันผ่านการตรวจแล้ว · Android ใช้ monitored mode ด้านล่างได้ ·{' '}
-            <Link href="/settings/exam-defaults" target="_blank" rel="noreferrer" className="font-medium underline underline-offset-2">
-              ตรวจความพร้อม SEB
-            </Link>
-            {hasSubmissions ? ' · ล็อกค่านี้แล้วเพราะมีนักเรียนเริ่มทำข้อสอบ' : ''}
-            {a.secure_browser_mode !== 'seb_required' && secureBrowserMode === 'seb_required'
-              ? ' · เมื่อบันทึก ระบบจะเก็บข้อสอบเป็นร่างจนกว่ารหัสออกและไฟล์ SEB รุ่นนี้จะพร้อม'
-              : ''}
-          </p>
-          {secureBrowserMode === 'seb_required' && (
-            <>
-              <label className={`ml-11 flex items-start justify-between gap-4 rounded-lg border border-warning/30 bg-warning/5 p-3 ${hasSubmissions ? '' : 'cursor-pointer'}`}>
-                <div className="flex items-start gap-3">
-                  <Smartphone className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
-                  <div>
-                    <p className="text-sm font-medium text-foreground">อนุญาต Android แบบครูตรวจเครื่อง</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      นักเรียนต้องขออนุมัติหน้าห้องสอบ ระบบแจ้งเมื่อออกจากหน้า แต่เว็บป้องกันการแคปหน้าจอระดับระบบไม่ได้
-                    </p>
-                  </div>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={androidExamMode === 'monitored'}
-                  disabled={hasSubmissions}
-                  onChange={event => {
-                    setAndroidExamMode(event.target.checked ? 'monitored' : 'blocked')
-                    if (event.target.checked) setProctoringEnabled(true)
-                  }}
-                  className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
-                />
-              </label>
-              <SebQuitPasswordSettings
-                assignmentId={a.id}
-                initialState={sebQuitPasswordSetup}
-              />
-            </>
-          )}
-        </Card>
-      )}
-
-      {a.mode === 'online' && a.type === 'exam' && (
-        <Card padding="xl" className="space-y-3">
-          <label className="flex items-center justify-between gap-4 cursor-pointer">
-            <div className="flex items-start gap-3">
-              <Fingerprint className="w-4 h-4 text-muted-foreground mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-foreground">แสดงลายน้ำผู้เข้าสอบ</p>
-                <p className="text-xs text-muted-foreground">แสดงชื่อ รหัส attempt และเวลาบนหน้าข้อสอบ เพื่อลดการส่งภาพต่อ แต่ไม่สามารถกัน screenshot ได้ทั้งหมด</p>
-              </div>
-            </div>
-            <input
-              type="checkbox"
-              checked={examWatermarkEnabled}
-              onChange={event => setExamWatermarkEnabled(event.target.checked)}
-              className="accent-primary w-4 h-4 shrink-0"
-            />
-          </label>
-        </Card>
-      )}
-
-      {a.mode === 'online' && a.type === 'exam' && (
-        <Card padding="xl" className="space-y-3">
-          <label className="flex items-center justify-between gap-4 cursor-pointer">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                <ShieldCheck className="w-4 h-4 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-foreground">เปิดห้องคุมสอบสด</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  ครูเห็นสถานะออนไลน์ เต็มจอ และเหตุการณ์ที่ควรตรวจสอบแบบเรียลไทม์ ส่วนการนับสลับแท็บในข้อสอบทำงานอัตโนมัติอยู่แล้ว
-                </p>
-              </div>
-            </div>
-            <input
-              type="checkbox"
-              checked={proctoringEnabled}
-              onChange={event => setProctoringEnabled(
-                secureBrowserMode === 'seb_required' ? true : event.target.checked
-              )}
-              disabled={secureBrowserMode === 'seb_required'}
-              className="accent-primary w-4 h-4 shrink-0"
-            />
-          </label>
-
-          {proctoringEnabled && (
-            <div className="space-y-3 border-t border-border pt-3 pl-11">
-              <label className="flex items-center justify-between gap-4 cursor-pointer">
-                <div className="flex items-center gap-2">
-                  <Maximize className="w-4 h-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium text-foreground">บังคับกลับเข้าโหมดเต็มจอ</p>
-                    <p className="text-xs text-muted-foreground">หน้าข้อสอบจะถูกบังจนกว่านักเรียนจะกลับเข้าเต็มจอ</p>
-                  </div>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={fullscreenRequired}
-                  onChange={event => setFullscreenRequired(event.target.checked)}
-                  className="accent-primary w-4 h-4 shrink-0"
-                />
-              </label>
-              <label className="flex items-center justify-between gap-4 cursor-pointer">
-                <div>
-                  <p className="text-sm font-medium text-foreground">ปิดการคัดลอก วาง และเมนูคลิกขวา</p>
-                  <p className="text-xs text-muted-foreground">เป็นแรงเสียดทานในเบราว์เซอร์ ไม่สามารถกันภาพถ่ายหรือเครื่องมือระดับระบบได้ทั้งหมด</p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={blockClipboard}
-                  onChange={event => setBlockClipboard(event.target.checked)}
-                  className="accent-primary w-4 h-4 shrink-0"
-                />
-              </label>
-              <p className="text-xs text-warning">
-                เวลาในข้อสอบยังเดินต่อเมื่อออกจากแท็บหรือเต็มจอ เพื่อไม่ให้ใช้การออกจากหน้าเป็นวิธีหยุดเวลา
-              </p>
-            </div>
-          )}
-        </Card>
-      )}
-
-      <Card padding="xl" className="flex flex-col gap-4">
+      <Card padding="md" className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-semibold text-foreground">ตั้งค่าคะแนน</h2>
+          <h2 className="text-sm font-semibold text-foreground">โจทย์ คะแนน และเวลา</h2>
           <span className="text-sm font-semibold text-primary shrink-0">
             {questionIds.length} ข้อ · {randomDrawOn ? 'ข้อละ 1 คะแนน' : `รวม ${pointsSum} คะแนน`}
           </span>
@@ -606,8 +478,8 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
             ค่าเริ่มต้นคิดตามจำนวนข้อย่อยในโจทย์ (ข้อย่อย 1 ข้อ = 1 คะแนน) ระบบรวมให้อัตโนมัติ
           </p>
         ) : (
-          <p className="flex items-start gap-2 text-xs text-warning">
-            <Lock className="w-3.5 h-3.5 shrink-0 mt-px" />
+          <p className="flex items-start gap-2 text-xs text-foreground">
+            <Lock className="mt-px size-3.5 shrink-0 text-warning" />
             <span>
               มีนักเรียนเริ่มทำชุดนี้แล้ว จึงเพิ่ม เอาออก หรือสลับลำดับข้อไม่ได้ —
               ชุดโจทย์ถูกตรึงไว้กับการทำแต่ละครั้งตั้งแต่ตอนกดเริ่ม การแก้ตอนนี้จะทำให้คนที่ทำทีหลังได้ข้อสอบคนละชุด
@@ -686,42 +558,10 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
             <Plus /> เพิ่มโจทย์จากคลัง
           </Button>
         )}
-        <Separator />
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-              <Scale className="w-4 h-4 text-muted-foreground" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-foreground">คะแนนเต็มที่แสดงผล</h3>
-              <p className="text-xs text-muted-foreground">
-                {randomDrawOn
-                  ? `เว้นว่างเพื่อใช้คะแนนเต็ม ${automaticDisplayMax} คะแนนตามจำนวนข้อที่สุ่ม หรือกรอกคะแนนเต็มที่ต้องการเพื่อปรับสเกลคะแนนรวม`
-                  : `ปรับแยกจากคะแนนแต่ละข้อด้านบน — เช่น โจทย์รวม ${pointsSum} คะแนน แต่อยากเก็บเพียง 10 คะแนน ระบบจะปรับสเกลคะแนนรวมให้อัตโนมัติ`}
-                {' '}ปรับได้ตลอด แม้นักเรียนจะทำเสร็จไปแล้วก็ตาม (คะแนนดิบที่ทำจริงไม่ถูกแก้ไข)
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 pl-11">
-            <Input
-              type="number"
-              min={0}
-              step="any"
-              value={displayMaxScore}
-              aria-label="คะแนนเต็มที่แสดงผล"
-              onChange={e => setDisplayMaxScore(e.target.value)}
-              placeholder={randomDrawOn
-                ? `อัตโนมัติ (${automaticDisplayMax})`
-                : `ไม่ปรับ (เท่ากับ ${pointsSum})`}
-              className="max-w-[160px]"
-            />
-            <span className="text-sm text-muted-foreground">คะแนน</span>
-          </div>
-        </div>
         {a.mode === 'online' && (
           <>
             <Separator />
-            <div className="flex flex-col gap-4">
+            <div className="grid gap-3 sm:grid-cols-2">
               {streakOn && (
                 <p className="text-xs text-muted-foreground rounded-lg bg-muted px-3 py-2">
                   {completionSectionLabel}เป็น “ทำถูกติดต่อกัน {streakTarget} ข้อ” — หน้าทำโจทย์แสดงทีละ 1 ข้อ และเปิดการตรวจทีละข้อให้เสมอ
@@ -748,82 +588,131 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
                   </p>
                 </div>
               )}
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="edit-duration">เวลาทำ (นาที)</Label>
+                <Input
+                  id="edit-duration"
+                  type="number"
+                  min={1}
+                  value={durationMinutes}
+                  onChange={e => setDurationMinutes(e.target.value)}
+                  placeholder="ไม่จำกัด (เว้นว่าง)"
+                  className="max-w-[200px]"
+                />
+              </div>
             </div>
           </>
         )}
       </Card>
 
-      {a.mode === 'online' && a.question_ids.length >= 2 && (
-        <Card padding="xl" className="space-y-3">
-          <div className="flex items-start gap-3">
-            <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-              <Dices className="w-4 h-4 text-muted-foreground" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-foreground">ชุดโจทย์ที่นักเรียนได้รับ</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                สุ่มจากคลัง {a.question_ids.length} ข้อ แล้วตรึงชุดที่ได้ไว้ตลอดรอบนั้น รวมถึงหลังปิดหน้าจอแล้วกลับมาทำต่อ
-              </p>
-            </div>
+      {questionIds.length > 0 && (
+        <Card padding="md" className="space-y-3">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">ชุดโจทย์ที่นักเรียนได้รับ</h2>
+            <p data-assignment-description className="text-xs text-muted-foreground">
+              คลังของงานนี้ {questionIds.length} ข้อ — เลือกว่าจะให้นักเรียนทำทั้งหมด หรือสุ่มมาบางข้อ
+            </p>
           </div>
-          <div className="flex items-center gap-2 pl-11">
-            <Input
-              id="edit-random-question-count"
-              type="number"
-              min={1}
-              max={Math.max(1, a.question_ids.length - 1)}
-              value={randomQuestionCount}
-              onChange={event => {
-                const nextValue = event.target.value
-                setRandomQuestionCount(nextValue)
-                const parsedNextValue = Number(nextValue)
-                const keepsRandomSubset = nextValue.trim() !== ''
-                  && Number.isInteger(parsedNextValue)
-                  && parsedNextValue > 0
-                  && parsedNextValue < questionIds.length
-                if (!keepsRandomSubset && completionRule === 'streak' && canEditCompletion) {
+
+          {a.mode === 'online' && questionIds.length >= 2 && (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              disabled={hasSubmissions}
+              onClick={() => {
+                setRandomQuestionCount('')
+                if (completionRule === 'streak' && canEditCompletion) {
                   setCompletionRule('fixed')
                   setPassingEnabled(false)
                 }
               }}
-              placeholder={`ครบทั้ง ${a.question_ids.length} ข้อ`}
+              className={`rounded-lg border border-border p-2.5 text-left transition-colors ${
+                !randomDrawOn ? 'bg-primary/10 shadow-sm' : 'bg-card hover:bg-muted/50'
+              } disabled:cursor-not-allowed disabled:opacity-70`}
+            >
+              <p className="text-sm font-medium text-foreground">ให้ทำทุกข้อ</p>
+              <p data-assignment-description className="text-xs text-muted-foreground">นักเรียนทุกคนได้รับโจทย์ที่เลือกไว้ทั้งหมด</p>
+            </button>
+            <button
+              type="button"
               disabled={hasSubmissions}
-              className="max-w-[150px]"
-            />
-            <Label htmlFor="edit-random-question-count" className="text-sm text-muted-foreground">
-              ข้อต่อคน
-            </Label>
+              onClick={() => {
+                if (!randomDrawOn) setRandomQuestionCount(String(Math.min(5, questionIds.length - 1)))
+              }}
+              className={`rounded-lg border border-border p-2.5 text-left transition-colors ${
+                randomDrawOn ? 'bg-primary/10 shadow-sm' : 'bg-card hover:bg-muted/50'
+              } disabled:cursor-not-allowed disabled:opacity-70`}
+            >
+              <p className="text-sm font-medium text-foreground">สุ่มจากโจทย์ที่เลือกข้างต้น</p>
+              <p data-assignment-description className="text-xs text-muted-foreground">นักเรียนแต่ละคนและแต่ละรอบอาจได้รับชุดโจทย์ต่างกัน</p>
+            </button>
           </div>
-          <p className="text-xs text-muted-foreground pl-11">
-            {hasSubmissions
-              ? 'ล็อกค่านี้แล้วเพราะมีนักเรียนเริ่มทำแล้ว — ชุดที่แต่ละคนได้ถูกตรึงไว้ตั้งแต่ตอนเริ่ม'
-              : 'เว้นว่างเพื่อใช้ครบทุกข้อ และจะเปลี่ยนจำนวนนี้ไม่ได้หลังมีนักเรียนเริ่มทำแล้ว'}
-          </p>
-          {randomDrawOn && (
-            <p className="text-xs text-muted-foreground pl-11">
-              ระบบคิดคะแนนตามจำนวนข้อที่ตอบถูก โดยโจทย์ทุกข้อมีค่า 1 คะแนน
-              คะแนนเต็มจึงเท่ากับจำนวนข้อที่สุ่มให้นักเรียนทำ
-            </p>
           )}
+
+          {randomDrawOn && (
+            <div className="flex flex-wrap items-center gap-2">
+              <Label htmlFor="edit-random-question-count">ให้นักเรียนทำ</Label>
+              <Input
+                id="edit-random-question-count"
+                type="number"
+                min={1}
+                max={Math.max(1, questionIds.length - 1)}
+                value={randomQuestionCount}
+                onChange={event => {
+                  const nextValue = event.target.value
+                  setRandomQuestionCount(nextValue)
+                  if (nextValue.trim() === '' && completionRule === 'streak' && canEditCompletion) {
+                    setCompletionRule('fixed')
+                    setPassingEnabled(false)
+                  }
+                }}
+                disabled={hasSubmissions}
+                className="w-20"
+              />
+              <span className="text-sm text-muted-foreground">ข้อ จากคลัง {questionIds.length} ข้อ</span>
+            </div>
+          )}
+
+          {hasSubmissions && (
+            <p className="text-xs text-muted-foreground">ล็อกการจ่ายชุดโจทย์แล้ว เพราะมีนักเรียนเริ่มทำงานนี้</p>
+          )}
+
+          <Separator />
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="edit-display-max-score">คะแนนเต็มที่แสดงผล</Label>
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                id="edit-display-max-score"
+                type="number"
+                min={0}
+                step="any"
+                value={displayMaxScore}
+                onChange={e => setDisplayMaxScore(e.target.value)}
+                placeholder={randomDrawOn
+                  ? `อัตโนมัติ (${automaticDisplayMax})`
+                  : `ไม่ปรับ (เท่ากับ ${pointsSum})`}
+                className="max-w-[180px]"
+              />
+              <span className="text-sm text-muted-foreground">คะแนน</span>
+            </div>
+            <p data-assignment-description className="text-xs text-muted-foreground">
+              เว้นว่างเพื่อใช้คะแนนเต็มอัตโนมัติ หรือกรอกค่าที่ต้องการเพื่อปรับสเกลผลรวม โดยไม่เปลี่ยนคะแนนดิบ
+            </p>
+          </div>
         </Card>
       )}
 
-      <Card padding="xl" className="space-y-4">
-        <div className="flex items-start gap-3">
-          <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-            <Target className="w-4 h-4 text-muted-foreground" />
-          </div>
-          <div>
-            <h2 className="font-semibold text-foreground">{completionSectionLabel}</h2>
+      <Card radius="md" padding="sm" className="space-y-2.5">
+        <div>
+            <h2 className="text-sm font-semibold text-foreground">{completionSectionLabel}</h2>
             <p className="text-xs text-muted-foreground">
               {canEditCompletion
                 ? 'นักเรียนทำถึงตรงไหนถือว่าเสร็จ และครูวัดว่าผ่านจากอะไร'
                 : 'ล็อกแล้วเพราะมีนักเรียนเริ่มทำ — เปลี่ยนตอนนี้จะทำให้ผลของคนที่ทำไปแล้วเทียบกับคนที่ทำทีหลังไม่ได้'}
             </p>
-          </div>
         </div>
 
-        <div data-completion-rules role="group" aria-label={completionSectionLabel} className={`grid grid-cols-1 gap-3 ${streakOffered ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+        <div data-completion-rules role="group" aria-label={completionSectionLabel} className={`grid grid-cols-1 gap-2 ${streakOffered ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
           <CompletionRuleCard
             selected={completionChoice === 'complete'}
             disabled={!canEditCompletion}
@@ -973,12 +862,12 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
               <p className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2">{streakBlocked}</p>
             )}
             {!streakBlocked && streakExcluded > 0 && (
-              <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
+              <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs text-foreground">
                 ข้อเขียนและข้อส่งไฟล์ {streakExcluded} ข้อจะไม่ถูกสุ่มมาในโหมดนี้ — เหลือโจทย์ที่ใช้ได้ {streakEligible} ข้อ
               </p>
             )}
             {streakAdvice && (
-              <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">{streakAdvice}</p>
+              <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs text-foreground">{streakAdvice}</p>
             )}
 
             {/* Same reason as in the create wizard: this mode hides the
@@ -1006,145 +895,239 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
         )}
       </Card>
 
-      <Card padding="xl" className="space-y-1.5">
+      <Card padding="md" className="space-y-3">
+        <h2 className="text-sm font-semibold text-foreground">
+          {a.type === 'exam' ? 'ตั้งค่าข้อสอบ' : 'ตั้งค่าแบบฝึกหัด'}
+        </h2>
 
-        {assignmentSections.length > 0 && (
-          <label className="flex items-center justify-between p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                <Layers className="w-4 h-4 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-foreground">แสดงชื่อแฟ้มย่อยให้นักเรียนเห็น</p>
-                <p className="text-xs text-muted-foreground">
-                  {assignmentSections.length} แฟ้มย่อย — ลำดับและเลขข้อไม่เปลี่ยนไม่ว่าจะเปิดหรือปิด
-                </p>
-              </div>
-            </div>
-            <input
-              type="checkbox"
-              checked={showSections}
-              onChange={e => setShowSections(e.target.checked)}
-              className="accent-primary w-4 h-4 shrink-0"
-            />
-          </label>
-        )}
-
-        {a.mode === 'online' && (
-          <>
-            <label className={`flex items-center justify-between p-3 rounded-xl border border-border transition-all ${hasSubmissions ? 'opacity-70' : 'hover:border-ring cursor-pointer'}`}>
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                  <Calculator className="w-4 h-4 text-muted-foreground" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-foreground">
-                    <AssignmentSettingHoverLabel
-                      label="เครื่องคิดเลขวิทยาศาสตร์"
-                      description={CALCULATOR_SETTING_DESCRIPTION}
+        <div className="space-y-2">
+          {a.mode === 'online' && a.type === 'exercise' && !streakOn && (
+            <AssignmentSettingToggle
+              label={INSTANT_CHECK_SETTING_LABEL}
+              description={INSTANT_CHECK_SETTING_DESCRIPTION}
+              descriptionOnHover
+              checked={instantCheck}
+              onCheckedChange={setInstantCheck}
+              footer={instantCheck ? (
+                <div className="pl-3">
+                  <label className="flex min-h-10 cursor-pointer items-center justify-between rounded-xl border border-border px-3 py-2 transition-colors hover:border-ring">
+                    <p className="text-sm font-medium text-foreground"><InstantCheckAnswerKeySettingLabel /></p>
+                    <input
+                      type="checkbox"
+                      checked={instantCheckAnswerKey}
+                      onChange={event => setInstantCheckAnswerKey(event.target.checked)}
+                      className="size-4 shrink-0 accent-primary"
                     />
-                  </p>
-                  {hasSubmissions && (
-                    <p className="text-xs text-muted-foreground">ล็อกค่าแล้ว เพราะมีนักเรียนเริ่มทำงานนี้</p>
-                  )}
+                  </label>
                 </div>
+              ) : null}
+            />
+          )}
+
+          <AssignmentSettingToggle
+            label="กำหนดรหัสผ่านเข้าทำ"
+            description="กำหนดให้นักเรียนกรอกรหัสผ่านที่ครูตั้งไว้ก่อนเริ่มทำแบบฝึกหัดหรือข้อสอบ"
+            descriptionOnHover
+            checked={accessCodeEnabled}
+            onCheckedChange={setAccessCodeEnabled}
+            footer={accessCodeEnabled ? (
+              <div className="space-y-1.5 pl-3">
+                <Label htmlFor="edit-access-code">รหัสผ่านเข้าทำ</Label>
+                <Input
+                  id="edit-access-code"
+                  value={accessCode}
+                  onChange={event => setAccessCode(event.target.value)}
+                  placeholder="กรอกรหัสผ่านที่นักเรียนต้องใช้"
+                  aria-invalid={accessCodeInvalid}
+                  className="max-w-sm"
+                />
+                {accessCodeInvalid && <p role="alert" className="text-xs text-destructive">กรุณากรอกรหัสผ่านเข้าทำ</p>}
               </div>
-              <input
-                type="checkbox"
+            ) : null}
+          />
+
+          {a.mode === 'online' && (
+            <>
+              <AssignmentSettingToggle
+                label="เครื่องคิดเลขวิทยาศาสตร์"
+                description={CALCULATOR_SETTING_DESCRIPTION}
+                descriptionOnHover
                 checked={calculatorEnabled}
-                onChange={e => setCalculatorEnabled(e.target.checked)}
+                onCheckedChange={setCalculatorEnabled}
                 disabled={hasSubmissions}
-                className="accent-primary w-4 h-4 shrink-0"
+                disabledMessage={hasSubmissions ? 'ล็อกค่าแล้ว เพราะมีนักเรียนเริ่มทำงานนี้' : undefined}
               />
-            </label>
-
-            <label className={`flex items-center justify-between p-3 rounded-xl border border-border transition-all ${hasSubmissions ? 'opacity-70' : 'hover:border-ring cursor-pointer'}`}>
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                  <NotebookPen className="w-4 h-4 text-muted-foreground" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-foreground">
-                    <AssignmentSettingHoverLabel
-                      label="กระดาษทด"
-                      description={SCRATCHPAD_SETTING_DESCRIPTION}
-                    />
-                  </p>
-                  {hasSubmissions && (
-                    <p className="text-xs text-muted-foreground">ล็อกค่าแล้ว เพราะมีนักเรียนเริ่มทำงานนี้</p>
-                  )}
-                </div>
-              </div>
-              <input
-                type="checkbox"
+              <AssignmentSettingToggle
+                label="กระดาษทด"
+                description={SCRATCHPAD_SETTING_DESCRIPTION}
+                descriptionOnHover
                 checked={scratchpadEnabled}
-                onChange={e => setScratchpadEnabled(e.target.checked)}
+                onCheckedChange={setScratchpadEnabled}
                 disabled={hasSubmissions}
-                className="accent-primary w-4 h-4 shrink-0"
+                disabledMessage={hasSubmissions ? 'ล็อกค่าแล้ว เพราะมีนักเรียนเริ่มทำงานนี้' : undefined}
               />
-            </label>
-          </>
-        )}
+            </>
+          )}
 
-        {hasWorkImageQuestions && (
-          <label className="flex items-center justify-between p-3 rounded-xl border border-border hover:border-ring cursor-pointer transition-all">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                <Camera className="w-4 h-4 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-foreground">
-                  <AssignmentSettingHoverLabel
-                    label="ให้นักเรียนแนบรูปแสดงวิธีทำ"
-                    description={WORK_IMAGE_SETTING_DESCRIPTION}
-                  />
-                </p>
-              </div>
-            </div>
-            <input
-              type="checkbox"
-              checked={requireWorkImage}
-              onChange={e => setRequireWorkImage(e.target.checked)}
-              className="accent-primary w-4 h-4 shrink-0"
+          {assignmentSections.length > 0 && (
+            <AssignmentSettingToggle
+              label="แสดงชื่อแฟ้มย่อยให้นักเรียนเห็น"
+              description={`${assignmentSections.length} แฟ้มย่อย — ลำดับและเลขข้อไม่เปลี่ยนไม่ว่าจะเปิดหรือปิด`}
+              checked={showSections}
+              onCheckedChange={setShowSections}
             />
-          </label>
-        )}
+          )}
 
-        {randomValueQuestionCount > 0 && (
-          <label className={`flex items-center justify-between p-3 rounded-xl border border-border transition-all ${hasSubmissions ? 'opacity-70' : 'hover:border-ring cursor-pointer'}`}>
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                <Hash className="w-4 h-4 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-foreground">
-                  <AssignmentSettingHoverLabel
-                    label="ให้นักเรียนได้ตัวเลขชุดเดียวกัน"
-                    description={SHARED_RANDOM_VALUES_SETTING_DESCRIPTION}
-                  />
-                </p>
-                {hasSubmissions && (
-                  <p className="text-xs text-muted-foreground">ล็อกค่าแล้ว เพราะมีนักเรียนเริ่มทำงานนี้</p>
-                )}
-              </div>
-            </div>
-            <input
-              type="checkbox"
+          <AssignmentSettingToggle
+            label="สับลำดับข้อ"
+            description={randomDrawOn
+              ? 'ระบบจะสับลำดับข้อในชุดโจทย์ที่สุ่มให้นักเรียนแต่ละคน ทำให้ลำดับข้อแตกต่างกัน'
+              : 'นักเรียนทุกคนได้รับโจทย์ชุดเดียวกัน แต่ระบบจะสับลำดับข้อให้แต่ละคนแตกต่างกัน'}
+            descriptionOnHover
+            checked={shuffleQuestions}
+            onCheckedChange={setShuffleQuestions}
+            disabled={hasSubmissions}
+            disabledMessage={hasSubmissions ? 'ล็อกค่าแล้ว เพราะมีนักเรียนเริ่มทำงานนี้' : undefined}
+          />
+          <AssignmentSettingToggle
+            label="สลับลำดับตัวเลือก"
+            description="สลับลำดับตัวเลือกของโจทย์ปรนัยให้นักเรียนแต่ละคนได้รับลำดับที่แตกต่างกัน"
+            descriptionOnHover
+            checked={shuffleOptions}
+            onCheckedChange={setShuffleOptions}
+            disabled={hasSubmissions}
+            disabledMessage={hasSubmissions ? 'ล็อกค่าแล้ว เพราะมีนักเรียนเริ่มทำงานนี้' : undefined}
+          />
+
+          {randomValueQuestionCount > 0 && (
+            <AssignmentSettingToggle
+              label="ให้นักเรียนได้ตัวเลขชุดเดียวกัน"
+              description={SHARED_RANDOM_VALUES_SETTING_DESCRIPTION}
+              descriptionOnHover
               checked={sharedRandomValues}
-              onChange={e => setSharedRandomValues(e.target.checked)}
+              onCheckedChange={setSharedRandomValues}
               disabled={hasSubmissions}
-              className="accent-primary w-4 h-4 shrink-0"
+              disabledMessage={hasSubmissions ? 'ล็อกค่าแล้ว เพราะมีนักเรียนเริ่มทำงานนี้' : undefined}
             />
-          </label>
+          )}
+
+          {hasWorkImageQuestions && (
+            <AssignmentSettingToggle
+              label="ให้นักเรียนแนบรูปแสดงวิธีทำ"
+              description={WORK_IMAGE_SETTING_DESCRIPTION}
+              descriptionOnHover
+              checked={requireWorkImage}
+              onCheckedChange={setRequireWorkImage}
+            />
+          )}
+
+          {a.mode === 'online' && (completionChoice !== 'complete' || maxAttempts !== '1') && !randomDrawOn && !streakOn && (
+            <AssignmentSettingToggle
+              label="แก้ไขเฉพาะข้อที่ไม่ถูกต้อง/ได้คะแนนไม่เต็ม"
+              description="รอบต่อไปนักเรียนทำเฉพาะข้อที่ผิดหรือได้คะแนนไม่เต็ม ข้อที่ถูกแล้วยกคะแนนมาให้"
+              checked={retryScope === 'wrong_only'}
+              onCheckedChange={checked => setRetryScope(checked ? 'wrong_only' : 'all')}
+              footer={retryScope === 'wrong_only' && showResults === 'immediate' ? (
+                <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs text-foreground">
+                  ตอนนี้ตั้งให้แสดงคำตอบที่ถูกทันทีหลังส่ง นักเรียนจึงเห็นคำตอบก่อนกลับมาแก้ข้อที่ผิด
+                </p>
+              ) : null}
+            />
+          )}
+        </div>
+
+        {a.mode === 'online' && a.type === 'exam' && (
+          <div className="space-y-3 rounded-xl border border-border p-3">
+            <AssignmentSettingToggle
+              label="บังคับใช้ Safe Exam Browser"
+              description="ล็อกเครื่องและตรวจ Config Key + Browser Exam Key ก่อนเข้าถึงการทำข้อสอบ"
+              checked={secureBrowserMode === 'seb_required'}
+              onCheckedChange={enabled => {
+                setSecureBrowserMode(enabled ? 'seb_required' : 'browser')
+                if (enabled) setProctoringEnabled(true)
+                else setAndroidExamMode('blocked')
+              }}
+              disabled={hasSubmissions}
+              disabledMessage={hasSubmissions ? 'ล็อกค่าแล้ว เพราะมีนักเรียนเริ่มทำข้อสอบนี้' : undefined}
+            />
+            <p className="text-xs leading-5 text-foreground">
+              เผยแพร่ได้เมื่อรหัสออกและไฟล์ SEB ของข้อสอบรุ่นเดียวกันผ่านการตรวจแล้ว ·{' '}
+              <Link href="/settings/exam-defaults" target="_blank" rel="noreferrer" className="font-medium underline underline-offset-2">
+                ตรวจความพร้อม SEB
+              </Link>
+              {a.secure_browser_mode !== 'seb_required' && secureBrowserMode === 'seb_required'
+                ? ' · เมื่อบันทึก ระบบจะเก็บข้อสอบเป็นร่างจนกว่าไฟล์ SEB รุ่นนี้จะพร้อม'
+                : ''}
+            </p>
+            {secureBrowserMode === 'seb_required' && (
+              <div className="space-y-2 border-t border-border pt-3">
+                <AssignmentSettingToggle
+                  label="อนุญาต Android แบบครูตรวจเครื่อง"
+                  description="นักเรียนต้องขออนุมัติหน้าห้องสอบ ระบบแจ้งเมื่อออกจากหน้า แต่เว็บป้องกันการแคปหน้าจอระดับระบบไม่ได้"
+                  checked={androidExamMode === 'monitored'}
+                  onCheckedChange={enabled => {
+                    setAndroidExamMode(enabled ? 'monitored' : 'blocked')
+                    if (enabled) setProctoringEnabled(true)
+                  }}
+                  disabled={hasSubmissions}
+                />
+                <SebQuitPasswordSettings assignmentId={a.id} initialState={sebQuitPasswordSetup} />
+              </div>
+            )}
+          </div>
         )}
 
+        {a.mode === 'online' && a.type === 'exam' && (
+          <AssignmentSettingToggle
+            label="แสดงลายน้ำผู้เข้าสอบ"
+            description="แสดงชื่อ รหัส attempt และเวลาบนหน้าข้อสอบ เพื่อลดการส่งภาพต่อ แต่ไม่สามารถกัน screenshot ได้ทั้งหมด"
+            checked={examWatermarkEnabled}
+            onCheckedChange={setExamWatermarkEnabled}
+          />
+        )}
+
+        {a.mode === 'online' && a.type === 'exam' && (
+          <div className="space-y-3 rounded-xl border border-border p-3">
+            <AssignmentSettingToggle
+              label="เปิดห้องคุมสอบสด"
+              description="ครูเห็นสถานะออนไลน์ เต็มจอ และเหตุการณ์ที่ควรตรวจสอบแบบเรียลไทม์ ส่วนการนับสลับแท็บในข้อสอบทำงานอัตโนมัติอยู่แล้ว"
+              checked={proctoringEnabled}
+              onCheckedChange={enabled => setProctoringEnabled(secureBrowserMode === 'seb_required' ? true : enabled)}
+              disabled={secureBrowserMode === 'seb_required'}
+            />
+            {proctoringEnabled && (
+              <div className="space-y-2 border-t border-border pt-3">
+                <AssignmentSettingToggle
+                  label="บังคับกลับเข้าโหมดเต็มจอ"
+                  description="หากออกจากเต็มจอ หน้าข้อสอบจะถูกบังจนกว่าจะกลับเข้า"
+                  checked={fullscreenRequired}
+                  onCheckedChange={setFullscreenRequired}
+                />
+                <AssignmentSettingToggle
+                  label="ปิดการคัดลอก วาง และเมนูคลิกขวา"
+                  description="ลดการนำข้อความออกจากหน้า แต่ไม่สามารถกันภาพถ่ายหรือเครื่องมือระดับระบบได้ทั้งหมด"
+                  checked={blockClipboard}
+                  onCheckedChange={setBlockClipboard}
+                />
+                <p className="text-xs text-foreground">เวลาในข้อสอบยังเดินต่อเมื่อออกจากแท็บหรือเต็มจอ</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        <SolutionReleaseSetting
+          checked={showSolutions}
+          onChange={setShowSolutions}
+          assignmentType={a.type}
+          maxAttempts={maxAttempts}
+          untilPassed={completionChoice !== 'complete'}
+          compact
+        />
       </Card>
 
-      <Card padding="xl" className="space-y-4">
-        <h2 className="font-semibold text-foreground flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-muted-foreground" /> กำหนดการ
-        </h2>
-        <div className="space-y-4">
+      <Card padding="md" className="space-y-3">
+        <h2 className="text-sm font-semibold text-foreground">กำหนดวันทำ</h2>
+        <div className="space-y-3">
           <div className="max-w-md space-y-1.5">
             <Label htmlFor="edit-sat">เปิดรับตั้งแต่</Label>
             <Input id="edit-sat" type="datetime-local" value={startAt} onChange={e => setStartAt(e.target.value)} />
@@ -1160,136 +1143,50 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
             onBandsChange={setLateBands}
           />
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="edit-duration" className="flex items-center gap-1.5">
-            <Clock className="w-4 h-4 text-muted-foreground" /> เวลาทำ (นาที)
-          </Label>
-          <Input
-            id="edit-duration"
-            type="number"
-            min={1}
-            value={durationMinutes}
-            onChange={e => setDurationMinutes(e.target.value)}
-            placeholder="ไม่จำกัด (เว้นว่าง)"
-            className="max-w-[200px]"
-          />
-        </div>
       </Card>
 
-      <Card padding="xl" className="space-y-4">
-        <div className="space-y-1.5">
-          <Label className="flex items-center gap-1.5">
-            <Eye className="w-4 h-4 text-muted-foreground" /> แสดงผลลัพธ์
-          </Label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <Card padding="md">
+        <Field className="gap-1.5">
+          <FieldLabel htmlFor="edit-show-results">แสดงผลลัพธ์</FieldLabel>
+          <Select
+            value={showResults}
+            onValueChange={value => {
+              if (value && RESULT_VISIBILITY_OPTIONS.some(option => option.key === value)) {
+                setShowResults(value as ShowResultsMode)
+              }
+            }}
+          >
+            <SelectTrigger id="edit-show-results" aria-label="เลือกเวลาแสดงผลลัพธ์" className="w-full sm:max-w-md">
+              <SelectValue>
+                {RESULT_VISIBILITY_OPTIONS.find(option => option.key === showResults)?.label}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent align="start" alignItemWithTrigger={false}>
+              <SelectGroup>
             {RESULT_VISIBILITY_OPTIONS.map(option => (
-              <ResultVisibilityOptionHoverCard
-                key={option.key}
-                description={option.description}
-                trigger={<button
-                  type="button"
-                  onClick={() => setShowResults(option.key)}
-                  className={`flex items-center gap-1.5 p-3 rounded-xl border-2 text-left transition-all ${
-                    showResults === option.key
-                      ? 'border-primary bg-primary/10'
-                      : 'border-border hover:border-ring'
-                  }`}
-                >
-                  <span className="font-medium text-sm text-foreground">{option.label}</span>
-                  <CircleHelp aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
-                </button>}
-              />
+                  <SelectItem key={option.key} value={option.key}>{option.label}</SelectItem>
             ))}
-          </div>
-        </div>
-
-        <SolutionReleaseSetting
-          checked={showSolutions}
-          onChange={setShowSolutions}
-          assignmentType={a.type}
-          maxAttempts={maxAttempts}
-          untilPassed={completionChoice !== 'complete'}
-        />
-
-        {a.mode === 'online' && a.type === 'exercise' && !streakOn && (
-          <div className="space-y-3 rounded-xl border border-border p-4">
-            <label className="flex items-center justify-between gap-4 cursor-pointer">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                  <CircleCheck className="w-4 h-4 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-foreground"><InstantCheckSettingLabel /></p>
-                </div>
-              </div>
-              <input
-                type="checkbox"
-                checked={instantCheck}
-                onChange={e => setInstantCheck(e.target.checked)}
-                className="accent-primary w-4 h-4 shrink-0"
-              />
-            </label>
-            {instantCheck && (
-              <label className="ml-11 flex items-center justify-between gap-4 rounded-xl border border-border p-3 cursor-pointer">
-                <p className="text-sm font-medium text-foreground">
-                  <InstantCheckAnswerKeySettingLabel />
-                </p>
-                <input
-                  type="checkbox"
-                  checked={instantCheckAnswerKey}
-                  onChange={e => setInstantCheckAnswerKey(e.target.checked)}
-                  className="accent-primary w-4 h-4 shrink-0"
-                />
-              </label>
-            )}
-          </div>
-        )}
-
-        {a.mode === 'online' && (completionChoice !== 'complete' || maxAttempts !== '1') && !streakOn && (
-          <div className="space-y-3 rounded-xl border border-border p-4">
-            <label className="flex items-center justify-between gap-4 cursor-pointer">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                  <RotateCcw className="w-4 h-4 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-foreground">แก้ไขเฉพาะข้อที่ไม่ถูกต้อง/ได้คะแนนไม่เต็ม</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    ครั้งถัดไปนักเรียนได้ทำเฉพาะข้อที่ผิดหรือได้คะแนนไม่เต็ม ข้อที่ถูกแล้วยกคะแนนมาให้ คะแนนเต็มจึงเท่าเดิม
-                    ข้ออัตนัยที่ยังไม่ได้ตรวจจะยกมาตามเดิมและแก้ไม่ได้ · มีผลกับการทำครั้งใหม่เท่านั้น
-                  </p>
-                </div>
-              </div>
-              <input
-                type="checkbox"
-                checked={retryScope === 'wrong_only'}
-                onChange={e => setRetryScope(e.target.checked ? 'wrong_only' : 'all')}
-                className="accent-primary w-4 h-4 shrink-0"
-              />
-            </label>
-            {retryScope === 'wrong_only' && showResults === 'immediate' && (
-              <p className="text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
-                ตอนนี้ตั้งให้แสดงคำตอบที่ถูกทันทีหลังส่ง นักเรียนจึงเห็นคำตอบก่อนกลับมาแก้ข้อที่ผิด
-              </p>
-            )}
-          </div>
-        )}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <FieldDescription className="text-xs leading-5">
+            {RESULT_VISIBILITY_OPTIONS.find(option => option.key === showResults)?.description}
+          </FieldDescription>
+        </Field>
       </Card>
 
-      <div className="bg-warning/10 border border-warning/20 rounded-xl p-4 flex items-start gap-2 text-sm text-warning">
-        <FileText className="w-4 h-4 shrink-0 mt-0.5" />
-        <p>
-          แก้ไขได้เฉพาะกำหนดการ รายละเอียด คะแนน และการแสดงผลลัพธ์ — โจทย์และห้องเรียนที่มอบหมายไว้จะไม่เปลี่ยน
-          (การเปลี่ยน &ldquo;คะแนนแต่ละข้อ&rdquo; จะมีผลกับการทำครั้งใหม่เท่านั้น ไม่กระทบคะแนนที่นักเรียนทำไปแล้ว
-          ส่วน &ldquo;คะแนนเต็มที่แสดงผล&rdquo; ปรับได้ตลอดและมีผลย้อนหลังกับทุกครั้งที่ทำไปแล้วทันที)
-        </p>
-      </div>
+      {hasSubmissions && (
+        <div className="flex items-start gap-2 rounded-xl border border-warning/20 bg-warning/10 p-3 text-sm text-foreground">
+          <Lock className="mt-0.5 size-4 shrink-0 text-warning" />
+          <p>ค่าที่มีผลต่อชุดโจทย์และรูปแบบ attempt ถูกล็อกไว้แล้ว ส่วนกำหนดการที่ยังอนุญาต การแสดงผล และคะแนนเต็มที่แสดงผลยังบันทึกได้ตามปกติ</p>
+        </div>
+      )}
 
-      <div className="flex gap-2">
-        <Button type="submit" disabled={isPending}>
+      <div className="flex flex-col-reverse gap-2 sm:flex-row">
+        <Button type="submit" disabled={isPending} className="w-full sm:w-auto">
           {isPending ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข'}
         </Button>
-        <Button type="button" variant="outline" onClick={() => router.back()}>
+        <Button type="button" variant="outline" onClick={() => router.back()} className="w-full sm:w-auto">
           ยกเลิก
         </Button>
       </div>

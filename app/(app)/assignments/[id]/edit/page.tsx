@@ -17,7 +17,7 @@ import { loadAssignmentQuestionsByProvenance } from '@/lib/assignment-question-a
 import { AssignmentEditSidebar } from './_components/assignment-edit-sidebar'
 import type { AssignmentSidebarSummary } from '../_components/assignment-context-sidebar'
 
-export const metadata = { title: 'แก้ไขชุดข้อสอบ — KorKru' }
+export const metadata = { title: 'ตั้งค่างานที่มอบหมาย — KorKru' }
 
 /** One assignment question as read here: what the form lists, plus what its
  *  default คะแนน is counted from. */
@@ -36,7 +36,7 @@ export default async function EditAssignmentPage({
   // unauthorized and is handled by notFound() below.
   const assignmentQuery = supabase
     .from('assignments')
-    .select('id, org_id, classroom_id, created_by, status, title, description, question_ids, question_points, display_max_score, start_at, due_at, late_bands, end_at, duration_minutes, max_attempts, mode, type, score_strategy, retry_scope, questions_per_page, instant_check, instant_check_answer_key, completion_rule, streak_target, streak_question_cap, streak_recycle_pool, passing_type, passing_value, show_results, show_solutions, sections, show_sections, proctoring_enabled, fullscreen_required, block_clipboard, random_question_count, shared_random_seed, exam_watermark_enabled, require_work_image, calculator_enabled, scratchpad_enabled, secure_browser_mode, android_exam_mode, classrooms(name)')
+    .select('id, org_id, classroom_id, created_by, status, title, description, question_ids, question_points, display_max_score, start_at, due_at, late_bands, end_at, duration_minutes, max_attempts, mode, type, score_strategy, retry_scope, questions_per_page, instant_check, instant_check_answer_key, completion_rule, streak_target, streak_question_cap, streak_recycle_pool, passing_type, passing_value, show_results, show_solutions, sections, show_sections, shuffle_questions, shuffle_options, access_code, proctoring_enabled, fullscreen_required, block_clipboard, random_question_count, shared_random_seed, exam_watermark_enabled, require_work_image, calculator_enabled, scratchpad_enabled, secure_browser_mode, android_exam_mode, classrooms(name)')
     .eq('id', id)
     .maybeSingle()
 
@@ -97,11 +97,13 @@ export default async function EditAssignmentPage({
       />
 
       <Link href={`/assignments/${id}`} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-muted-foreground transition-colors">
-        <ChevronLeft className="w-4 h-4" /> กลับไปหน้าชุดข้อสอบ
+        <ChevronLeft className="w-4 h-4" /> กลับไปหน้า{a.type === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'}
       </Link>
 
       <div>
-        <h1 className="text-2xl font-bold text-foreground">แก้ไขชุดข้อสอบ</h1>
+        <h1 className="text-2xl font-bold text-foreground">
+          {a.type === 'exam' ? 'ตั้งค่าข้อสอบ' : 'ตั้งค่าแบบฝึกหัด'}
+        </h1>
         <p className="text-sm text-muted-foreground mt-1">{a.title}</p>
       </div>
 
