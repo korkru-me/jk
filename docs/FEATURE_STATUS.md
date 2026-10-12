@@ -12,7 +12,8 @@
 - UI ใช้ compact list/table ไม่ใช้การ์ดสูงต่อโจทย์: toolbar ราว 96px, แถวโจทย์ 64–72px, แถว progress 44–48px และป้าย “ไม่มีคะแนน” อยู่ทุกทางเข้าที่อาจสับสนกับแบบฝึกหัด
 - navigation และทางเข้าสร้างถูกซ่อนด้วย server-only `PRACTICE_LIBRARY_ENABLED=true`; flag เป็น presentation/rollout gate ไม่ใช่ authorization และค่าเริ่มต้นปิด ข้อมูลการตรวจ Phase 7 กับ owner sign-off ต้องบันทึกใน `docs/SELF_PRACTICE_UAT.md` ก่อนเปิด Production
 - Candidate ผ่าน TypeScript, design-token lint, full Vitest 238 files / 3,192 tests, SQL/RLS/RPC contract บน PGlite 31 เคส, webpack production build และ Next 16 runtime diagnostics; local unauthenticated route guard redirect `/practice` ไป `/login` และ viewport 320 px ไม่ล้นแนวนอน ส่วน authenticated multi-role/1,000-question/physical-device/owner sign-off ยังเป็น Production release gate
-- สถานะ deploy ต้องอ่านจากหลักฐาน UAT ล่าสุด ไม่อนุมานจากการมี route ใน repository; migration ต้องผ่าน local/Staging ledger audit, database lint และ negative RLS cases ก่อนถือว่าพร้อมเปิดใช้
+- Staging รับ migration `20261012155740` + `20261013045149` จาก committed delivery `d71e21b` แล้ว; post-apply ledger ตรง, dry-run up-to-date, database lint ผ่าน และ anon ถูกปฏิเสธจากทั้งสามตารางกับ service-only RPC แต่ readiness guard ยังขาด Staging service-role key จึงไม่สร้าง synthetic fixture และยังไม่ผ่าน authenticated multi-role UAT
+- สถานะ deploy ต้องอ่านจากหลักฐาน UAT ล่าสุด ไม่อนุมานจากการมี route ใน repository; Production flag ยังต้องปิดจนกว่า authenticated multi-role UAT, 1,000-question performance evidence และ owner sign-off จะครบ
 
 ### ตำแหน่งไอคอน Sidebar ตรงกันทุกสถานะ — 12 ตุลาคม 2026
 

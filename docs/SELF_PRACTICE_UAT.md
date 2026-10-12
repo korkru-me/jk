@@ -7,7 +7,7 @@
 ## หลักฐานรอบทดสอบ
 
 - Environment / URL: Local candidate `http://localhost:3001`; hosted UAT ต้องใช้ `https://staging.korkru.com` เท่านั้น
-- Branch / commit: `codex/self-practice-library`; ให้ใช้ implementation commit ที่บรรจุเอกสารฉบับนี้
+- Branch / commit: `codex/self-practice-library` @ `4a979ee`; migration delivery `codex/self-practice-staging-delivery` @ `d71e21b`
 - Supabase project ref (ไม่ใส่ secret): `dyuxkrzeveknqgtuzpbh` (Staging)
 - Migration version + checksum:
   - `20261012155740_self_practice_library.sql` — `ddb723b0cdf87e42d47417d5a55cc6c7a52f46326b6527aca1ad20d40692ae11`
@@ -24,7 +24,9 @@
 - Production build: `next build --webpack` ผ่าน และสร้าง practice routes ครบ
 - Next 16 runtime: `get_compilation_issues` ไม่พบ issue; `get_errors` ไม่พบ config/session error หลังเปิด route ใหม่
 - Browser local: เปิด `/practice` โดยไม่มี session แล้ว redirect ไป `/login`; console รอบใหม่สะอาด และ viewport 320 px มี `scrollWidth = innerWidth = 320`
-- Migration preflight บน Staging delivery worktree: ledger ตรงกันถึง remote baseline; `db push --dry-run --linked` เห็นเฉพาะ migration สองไฟล์ด้านบน; `db lint --linked --level error` ผ่าน
+- Staging migration: apply จาก committed delivery `d71e21b` เฉพาะ `20261012155740` + `20261013045149` สำเร็จ; post-apply ledger ตรง local/remote, dry-run คืน `upToDate: true` และ `db lint --linked --level error` ไม่พบผลลัพธ์
+- Staging anonymous negative smoke: direct `SELECT` ของทั้งสามตารางและ service-only search RPC ถูกปฏิเสธด้วย PostgreSQL `42501`
+- Staging readiness guard: 6 checks ผ่าน แต่ขาด `SUPABASE_SERVICE_ROLE_KEY` ของ Staging จึงไม่สร้าง synthetic accounts/fixtures และไม่อ้าง authenticated UAT ว่าผ่าน
 
 หลักฐานชุดนี้ยังไม่แทน authenticated multi-role browser UAT, fixture 1,000 ข้อ, physical-device UAT หรือ owner sign-off; รายการเหล่านั้นยังคงเป็น release gate ของ Production
 
