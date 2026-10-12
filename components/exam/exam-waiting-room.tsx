@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { RichText } from '@/components/ui/rich-text'
 import { Separator } from '@/components/ui/separator'
 import type { ExamWaitingSummary } from '@/lib/exam-waiting-room'
 
@@ -68,13 +69,22 @@ export function ExamWaitingRoom({ summary, busy, error, code, onCodeChange, onSt
         {summary.blockedReason && <p role="alert" className="text-sm text-destructive">{summary.blockedReason}</p>}
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       </section>
+      {summary.description && <>
+        <Separator />
+        <section aria-labelledby="exam-waiting-announcement">
+          <Card radius="md" edge="none" padding="md" className="flex flex-col gap-2 bg-primary/10">
+            <h2 id="exam-waiting-announcement" className="text-lg font-semibold text-foreground">ประกาศจากครู</h2>
+            <RichText
+              text={summary.description}
+              blocks
+              className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground [&_a]:underline [&_a]:underline-offset-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5"
+            />
+          </Card>
+        </section>
+      </>}
       <Separator />
       <section aria-labelledby="exam-waiting-rules" className="flex flex-col gap-3">
         <h2 id="exam-waiting-rules" className="text-lg font-semibold">กติกาก่อนเข้า{room}</h2>
-        {summary.description && <div className="flex flex-col gap-1">
-          <h3 className="text-sm font-medium">คำชี้แจงจากครู</h3>
-          <p className="whitespace-pre-wrap break-words text-sm text-muted-foreground">{summary.description}</p>
-        </div>}
         <ul className="flex list-disc flex-col gap-2 pl-5 text-sm text-muted-foreground">
           <li>อ่านคำชี้แจงและเตรียมอุปกรณ์ให้พร้อม แล้วจึงกดเข้า{room}</li>
           <li>{summary.completedSubmissionId ? `รอบเดิมสิ้นสุดแล้ว การดูผลไม่เริ่ม${round}ใหม่`

@@ -101,10 +101,12 @@ async function stillReferenced(
     for (const path of (data ?? []) as string[]) referenced.add(path)
   }
 
-  // Classroom covers deliberately reuse the teacher-owned question-images
-  // bucket, but their URLs live in classrooms.description rather than a
-  // question column understood by the legacy RPC. Scan the owner's complete
-  // classroom set as a second, fail-closed source of truth before sweeping.
+  // Classroom covers and waiting-room announcements deliberately reuse the
+  // teacher-owned question-images bucket, but their URLs live outside the
+  // question columns understood by the legacy RPC. Scan both tables as a
+  // second, fail-closed source of truth before sweeping. Assignments are not
+  // filtered by creator: a co-teacher may upload into an assignment they can
+  // manage, just as copied questions can reference somebody else's file.
   if (bucket === 'question-images') {
     const wanted = new Set(paths)
     const pageSize = 1000
@@ -113,6 +115,21 @@ async function stillReferenced(
         .from('classrooms')
         .select('description')
         .eq('teacher_id', ownerId)
+        .like('description', `%question-images/${ownerId}/%`)
+        .range(from, from + pageSize - 1)
+      if (error) throw new Error(error.message)
+      for (const row of data ?? []) {
+        for (const path of extractStoragePaths(row.description ?? '', bucket)) {
+          if (wanted.has(path)) referenced.add(path)
+        }
+      }
+      if ((data?.length ?? 0) < pageSize) break
+    }
+
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await admin
+        .from('assignments')
+        .select('description')
         .like('description', `%question-images/${ownerId}/%`)
         .range(from, from + pageSize - 1)
       if (error) throw new Error(error.message)

@@ -41,7 +41,6 @@ import { Label } from '@/components/ui/label'
 import {
   Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
 import {
   Check, ChevronRight, ChevronLeft, ChevronDown, Eye,
   X, Save, FileText,
@@ -71,6 +70,7 @@ import { Card } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { IconButton } from '@/components/ui/icon-button'
 import { OrderNumberInput } from '@/components/assignments/order-number-input'
+import { AssignmentAnnouncementEditor } from '@/components/assignments/assignment-announcement-editor'
 import { QuestionPreviewDialog } from '@/components/assignments/question-preview-dialog'
 import { QuestionListPreviewDialog } from '@/components/assignments/question-list-preview-dialog'
 import type { getQuestionPreviewDetails } from '@/lib/actions/question-previews'
@@ -245,7 +245,9 @@ export function CreateAssignmentForm({
   const [title, setTitle] = useState(
     copySource ? assignmentCopyTitle(copySource.title) : (preselectedSet?.title ?? ''),
   )
-  const [description, setDescription] = useState(copySource?.description ?? preselectedSet?.description ?? '')
+  // Copying an assignment keeps its announcement. Starting from a question
+  // set does not turn that set's internal description into a student notice.
+  const [description, setDescription] = useState(copySource?.description ?? '')
   const [classroomIds, setClassroomIds] = useState<string[]>(
     preselectedClassroomId ? [preselectedClassroomId] : (classrooms[0] ? [classrooms[0].id] : [])
   )
@@ -1108,15 +1110,12 @@ export function CreateAssignmentForm({
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="desc">คำอธิบาย</Label>
-              <Textarea
-                id="desc"
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-                placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"
-                rows={2}
-              />
+            <div className="flex flex-col gap-1.5">
+              <Label>ประกาศในห้องรอ (ไม่บังคับ)</Label>
+              <p className="text-xs text-muted-foreground">
+                นักเรียนจะเห็นข้อความและรูปนี้ก่อนเข้าทำ{assignmentNoun} สามารถพิมพ์ วาง หรือลากรูปลงในช่องได้
+              </p>
+              <AssignmentAnnouncementEditor value={description} onChange={setDescription} />
             </div>
 
             {!preselectedClassroomId && (

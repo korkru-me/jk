@@ -16,17 +16,19 @@ describe('shared exam waiting presentation', () => {
   it.each([false, true])('shows the same rules without question inputs for preview=%s', previewMode => {
     const html = renderToStaticMarkup(createElement(ExamWaitingRoom, { summary, busy: false, code: '', error: null,
       previewMode, returnHref: '/assignments/test', ...callbacks() }))
-    expect(html).toContain('กติกาก่อนเข้าห้องสอบ'); expect(html).toContain('คำชี้แจงของครู')
+    expect(html).toContain('กติกาก่อนเข้าห้องสอบ'); expect(html).toContain('ประกาศจากครู'); expect(html).toContain('คำชี้แจงของครู')
     expect(html).not.toContain('<input'); expect(html).not.toContain('<textarea')
     if (previewMode) {
       expect(html).toContain('ไม่สร้างรอบสอบ'); expect(html).toContain('เข้าห้องสอบตัวอย่าง')
       expect(html).toContain('href="/assignments/test"')
     } else expect(html).toContain('เข้าห้องสอบและเริ่มจับเวลา')
   })
-  it('escapes teacher instructions rather than treating them as executable HTML', () => {
-    const html = renderToStaticMarkup(createElement(ExamWaitingRoom, { summary: { ...summary, description: '<img src=x onerror=alert(1)>' },
+  it('renders editor formatting while removing unsafe announcement markup', () => {
+    const html = renderToStaticMarkup(createElement(ExamWaitingRoom, { summary: { ...summary, description: '<p><strong>อ่านก่อนเริ่ม</strong><img src=x onerror=alert(1)></p>' },
       busy: false, code: '', error: null, ...callbacks() }))
-    expect(html).not.toContain('<img'); expect(html).toContain('&lt;img')
+    expect(html).toContain('<strong>อ่านก่อนเริ่ม</strong>')
+    expect(html).not.toContain('<img')
+    expect(html).not.toContain('onerror')
   })
   it.each(['busy', 'blocked', 'completed', 'empty-code'])('form submission cannot bypass disabled %s state with Enter', state => {
     const cb = callbacks()

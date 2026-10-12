@@ -77,6 +77,7 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 - random values และ correct answer ต้องตรึงต่อ attempt
 - server ต้องบังคับเวลา attempts และ access code ไม่พึ่ง client
 - หน้ารอของ exam/exercise ส่งเฉพาะ allowlisted metadata หลังตรวจ Auth/assignment roster/native session ไม่ส่ง assignment row, access-code value, question/answer content หรือ student score; GET/prefetch ไม่ allocate/grade/draw `startAssignmentFromWaiting` ตรวจทุก gate ใหม่ ไม่ถือว่า UI/previous receipt/query เป็น authorization และ teacher preview ต้องตรวจ `canManageAssignment` ทั้ง waiting และ answer-bearing route (12 ตุลาคม 2026)
+- ประกาศจากครูในหน้ารอใช้ `assignments.description` แบบ rich text: create/update Server Action sanitize ก่อนเขียนและทุก render sanitize ซ้ำ อนุญาตรูปเฉพาะ HTTPS public URL ของ bucket `question-images` บน `NEXT_PUBLIC_SUPABASE_URL` ปัจจุบัน ตัด script/event/style/external/data/signed URL ออก; upload ใช้ session browser และ Storage RLS บังคับโฟลเดอร์ `{auth.uid()}` เดิม ไม่ใช้ service-role upload
 - การแก้คะแนนต้องตรวจสิทธิ์ เก็บผู้แก้ และเวลา
 - การปรับคะแนนกลุ่มส่งช้าต้องไม่รับ student ids จาก browser: Server Action ตรวจ `canManageAssignment` แล้วคำนวณสมาชิกจาก first completed submission, policy สี และ extension ในฐานข้อมูลใหม่ทุกครั้ง ก่อนเรียก RPC ที่ grant เฉพาะ `service_role`; current/audit tables เปิด RLS โดยไม่มี browser policy หรือ direct grant
 - ค่าปรับแบบกลุ่มต้องเก็บแยกจากผลรวมคำตอบ ใช้ replacement semantics พร้อม batch/item audit และทำให้ attempt เดิมกับ retry ใหม่ของ student เดียวกันตรงกัน เพื่อไม่ให้การตรวจรายข้อซ้ำลบค่าปรับหรือการกดซ้ำหักสะสมโดยไม่ตั้งใจ

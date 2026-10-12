@@ -12,7 +12,6 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { updateAssignment } from '@/lib/actions/assignments'
 import { CompletionAttemptSettings } from '@/components/assignments/completion-attempt-settings'
 import {
@@ -33,6 +32,7 @@ import {
 } from '@/components/ui/dialog'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { OrderNumberInput } from '@/components/assignments/order-number-input'
+import { AssignmentAnnouncementEditor } from '@/components/assignments/assignment-announcement-editor'
 import { QuestionPicker } from '@/components/assignments/question-picker'
 import type { BankQuestion } from '@/lib/question-bank'
 import { questionExcerpt } from '@/lib/question-display'
@@ -426,9 +426,12 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
           <Label htmlFor="edit-title">ชื่องานที่มอบหมาย</Label>
           <Input id="edit-title" value={title} onChange={e => setTitle(e.target.value)} />
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="edit-desc">คำอธิบาย</Label>
-          <Textarea id="edit-desc" value={description} onChange={e => setDescription(e.target.value)} rows={3} />
+        <div className="flex flex-col gap-1.5">
+          <Label>ประกาศในห้องรอ (ไม่บังคับ)</Label>
+          <p className="text-xs text-muted-foreground">
+            นักเรียนจะเห็นข้อความและรูปนี้ก่อนเข้าทำ{assignmentNoun} สามารถพิมพ์ วาง หรือลากรูปลงในช่องได้
+          </p>
+          <AssignmentAnnouncementEditor value={description} onChange={setDescription} />
         </div>
       </Card>
 

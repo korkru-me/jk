@@ -248,7 +248,9 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, {
   images?: RichTextEditorImages
   /** Puts the cursor at the end on mount, for an editor opened by a button. */
   autoFocus?: boolean
-}>(function RichTextEditor({ value, onChange, placeholder, rows = 5, className, images, autoFocus = false }, ref) {
+  /** Accessible name for the contenteditable surface when there is no native label target. */
+  ariaLabel?: string
+}>(function RichTextEditor({ value, onChange, placeholder, rows = 5, className, images, autoFocus = false, ariaLabel }, ref) {
   const imagesRef = useRef(images)
   imagesRef.current = images
   const editorRef = useRef<Editor | null>(null)
@@ -326,6 +328,9 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, {
       attributes: {
         class: 'outline-none min-h-[80px] text-sm text-gray-900 leading-relaxed',
         'data-placeholder': placeholder ?? '',
+        role: 'textbox',
+        'aria-multiline': 'true',
+        ...(ariaLabel ? { 'aria-label': ariaLabel } : {}),
       },
       // A screenshot pasted or a picture dropped goes up like one picked
       // from the button. Anything else is left to the editor as before.
