@@ -1913,7 +1913,7 @@ export function CreateAssignmentForm({
                 <div>
                   <p className="text-sm font-medium text-foreground">เปิดห้องคุมสอบสด</p>
                   <p data-assignment-description className="text-xs text-muted-foreground mt-0.5">
-                    ครูเห็นสถานะออนไลน์ การออกจากแท็บ/เต็มจอ และเหตุการณ์ที่ควรตรวจสอบแบบเรียลไทม์
+                    ครูเห็นสถานะออนไลน์ เต็มจอ และเหตุการณ์ที่ควรตรวจสอบแบบเรียลไทม์ ส่วนการนับสลับแท็บในข้อสอบทำงานอัตโนมัติอยู่แล้ว
                   </p>
                 </div>
                 <input

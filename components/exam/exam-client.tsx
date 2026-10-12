@@ -43,10 +43,10 @@ import { RichText } from '@/components/ui/rich-text'
 import { containsMath } from '@/lib/math/latex'
 import { renderRichTextHtml } from '@/lib/rich-text-html'
 import { partLabels } from '@/lib/part-labels'
-import { groupQuestionsBySection, sectionByQuestionId, type QuestionSetSection } from '@/lib/question-set-sections'
+import { sectionByQuestionId, type QuestionSetSection } from '@/lib/question-set-sections'
 import { getBlankType, splitFillBlankHtml, extractBlankNumbers } from '@/lib/fill-blank'
 import { splitAnswerBlankHtml, countAnswerBlanks, splitNumberedAnswerBlanks } from '@/lib/answer-blank'
-import type { AnswerPart, MatchingAnswerMode, MathInputMode, TrueFalseConfig, TrueFalseStatement, TrueFalseExplanationMode, FillBlankConfig, OrderingConfig, OrderingItem, RandomQuestionConfig, FileUploadConfig, SubmittedFile, CompositeConfig, ClassifyConfig, ImageLabelConfig, LogicRule, Question } from '@/lib/types'
+import type { AnswerPart, AssignmentType, MatchingAnswerMode, MathInputMode, TrueFalseConfig, TrueFalseStatement, TrueFalseExplanationMode, FillBlankConfig, OrderingConfig, OrderingItem, RandomQuestionConfig, FileUploadConfig, SubmittedFile, CompositeConfig, ClassifyConfig, ImageLabelConfig, LogicRule, Question } from '@/lib/types'
 import { CLASSIFY_UNSET, parseClassifyGrid } from '@/lib/classify'
 import { normalizeImageLabelMode, parseImageLabelAnswer } from '@/lib/image-label'
 import { ImageLabelInput } from './image-label-input'
@@ -75,6 +75,8 @@ import {
   type FingerInputMode,
 } from '@/lib/drawing-board-input'
 import type { StudentAttachmentState } from '@/lib/scratchpad-state'
+import { cn } from '@/lib/utils'
+import { shouldDetectTabSwitch } from '@/lib/exam-tab-switch'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -142,6 +144,7 @@ interface AnswerRow extends Omit<SafeExamAnswer, 'questions'> {
 }
 
 export interface ExamConfig {
+  assignmentType: AssignmentType
   proctoringEnabled: boolean
   isFullscreenEnforced: boolean
   blockClipboard: boolean
@@ -296,11 +299,11 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   const [currentIndex, setCurrentIndex] = useState(0)
   /** -1 for every งาน that is not a streak run, which disables the sync below. */
   const streakLatestIndex = streak != null ? answers.length - 1 : -1
-  // Runs follow the order this student actually sees (shuffling reorders
-  // submission_answers), so a shuffled exam simply breaks into short runs
-  // instead of printing headings over the wrong questions.
+  // The question card may still show the first section that owns it, but the
+  // navigator is deliberately one uninterrupted number sequence. A question
+  // can belong to more than one section, so section headings here implied a
+  // grouping that the student's actual order does not guarantee.
   const sectionOwner = sectionByQuestionId(sections)
-  const sectionRuns = groupQuestionsBySection(answers.map(a => a.question_id), sections)
   // Preview-only: the client-side (never persisted) grading result shown
   // after a teacher clicks submit in previewMode, in place of the real
   // /submissions/[id] results page.
@@ -476,7 +479,11 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   }, [streakLatestIndex])
 
   // ── Anti-cheat ──────────────────────────────────────────────────────────────
-  const { tabSwitchCount, showTabWarning } = useTabSwitchGuard()
+  // Every real exam observes tab changes automatically. Exercises and teacher
+  // previews never do, regardless of the optional live proctor room setting.
+  const { tabSwitchCount, showTabWarning } = useTabSwitchGuard(
+    shouldDetectTabSwitch(config.assignmentType, previewMode),
+  )
   const { status: proctorStatus, activeConnectionCount: proctorActiveConnectionCount } = useExamProctor({
     enabled: config.proctoringEnabled && !previewMode,
     submissionId,
@@ -1168,71 +1175,74 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   const timerUrgent   = secondsLeft !== null && secondsLeft < 300
   const timerDanger   = secondsLeft !== null && secondsLeft < 60
 
-  const renderQuestionNavigation = (touchFriendly = false) => {
-    let numbered = 0
-    return (
-      <>
-        {sectionRuns.map((run, runIndex) => {
-          const startIndex = numbered
-          numbered += run.question_ids.length
-          return (
-            <div key={runIndex} className={runIndex > 0 ? 'mt-3' : undefined}>
-              {run.title && (
-                <p className="mb-1.5 truncate text-[10px] font-semibold text-muted-foreground">{run.title}</p>
-              )}
-              <div className={`grid ${touchFriendly ? 'grid-cols-5 gap-1.5' : 'grid-cols-4 gap-1.5 pointer-coarse:gap-1'}`}>
-                {run.question_ids.map((_, offset) => {
-                  const i = startIndex + offset
-                  const answer = answers[i]
-                  const isCurrent = i >= pageStart && i < pageStart + perPage
-                  const isAnswered = hasAnswered(answer.id)
-                  const isFlagged = flagged.has(answer.id)
-                  const verdict = checked[answer.id]?.verdict
-                  let tone = 'bg-muted text-muted-foreground'
-                  if (isCurrent) tone = 'bg-primary text-white shadow-md shadow-primary/40 scale-110 z-10'
-                  else if (isFlagged) tone = 'bg-flag text-white'
-                  else if (verdict === 'correct') tone = 'bg-success text-success-foreground'
-                  else if (verdict === 'wrong' || verdict === 'partial') tone = 'bg-destructive/15 text-destructive border border-destructive/30'
-                  else if (isAnswered) tone = 'bg-success/10 text-success border border-success/20 dark:bg-success/15'
+  const navigationLegendItems = [
+    { cls: 'bg-primary', label: 'ข้อปัจจุบัน' },
+    { cls: 'border border-success/20 bg-success/10 dark:bg-success/15', label: 'ตอบแล้ว' },
+    ...(instantCheckOn ? [
+      { cls: 'bg-success', label: 'ตรวจแล้ว ถูก' },
+      { cls: 'border border-destructive/30 bg-destructive/15', label: 'ตรวจแล้ว ยังไม่ถูก' },
+    ] : []),
+    { cls: 'bg-flag', label: 'ปักธง' },
+    { cls: 'bg-muted', label: 'ยังไม่ตอบ' },
+  ]
 
-                  return (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => {
-                        navigateTo(i)
-                        if (touchFriendly) setShowQuestionNavigator(false)
-                      }}
-                      aria-label={`ไปข้อ ${i + 1}`}
-                      aria-current={isCurrent ? 'page' : undefined}
-                      className={`${touchFriendly ? 'h-11 w-11' : 'h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11'} rounded-lg text-sm font-bold transition-all hover:scale-105 ${tone}`}
-                    >
-                      {i + 1}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
+  const renderQuestionNavigationLegend = () => (
+    <div className="grid shrink-0 grid-cols-2 gap-x-3 gap-y-1.5 px-1">
+      {navigationLegendItems.map(item => (
+        <div key={item.label} className="flex min-w-0 items-center gap-2">
+          <div className={cn('h-3 w-3 shrink-0 rounded-sm', item.cls)} />
+          <span className="truncate text-[10px] text-muted-foreground">{item.label}</span>
+        </div>
+      ))}
+    </div>
+  )
+
+  const renderQuestionNavigation = (touchFriendly = false) => {
+    const compactNumbers = !touchFriendly && answers.length > 12
+    return (
+      <div className={cn(
+        'grid gap-1.5',
+        touchFriendly || compactNumbers ? 'grid-cols-5' : 'grid-cols-4',
+      )}>
+        {answers.map((answer, i) => {
+          const isCurrent = i >= pageStart && i < pageStart + perPage
+          const isAnswered = hasAnswered(answer.id)
+          const isFlagged = flagged.has(answer.id)
+          const verdict = checked[answer.id]?.verdict
+          let tone = 'bg-muted text-foreground/70'
+          if (isCurrent) tone = 'z-10 scale-105 bg-primary text-primary-foreground shadow-md shadow-primary/40'
+          else if (isFlagged) tone = 'bg-flag text-white'
+          else if (verdict === 'correct') tone = 'bg-success text-success-foreground'
+          else if (verdict === 'wrong' || verdict === 'partial') tone = 'border border-destructive/30 bg-destructive/15 text-destructive'
+          else if (isAnswered) tone = 'border border-success/20 bg-success/10 text-success dark:bg-success/15'
+
+          return (
+            <Button
+              key={answer.id}
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                navigateTo(i)
+                if (touchFriendly) setShowQuestionNavigator(false)
+              }}
+              aria-label={`ไปข้อ ${i + 1}`}
+              aria-current={isCurrent ? 'page' : undefined}
+              className={cn(
+                'rounded-lg font-bold transition-all hover:scale-105',
+                touchFriendly
+                  ? 'h-11 w-11 text-sm'
+                  : compactNumbers
+                    ? 'h-8 w-8 text-xs'
+                    : 'h-10 w-10 text-sm pointer-coarse:h-11 pointer-coarse:w-11',
+                tone,
+              )}
+            >
+              {i + 1}
+            </Button>
           )
         })}
-        <div className="mt-3 space-y-1.5 border-t pt-3">
-          {[
-            { cls: 'bg-primary', label: 'ข้อปัจจุบัน' },
-            { cls: 'bg-success/10 border border-success/20 dark:bg-success/15', label: 'ตอบแล้ว' },
-            ...(instantCheckOn ? [
-              { cls: 'bg-success', label: 'ตรวจแล้ว ถูก' },
-              { cls: 'bg-destructive/15 border border-destructive/30', label: 'ตรวจแล้ว ยังไม่ถูก' },
-            ] : []),
-            { cls: 'bg-flag', label: 'ปักธง' },
-            { cls: 'bg-muted', label: 'ยังไม่ตอบ' },
-          ].map(item => (
-            <div key={item.label} className="flex items-center gap-2">
-              <div className={`h-3 w-3 shrink-0 rounded-sm ${item.cls}`} />
-              <span className="text-[10px] text-muted-foreground">{item.label}</span>
-            </div>
-          ))}
-        </div>
-      </>
+      </div>
     )
   }
 
@@ -1668,7 +1678,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
         className={`hidden min-h-0 shrink-0 flex-col gap-3 lg:flex ${
           focusMode
             ? 'h-full w-60'
-            : 'sticky top-3 h-[calc(100dvh-4rem)] w-56 self-start'
+            : 'sticky top-3 h-[calc(100dvh-14.5rem)] w-56 self-start overflow-hidden'
         }`}
       >
 
@@ -1739,28 +1749,32 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
         </Card>
         )}
 
-        {/* Anti-cheat counter */}
-        {tabSwitchCount > 0 && (
-          <div className="bg-destructive/10 border border-destructive/30 rounded-xl px-3 py-2 flex items-center gap-2">
-            <ShieldAlert size={14} className="text-destructive shrink-0" />
-            <div>
-              <p className="text-[10px] font-bold text-destructive">สลับแท็บ {tabSwitchCount} ครั้ง</p>
-              <p className="text-[9px] text-muted-foreground">ระบบบันทึกไว้แล้ว</p>
-            </div>
-          </div>
-        )}
+        {!streakOn && renderQuestionNavigationLegend()}
 
-        {/* A streak run has no bulk ส่งคำตอบ: the attempt ends when the run
-            does, and its controls live under the ข้อ itself. */}
-        {!streakOn && (
-          <Button
-            onClick={openSubmitDialog}
-            disabled={submitting}
-            className="w-full bg-success hover:bg-success/90 text-success-foreground border-0"
-          >
-            {submitting ? 'กำลังส่ง...' : 'ส่งคำตอบ ✓'}
-          </Button>
-        )}
+        <div className="flex shrink-0 flex-col gap-2">
+          {/* Anti-cheat counter */}
+          {tabSwitchCount > 0 && (
+            <div className="flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2">
+              <ShieldAlert size={14} className="shrink-0 text-destructive" />
+              <div>
+                <p className="text-[10px] font-bold text-destructive">สลับแท็บ {tabSwitchCount} ครั้ง</p>
+                <p className="text-[9px] text-muted-foreground">ระบบตรวจพบแล้ว</p>
+              </div>
+            </div>
+          )}
+
+          {/* A streak run has no bulk ส่งคำตอบ: the attempt ends when the run
+              does, and its controls live under the ข้อ itself. */}
+          {!streakOn && (
+            <Button
+              onClick={openSubmitDialog}
+              disabled={submitting}
+              className="w-full border-0 bg-success text-success-foreground hover:bg-success/90"
+            >
+              {submitting ? 'กำลังส่ง...' : 'ส่งคำตอบ ✓'}
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -1992,10 +2006,10 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
             role="dialog"
             aria-modal="true"
             aria-labelledby="mobile-question-navigator-title"
-            className="max-h-[calc(var(--app-height,100dvh)-1.5rem)] w-full max-w-sm overflow-y-auto overscroll-contain"
+            className="flex max-h-[calc(var(--app-height,100dvh)-1.5rem)] w-full max-w-sm flex-col overflow-hidden"
             style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
           >
-            <div className="mb-3 flex items-center gap-3">
+            <div className="mb-3 flex shrink-0 items-center gap-3">
               <div className="min-w-0 flex-1">
                 <h2 id="mobile-question-navigator-title" className="font-bold">ดูทุกข้อ</h2>
                 <p className="text-xs text-muted-foreground">ตอบแล้ว {answeredCount}/{answers.length} ข้อ</p>
@@ -2022,12 +2036,17 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                 <X />
               </Button>
             </div>
-            {renderQuestionNavigation(true)}
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-xl border border-border p-3">
+              {renderQuestionNavigation(true)}
+            </div>
+            <div className="mt-3">
+              {renderQuestionNavigationLegend()}
+            </div>
             <Button
               type="button"
               onClick={openSubmitDialog}
               disabled={submitting}
-              className="mt-4 min-h-10 w-full bg-success text-success-foreground hover:bg-success/90 pointer-coarse:min-h-11"
+              className="mt-4 min-h-10 w-full shrink-0 bg-success text-success-foreground hover:bg-success/90 pointer-coarse:min-h-11"
             >
               {submitting ? 'กำลังส่ง...' : 'ส่งคำตอบ ✓'}
             </Button>

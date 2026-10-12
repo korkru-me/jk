@@ -114,6 +114,7 @@ export default async function TakeExamPage({
   }
 
   const examConfig: ExamConfig = {
+    assignmentType: assignment.type,
     proctoringEnabled: assignment.proctoring_enabled,
     // SEB already owns OS-level kiosk/fullscreen behavior. Asking the DOM to
     // enter fullscreen on top of it causes false overlays on iOS/macOS.
