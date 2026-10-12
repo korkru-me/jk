@@ -88,7 +88,7 @@ export default async function EditAssignmentPage({
   const duplicateQuestionCount = Math.max(0, a.question_ids.length - uniqueQuestionCount)
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="assignment-edit-stage flex max-w-5xl flex-col gap-6">
       <AssignmentEditSidebar
         assignment={assignment as unknown as AssignmentSidebarSummary}
         availableQuestionCount={questions.length}

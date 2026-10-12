@@ -50,7 +50,7 @@ export function ExamWaitingLab() {
   const [mode, setMode] = useState('ready')
   const [starts, setStarts] = useState(0)
   const [entered, setEntered] = useState('ยังไม่มีการเริ่มหรือส่งรอบทำงาน')
-  return <div className="mx-auto flex max-w-2xl flex-col gap-4">
+  return <div className="assignment-waiting-stage flex w-full max-w-5xl flex-col gap-4">
     <p className="text-sm text-muted-foreground">ตัวอย่าง UI เท่านั้น · ไม่มี Auth/ฐานข้อมูล/SEB จริง ไม่มีการเปิดโจทย์หรือจับเวลา</p>
     <FieldGroup><Field>
       <FieldLabel htmlFor="waiting-lab-mode">สถานการณ์ตัวอย่าง</FieldLabel>
