@@ -1,5 +1,25 @@
 # แผนปิดงาน Safe Exam Browser หลัง Drawing Board
 
+## อนุมัติ release ordinary waiting/preview เท่านั้น — 12 ตุลาคม 2026
+
+เจ้าของอนุมัติให้นำหน้ารอสอบและ “ดูตัวอย่างนักเรียน” ของ narrowed candidate `c270c40` ขึ้น Production เพื่อดูด้วยตนเอง อำนาจนี้ไม่รวม native W7, SEB pilot, seed/final/enrollment, keys, activation หรือ Production migration ใหม่ รวม master `7e74dee` แล้วและรัน local regression ใหม่: 223 files / 2,981 tests, TypeScript/token lint/guarded TEST build ผ่าน เผยแพร่ผ่าน PR เข้า master/project `jk` ด้วย environment เดิม และต้องยืนยัน READY + exact merged source + canonical Production alias ก่อนรายงาน release สำเร็จ Production verification เป็น read-only ไม่สร้าง fixture/attempt/คะแนน; W7 ยัง HOLD จนได้รับคำขอใหม่โดยตรง ประวัติ Preview credential gate ด้านล่างไม่ใช่ข้ออนุมัติให้ย้าย secrets หรือเปลี่ยน environment
+
+## คำขอเพิ่มเติม 11 ตุลาคม 2026 — ทำหน้ารอให้ครบก่อน W7
+
+เจ้าของขอพัก W7 และปรับ “ดูตัวอย่างนักเรียน” ของข้อสอบ Browser ให้เริ่มที่หน้ารอ/อ่านกติกาเหมือนทางเข้าสอบจริงแล้ว จึงแก้ใน narrowed candidate branch นี้ โดยใช้ shared waiting presentation ไม่สร้าง attempt จริงใน preview และไม่แตะ native seed/final/enrollment/keys/activation ตัวอย่างแบบฝึกหัดไม่เปลี่ยน ผลใหม่ 217 files / 2,913 tests, TypeScript/token lint/guarded TEST build และ local shared-view browser QA ผ่าน; hosted authenticated journey และ W7 ยังไม่ทดสอบ ไม่ Deploy/merge เว็บจริงในรอบนี้ ขั้นถัดไปให้เจ้าของตรวจหน้ารอและผ่าน permission gate ของ isolated Preview ก่อน hosted QA แล้วค่อยอนุมัติกลับ W7 ใหม่ ไม่ใช้ผล UI แทน native proof
+
+## ส่วนเพิ่มหน้ารอสอบสำหรับเว็บจริง — 10 ตุลาคม 2026 / pending release
+
+เจ้าของอนุมัติให้นำเฉพาะส่วนที่เสร็จขึ้น Production แล้ว และยืนยัน Vercel CLI ใหม่สำเร็จ แต่ไม่ได้อนุมัติข้าม native W7 แยก candidate `codex/exam-waiting-production` จาก master `8d54184` ที่ live Production ใช้อยู่ โดย port หน้ารอสอบ Browser/legacy verified SEB/approved Android จาก `326ead6` เท่านั้น ไม่รวม `/exam/{assignment}/r/{revision}` pilot, atomic-start migration, operator scripts, native artifact/keys/release/activation ของ W1–W6 ซึ่งยังอยู่ `codex/seb-exam-only-waiting-room` ที่ `b8a6b57` ขอบเขตนี้ไม่เปลี่ยนแบบฝึกหัดหรือสูตรคะแนน และรักษา score adjustment ของ master
+
+Candidate local verification ผ่าน: waiting entry/route 33 regressions รวมสองเคส score-adjustment compatibility, full 215 files / 2,892 tests, TypeScript, token lint, guarded TEST-only webpack build, Chrome controller lab ที่ 320px/axe/Next runtime ไม่มี errors ไม่ใช่ authenticated hosted-to-DB หรือ native physical proof แก้ union narrowing สองบรรทัดในสองฟอร์มห้องเรียนเพื่อให้ TypeScript/build ผ่าน ไม่เปลี่ยนฟอร์มหรือ payload
+
+**Staging schema ส่งแล้ว / hosted deploy ยังหยุด:** เจ้าของอนุมัติเฉพาะ Staging จึง apply `20261007145225_assignment_late_submission_bands.sql`, `20261007151705_late_submission_score_adjustments.sql`, `20261008025659_late_bands_stable_volatility.sql` จาก committed/pushed source `4630479` ผ่าน delivery checkout history Staging เดิม + สามไฟล์ exact checksum ไม่ใช้ main checkout ที่ link Production CLI dry-run แสดงเฉพาะสามรายการก่อน apply และตรวจหลัง apply parity ตรง 144 รายการ/ไม่มี gap; schema-only limit=0 ของ assignments/submissions/extensions/current/audit tables ผ่าน HTTP 200 ทั้งหก ไม่อ่าน student rows ไม่เรียกปรับคะแนน ไม่สร้าง fixture/attempt ไม่ replay/repair/reset pilot `20261009142610` และไม่แตะ Production Focused migration/action/waiting 5 files / 50 tests ผ่าน
+
+Preview ของ candidate `4630479` เตรียมใน project ทดสอบ `korkru-seb-uat` แต่ auto-review ปฏิเสธก่อน execute เพราะส่งคีย์ Staging ฝั่ง server ไป build/runtime Preview จึงยังไม่มี deployment request/link/env/alias mutation ห้าม bypass Read-only Vercel preflight ยืนยัน public Supabase URL ตรง Staging operator แต่ project env ปัจจุบันผูกเฉพาะ target `production` ของ project ทดสอบ (ไม่ใช่ `korkru.com`); sensitive service-role key ไม่ส่ง value คืนจึงไม่พิสูจน์ Preview readiness รออนุมัติการใช้ Staging server keys ใน isolated Preview ชัดเจนก่อน deploy/test Auth-to-DB คง canonical aliases/cron/native flags และ W7 HOLD ยังไม่ได้ merge master
+
+Production preflight อ่าน project `jk`/production branch `master`/verified domains/source/READY ได้ แต่ sensitive `NEXT_PUBLIC_SUPABASE_URL` กับ service key ไม่ส่ง value คืนจาก Vercel API จึงยังไม่ยืนยัน Production DB target/ledger และไม่ apply Production การมี URL ใน local `.env.local` หรือ ref ใน cached CLI linkไม่ใช่หลักฐานแทน deployment ต้องยืนยัน exact target ก่อน read ledger/dry-run/apply ตามกฎ migration-delivery; Production schema authority changes ยังต้องขออนุมัติแยก และไม่เปิด W7 อัตโนมัติ
+
 อัปเดต: 23 กันยายน 2026
 
 เอกสารนี้กำหนดลำดับงาน SEB/Exam ต่อจาก `origin/master` ที่ commit

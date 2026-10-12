@@ -1,10 +1,13 @@
 import { redirect } from 'next/navigation'
-import { drawNextStreakQuestion, startSubmission } from '@/lib/actions/submissions'
+import { drawNextStreakQuestion, readSubmissionEntry } from '@/lib/actions/submissions'
 import { ExamClient, type ExamConfig } from '@/components/exam/exam-client'
 import { AccessCodeForm } from '@/components/exam/access-code-form'
 import { parseSections } from '@/lib/question-set-sections'
 import { getExamTakingData } from '@/lib/exam-taking'
 import { SecureExamLaunchGate } from '@/components/exam/secure-exam-launch-gate'
+import { ExamWaitingClient } from '@/components/exam/exam-waiting-client'
+import { waitingResumeId } from '@/lib/exam-waiting-room'
+import { isAttemptExpired } from '@/lib/grading'
 
 export const metadata = { title: 'ทำข้อสอบ — KorKru' }
 
@@ -13,14 +16,16 @@ export default async function TakeExamPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ sebChallenge?: string | string[] }>
+  searchParams: Promise<{ sebChallenge?: string | string[]; attempt?: string | string[] }>
 }) {
   const { id } = await params
-  const rawChallenge = (await searchParams).sebChallenge
+  const query = await searchParams
+  const rawChallenge = query.sebChallenge
   const sebChallenge = typeof rawChallenge === 'string' ? rawChallenge : undefined
 
-  // Start or resume submission
-  const result = await startSubmission(id, undefined, sebChallenge)
+  // Exam GET/prefetch never creates or grades an attempt. Only the waiting
+  // room's explicit POST starts one; exercises keep their existing behavior.
+  const result = await readSubmissionEntry(id, sebChallenge)
 
   if ('unauthenticated' in result && result.unauthenticated) {
     redirect('/login')
@@ -61,17 +66,41 @@ export default async function TakeExamPage({
     redirect(`/submissions/${result.submissionId}`)
   }
 
-  let exam = await getExamTakingData(result.submissionId!)
+  let submissionId = result.submissionId
+  if (result.waitingRoom) {
+    const resumeId = waitingResumeId(result.waitingRoom, query.attempt)
+    if (!resumeId) {
+      return <ExamWaitingClient key={`${id}:${result.waitingRoom.previousSubmissionId ?? 'new'}`}
+        assignmentId={id} summary={result.waitingRoom} sebChallenge={sebChallenge} />
+    }
+    submissionId = resumeId
+  }
+  if (!submissionId) redirect('/assignments')
+  let exam = await getExamTakingData(submissionId)
   if (!exam) redirect('/assignments')
+  if (result.waitingRoom) {
+    // A slow safe-data read may cross the timer/deadline boundary. Do not
+    // serialize the questions then: show question-free recovery instead.
+    const expired = isAttemptExpired(exam.submission.started_at, exam.assignment.duration_minutes)
+    const deadlinePassed = result.waitingRoom.endAt != null && new Date(result.waitingRoom.endAt).getTime() < Date.now()
+    if (expired || deadlinePassed) {
+      return <ExamWaitingClient assignmentId={id} sebChallenge={sebChallenge}
+        summary={{ ...result.waitingRoom, activeSubmissionId: null, expired,
+          blockedReason: deadlinePassed ? 'หมดเวลาส่งแล้ว กรุณาติดต่อครูผู้สอน' : null }} />
+    }
+  }
 
   // A "ถูกติดต่อกัน" attempt is created with no ข้อ at all — its length is an
-  // outcome, so startSubmission has nothing to freeze. The first ข้อ is drawn
-  // here, through the same action the ข้อต่อไป button uses, so there is one
-  // place that decides which ข้อ a student gets and one that builds the row.
-  // Idempotent, so a reload finds the ข้อ already waiting instead of skipping
-  // one the student never saw.
-  if (exam.assignment.completion_rule === 'streak' && exam.answers.length === 0) {
-    const drawn = await drawNextStreakQuestion(result.submissionId!)
+  // outcome, so startSubmission has nothing to freeze. Exam initialization is
+  // now performed by the explicit waiting POST; only legacy exercises draw
+  // here. Both use the same action as the ข้อต่อไป button.
+  if (result.waitingRoom && exam.assignment.completion_rule === 'streak' && exam.answers.length === 0) {
+    // An interrupted POST may have opened a header before drawing. Resume it
+    // deliberately from the waiting room; GET/prefetch must not draw or grade.
+    return <ExamWaitingClient assignmentId={id} summary={result.waitingRoom} sebChallenge={sebChallenge} />
+  }
+  if (!result.waitingRoom && exam.assignment.completion_rule === 'streak' && exam.answers.length === 0) {
+    const drawn = await drawNextStreakQuestion(submissionId)
     if (drawn && 'error' in drawn) {
       return (
         <div className="max-w-md mx-auto mt-16 text-center">
@@ -83,7 +112,7 @@ export default async function TakeExamPage({
         </div>
       )
     }
-    exam = await getExamTakingData(result.submissionId!)
+    exam = await getExamTakingData(submissionId)
     if (!exam) redirect('/assignments')
   }
 
@@ -122,7 +151,7 @@ export default async function TakeExamPage({
   return (
     <div className="h-full flex flex-col">
       <ExamClient
-        submissionId={result.submissionId!}
+        submissionId={submissionId}
         storageOwnerId={submission.student_id}
         answers={answers}
         initialWorkArtifacts={artifacts}
