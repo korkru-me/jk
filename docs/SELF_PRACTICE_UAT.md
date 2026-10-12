@@ -7,7 +7,7 @@
 ## หลักฐานรอบทดสอบ
 
 - Environment / URL: Local candidate `http://localhost:3001`; hosted UAT ต้องใช้ `https://staging.korkru.com` เท่านั้น
-- Branch / commit: `codex/self-practice-library` @ `4a979ee`; migration delivery `codex/self-practice-staging-delivery` @ `d71e21b`
+- Branch / commit: `codex/self-practice-library` implementation `4a979ee` + scale evidence `70fbef6`; migration delivery `codex/self-practice-staging-delivery` @ `d71e21b`
 - Supabase project ref (ไม่ใส่ secret): `dyuxkrzeveknqgtuzpbh` (Staging)
 - Migration version + checksum:
   - `20261012155740_self_practice_library.sql` — `ddb723b0cdf87e42d47417d5a55cc6c7a52f46326b6527aca1ad20d40692ae11`
