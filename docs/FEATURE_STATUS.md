@@ -1,5 +1,12 @@
 # Feature status
 
+### คลังฝึกไม่มีคะแนน — เริ่ม Phase 1 (12 ตุลาคม 2026)
+
+- อนุมัติทิศทางเป็นโดเมน `คลังฝึก` แยกจาก assignment/submission แต่ใช้ทางเข้าสร้าง คลังโจทย์ การค้นหา ตัวแสดงโจทย์ และ evaluator ที่ปลอดภัยร่วมกันได้; แผนใน `docs/PRACTICE_LIBRARY_PLAN.md` แบ่ง 7 เฟสพร้อม acceptance gate และกำหนด compact-Y เป็นข้อบังคับของ UI
+- เพิ่ม pure contract ที่ `lib/practice-library.ts`: หลายแท็กตรงทุกแท็กแบบ exact AND โดย reuse กติกาคลังโจทย์เดิม, นับเฉพาะการกด “ตรวจคำตอบ” ที่มีคำตอบไม่ว่าง และสร้าง metadata allowlist 5 field พร้อม UUID idempotency key โดยตัด answer/correctness/score ออก
+- Phase 1 ยังไม่มี route, component, feature flag, schema, RLS หรือ production navigation; ภาพทั้งหกใน `docs/practice/mockups/` เป็น reference ของ flow ไม่ใช่หลักฐานว่าฟีเจอร์ใช้งานจริง และ Phase 2 จะเริ่มได้ต่อเมื่อ migration ledger/environment พร้อมและแบบสิทธิ์ผ่าน gate
+- focused Vitest ของ contract ผ่าน 11/11 เคส, full suite ผ่าน 228 files / 3,073 cases, TypeScript, design-token lint, production build และ `git diff --check` ผ่าน; ยังไม่แตะฐานข้อมูลหรือ migration
+
 ### ตำแหน่งไอคอน Sidebar ตรงกันทุกสถานะ — 12 ตุลาคม 2026
 
 - **UI-116** — แถวเมนูระดับบนใน Sidebar หลักและ contextual sidebar ใช้แกนแนวนอนเดียวกับปุ่ม hamburger ทั้ง drawer มือถือ, panel เต็ม, icon rail และ hover preview บน desktop จึงไม่กระโดดซ้าย–ขวาเมื่อซ่อนหรือแสดงเมนู; รายการลูกยังเยื้องเมื่อมี label เพื่อคงลำดับชั้น แต่กลับสู่แกนหลักเมื่ออยู่ใน icon rail
