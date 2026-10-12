@@ -55,7 +55,7 @@ export function AssignmentAnnouncementEditor({ value, onChange }: {
       onChange={onChange}
       placeholder="เช่น โปรดเตรียมเครื่องคิดเลข อ่านกติกาให้ครบ หรือแจ้งสิ่งที่ต้องทำก่อนเริ่ม"
       rows={5}
-      ariaLabel="ประกาศในห้องรอ"
+      ariaLabel="ชี้แจงรายละเอียดเพิ่มเติม"
       images={{
         upload: uploadAnnouncementImage,
         accepts: isAssignmentAnnouncementImageSrc,
