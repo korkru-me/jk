@@ -33,6 +33,7 @@ const QUESTION_SNAPSHOT = '40000000-0000-4000-8000-000000000005'
 const QUESTION_PUBLIC = '40000000-0000-4000-8000-000000000006'
 const LIBRARY = '50000000-0000-4000-8000-000000000001'
 const LIBRARY_DELETE = '50000000-0000-4000-8000-000000000002'
+const PERFORMANCE_LIBRARY = '50000000-0000-4000-8000-000000000003'
 
 let db: PGlite
 
@@ -1107,6 +1108,122 @@ describe('self-practice RPC privilege and execution contracts', () => {
         { question_id: QUESTION_A1 },
         { question_id: QUESTION_A2 },
       ])
+    })
+  })
+
+  it('keeps a 1,000-question library paged, bounded, and counted in one search RPC', async () => {
+    await as(service, async tx => {
+      await tx.exec('RESET ROLE')
+      await tx.query(`
+        INSERT INTO public.practice_libraries
+          (id, org_id, classroom_id, created_by, title)
+        VALUES ($1, $2, $3, $4, 'คลังทดสอบหนึ่งพันข้อ')
+      `, [PERFORMANCE_LIBRARY, ORG_A, ROOM_A, OWNER_A])
+      await tx.query(`
+        INSERT INTO public.questions
+          (id, created_by, org_id, visibility, title, question_text, question_type,
+           tags, search_text, is_research_snapshot)
+        SELECT
+          ('41000000-0000-4000-8000-' || lpad(item::text, 12, '0'))::uuid,
+          $1,
+          $2,
+          'private',
+          'โจทย์ฝึก ' || item,
+          'โจทย์สำหรับทดสอบคลังขนาดใหญ่ ' || item,
+          'written',
+          CASE WHEN item % 2 = 0
+            THEN ARRAY['สอวน. ค่าย 1', 'ไฟฟ้า']::text[]
+            ELSE ARRAY['สอวน. ค่าย 1', 'นิวตัน']::text[]
+          END,
+          'โจทย์ สอวน. ค่าย 1 ' || CASE WHEN item % 2 = 0 THEN 'ไฟฟ้า' ELSE 'นิวตัน' END
+            || ' ' || item,
+          false
+        FROM generate_series(1, 1000) item
+      `, [OWNER_A, ORG_A])
+      await tx.query(`
+        INSERT INTO public.practice_library_questions
+          (library_id, question_id, position)
+        SELECT
+          $1,
+          ('41000000-0000-4000-8000-' || lpad(item::text, 12, '0'))::uuid,
+          item - 1
+        FROM generate_series(1, 1000) item
+      `, [PERFORMANCE_LIBRARY])
+      await tx.query(`
+        INSERT INTO public.practice_answer_attempts
+          (library_id, student_id, question_id, idempotency_key)
+        SELECT
+          $1::uuid,
+          $2::uuid,
+          ('41000000-0000-4000-8000-' || lpad(item::text, 12, '0'))::uuid,
+          ('63000000-0000-4000-8000-' || lpad(item::text, 12, '0'))::uuid
+        FROM generate_series(10, 1000, 10) item
+        UNION ALL
+        SELECT
+          $1::uuid,
+          $3::uuid,
+          ('41000000-0000-4000-8000-' || lpad(item::text, 12, '0'))::uuid,
+          ('64000000-0000-4000-8000-' || lpad(item::text, 12, '0'))::uuid
+        FROM generate_series(7, 1000, 7) item
+      `, [PERFORMANCE_LIBRARY, STUDENT_A, STUDENT_B])
+      await tx.query(
+        "UPDATE public.practice_libraries SET status = 'published' WHERE id = $1",
+        [PERFORMANCE_LIBRARY],
+      )
+      await tx.exec('SET LOCAL ROLE service_role')
+
+      const startedAt = process.hrtime.bigint()
+      const rows = (await tx.query<{
+        question_id: string
+        position: number
+        title: string
+        question_type: string
+        tags: string[]
+        attempt_count: bigint
+        total_count: bigint
+      }>(`
+        SELECT *
+        FROM public.search_practice_library_questions(
+          $1, $2, ARRAY['โจทย์'], ARRAY['สอวน. ค่าย 1', 'ไฟฟ้า'], 24, 0
+        )
+      `, [STUDENT_A, PERFORMANCE_LIBRARY])).rows
+      const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000
+      const normalizedRows = rows.map(row => ({
+        ...row,
+        attempt_count: Number(row.attempt_count),
+        total_count: Number(row.total_count),
+      }))
+      const payloadBytes = Buffer.byteLength(JSON.stringify(normalizedRows), 'utf8')
+
+      const explain = await tx.query<Record<string, unknown>>(`
+        EXPLAIN (ANALYZE, FORMAT JSON)
+        SELECT *
+        FROM public.search_practice_library_questions(
+          $1, $2, ARRAY['โจทย์'], ARRAY['สอวน. ค่าย 1', 'ไฟฟ้า'], 24, 0
+        )
+      `, [STUDENT_A, PERFORMANCE_LIBRARY])
+
+      expect(normalizedRows).toHaveLength(24)
+      expect(normalizedRows.every(row => row.total_count === 500)).toBe(true)
+      expect(normalizedRows.map(row => row.position)).toEqual(
+        Array.from({ length: 24 }, (_, index) => index * 2 + 1),
+      )
+      expect(normalizedRows.find(row => row.title === 'โจทย์ฝึก 10')?.attempt_count).toBe(1)
+      expect(payloadBytes).toBeLessThan(64 * 1024)
+      expect(elapsedMs).toBeLessThan(5_000)
+      expect(explain.rows[0]?.['QUERY PLAN']).toBeDefined()
+
+      if (process.env.PRACTICE_PERF_EVIDENCE === '1') {
+        console.info('[practice-library-performance]', JSON.stringify({
+          questions: 1000,
+          matchingQuestions: 500,
+          requestDatabaseCalls: 1,
+          returnedRows: rows.length,
+          payloadBytes,
+          elapsedMs: Number(elapsedMs.toFixed(2)),
+          queryPlan: explain.rows[0]?.['QUERY PLAN'],
+        }))
+      }
     })
   })
 

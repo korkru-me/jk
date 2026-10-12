@@ -19,7 +19,7 @@
 ### Automated candidate evidence (13 ตุลาคม 2026)
 
 - TypeScript: `npx tsc --noEmit` ผ่าน
-- Vitest: 238 files / 3,192 tests ผ่าน รวม SQL/RLS/RPC contract บน PGlite 31 เคส
+- Vitest: 238 files / 3,193 tests ผ่าน รวม SQL/RLS/RPC contract บน PGlite 32 เคส
 - Design-token lint: ผ่าน; palette 105 (baseline 149), hand-rolled cards 0, buttons 259 (baseline 302)
 - Production build: `next build --webpack` ผ่าน และสร้าง practice routes ครบ
 - Next 16 runtime: `get_compilation_issues` ไม่พบ issue; `get_errors` ไม่พบ config/session error หลังเปิด route ใหม่
@@ -27,8 +27,9 @@
 - Staging migration: apply จาก committed delivery `d71e21b` เฉพาะ `20261012155740` + `20261013045149` สำเร็จ; post-apply ledger ตรง local/remote, dry-run คืน `upToDate: true` และ `db lint --linked --level error` ไม่พบผลลัพธ์
 - Staging anonymous negative smoke: direct `SELECT` ของทั้งสามตารางและ service-only search RPC ถูกปฏิเสธด้วย PostgreSQL `42501`
 - Staging readiness guard: 6 checks ผ่าน แต่ขาด `SUPABASE_SERVICE_ROLE_KEY` ของ Staging จึงไม่สร้าง synthetic accounts/fixtures และไม่อ้าง authenticated UAT ว่าผ่าน
+- Local scale evidence: PGlite fixture 1,000 โจทย์ มี progress สังเคราะห์ของนักเรียน 2 คน; ค้นข้อความ + แท็ก AND พบ 500 ข้อและคืน 24 แถวผ่าน RPC เดียว, payload แถวผลลัพธ์ 5,440 bytes, เวลาที่ caller วัด 37.03 ms และ `EXPLAIN ANALYZE` เป็น `Function Scan` 24 actual rows / 33.197 ms (ค่าจากเครื่อง local รอบนี้ ไม่ใช่ hosted latency หรือ RSC bytes)
 
-หลักฐานชุดนี้ยังไม่แทน authenticated multi-role browser UAT, fixture 1,000 ข้อ, physical-device UAT หรือ owner sign-off; รายการเหล่านั้นยังคงเป็น release gate ของ Production
+หลักฐานชุดนี้ยังไม่แทน authenticated multi-role browser UAT, hosted 1,000-question/RSC measurement, physical-device UAT หรือ owner sign-off; รายการเหล่านั้นยังคงเป็น release gate ของ Production
 
 ใช้เฉพาะ Staging ที่ผ่าน isolation guard และข้อมูล QA สังเคราะห์ ห้ามใช้ข้อมูลนักเรียนจริงหรือ Production เพื่อทดสอบ mutation
 
