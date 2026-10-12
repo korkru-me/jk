@@ -27,7 +27,9 @@ export function AssignmentActions({ assignmentId, currentStatus }: Props) {
     if (result?.error) toast.error(result.error)
     else {
       toast.success(
-        status === 'published' ? 'เผยแพร่ชุดข้อสอบแล้ว' : 'ปิดชุดข้อสอบแล้ว'
+        status === 'published'
+          ? currentStatus === 'closed' ? 'เปิดชุดข้อสอบให้ทำอีกครั้งแล้ว' : 'เผยแพร่ชุดข้อสอบแล้ว'
+          : 'ปิดชุดข้อสอบแล้ว'
       )
       router.refresh()
     }
@@ -51,6 +53,11 @@ export function AssignmentActions({ assignmentId, currentStatus }: Props) {
       {currentStatus === 'draft' && (
         <Button onClick={() => changeStatus('published')} disabled={loading} className="bg-success hover:bg-success/90">
           เผยแพร่
+        </Button>
+      )}
+      {currentStatus === 'closed' && (
+        <Button onClick={() => changeStatus('published')} disabled={loading} className="bg-success hover:bg-success/90">
+          เปิดให้ทำอีกครั้ง
         </Button>
       )}
       {currentStatus === 'published' && (

@@ -43,6 +43,19 @@ describe('attemptLimitFor', () => {
 })
 
 describe('resolveSolutionRelease', () => {
+  it('keeps mastery solutions locked after a failed run despite an old quota of one', () => {
+    expect(resolveSolutionRelease(input({ type: 'exam', maxAttempts: 1,
+      passingType: 'percent', passingValue: 70,
+      attempts: [{ id: 'failed', status: 'graded', attempt_number: 1, started_at: iso(-HOUR), total_score: 6, max_score: 10 }],
+    })).state).toBe('locked')
+  })
+  it('opens after a finished mastery pass but never while another attempt remains writable', () => {
+    const passed = { id: 'passed', status: 'graded' as const, attempt_number: 1, started_at: iso(-HOUR), streak_reached: true }
+    expect(resolveSolutionRelease(input({ completionRule: 'streak', attempts: [passed] })).state).toBe('open')
+    expect(resolveSolutionRelease(input({ completionRule: 'streak', attempts: [passed,
+      { id: 'live', status: 'in_progress', attempt_number: 2, started_at: iso(0) }],
+    })).state).toBe('locked')
+  })
   it('stays off when the teacher did not tick it, whatever else is true', () => {
     expect(resolveSolutionRelease(input({ showSolutions: false, status: 'closed' }))).toEqual({ state: 'off' })
   })

@@ -7,6 +7,8 @@ import { getTeachingBoards } from '@/lib/actions/math-work'
 import { TeachingModeClient, type TeachingQuestionView } from '@/components/assignments/teaching-mode-client'
 import type { Assignment, Question } from '@/lib/types'
 import { backHrefFromSearchParams } from '@/lib/back-link'
+import { canManageAssignment } from '@/lib/auth/assignment-access'
+import { loadAssignmentQuestionsByProvenance } from '@/lib/assignment-question-access.server'
 
 export const metadata = { title: 'โหมดสอน — KorKru' }
 
@@ -23,11 +25,11 @@ export default async function AssignmentTeachingPage({
   if (!user) redirect('/login')
 
   const supabase = await createClient()
-  const [{ data: assignment }, { data: canManage }] = await Promise.all([
+  const [{ data: assignment }, canManage] = await Promise.all([
     supabase.from('assignments').select('*').eq('id', id).maybeSingle(),
-    supabase.rpc('can_manage_math_tools_assignment', { p_assignment_id: id }),
+    canManageAssignment(id, user.id),
   ])
-  if (!assignment) notFound()
+  if (!assignment || !canManage) notFound()
   const a = assignment as Assignment
 
   if (a.question_ids.length === 0) {
@@ -39,11 +41,11 @@ export default async function AssignmentTeachingPage({
     )
   }
 
-  const { data: questionRows } = await supabase
-    .from('questions')
-    .select('*')
-    .in('id', a.question_ids)
-  if (!questionRows || questionRows.length === 0) notFound()
+  const questionResult = await loadAssignmentQuestionsByProvenance(a)
+  if ('error' in questionResult) throw new Error(questionResult.error)
+  if (questionResult.missingQuestionIds.length > 0 || questionResult.duplicateQuestionCount > 0) notFound()
+  const questionRows = questionResult.questions
+  if (questionRows.length === 0) notFound()
 
   const questionsById = new Map((questionRows as Question[]).map(question => [question.id, question]))
   const orderedQuestions = a.question_ids
@@ -81,11 +83,12 @@ export default async function AssignmentTeachingPage({
       assignmentTitle={a.title}
       backHref={backHref}
       currentUserId={user.id}
-      canManage={canManage === true}
+      canManage
       questions={teachingQuestions}
       questionsPerPage={a.questions_per_page ?? 1}
       initialBoards={initial && !('error' in initial) ? initial.boards : []}
       initialBoardsError={initial && 'error' in initial ? initial.error : undefined}
+      contextualSidebarPath={`/assignments/${id}/teach`}
     />
   )
 }

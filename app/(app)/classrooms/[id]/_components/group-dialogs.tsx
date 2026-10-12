@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Check, Search, Shuffle } from 'lucide-react'
+import { Check, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,22 +10,34 @@ import {
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import {
-  GROUP_COLOR_IDS, GROUP_NAME_MAX, MAX_GROUPS_PER_CLASSROOM,
+  GROUP_COLOR_IDS, GROUP_NAME_MAX,
   type ClassroomGroup, type GroupColorId,
 } from '@/lib/classroom-groups'
 import { groupPreset } from '@/app/(app)/classrooms/_components/group-colors'
 
 export { groupPreset }
 
-export interface GroupStudent { id: string; full_name: string }
+export interface GroupStudent {
+  id: string
+  full_name: string
+  grade_level: string | null
+  section_number: number | null
+  class_number: number | null
+  student_code: string | null
+}
 
 // ── Colour swatches ────────────────────────────────────────────────────────
 
 export function GroupColorSwatches({
-  value, onChange, idPrefix,
-}: { value: GroupColorId; onChange: (color: GroupColorId) => void; idPrefix: string }) {
+  value, onChange, idPrefix, ariaLabel = 'สีของกลุ่ม',
+}: {
+  value: GroupColorId
+  onChange: (color: GroupColorId) => void
+  idPrefix: string
+  ariaLabel?: string
+}) {
   return (
-    <div role="radiogroup" aria-label="สีของกลุ่ม" className="flex flex-wrap gap-1.5">
+    <div role="radiogroup" aria-label={ariaLabel} className="flex flex-wrap gap-1.5">
       {GROUP_COLOR_IDS.map(id => {
         const preset = groupPreset(id)
         const selected = value === id
@@ -330,114 +342,6 @@ function AddStudentsForm({
           ตกลง
         </Button>
       </DialogFooter>
-    </DialogContent>
-  )
-}
-
-// ── Random split ───────────────────────────────────────────────────────────
-
-export function RandomSplitDialog({
-  open, onOpenChange, studentCount, groupCount, pending, onConfirm,
-}: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  studentCount: number
-  groupCount: number
-  pending: boolean
-  onConfirm: (createCount?: number) => void
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      {open && (
-        <RandomSplitForm
-          studentCount={studentCount}
-          groupCount={groupCount}
-          pending={pending}
-          onCancel={() => onOpenChange(false)}
-          onConfirm={onConfirm}
-        />
-      )}
-    </Dialog>
-  )
-}
-
-function RandomSplitForm({
-  studentCount, groupCount, pending, onCancel, onConfirm,
-}: {
-  studentCount: number
-  groupCount: number
-  pending: boolean
-  onCancel: () => void
-  onConfirm: (createCount?: number) => void
-}) {
-  const needsGroups = groupCount === 0
-  const [countText, setCountText] = useState(String(Math.max(2, Math.min(4, Math.ceil(studentCount / 2)))))
-  const count = Number(countText)
-  const countValid = Number.isInteger(count) && count >= 2 && count <= MAX_GROUPS_PER_CLASSROOM
-  const groups = needsGroups ? (countValid ? count : 0) : groupCount
-  const perGroup = groups > 0 ? studentCount / groups : 0
-  const sizeHint = groups > 0
-    ? (Number.isInteger(perGroup) ? `กลุ่มละ ${perGroup} คน` : `กลุ่มละ ${Math.floor(perGroup)}–${Math.ceil(perGroup)} คน`)
-    : ''
-
-  return (
-    <DialogContent className="sm:max-w-md">
-      <form
-        className="grid gap-4"
-        onSubmit={e => {
-          e.preventDefault()
-          if (needsGroups && !countValid) return
-          onConfirm(needsGroups ? count : undefined)
-        }}
-      >
-        <DialogHeader>
-          <DialogTitle>แบ่งกลุ่มแบบสุ่ม</DialogTitle>
-          <DialogDescription render={<div />}>
-            {needsGroups
-              ? <>ห้องนี้ยังไม่มีกลุ่ม จะสร้างกลุ่มใหม่ตามจำนวนที่ตั้ง แล้วสุ่มนักเรียนทั้ง {studentCount} คนลงกลุ่ม</>
-              : <>สุ่มนักเรียนทั้ง {studentCount} คนลงใน {groupCount} กลุ่มที่มีอยู่ ให้แต่ละกลุ่มมีจำนวนใกล้เคียงกัน</>}
-          </DialogDescription>
-        </DialogHeader>
-
-        {needsGroups && (
-          <div className="space-y-1.5">
-            <Label htmlFor="random-group-count">จำนวนกลุ่ม</Label>
-            <Input
-              id="random-group-count"
-              type="number"
-              inputMode="numeric"
-              min={2}
-              max={MAX_GROUPS_PER_CLASSROOM}
-              value={countText}
-              onChange={e => setCountText(e.target.value)}
-              aria-invalid={!countValid}
-              className="w-28"
-              autoFocus
-            />
-            {!countValid && (
-              <p className="text-xs text-destructive">ใส่ได้ 2–{MAX_GROUPS_PER_CLASSROOM} กลุ่ม</p>
-            )}
-          </div>
-        )}
-
-        {sizeHint && studentCount > 0 && (
-          <p className="text-sm text-foreground">ได้ประมาณ{sizeHint}</p>
-        )}
-
-        {!needsGroups && (
-          <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning">
-            การจัดกลุ่มที่ทำไว้ตอนนี้จะถูกแทนที่ทั้งหมด ชื่อและสีของกลุ่มยังอยู่เหมือนเดิม
-          </p>
-        )}
-
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={onCancel}>ยกเลิก</Button>
-          <Button type="submit" disabled={pending || studentCount === 0 || (needsGroups && !countValid)} className="gap-1.5">
-            <Shuffle className="size-3.5" />
-            {pending ? 'กำลังสุ่ม…' : 'สุ่มเลย'}
-          </Button>
-        </DialogFooter>
-      </form>
     </DialogContent>
   )
 }

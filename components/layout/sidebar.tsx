@@ -1,23 +1,49 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
-import { usePathname } from 'next/navigation'
-import { ChevronDown } from 'lucide-react'
+import { usePathname, useSearchParams } from 'next/navigation'
+import {
+  ChevronDown,
+  ChevronLeft,
+  BookOpenCheck,
+  ClipboardCheck,
+  ClipboardList,
+  FilePlus2,
+  FileUp,
+  FlaskConical,
+  FolderKanban,
+  House,
+  LayoutGrid,
+  LibraryBig,
+  NotebookPen,
+  Plus,
+  School,
+  Settings,
+  ShieldCheck,
+  Trash2,
+  UserRound,
+  type LucideIcon,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { isClassroomSectionPath } from '@/lib/classroom-navigation'
+import { isAssignmentStudentPreviewPath } from '@/lib/assignment-preview-navigation'
+import { Separator } from '@/components/ui/separator'
+import { sidebarSearchKey, useSidebarContext } from './sidebar-context'
+import { SidebarDisplayProvider, SidebarLabel, SidebarSectionLabel, useSidebarCompact } from './sidebar-display'
 import type { UserRole } from '@/lib/types'
+import { useAppFeatureFlags } from './app-feature-flags'
 
 interface NavItem {
   href: string
   label: string
-  icon: string
+  icon: LucideIcon
 }
 
 /** A heading that opens to reveal its pages instead of navigating anywhere. */
 interface NavGroup {
   label: string
-  icon: string
+  icon: LucideIcon
   children: NavItem[]
 }
 
@@ -27,35 +53,47 @@ function isGroup(entry: NavEntry): entry is NavGroup {
   return 'children' in entry
 }
 
-const teacherNav: NavEntry[] = [
-  { href: '/dashboard', label: 'หน้าหลัก', icon: '🏠' },
-  {
-    label: 'จัดการโจทย์',
-    icon: '📝',
-    children: [
-      { href: '/questions/new', label: 'สร้างโจทย์', icon: '➕' },
-      { href: '/questions/import', label: 'นำเข้าโจทย์', icon: '📥' },
-      { href: '/questions/sets', label: 'คลังโจทย์', icon: '📚' },
-    ],
-  },
-  { href: '/classrooms', label: 'ห้องเรียน', icon: '🏫' },
-  {
-    label: 'วิจัยการศึกษา',
-    icon: '🧪',
-    children: [
-      { href: '/research', label: 'โครงการวิจัย', icon: '📊' },
-      { href: '/research/ioc', label: 'ฟอร์ม IOC', icon: '📋' },
-    ],
-  },
-  { href: '/settings/profile', label: 'ตั้งค่า', icon: '⚙️' },
-]
+const homeNav: NavItem = { href: '/dashboard', label: 'หน้าหลัก', icon: House }
 
-const studentNav: NavEntry[] = [
-  { href: '/dashboard', label: 'หน้าหลัก', icon: '🏠' },
-  { href: '/classrooms', label: 'ห้องเรียนของฉัน', icon: '🏫' },
-  { href: '/my-submissions', label: 'สรุปงานของฉัน', icon: '📋' },
-  { href: '/settings/profile', label: 'ข้อมูลส่วนตัว', icon: '⚙️' },
-]
+function teacherNavigation(practiceLibrary: boolean): NavEntry[] {
+  return [
+    homeNav,
+    {
+      label: 'จัดการโจทย์',
+      icon: NotebookPen,
+      children: [
+        { href: '/questions/new', label: 'สร้างโจทย์', icon: FilePlus2 },
+        { href: '/questions/import', label: 'นำเข้าโจทย์', icon: FileUp },
+        { href: '/questions/sets', label: 'คลังโจทย์', icon: LibraryBig },
+      ],
+    },
+    ...(practiceLibrary
+      ? [{ href: '/practice', label: 'คลังฝึก · ไม่มีคะแนน', icon: BookOpenCheck } satisfies NavItem]
+      : []),
+    { href: '/classrooms', label: 'ห้องเรียน', icon: School },
+    {
+      label: 'วิจัยการศึกษา',
+      icon: FlaskConical,
+      children: [
+        { href: '/research', label: 'โครงการวิจัย', icon: FolderKanban },
+        { href: '/research/ioc', label: 'ฟอร์ม IOC', icon: ClipboardCheck },
+      ],
+    },
+    { href: '/settings/profile', label: 'ตั้งค่า', icon: Settings },
+  ]
+}
+
+function studentNavigation(practiceLibrary: boolean): NavEntry[] {
+  return [
+    homeNav,
+    { href: '/classrooms', label: 'ห้องเรียนของฉัน', icon: School },
+    ...(practiceLibrary
+      ? [{ href: '/practice', label: 'คลังฝึก · ไม่มีคะแนน', icon: BookOpenCheck } satisfies NavItem]
+      : []),
+    { href: '/my-submissions', label: 'สรุปงานของฉัน', icon: ClipboardList },
+    { href: '/settings/profile', label: 'ข้อมูลส่วนตัว', icon: UserRound },
+  ]
+}
 
 function isNavActive(pathname: string, href: string): boolean {
   if (href === '/dashboard') return pathname === '/dashboard'
@@ -73,6 +111,10 @@ function isNavActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(href + '/')
 }
 
+function NavItemIcon({ icon: Icon }: Pick<NavItem, 'icon'>) {
+  return <Icon className="size-4 shrink-0" aria-hidden="true" />
+}
+
 /**
  * A nav heading whose pages slide down underneath it.
  *
@@ -86,10 +128,11 @@ function isNavActive(pathname: string, href: string): boolean {
  * a page is added. (The newer interpolate-size/calc-size route does the same
  * job but is Chrome/Edge only — on Safari and Firefox it would snap open.)
  */
-function NavGroupItem({ group, pathname, onNavigate }: {
+function NavGroupItem({ group, pathname, onNavigate, compactOnDesktop = false }: {
   group: NavGroup
   pathname: string
   onNavigate?: () => void
+  compactOnDesktop?: boolean
 }) {
   const hasActiveChild = group.children.some(child => isNavActive(pathname, child.href))
   const [override, setOverride] = useState<boolean | null>(null)
@@ -103,20 +146,22 @@ function NavGroupItem({ group, pathname, onNavigate }: {
         onClick={() => setOverride(!open)}
         aria-expanded={open}
         aria-controls={panelId}
+        title={compactOnDesktop ? group.label : undefined}
         className={cn(
-          'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+          'flex w-full items-center gap-3 rounded-lg py-2.5 pl-3.5 pr-3 text-sm font-medium transition-colors',
           hasActiveChild
-            ? 'text-primary'
-            : 'text-foreground/70 hover:bg-muted hover:text-foreground'
+            ? 'bg-primary/10 text-primary'
+            : 'text-foreground/70 hover:bg-muted hover:text-foreground',
         )}
       >
-        <span className="text-base">{group.icon}</span>
-        {group.label}
+        <NavItemIcon icon={group.icon} />
+        <span className={cn(compactOnDesktop && 'md:sr-only')}>{group.label}</span>
         <ChevronDown
           aria-hidden="true"
           className={cn(
             'ml-auto size-4 transition-transform duration-200 motion-reduce:transition-none',
-            open && 'rotate-180'
+            open && 'rotate-180',
+            compactOnDesktop && 'md:hidden'
           )}
         />
       </button>
@@ -134,26 +179,95 @@ function NavGroupItem({ group, pathname, onNavigate }: {
         <div className="overflow-hidden">
           {/* Indented under the heading, with a rail so the nesting reads at a
               glance rather than only from the padding. */}
-          <div className="ml-6 mt-1 space-y-1 border-l pl-2">
+          <div className={cn(
+            'ml-6 mt-1 space-y-1 border-l pl-2',
+            compactOnDesktop && 'md:ml-0 md:border-l-0 md:pl-0'
+          )}>
             {group.children.map(child => (
               <Link
                 key={child.href}
                 href={child.href}
                 onClick={onNavigate}
+                title={compactOnDesktop ? child.label : undefined}
                 className={cn(
-                  'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                  'flex items-center gap-2.5 rounded-lg py-2 pl-3.5 pr-3 text-sm font-medium transition-colors',
                   isNavActive(pathname, child.href)
                     ? 'bg-primary/10 text-primary'
-                    : 'text-foreground/70 hover:bg-muted hover:text-foreground'
+                    : 'text-foreground/70 hover:bg-muted hover:text-foreground',
                 )}
               >
-                <span className="text-sm">{child.icon}</span>
-                {child.label}
+                <NavItemIcon icon={child.icon} />
+                <span className={cn(compactOnDesktop && 'md:sr-only')}>{child.label}</span>
               </Link>
             ))}
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+function ClassroomSectionNavigation({ pathname, onNavigate }: {
+  pathname: string
+  onNavigate?: () => void
+}) {
+  const compact = useSidebarCompact()
+  const items = [
+    { href: '/classrooms', label: 'ห้องเรียนทั้งหมด', Icon: LayoutGrid },
+    { href: '/classrooms/new', label: 'สร้างห้องเรียน', Icon: Plus },
+    { href: '/classrooms/trash', label: 'ถังขยะ', Icon: Trash2 },
+  ]
+
+  return (
+    <div className="flex min-w-0 flex-col gap-3">
+      <Link
+        href="/dashboard"
+        onClick={onNavigate}
+        title={compact ? 'เมนูหลัก' : undefined}
+        className="flex items-center gap-2 rounded-lg py-2 pl-3.5 pr-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+      >
+        <ChevronLeft aria-hidden="true" className="size-4" />
+        <SidebarLabel>เมนูหลัก</SidebarLabel>
+      </Link>
+
+      <div className="flex items-start gap-3 px-2 py-1" title="ห้องเรียน">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <School aria-hidden="true" className="size-5" />
+        </div>
+        <div className={cn('min-w-0 flex-1', compact && 'md:hidden')}>
+          <p className="font-semibold text-foreground">ห้องเรียน</p>
+          <p className="text-xs text-muted-foreground">จัดการพื้นที่การเรียนรู้</p>
+        </div>
+      </div>
+
+      <Separator />
+
+      <SidebarSectionLabel className="px-2 text-xs font-medium text-muted-foreground">
+        เมนูห้องเรียน
+      </SidebarSectionLabel>
+      <nav aria-label="เมนูจัดการห้องเรียน" className="flex flex-col gap-1">
+        {items.map(({ href, label, Icon }) => {
+          const selected = pathname === href
+          return (
+            <Link
+              key={href}
+              href={href}
+              onClick={onNavigate}
+              aria-current={selected ? 'page' : undefined}
+              title={compact ? label : undefined}
+              className={cn(
+                'flex items-center gap-3 rounded-lg py-2.5 pl-3.5 pr-3 text-sm font-medium transition-colors',
+                selected
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-foreground/70 hover:bg-muted hover:text-foreground',
+              )}
+            >
+              <Icon aria-hidden="true" className="size-4" />
+              <SidebarLabel>{label}</SidebarLabel>
+            </Link>
+          )
+        })}
+      </nav>
     </div>
   )
 }
@@ -164,79 +278,154 @@ interface SidebarProps {
   isOpen?: boolean
   onClose?: () => void
   collapsed?: boolean
+  previewNavigationOnly?: boolean
 }
 
-export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = false }: SidebarProps) {
+export function Sidebar({
+  role,
+  fullName,
+  isOpen = false,
+  onClose,
+  collapsed = false,
+  previewNavigationOnly: previewNavigationOnlyOverride,
+}: SidebarProps) {
+  const [desktop, setDesktop] = useState(false)
+  const [desktopPreviewOpen, setDesktopPreviewOpen] = useState(false)
   const pathname = usePathname()
-  const navItems = role === 'teacher' || role === 'admin' ? teacherNav : studentNav
+  const searchParams = useSearchParams()
+  const { practiceLibrary } = useAppFeatureFlags()
+  const search = sidebarSearchKey(searchParams.toString())
+  const previewNavigationOnly = previewNavigationOnlyOverride ?? isAssignmentStudentPreviewPath(pathname)
+  const navItems = previewNavigationOnly
+    ? [homeNav]
+    : role === 'teacher' || role === 'admin'
+      ? teacherNavigation(practiceLibrary)
+      : studentNavigation(practiceLibrary)
+  const { contextualSidebar, pendingSidebar, clearPendingSidebar } = useSidebarContext()
+  const usesTeacherNavigation = role === 'teacher' || role === 'admin'
+  const usesClassroomSidebar = !previewNavigationOnly
+    && usesTeacherNavigation
+    && isClassroomSectionPath(pathname)
+  const pendingMatches = pendingSidebar?.pathname === pathname && pendingSidebar.search === search
+  const sidebarEntry = pendingMatches ? pendingSidebar.entry : contextualSidebar
+  const contextualMatches = sidebarEntry?.pathname === pathname
+    && (pathname !== '/assignments/new' || sidebarEntry.classroomId === searchParams.get('classroom'))
+  const contextualContent = !previewNavigationOnly
+    && usesTeacherNavigation
+    && (pendingMatches || contextualMatches)
+    ? sidebarEntry?.render(onClose)
+    : null
+
+  useEffect(() => {
+    const media = window.matchMedia('(min-width: 768px)')
+    const update = () => setDesktop(media.matches)
+    update()
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
+
+  useEffect(() => {
+    if (!desktop || !collapsed) setDesktopPreviewOpen(false)
+  }, [collapsed, desktop])
+
+  useEffect(() => {
+    if (pendingSidebar && pathname !== pendingSidebar.sourcePathname && !pendingMatches) {
+      clearPendingSidebar()
+    }
+  }, [clearPendingSidebar, pathname, pendingMatches, pendingSidebar])
+
+  const compactOnDesktop = collapsed && !desktopPreviewOpen
 
   return (
-    <aside className={cn(
-      'flex-shrink-0 border-r bg-card overflow-hidden',
-      'fixed inset-y-0 left-0 z-30 transition-[width,transform] duration-200 ease-in-out',
-      'md:static',
-      isOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0',
-      collapsed ? 'md:w-0 md:border-r-0' : 'md:w-64',
-    )}>
-      <div className="w-64 h-full flex flex-col">
-        {/* Logo */}
-        <div className="h-16 flex items-center px-5 border-b shrink-0">
-          <Link href="/dashboard" onClick={onClose}>
-            <Image
-              src="/logo.png"
-              alt="KorKru"
-              width={423}
-              height={576}
-              className="h-11 w-auto object-contain dark:brightness-0 dark:invert"
-            />
-          </Link>
-        </div>
-
+    <SidebarDisplayProvider compactOnDesktop={compactOnDesktop}>
+    <aside
+      id="app-sidebar"
+      aria-label="เมนูด้านข้าง"
+      inert={!desktop && !isOpen}
+      data-collapsed={collapsed ? 'true' : 'false'}
+      data-preview-open={desktopPreviewOpen ? 'true' : 'false'}
+      onMouseEnter={() => {
+        if (desktop && collapsed) setDesktopPreviewOpen(true)
+      }}
+      onMouseLeave={() => setDesktopPreviewOpen(false)}
+      className={cn(
+        'fixed bottom-0 left-0 top-12 z-30 w-64 flex-shrink-0 transition-none',
+        'md:static md:overflow-visible',
+        isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+        collapsed ? 'md:w-20' : 'md:w-64',
+      )}
+    >
+      <div
+        data-sidebar-panel
+        className={cn(
+          'flex h-full w-64 flex-col overflow-hidden border-r bg-card transition-none',
+          collapsed && 'md:absolute md:inset-y-0 md:left-0',
+          compactOnDesktop ? 'md:w-20' : 'md:w-64',
+          desktopPreviewOpen && 'md:shadow-lg',
+        )}
+      >
         {/* Nav */}
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-          {navItems.map((entry) => (
-            isGroup(entry)
-              ? <NavGroupItem key={entry.label} group={entry} pathname={pathname} onNavigate={onClose} />
-              : (
-                <Link
-                  key={entry.href}
-                  href={entry.href}
-                  onClick={onClose}
-                  className={cn(
-                    'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-                    isNavActive(pathname, entry.href)
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-foreground/70 hover:bg-muted hover:text-foreground'
-                  )}
-                >
-                  <span className="text-base">{entry.icon}</span>
-                  {entry.label}
-                </Link>
-              )
-          ))}
-        </nav>
+        {contextualContent || usesClassroomSidebar ? (
+          <div className="flex-1 overflow-y-auto overflow-x-hidden p-3">
+            {contextualContent ?? <ClassroomSectionNavigation pathname={pathname} onNavigate={onClose} />}
+          </div>
+        ) : (
+          <nav aria-label="เมนูหลัก" className="flex flex-1 flex-col gap-1 overflow-y-auto overflow-x-hidden p-3">
+            {navItems.map((entry) => (
+              isGroup(entry)
+                ? (
+                  <NavGroupItem
+                    key={entry.label}
+                    group={entry}
+                    pathname={pathname}
+                    onNavigate={onClose}
+                    compactOnDesktop={compactOnDesktop}
+                  />
+                )
+                : (
+                  <Link
+                    key={entry.href}
+                    href={entry.href}
+                    onClick={onClose}
+                    title={compactOnDesktop ? entry.label : undefined}
+                    aria-current={isNavActive(pathname, entry.href) ? 'page' : undefined}
+                    className={cn(
+                      'flex items-center gap-3 rounded-lg py-2.5 pl-3.5 pr-3 text-sm font-medium transition-colors',
+                      isNavActive(pathname, entry.href)
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-foreground/70 hover:bg-muted hover:text-foreground',
+                    )}
+                  >
+                    <NavItemIcon icon={entry.icon} />
+                    <SidebarLabel>{entry.label}</SidebarLabel>
+                  </Link>
+                )
+            ))}
+          </nav>
+        )}
 
         {/* Admin link */}
-        {role === 'admin' && (
+        {role === 'admin' && !previewNavigationOnly && !usesClassroomSidebar && !contextualContent && (
           <div className="px-3 pb-2">
             <Link
               href="/admin"
               onClick={onClose}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors bg-warning/10 text-warning hover:bg-warning/20 border border-warning/20"
+              title={compactOnDesktop ? 'Admin Panel' : undefined}
+              className="flex items-center gap-3 rounded-lg border border-warning/20 bg-warning/10 py-2.5 pl-3.5 pr-3 text-sm font-medium text-warning transition-colors hover:bg-warning/20"
             >
-              <span className="text-base">⚙️</span>
-              Admin Panel
+              <NavItemIcon icon={ShieldCheck} />
+              <SidebarLabel>Admin Panel</SidebarLabel>
             </Link>
           </div>
         )}
 
         {/* User info */}
-        <div className="p-4 border-t shrink-0">
+        <div className="shrink-0 border-t p-4" title={fullName}>
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-bold shrink-0">
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
               {fullName.charAt(0)}
             </div>
-            <div className="flex-1 min-w-0">
+            <div className={cn('min-w-0 flex-1', compactOnDesktop && 'md:sr-only')}>
               <p className="text-sm font-medium truncate">{fullName}</p>
               <p className="text-xs text-muted-foreground">
                 {role === 'teacher' ? 'ครู' : role === 'student' ? 'นักเรียน' : 'Admin'}
@@ -246,5 +435,6 @@ export function Sidebar({ role, fullName, isOpen = false, onClose, collapsed = f
         </div>
       </div>
     </aside>
+    </SidebarDisplayProvider>
   )
 }

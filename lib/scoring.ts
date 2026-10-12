@@ -3,6 +3,8 @@ import type { ScoreStrategy } from '@/lib/types'
 interface ScoredRow {
   total_score: number | null
   max_score: number
+  /** Display points set by a teacher after automatic scoring. */
+  score_adjustment?: number | null
 }
 
 // Proportionally rescales total_score/max_score to `displayMax` (an
@@ -21,12 +23,17 @@ export function rescaleToDisplayMax<T extends ScoredRow>(
 ): T[] {
   return rows.map(row => {
     const displayMax = resolveDisplayMax(row)
-    if (displayMax == null || row.max_score <= 0) return row
-    const scale = displayMax / row.max_score
+    const visibleMax = displayMax ?? row.max_score
+    const scale = displayMax == null || row.max_score <= 0 ? 1 : displayMax / row.max_score
+    const scaled = row.total_score == null ? null : Math.round(row.total_score * scale * 100) / 100
+    const adjustment = Number(row.score_adjustment ?? 0)
+    const adjusted = scaled == null
+      ? null
+      : Math.round(Math.min(visibleMax, Math.max(0, scaled + adjustment)) * 100) / 100
     return {
       ...row,
-      total_score: row.total_score == null ? null : Math.round(row.total_score * scale * 100) / 100,
-      max_score: displayMax,
+      total_score: adjusted,
+      max_score: visibleMax,
     }
   })
 }

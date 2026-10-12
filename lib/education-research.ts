@@ -11,6 +11,7 @@ export interface ResearchQuestionOption {
   question_text: string
   question_type: Question['question_type']
   difficulty: Question['difficulty']
+  subject: string | null
   tags: string[] | null
   max_score: number
 }
@@ -91,4 +92,3 @@ export function isValidResearchAccessCode(value: string | null | undefined): boo
   const normalized = normalizeResearchAccessCode(value)
   return normalized === null || /^[A-Z0-9-]{4,12}$/.test(normalized)
 }
-

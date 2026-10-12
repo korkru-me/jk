@@ -10,6 +10,8 @@
  * by its extension, a board picture by the name it was uploaded under.
  */
 
+import { isRichTextImageSrc } from '@/lib/rich-text-sanitize'
+
 /**
  * A PDF is stored as picked — nothing in the browser can shrink one. 5 MB
  * holds dozens of typed pages or ten-odd scanned ones, and is still quick to
@@ -84,19 +86,15 @@ export function solutionUploadPath(
 }
 
 /**
- * Whether a picture may sit in a เฉลย's typed text: one of this app's own
- * `question-images` uploads, or the QA lab's in-memory file. Anything else —
- * a picture pasted in along with text copied from a web page — is dropped
- * rather than hot-linked from someone else's server into a student's screen.
+ * Whether a picture may sit in a เฉลย's typed text: one of this project's own
+ * `question-images` uploads (host as well as path), or the QA lab's in-memory
+ * file in a development build. Anything else — a picture pasted in along with
+ * text copied from a web page — is dropped rather than hot-linked from someone
+ * else's server into a student's screen. It is the sanitiser's own rule, so
+ * the editor keeps exactly the pictures the page will go on to show.
  */
 export function isSolutionTextImageSrc(src: string): boolean {
-  if (src.startsWith('blob:')) return true
-  try {
-    const url = new URL(src)
-    return url.protocol === 'https:' && url.pathname.includes('/storage/v1/object/public/question-images/')
-  } catch {
-    return false
-  }
+  return isRichTextImageSrc(src)
 }
 
 const EXTENSIONS: Record<(typeof SOLUTION_FILE_TYPES)[number], string> = {

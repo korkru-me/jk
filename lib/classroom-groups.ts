@@ -120,24 +120,35 @@ export function targetedStudentIds(
   }))
 }
 
-/**
- * Deal students into groups at random, as evenly as possible: shuffle, then
- * round-robin, so group sizes never differ by more than one.
- */
-export function splitIntoGroups(
-  studentIds: string[],
-  groupIds: string[],
-  random: () => number = Math.random,
-): Map<string, string> {
-  const result = new Map<string, string>()
-  if (groupIds.length === 0) return result
-  const shuffled = [...studentIds]
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(random() * (i + 1))
-    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
-  }
-  shuffled.forEach((id, i) => result.set(id, groupIds[i % groupIds.length]))
-  return result
+export const GROUP_STUDENT_FILTER_ALL = '__all__'
+export const GROUP_STUDENT_FILTER_MISSING = '__missing__'
+
+export interface GroupStudentFilterable {
+  full_name: string
+  grade_level: string | null
+  section_number: number | null
+}
+
+/** Search and both roster filters are intersected so a teacher can narrow the
+ * unassigned pool to one exact grade/section combination. */
+export function filterGroupStudents<T extends GroupStudentFilterable>(
+  students: T[],
+  filters: { query: string; gradeLevel: string; sectionNumber: string },
+): T[] {
+  const term = filters.query.trim().toLocaleLowerCase('th')
+  return students.filter(student => {
+    const gradeLevel = student.grade_level?.trim() || null
+    const matchesName = !term || student.full_name.toLocaleLowerCase('th').includes(term)
+    const matchesGrade = filters.gradeLevel === GROUP_STUDENT_FILTER_ALL
+      || (filters.gradeLevel === GROUP_STUDENT_FILTER_MISSING
+        ? gradeLevel === null
+        : gradeLevel === filters.gradeLevel)
+    const matchesSection = filters.sectionNumber === GROUP_STUDENT_FILTER_ALL
+      || (filters.sectionNumber === GROUP_STUDENT_FILTER_MISSING
+        ? student.section_number === null
+        : String(student.section_number) === filters.sectionNumber)
+    return matchesName && matchesGrade && matchesSection
+  })
 }
 
 /**

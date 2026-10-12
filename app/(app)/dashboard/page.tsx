@@ -14,9 +14,11 @@ import { computePassed } from '@/lib/grading'
 import { rescaleToDisplayMax } from '@/lib/scoring'
 import { assignmentSizeLabel } from '@/lib/assignment-size-label'
 import { canStudentViewScore } from '@/lib/result-visibility'
+import { formatThaiDate, thaiHour } from '@/lib/thai-time'
 import { filterAssignmentsForStudent } from '@/lib/classroom-groups-server'
-import { Clock, BookOpen, ChevronRight, TrendingUp, AlertCircle, Megaphone } from 'lucide-react'
+import { Clock, BookOpen, School, ChevronRight, TrendingUp, AlertCircle, Megaphone } from 'lucide-react'
 import { Card } from '@/components/ui/card'
+import { sortClassroomsByRecentViews } from '@/lib/classroom-recency'
 
 export const metadata = { title: 'หน้าหลัก — KorKru' }
 
@@ -43,12 +45,12 @@ export default async function DashboardPage() {
     // Everything shown to a teacher is their own real data. Counts come back
     // with the first page of rows (`count: 'exact'` alongside `limit`), so the
     // totals and the previews cost one query each rather than two.
-    const [classroomsRes, questionsRes, setsRes] = await Promise.all([
+    const [classroomsRes, questionsRes, setsRes, recentClassroomViewsRes] = await Promise.all([
       // Roster and assignment tallies ride along on the classroom relation,
       // the same way the classroom list page reads them.
       admin
         .from('classrooms')
-        .select('id, name, classroom_type, created_at, classroom_students(count), assignment_classrooms(count)')
+        .select('id, name, description, classroom_type, created_at, classroom_students(count), assignment_classrooms(count)')
         .eq('teacher_id', user.id)
         .eq('status', 'active')
         .order('created_at', { ascending: false }),
@@ -68,6 +70,10 @@ export default async function DashboardPage() {
         .eq('created_by', user.id)
         .order('created_at', { ascending: false })
         .limit(RECENT_LIMIT),
+      supabase
+        .from('classroom_recent_views')
+        .select('classroom_id, viewed_at')
+        .eq('user_id', user.id),
     ])
 
     // A set's question_ids keep pointing at deleted questions, so the stored
@@ -80,10 +86,14 @@ export default async function DashboardPage() {
       : { data: [] as { id: string }[] }
     const liveQuestionIds = new Set((liveQuestions ?? []).map(q => q.id))
 
-    const classroomRows = (classroomsRes.data ?? []) as any[]
+    const classroomRows = sortClassroomsByRecentViews(
+      (classroomsRes.data ?? []) as any[],
+      (recentClassroomViewsRes.data ?? []) as { classroom_id: string; viewed_at: string }[],
+    )
     const classrooms: DashboardClassroom[] = classroomRows.map(row => ({
       id: row.id,
       name: row.name,
+      description: row.description,
       classroom_type: row.classroom_type,
       studentCount: row.classroom_students?.[0]?.count ?? 0,
       assignmentCount: row.assignment_classrooms?.[0]?.count ?? 0,
@@ -91,7 +101,6 @@ export default async function DashboardPage() {
 
     return (
       <TeacherDashboard
-        user={user}
         classroomsCount={classrooms.length}
         questionsCount={questionsRes.count ?? 0}
         setsCount={setsRes.count ?? 0}
@@ -120,7 +129,7 @@ export default async function DashboardPage() {
       .eq('student_id', user.id),
     admin
       .from('submissions')
-      .select('id, total_score, max_score, status, assignment_id, created_at, assignments(display_max_score, show_results, end_at)')
+      .select('id, total_score, score_adjustment, max_score, status, assignment_id, created_at, assignments(display_max_score, show_results, end_at)')
       .eq('student_id', user.id),
   ])
 
@@ -277,7 +286,7 @@ function StudentDashboard({
   calendarEvents: CalendarEvent[]
   recentPosts: any[]
 }) {
-  const hour = new Date().getHours()
+  const hour = thaiHour()
   const greeting = hour < 12 ? 'สวัสดีตอนเช้า' : hour < 17 ? 'สวัสดีตอนบ่าย' : 'สวัสดีตอนเย็น'
 
   return (
@@ -303,7 +312,7 @@ function StudentDashboard({
         <StatCard
           value={String(classroomsCount)}
           label="ห้องเรียน"
-          icon={<span className="text-2xl">🏫</span>}
+          icon={<School className="size-6" aria-hidden="true" />}
           href="/classrooms"
           accent="blue"
         />
@@ -354,7 +363,7 @@ function StudentDashboard({
         </Card>
       ) : (
         <div className="bg-card border-2 border-dashed border-primary/20 bg-primary/10 rounded-2xl p-10 text-center">
-          <p className="text-4xl mb-3">🏫</p>
+          <School className="mx-auto mb-3 size-10 text-primary" aria-hidden="true" />
           <h3 className="font-semibold mb-1">เข้าร่วมห้องเรียนแรกของคุณ</h3>
           <p className="text-sm text-muted-foreground mb-4">ขอรหัส Class Code จากครู แล้วกรอกในหน้าห้องเรียน</p>
           <Link href="/classrooms" className={cn(buttonVariants())}>
@@ -406,7 +415,7 @@ function timeAgo(iso: string): string {
   if (hours < 24) return `${hours} ชม.ที่แล้ว`
   const days = Math.floor(hours / 24)
   if (days < 7) return `${days} วันที่แล้ว`
-  return new Date(iso).toLocaleDateString('th-TH', { dateStyle: 'short' })
+  return formatThaiDate(iso, { dateStyle: 'short' })
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -451,7 +460,7 @@ function getDueInfo(endAt: string | null): { label: string; urgent: boolean; col
   if (hours < 24) return { label: `อีก ${hours} ชม.`, urgent: true, color: 'text-flag dark:text-flag' }
   if (days <= 2) return { label: `อีก ${days} วัน`, urgent: true, color: 'text-warning' }
   return {
-    label: new Date(endAt).toLocaleDateString('th-TH', { dateStyle: 'short' }),
+    label: formatThaiDate(endAt, { dateStyle: 'short' }),
     urgent: false,
     color: 'text-muted-foreground',
   }

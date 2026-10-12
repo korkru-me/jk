@@ -114,7 +114,7 @@ export function HomeroomStudentView({
         canPost={false}
         initialPosts={posts}
         variant="panel"
-        maxHeightClass="max-h-[360px]"
+        maxHeightClass="max-h-[680px]"
         title="ประกาศจากครูที่ปรึกษา"
         trackSeen
       />

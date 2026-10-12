@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   BookOpenCheck,
   LockKeyhole,
+  School,
   Target,
   Users,
 } from 'lucide-react'
@@ -364,7 +365,7 @@ function ResultsHeader({ project, participantCount, maxScore }: { project: Proje
         <h1 className="mt-1 text-2xl font-bold text-foreground">ผลวิเคราะห์: {project.title}</h1>
         <p className="mt-1 text-sm text-muted-foreground">{project.topic}</p>
         <div className="mt-3 flex flex-wrap gap-2 text-sm">
-          <span className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5"><BookOpenCheck className="size-4 text-primary" aria-hidden="true" />{project.classrooms?.name ?? 'ไม่พบห้องเรียน'}</span>
+          <span className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5"><School className="size-4 text-primary" aria-hidden="true" />{project.classrooms?.name ?? 'ไม่พบห้องเรียน'}</span>
           {participantCount !== null && <span className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5"><Users className="size-4 text-primary" aria-hidden="true" />{participantCount} นักเรียน</span>}
           {maxScore !== null && <span className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5"><BookOpenCheck className="size-4 text-primary" aria-hidden="true" />คะแนนเต็ม {formatCompact(maxScore)}</span>}
           <span className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5"><Target className="size-4 text-primary" aria-hidden="true" />เกณฑ์ {formatCompact(Number(project.passing_threshold_percent))}%</span>

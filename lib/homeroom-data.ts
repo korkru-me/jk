@@ -65,7 +65,7 @@ export async function getHomeroomAggregate(
 
   const { data: submissionRows } = await admin
     .from('submissions')
-    .select('id, assignment_id, student_id, status, total_score, max_score, submitted_at, attempt_number')
+    .select('id, assignment_id, student_id, status, total_score, score_adjustment, max_score, submitted_at, attempt_number')
     .in('assignment_id', publishedAssignmentIds)
     .in('student_id', rosterStudentIds)
 

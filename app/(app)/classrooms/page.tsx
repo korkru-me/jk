@@ -4,11 +4,13 @@ import { getAuthUser } from '@/lib/auth/server'
 import { JoinClassroomForm } from '@/components/classrooms/join-classroom-form'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Home, GraduationCap, ArrowRight } from 'lucide-react'
+import { School, GraduationCap, ArrowRight } from 'lucide-react'
 import type { Classroom } from '@/lib/types'
 import { TeacherViewClient } from './_components/teacher-view-client'
 import { Card } from '@/components/ui/card'
-import { displayDescription } from './_components/classroom-meta'
+import { displayDescription, parseDescription } from './_components/classroom-meta'
+import { ClassroomIcon } from '@/components/classrooms/classroom-icon'
+import { withBackHref } from '@/lib/back-link'
 import { linkReachesGroup } from '@/lib/classroom-groups'
 import { getStudentGroups } from '@/lib/classroom-groups-server'
 
@@ -22,7 +24,13 @@ type ClassroomListRow = Classroom & {
 
 type StudentClassroom = Pick<Classroom, 'id' | 'name' | 'description' | 'status' | 'classroom_type'>
 
-export default async function ClassroomsPage() {
+export default async function ClassroomsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ join?: string | string[] }>
+}) {
+  const { join } = await searchParams
+  const initialJoinCode = (Array.isArray(join) ? join[0] : join) ?? ''
   const supabase = await createClient()
   const authUser = await getAuthUser()
   if (!authUser) redirect('/login')
@@ -33,14 +41,13 @@ export default async function ClassroomsPage() {
   const isTeacher = profile?.role === 'teacher' || profile?.role === 'admin'
 
   if (isTeacher) {
-    const [activeRes, archivedRes, trashedRes] = await Promise.all([
+    const [activeRes, trashedRes] = await Promise.all([
       admin
         .from('classrooms')
-        .select('id, org_id, teacher_id, name, description, class_code, status, classroom_type, pinned_at, deleted_at, created_at, updated_at, classroom_students(count), assignment_classrooms(count)')
+        .select('id, org_id, teacher_id, name, description, class_code, status, classroom_type, pinned_at, display_order, deleted_at, created_at, updated_at, classroom_students(count), assignment_classrooms(count)')
         .eq('teacher_id', authUser.id)
         .eq('status', 'active')
         .order('created_at', { ascending: false }),
-      admin.from('classrooms').select('id', { count: 'exact', head: true }).eq('teacher_id', authUser.id).eq('status', 'archived'),
       admin.from('classrooms').select('id', { count: 'exact', head: true }).eq('teacher_id', authUser.id).eq('status', 'deleted'),
     ])
 
@@ -53,15 +60,16 @@ export default async function ClassroomsPage() {
       return classroom
     })
 
-    // Homeroom classrooms lead the list (there are only ever a handful);
-    // subject classrooms follow, most-recently-pinned first.
+    // Homeroom classrooms keep their own section; subject classrooms use the
+    // teacher's manual order. Legacy pins are intentionally ignored now that
+    // every subject card can be dragged directly.
     const cls = [
       ...classrooms.filter(c => c.classroom_type === 'homeroom'),
       ...classrooms
         .filter(c => c.classroom_type !== 'homeroom')
         .sort((a, b) => {
-          const pinDiff = (b.pinned_at ? new Date(b.pinned_at).getTime() : 0) - (a.pinned_at ? new Date(a.pinned_at).getTime() : 0)
-          if (pinDiff !== 0) return pinDiff
+          const orderDiff = (a.display_order ?? Number.MAX_SAFE_INTEGER) - (b.display_order ?? Number.MAX_SAFE_INTEGER)
+          if (orderDiff !== 0) return orderDiff
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         }),
     ]
@@ -73,7 +81,6 @@ export default async function ClassroomsPage() {
         assignmentCountMap={assignmentCountMap}
         totalStudents={Object.values(studentCountMap).reduce((a, b) => a + b, 0)}
         totalAssignments={Object.values(assignmentCountMap).reduce((a, b) => a + b, 0)}
-        archivedCount={archivedRes.count ?? 0}
         trashedCount={trashedRes.count ?? 0}
       />
     )
@@ -119,10 +126,24 @@ export default async function ClassroomsPage() {
     }
   }
 
-  return <StudentView classrooms={classrooms} pendingCountMap={pendingCountMap} />
+  return (
+    <StudentView
+      classrooms={classrooms}
+      pendingCountMap={pendingCountMap}
+      initialJoinCode={initialJoinCode}
+    />
+  )
 }
 
-function StudentView({ classrooms, pendingCountMap }: { classrooms: StudentClassroom[]; pendingCountMap: Record<string, number> }) {
+function StudentView({
+  classrooms,
+  pendingCountMap,
+  initialJoinCode,
+}: {
+  classrooms: StudentClassroom[]
+  pendingCountMap: Record<string, number>
+  initialJoinCode: string
+}) {
   const homeroomClassrooms = classrooms.filter(c => c.classroom_type === 'homeroom')
   const subjectClassrooms = classrooms.filter(c => c.classroom_type !== 'homeroom')
 
@@ -135,12 +156,12 @@ function StudentView({ classrooms, pendingCountMap }: { classrooms: StudentClass
 
       <Card padding="lg">
         <p className="text-sm font-medium mb-3">เข้าร่วมห้องเรียนใหม่</p>
-        <JoinClassroomForm />
+        <JoinClassroomForm initialCode={initialJoinCode} />
       </Card>
 
       {classrooms.length === 0 ? (
         <div className="text-center py-16 border-2 border-dashed rounded-2xl">
-          <p className="text-4xl mb-3">🏫</p>
+          <School className="mx-auto mb-3 size-10 text-primary" aria-hidden="true" />
           <p className="text-muted-foreground font-medium">ยังไม่ได้เข้าร่วมห้องเรียนใด</p>
           <p className="text-sm text-muted-foreground/70 mt-1">กรอกรหัสห้องเรียนจากครูเพื่อเริ่มต้น</p>
         </div>
@@ -155,11 +176,11 @@ function StudentView({ classrooms, pendingCountMap }: { classrooms: StudentClass
                 {homeroomClassrooms.map(c => (
                   <Link
                     key={c.id}
-                    href={`/classrooms/${c.id}`}
+                    href={withBackHref(`/classrooms/${c.id}`, '/classrooms')}
                     className="flex items-center gap-5 bg-surface-inverse rounded-2xl px-6 py-5 hover:opacity-90 transition-opacity"
                   >
                     <div className="w-12 h-12 rounded-2xl bg-card/10 flex items-center justify-center shrink-0">
-                      <Home className="w-6 h-6 text-white" />
+                      <ClassroomIcon iconKey={parseDescription(c.description).iconKey} className="size-6 text-surface-inverse-foreground" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[10px] font-bold uppercase tracking-widest text-primary">ครูที่ปรึกษาประจำชั้น</p>
@@ -180,7 +201,7 @@ function StudentView({ classrooms, pendingCountMap }: { classrooms: StudentClass
           <div className="space-y-3">
             {homeroomClassrooms.length > 0 && (
               <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                🏫 ห้องเรียนวิชา
+                <School className="size-3.5" aria-hidden="true" /> ห้องเรียนวิชา
               </div>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -189,12 +210,12 @@ function StudentView({ classrooms, pendingCountMap }: { classrooms: StudentClass
                 return (
                   <Link
                     key={c.id}
-                    href={`/classrooms/${c.id}`}
+                    href={withBackHref(`/classrooms/${c.id}`, '/classrooms')}
                     className="block p-5 bg-card border rounded-2xl hover:border-primary/20 dark:hover:border-primary hover:shadow-sm transition-all"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <p className="font-semibold truncate">{c.name}</p>
-                      <span className="shrink-0 text-2xl">🏫</span>
+                      <ClassroomIcon iconKey={parseDescription(c.description).iconKey} className="size-6 shrink-0 text-primary" />
                     </div>
                     {displayDescription(c.description) && (
                       <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{displayDescription(c.description)}</p>

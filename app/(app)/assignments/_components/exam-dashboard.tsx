@@ -89,7 +89,7 @@ export function ExamDashboard({ assignments, mySubMap, attemptsUsed, hasInProgre
             // hasInProgress separately so an unfinished retry is never
             // hidden behind an older finished attempt's score.
             const isInProgress = hasInProgress[a.id] ?? false
-            const canRetry = !isInProgress && isDone && (a.max_attempts == null || used < a.max_attempts)
+            const canRetry = !isInProgress && isDone && !a.completion_reached && (a.max_attempts == null || used < a.max_attempts)
             return (
               <Card padding="md" className="hover:border-primary/20 dark:hover:border-primary transition-colors" key={a.id}>
                 <div className="flex items-start justify-between gap-3">

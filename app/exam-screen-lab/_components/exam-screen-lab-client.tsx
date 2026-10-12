@@ -37,6 +37,7 @@ export function ExamScreenLabClient({
         durationMinutes={null}
         startedAt="2026-01-01T00:00:00.000Z"
         config={{
+          assignmentType: 'exam',
           proctoringEnabled: false,
           isFullscreenEnforced: false,
           blockClipboard: false,

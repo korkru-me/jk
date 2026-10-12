@@ -18,6 +18,7 @@ import { formatIocIndex, formatIocPercent, summarizeIocForm, type IocScore } fro
 import { buildIocDocumentTitle, formatStandardLabel } from '@/lib/ioc-form'
 import { buildIocSummaryParagraph } from '@/lib/ioc-summary'
 import { buildIocPrintRows, type IocPrintOptions, type IocSignatureBlock, type PrintSection, type SummaryPrintRow } from '@/lib/ioc-print'
+import { formatThaiDate } from '@/lib/thai-time'
 import type { IocForm, IocFormExpert, IocFormItem, IocFormStandard } from '@/lib/types'
 
 type FormRow = Pick<
@@ -119,7 +120,7 @@ export async function loadIocDocument(
       typedName: withSignature && expert.signature_mode === 'typed' ? expert.display_name : null,
       signedAt:
         withSignature && expert.signature_mode !== 'none' && expert.submitted_at
-          ? new Date(expert.submitted_at).toLocaleDateString('th-TH', { dateStyle: 'long' })
+          ? formatThaiDate(expert.submitted_at, { dateStyle: 'long' })
           : null,
     }
   }

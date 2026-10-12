@@ -4,6 +4,19 @@ export const SCRATCHPAD_TTL_MS = 7 * 24 * 60 * 60 * 1_000
 
 export type ScratchpadBackground = 'blank' | 'lined' | 'grid' | 'dots'
 
+export const MIN_SCRATCHPAD_PAGE_COUNT = 1
+export const MAX_SCRATCHPAD_PAGE_COUNT = 3
+
+export function isScratchpadPageCount(value: unknown): value is number {
+  return Number.isInteger(value)
+    && Number(value) >= MIN_SCRATCHPAD_PAGE_COUNT
+    && Number(value) <= MAX_SCRATCHPAD_PAGE_COUNT
+}
+
+export function scratchpadPageCount(value: unknown): number {
+  return isScratchpadPageCount(value) ? value : MIN_SCRATCHPAD_PAGE_COUNT
+}
+
 export interface ScratchpadScope {
   ownerId: string
   submissionId: string
@@ -18,6 +31,8 @@ export interface ScratchpadScene {
   appState: Record<string, unknown>
   files: Record<string, unknown>
   background: ScratchpadBackground
+  /** Teaching boards may stack up to three fixed paper sheets. Omitted means one. */
+  pageCount?: number
 }
 
 const BACKGROUNDS = new Set<ScratchpadBackground>(['blank', 'lined', 'grid', 'dots'])
@@ -62,12 +77,17 @@ export function sanitizeScratchpadScene(value: unknown): ScratchpadScene | null 
   if (!scene.appState || typeof scene.appState !== 'object' || Array.isArray(scene.appState)) return null
   if (!scene.files || typeof scene.files !== 'object' || Array.isArray(scene.files)) return null
   if (!BACKGROUNDS.has(scene.background as ScratchpadBackground)) return null
+  if (
+    Object.prototype.hasOwnProperty.call(scene, 'pageCount')
+    && !isScratchpadPageCount(scene.pageCount)
+  ) return null
   return {
     formatVersion: CURRENT_WORK_FORMAT_VERSION,
     elements: scene.elements,
     appState: scene.appState as Record<string, unknown>,
     files: scene.files as Record<string, unknown>,
     background: scene.background as ScratchpadBackground,
+    ...(isScratchpadPageCount(scene.pageCount) ? { pageCount: scene.pageCount } : {}),
   }
 }
 

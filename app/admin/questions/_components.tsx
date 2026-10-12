@@ -34,7 +34,7 @@ export function QuestionsFilter({ categories }: { categories: QuestionCategory[]
   return (
     <div className="flex flex-wrap gap-3 mb-4">
       <Input
-        placeholder="ค้นหาชื่อโจทย์..."
+        placeholder="ค้นหาจากชื่อ เนื้อหา หรือแท็ก..."
         defaultValue={searchParams.get('search') ?? ''}
         onChange={(e) => update('search', e.target.value)}
         className="w-52"

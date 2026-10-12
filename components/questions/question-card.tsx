@@ -22,6 +22,7 @@ import { difficultyLabel, discriminationLabel, type QuestionStats } from '@/lib/
 import { QuestionTagsEditor } from './question-tags-editor'
 import { SubQuestionCountBadge } from './sub-question-count-badge'
 import { QuestionSetBadges, type QuestionSetRef } from './question-set-badges'
+import { QuestionSectionBadges } from './question-section-badges'
 import { SolutionButton } from './solution-button'
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
@@ -277,20 +278,7 @@ export function QuestionCard({
                   {q.question_categories.name}
                 </span>
               )}
-              {/* Which แฟ้มโจทย์ this question was filed into — all of them,
-                  since a question can sit in several. Inside a แฟ้ม the
-                  แฟ้มย่อย holding it are the ones that matter, and "which แฟ้ม"
-                  is already answered by being on this page. */}
-              {setContext
-                ? setContext.sectionTitles.map(title => (
-                    <span
-                      key={title}
-                      className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary max-w-[10rem] truncate"
-                    >
-                      {title}
-                    </span>
-                  ))
-                : <QuestionSetBadges sets={sets} showEmpty />}
+              {!setContext && <QuestionSetBadges sets={sets} showEmpty />}
               <QuestionTagsEditor questionId={q.id} tags={q.tags ?? []} allTags={allTags} />
             </div>
 
@@ -304,6 +292,18 @@ export function QuestionCard({
 
             {/* Question text preview */}
             <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{questionExcerpt(q.question_text)}</p>
+
+            {/* Keep แฟ้มย่อย out of the metadata row above. A title such as
+                "งาน" can also be a category or a tag; this labelled row makes
+                the location unambiguous and names every แฟ้มย่อย rather than
+                shortening several memberships to "+N". */}
+            {setContext && (
+              <QuestionSectionBadges
+                titles={setContext.sectionTitles}
+                showEmpty
+                className="mt-2"
+              />
+            )}
 
             {/* Stats row — measured from graded attempts, so absent on a question
                 nobody has answered yet. While the read is still in flight the

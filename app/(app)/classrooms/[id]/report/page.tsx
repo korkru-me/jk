@@ -4,6 +4,7 @@ import { getAuthUser } from '@/lib/auth/server'
 import { getHomeroomAggregate } from '@/lib/homeroom-data'
 import { computePassed } from '@/lib/grading'
 import { selectOfficialAttempt } from '@/lib/scoring'
+import { formatThaiDate } from '@/lib/thai-time'
 import { PrintReportButton } from './_components/print-report-button'
 
 export const metadata = { title: 'รายงานผู้ปกครอง — KorKru' }
@@ -65,7 +66,7 @@ export default async function HomeroomReportPage({
     }
   }
 
-  const today = new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })
+  const today = formatThaiDate(new Date(), { day: 'numeric', month: 'long', year: 'numeric' })
 
   return (
     <div className="p-8 print:p-0 max-w-3xl mx-auto">
@@ -136,7 +137,7 @@ export default async function HomeroomReportPage({
                           <td className="py-1.5 pr-2 text-gray-600">{a.classroomName}</td>
                           <td className="py-1.5 pr-2 text-gray-900">{a.title}</td>
                           <td className="py-1.5 pr-2 text-gray-500">
-                            {a.end_at ? new Date(a.end_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' }) : 'ไม่กำหนด'}
+                            {a.end_at ? formatThaiDate(a.end_at, { day: 'numeric', month: 'short', year: '2-digit' }) : 'ไม่กำหนด'}
                           </td>
                           <td className="py-1.5 text-right">
                             {done ? (

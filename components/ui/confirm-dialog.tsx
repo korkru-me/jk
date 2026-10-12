@@ -17,6 +17,8 @@ interface Props {
   cancelLabel?: string
   variant?: 'default' | 'destructive'
   onConfirm: () => void
+  /** Where focus returns when a confirmation is nested inside another popup. */
+  finalFocus?: React.ComponentProps<typeof DialogContent>['finalFocus']
 }
 
 /**
@@ -27,11 +29,11 @@ interface Props {
  */
 export function ConfirmDialog({
   open, onOpenChange, title, description, confirmLabel,
-  cancelLabel = 'ยกเลิก', variant = 'default', onConfirm,
+  cancelLabel = 'ยกเลิก', variant = 'default', onConfirm, finalFocus,
 }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" finalFocus={finalFocus}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           {description && <DialogDescription render={<div />}>{description}</DialogDescription>}

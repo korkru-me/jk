@@ -7,6 +7,8 @@ import { isAttemptExpired } from '@/lib/grading'
 import { canStudentViewScore } from '@/lib/result-visibility'
 import { filterAssignmentsForStudent } from '@/lib/classroom-groups-server'
 import { ExamDashboard } from './_components/exam-dashboard'
+import { completionAttemptLimit, findPassingCompletion } from '@/lib/assignment-completion'
+import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
 
 export const metadata = { title: 'ชุดข้อสอบ — KorKru' }
 
@@ -21,6 +23,7 @@ export interface AssignmentRow {
   end_at: string | null
   show_results: string
   max_attempts: number | null
+  completion_reached: boolean
   retry_scope: 'all' | 'wrong_only'
   score_strategy: 'best' | 'average' | 'latest'
   display_max_score: number | null
@@ -44,11 +47,12 @@ export default async function AssignmentsPage() {
       .from('classroom_students')
       .select('classroom_id')
       .eq('student_id', user.id),
-    supabase
+    fetchAllRows((from, to) => admin
       .from('submissions')
-      .select('assignment_id, id, status, total_score, max_score, attempt_number, started_at, assignments!inner(status)')
+      .select('assignment_id, id, status, total_score, score_adjustment, max_score, streak_reached, attempt_number, started_at, assignments!inner(status)')
       .eq('student_id', user.id)
-      .eq('assignments.status', 'published'),
+      .eq('assignments.status', 'published')
+      .order('id').range(from, to)).then(({ rows, error }) => ({ data: rows, error })),
   ])
 
   const profile = profileRes.data
@@ -67,7 +71,7 @@ export default async function AssignmentsPage() {
   const { data: published } = cids.length > 0
     ? await admin
         .from('assignments')
-        .select('id, title, question_ids, random_question_count, completion_rule, streak_target, duration_minutes, end_at, show_results, max_attempts, score_strategy, retry_scope, display_max_score, secure_browser_mode, android_exam_mode, classrooms(name), assignment_classrooms!inner(classroom_id, group_ids)')
+        .select('id, title, question_ids, random_question_count, completion_rule, streak_target, passing_type, passing_value, type, duration_minutes, end_at, show_results, max_attempts, score_strategy, retry_scope, display_max_score, secure_browser_mode, android_exam_mode, classrooms(name), assignment_classrooms!inner(classroom_id, group_ids)')
         .in('assignment_classrooms.classroom_id', cids)
         .eq('status', 'published')
         .order('created_at', { ascending: false })
@@ -93,7 +97,8 @@ export default async function AssignmentsPage() {
     duration_minutes: row.duration_minutes,
     end_at: row.end_at,
     show_results: row.show_results,
-    max_attempts: row.max_attempts,
+    max_attempts: completionAttemptLimit(row),
+    completion_reached: findPassingCompletion(row, (submissionsRes.data ?? []).filter(s => s.assignment_id === row.id)) != null,
     retry_scope: row.retry_scope ?? 'all',
     score_strategy: row.score_strategy,
     display_max_score: row.display_max_score,
@@ -122,7 +127,7 @@ export default async function AssignmentsPage() {
   for (const s of mySubs) {
     attemptsUsed[s.assignment_id] = Math.max(attemptsUsed[s.assignment_id] ?? 0, s.attempt_number)
     // An abandoned in-progress attempt whose timer already ran out gets
-    // force-finalized by startSubmission() on the next visit rather than
+    // finalized only by an explicit waiting-room recovery POST rather than
     // resumed — don't offer "ทำต่อ" for it here either.
     if (s.status === 'in_progress' && !isAttemptExpired(s.started_at, durationByAssignment.get(s.assignment_id) ?? null)) {
       hasInProgress[s.assignment_id] = true

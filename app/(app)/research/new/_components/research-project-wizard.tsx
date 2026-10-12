@@ -49,6 +49,7 @@ import {
 } from '@/lib/education-research'
 import { cn } from '@/lib/utils'
 import type { QuestionSetSection } from '@/lib/question-set-sections'
+import { matchesSearch } from '@/lib/question-search'
 
 const STEPS = ['ข้อมูลโครงการ', 'ก่อนเรียน', 'หลังเรียน', 'ตรวจสอบ']
 
@@ -661,9 +662,8 @@ function ExamPickerDialog({ open, onOpenChange, initial, questions, questionSets
   }, [open, initial])
 
   const filteredQuestions = useMemo(() => {
-    const term = search.trim().toLocaleLowerCase('th')
-    if (!term) return questions
-    return questions.filter(question => `${question.title} ${question.question_text} ${(question.tags ?? []).join(' ')}`.toLocaleLowerCase('th').includes(term))
+    if (!search.trim()) return questions
+    return questions.filter(question => matchesSearch(question, search))
   }, [questions, search])
   const maxScore = selectedResearchMaxScore(selectedIds, questions)
 

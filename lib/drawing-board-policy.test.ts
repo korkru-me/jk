@@ -138,6 +138,17 @@ describe('drawing board command policy', () => {
 })
 
 describe('drawing scene content policy', () => {
+  it('accepts up to three paper pages and rejects counts outside the limit', () => {
+    const accepted = validateDrawingScene(scene({ pageCount: 3 }), { role: 'teacher' })
+    expect(accepted).toMatchObject({ ok: true, scene: { pageCount: 3 } })
+    expect(validateDrawingScene(scene({ pageCount: 0 }), { role: 'teacher' }))
+      .toMatchObject({ ok: false, code: 'invalid-envelope' })
+    expect(validateDrawingScene(scene({ pageCount: 4 }), { role: 'teacher' }))
+      .toMatchObject({ ok: false, code: 'invalid-envelope' })
+    expect(validateDrawingScene(scene({ pageCount: 1.5 }), { role: 'teacher' }))
+      .toMatchObject({ ok: false, code: 'invalid-envelope' })
+  })
+
   it.each(['rectangle', 'diamond', 'ellipse', 'arrow', 'line', 'freedraw', 'text'])(
     'accepts student %s elements, including deleted history',
     type => {

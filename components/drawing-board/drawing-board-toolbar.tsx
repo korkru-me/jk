@@ -3,6 +3,7 @@
 import { FONT_FAMILY } from '@excalidraw/excalidraw'
 import type { ReactNode } from 'react'
 import {
+  ChevronDown,
   Circle,
   CopyPlus,
   Diamond,
@@ -21,11 +22,13 @@ import {
   Pointer,
   RectangleHorizontal,
   Redo2,
+  SlidersHorizontal,
   Type,
   Undo2,
   UnlockKeyhole,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { NativeSelect } from '@/components/ui/native-select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import type { FingerInputMode } from '@/lib/drawing-board-input'
@@ -53,19 +56,35 @@ interface StudentDrawingToolbarProps {
   onFingerModeChange: (mode: FingerInputMode) => void
   onFit?: () => void
   primarySuffix?: ReactNode
+  primaryEnd?: ReactNode
   secondaryPrefix?: ReactNode
+  secondaryBefore?: ReactNode
+  secondaryAfter?: ReactNode
+  secondaryOpen?: boolean
+  onSecondaryOpenChange?: (open: boolean) => void
   labelContext?: 'scratchpad' | 'teaching'
   placement?: 'top' | 'bottom'
 }
 
 interface TeacherDrawingToolbarProps extends Omit<
   StudentDrawingToolbarProps,
-  'primarySuffix' | 'secondaryPrefix' | 'labelContext' | 'placement'
+  | 'primarySuffix'
+  | 'primaryEnd'
+  | 'secondaryPrefix'
+  | 'secondaryBefore'
+  | 'secondaryAfter'
+  | 'secondaryOpen'
+  | 'onSecondaryOpenChange'
+  | 'labelContext'
+  | 'placement'
 > {
   presentationLocked: boolean
   gridEnabled: boolean
   snapEnabled: boolean
   duplicateBusy?: boolean
+  advancedOpen?: boolean
+  advancedContent?: ReactNode
+  onAdvancedOpenChange?: (open: boolean) => void
   onPresentationLockedChange: (locked: boolean) => void
   onGridEnabledChange: (enabled: boolean) => void
   onSnapEnabledChange: (enabled: boolean) => void
@@ -130,7 +149,12 @@ export function StudentDrawingToolbar({
   onFingerModeChange,
   onFit,
   primarySuffix,
+  primaryEnd,
   secondaryPrefix,
+  secondaryBefore,
+  secondaryAfter,
+  secondaryOpen = true,
+  onSecondaryOpenChange,
   labelContext = 'scratchpad',
   placement = 'bottom',
 }: StudentDrawingToolbarProps) {
@@ -143,12 +167,17 @@ export function StudentDrawingToolbar({
     || FONT_SIZES.some(size => size === state.fontSize)
 
   return (
-    <div className={`shrink-0 border-border bg-card px-2 py-1.5 sm:px-3 ${placement === 'top' ? 'border-b' : 'border-t'}`}>
-      <div
-        role="toolbar"
-        aria-label={labelContext === 'teaching' ? 'เครื่องมือหลักของกระดานสอน' : 'เครื่องมือหลักของกระดาษทด'}
-        className="flex min-w-0 items-center gap-1 overflow-x-auto overscroll-x-contain pb-1"
-      >
+    <Collapsible
+      open={secondaryOpen}
+      onOpenChange={onSecondaryOpenChange}
+      className={`shrink-0 border-border bg-card ${placement === 'top' ? 'border-b' : 'border-t'}`}
+    >
+      <div className="flex min-w-0 items-center gap-1 px-2 py-1.5 sm:px-3">
+        <div
+          role="toolbar"
+          aria-label={labelContext === 'teaching' ? 'เครื่องมือหลักของกระดานสอน' : 'เครื่องมือหลักของกระดาษทด'}
+          className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto overscroll-x-contain"
+        >
         <Button
           type="button"
           variant={toolSelected(state, 'selection') ? 'secondary' : 'ghost'}
@@ -245,15 +274,25 @@ export function StudentDrawingToolbar({
         >
           <Hand data-icon="inline-start" /> นิ้วเลื่อน
         </Button>
-        {primarySuffix}
+          {primarySuffix}
+        </div>
+        {primaryEnd && (
+          <div className="flex shrink-0 items-center border-l border-border pl-1">
+            {primaryEnd}
+          </div>
+        )}
       </div>
 
-      <div
-        role="toolbar"
-        aria-label={labelContext === 'teaching' ? 'เครื่องมือเสริมของกระดานสอน' : 'เครื่องมือเสริมของกระดาษทด'}
-        className="flex min-w-0 items-center gap-1 overflow-x-auto overscroll-x-contain"
+      <CollapsibleContent
+        className="overflow-hidden data-closed:hidden"
       >
-        {secondaryPrefix}
+        {secondaryBefore}
+        <div
+          role="toolbar"
+          aria-label={labelContext === 'teaching' ? 'เครื่องมือเสริมของกระดานสอน' : 'เครื่องมือเสริมของกระดาษทด'}
+          className="flex min-w-0 items-center gap-1 overflow-x-auto overscroll-x-contain border-t border-border px-2 py-1.5 sm:px-3"
+        >
+          {secondaryPrefix}
         <Button
           type="button"
           variant={inkSelected(state, HIGHLIGHTER_INK) ? 'secondary' : 'ghost'}
@@ -358,22 +397,24 @@ export function StudentDrawingToolbar({
         </NativeSelect>
 
         <ToolbarDivider />
-        {DRAWING_BACKGROUNDS.map(item => (
-          <Button
-            key={item.value}
-            type="button"
-            variant={background === item.value ? 'secondary' : 'ghost'}
-            size="xs"
-            className="min-h-10 min-w-10 shrink-0 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
-            onClick={() => onBackgroundChange(item.value)}
-            disabled={contentDisabled}
-            aria-pressed={background === item.value}
-          >
-            {item.label}
-          </Button>
-        ))}
-      </div>
-    </div>
+          {DRAWING_BACKGROUNDS.map(item => (
+            <Button
+              key={item.value}
+              type="button"
+              variant={background === item.value ? 'secondary' : 'ghost'}
+              size="xs"
+              className="min-h-10 min-w-10 shrink-0 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+              onClick={() => onBackgroundChange(item.value)}
+              disabled={contentDisabled}
+              aria-pressed={background === item.value}
+            >
+              {item.label}
+            </Button>
+          ))}
+        </div>
+        {secondaryAfter}
+      </CollapsibleContent>
+    </Collapsible>
   )
 }
 
@@ -387,6 +428,8 @@ export function TeacherDrawingToolbar({
   gridEnabled,
   snapEnabled,
   duplicateBusy = false,
+  advancedOpen = true,
+  advancedContent,
   onBackgroundChange,
   onFingerModeChange,
   onFit,
@@ -394,6 +437,7 @@ export function TeacherDrawingToolbar({
   onGridEnabledChange,
   onSnapEnabledChange,
   onDuplicateNextStep,
+  onAdvancedOpenChange,
 }: TeacherDrawingToolbarProps) {
   const ready = state.ready && Boolean(controller)
   const contentDisabled = disabled || state.readOnly || !ready
@@ -449,26 +493,11 @@ export function TeacherDrawingToolbar({
     </Button>
   )
 
-  return (
-    <div className="shrink-0 bg-card">
-      <StudentDrawingToolbar
-        controller={controller}
-        state={state}
-        background={background}
-        fingerMode={fingerMode}
-        disabled={disabled}
-        onBackgroundChange={onBackgroundChange}
-        onFingerModeChange={onFingerModeChange}
-        onFit={onFit}
-        primarySuffix={laserAndLock}
-        secondaryPrefix={frameTool}
-        labelContext="teaching"
-        placement="top"
-      />
+  const advancedTools = (
       <div
         role="toolbar"
         aria-label="เครื่องมือพรีเซนต์ของครู"
-        className="flex min-w-0 items-center gap-1 overflow-x-auto overscroll-x-contain px-2 py-1.5 sm:px-3"
+        className="flex min-w-0 items-center gap-1 overflow-x-auto overscroll-x-contain border-t border-border px-2 py-1.5 sm:px-3"
       >
         <span className="shrink-0 text-xs text-muted-foreground">สีด่วน</span>
         <span className="sr-only" aria-live="polite">สีที่เลือก {selectedColorLabel}</span>
@@ -537,6 +566,38 @@ export function TeacherDrawingToolbar({
           {duplicateBusy ? 'กำลังทำสำเนา...' : 'ทำสำเนาเป็นขั้นถัดไป'}
         </Button>
       </div>
-    </div>
+  )
+
+  const advancedTrigger = onAdvancedOpenChange ? (
+    <CollapsibleTrigger
+      aria-label={advancedOpen ? 'ซ่อนเครื่องมือเพิ่มเติม' : 'แสดงเครื่องมือทั้งหมด'}
+      className="group flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-primary outline-none transition-colors hover:bg-primary/10 focus-visible:ring-3 focus-visible:ring-ring/50 pointer-coarse:min-h-11"
+    >
+      <SlidersHorizontal className="size-3.5" aria-hidden="true" />
+      <span className="hidden md:inline">{advancedOpen ? 'ซ่อนเครื่องมือ' : 'เครื่องมือทั้งหมด'}</span>
+      <ChevronDown className="size-3.5 transition-transform group-data-panel-open:rotate-180" aria-hidden="true" />
+    </CollapsibleTrigger>
+  ) : undefined
+
+  return (
+    <StudentDrawingToolbar
+      controller={controller}
+      state={state}
+      background={background}
+      fingerMode={fingerMode}
+      disabled={disabled}
+      onBackgroundChange={onBackgroundChange}
+      onFingerModeChange={onFingerModeChange}
+      onFit={onFit}
+      primarySuffix={laserAndLock}
+      primaryEnd={advancedTrigger}
+      secondaryPrefix={frameTool}
+      secondaryBefore={advancedContent}
+      secondaryAfter={advancedTools}
+      secondaryOpen={advancedOpen}
+      onSecondaryOpenChange={onAdvancedOpenChange}
+      labelContext="teaching"
+      placement="top"
+    />
   )
 }

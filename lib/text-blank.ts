@@ -1,109 +1,114 @@
-// Splits HTML on every occurrence of `marker`, walking the DOM with Ranges so a
-// naive string split doesn't cut a tag in half — e.g. "<p>...[x]</p>" would
-// otherwise leave a dangling "</p>". Each returned fragment keeps only its own
-// (correctly closed) formatting tags. Falls back to a plain string split for
-// non-HTML text, or when running server-side (no DOM available).
-export function splitHtmlOnMarker(html: string, marker: string): string[] {
-  if (!html) return ['']
-  if (typeof document === 'undefined' || !/<[a-z][\s\S]*>/i.test(html)) return html.split(marker)
+type MarkerMatch = { index: number; length: number; capture: string }
 
-  let container = document.createElement('div')
-  container.innerHTML = html
-  const parts: string[] = []
+type OpenTag = { name: string; raw: string }
 
-  for (;;) {
-    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT)
-    let target: Text | null = null
-    let idx = -1
-    let node: Node | null
-    while ((node = walker.nextNode())) {
-      const i = (node as Text).data.indexOf(marker)
-      if (i !== -1) { target = node as Text; idx = i; break }
-    }
-    if (!target) {
-      parts.push(container.innerHTML)
-      break
-    }
+const VOID_TAGS = new Set([
+  'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link',
+  'meta', 'param', 'source', 'track', 'wbr',
+])
 
-    const beforeRange = document.createRange()
-    beforeRange.setStart(container, 0)
-    beforeRange.setEnd(target, idx)
-    const beforeDiv = document.createElement('div')
-    beforeDiv.appendChild(beforeRange.cloneContents())
-    parts.push(beforeDiv.innerHTML)
+// Unlike DOM Range, this tokenizer runs identically during SSR and hydration.
+// It never examines marker-looking text inside attributes, and every fragment
+// closes/reopens the formatting stack around an inline input boundary.
+const HTML_TOKEN = /<!--[\s\S]*?-->|<![^>]*>|<\/?[A-Za-z][^>"']*(?:(?:"[^"]*"|'[^']*')[^>"']*)*>|[^<]+|</g
 
-    const afterRange = document.createRange()
-    afterRange.setStart(target, idx + marker.length)
-    afterRange.setEnd(container, container.childNodes.length)
-    const afterDiv = document.createElement('div')
-    afterDiv.appendChild(afterRange.cloneContents())
-    container = afterDiv
-  }
-
-  return parts
+function closingTags(stack: readonly OpenTag[]): string {
+  return [...stack].reverse().map(tag => `</${tag.name}>`).join('')
 }
 
-// Same idea as splitHtmlOnMarker, but splits on every match of a regex with a
-// single capture group instead of a fixed string — e.g. numbered markers like
-// [คำตอบ 1], [คำตอบ 2]. Returns `parts` (N+1 fragments) alongside `captures`
-// (the N captured groups, in order), so callers can pair each fragment
-// boundary with what was captured there (e.g. the blank's number).
-export function splitHtmlOnPattern(html: string, pattern: RegExp): { parts: string[]; captures: string[] } {
-  if (!html) return { parts: [''], captures: [] }
-  const flags = pattern.flags.includes('g') ? pattern.flags : pattern.flags + 'g'
+function openingTags(stack: readonly OpenTag[]): string {
+  return stack.map(tag => tag.raw).join('')
+}
 
-  if (typeof document === 'undefined' || !/<[a-z][\s\S]*>/i.test(html)) {
-    const re = new RegExp(pattern.source, flags)
-    const captures: string[] = []
-    const parts: string[] = []
-    let lastIndex = 0
-    let m: RegExpExecArray | null
-    while ((m = re.exec(html))) {
-      parts.push(html.slice(lastIndex, m.index))
-      captures.push(m[1] ?? '')
-      lastIndex = m.index + m[0].length
-      if (m[0].length === 0) re.lastIndex++ // avoid infinite loop on zero-width matches
-    }
-    parts.push(html.slice(lastIndex))
-    return { parts, captures }
+function updateStack(stack: OpenTag[], token: string): void {
+  const closing = /^<\/\s*([A-Za-z][\w:-]*)[^>]*>$/.exec(token)
+  if (closing) {
+    const name = closing[1].toLowerCase()
+    const index = stack.map(tag => tag.name).lastIndexOf(name)
+    if (index >= 0) stack.splice(index, 1)
+    return
   }
+  const opening = /^<\s*([A-Za-z][\w:-]*)\b[^>]*>$/.exec(token)
+  if (!opening || /\/\s*>$/.test(token)) return
+  const name = opening[1].toLowerCase()
+  if (!VOID_TAGS.has(name)) stack.push({ name, raw: token })
+}
 
-  let container = document.createElement('div')
-  container.innerHTML = html
+function splitBalancedHtml(
+  html: string,
+  matchesInText: (text: string) => MarkerMatch[],
+): { parts: string[]; captures: string[] } {
+  if (!html) return { parts: [''], captures: [] }
   const parts: string[] = []
   const captures: string[] = []
+  const stack: OpenTag[] = []
+  let current = ''
 
-  for (;;) {
-    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT)
-    let target: Text | null = null
-    let match: RegExpExecArray | null = null
-    let node: Node | null
-    while ((node = walker.nextNode())) {
-      const re = new RegExp(pattern.source, flags)
-      const m = re.exec((node as Text).data)
-      if (m) { target = node as Text; match = m; break }
-    }
-    if (!target || !match) {
-      parts.push(container.innerHTML)
-      break
+  for (const token of html.match(HTML_TOKEN) ?? []) {
+    if (token.startsWith('<')) {
+      current += token
+      updateStack(stack, token)
+      continue
     }
 
-    captures.push(match[1] ?? '')
-
-    const beforeRange = document.createRange()
-    beforeRange.setStart(container, 0)
-    beforeRange.setEnd(target, match.index)
-    const beforeDiv = document.createElement('div')
-    beforeDiv.appendChild(beforeRange.cloneContents())
-    parts.push(beforeDiv.innerHTML)
-
-    const afterRange = document.createRange()
-    afterRange.setStart(target, match.index + match[0].length)
-    afterRange.setEnd(container, container.childNodes.length)
-    const afterDiv = document.createElement('div')
-    afterDiv.appendChild(afterRange.cloneContents())
-    container = afterDiv
+    const matches = matchesInText(token)
+    if (matches.length === 0) {
+      current += token
+      continue
+    }
+    let cursor = 0
+    for (const match of matches) {
+      current += token.slice(cursor, match.index)
+      current += closingTags(stack)
+      parts.push(current)
+      captures.push(match.capture)
+      current = openingTags(stack)
+      cursor = match.index + match.length
+    }
+    current += token.slice(cursor)
   }
 
+  current += closingTags(stack)
+  parts.push(current)
   return { parts, captures }
+}
+
+// Splits on visible text only. Rich-text tags remain balanced in every piece,
+// preventing server/client markup divergence around the inserted control.
+export function splitHtmlOnMarker(html: string, marker: string): string[] {
+  if (!marker) return [html]
+  return splitBalancedHtml(html, text => {
+    const matches: MarkerMatch[] = []
+    let from = 0
+    for (;;) {
+      const index = text.indexOf(marker, from)
+      if (index < 0) return matches
+      matches.push({ index, length: marker.length, capture: '' })
+      from = index + marker.length
+    }
+  }).parts
+}
+
+// Same operation for a regex with one capture group (the optional visible
+// blank number). A fresh global regex per text token prevents lastIndex state
+// from making SSR and hydration disagree.
+export function splitHtmlOnPattern(
+  html: string,
+  pattern: RegExp,
+): { parts: string[]; captures: string[] } {
+  const flags = pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`
+  return splitBalancedHtml(html, text => {
+    const re = new RegExp(pattern.source, flags)
+    const matches: MarkerMatch[] = []
+    let match: RegExpExecArray | null
+    while ((match = re.exec(text))) {
+      matches.push({
+        index: match.index,
+        length: match[0].length,
+        capture: match[1] ?? '',
+      })
+      if (match[0].length === 0) re.lastIndex += 1
+    }
+    return matches
+  })
 }

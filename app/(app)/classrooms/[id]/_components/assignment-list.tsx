@@ -2,14 +2,21 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { BookOpen, Clock, AlertCircle, CheckCircle2, XCircle, RotateCcw, Target, FileText, Repeat } from 'lucide-react'
+import { BookOpen, Clock, AlertCircle, CheckCircle2, XCircle, RotateCcw, Target, Repeat, Folder } from 'lucide-react'
+import { AssignmentTypeFilter, type AssignmentTypeFilterValue } from '@/components/assignments/assignment-type-filter'
 import { TYPE_CFG } from '@/lib/assignment-display'
 import { cn } from '@/lib/utils'
 import { buttonVariants } from '@/components/ui/button'
 import { assignmentSizeLabel } from '@/lib/assignment-size-label'
 import { computePassed, formatPassingThreshold } from '@/lib/grading'
+import { completionAttemptLimit, completionChoiceFor } from '@/lib/assignment-completion'
 import { isCompleted, type StudentAssignmentRow } from './assignment-status'
 import { Card } from '@/components/ui/card'
+import { groupPreset } from '@/app/(app)/classrooms/_components/group-colors'
+import {
+  groupAssignmentsByCategory,
+  type AssignmentCategory,
+} from '@/lib/assignment-categories'
 
 export type { StudentAssignmentRow }
 
@@ -31,9 +38,15 @@ function getDueInfo(endAt: string | null): { label: string; urgent: boolean; col
 }
 
 type StatusFilterKey = 'all' | 'pending' | 'done'
-type TypeFilterKey = 'all' | 'exam' | 'exercise'
+type TypeFilterKey = AssignmentTypeFilterValue
 
-export function AssignmentList({ assignments }: { assignments: StudentAssignmentRow[] }) {
+export function AssignmentList({
+  assignments,
+  categories,
+}: {
+  assignments: StudentAssignmentRow[]
+  categories: AssignmentCategory[]
+}) {
   const [statusFilter, setStatusFilter] = useState<StatusFilterKey>('all')
   const [typeFilter, setTypeFilter] = useState<TypeFilterKey>('all')
 
@@ -48,14 +61,9 @@ export function AssignmentList({ assignments }: { assignments: StudentAssignment
     { key: 'done', label: 'ส่งแล้ว', count: done.length },
   ]
 
-  const typeFilters: { key: TypeFilterKey; label: string; count: number; icon: typeof FileText }[] = [
-    { key: 'all', label: 'ทุกประเภท', count: assignments.length, icon: BookOpen },
-    { key: 'exam', label: 'ข้อสอบ', count: exams.length, icon: FileText },
-    { key: 'exercise', label: 'แบบฝึกหัด', count: exercises.length, icon: Repeat },
-  ]
-
   const byStatus = statusFilter === 'pending' ? pending : statusFilter === 'done' ? done : assignments
   const visible = typeFilter === 'all' ? byStatus : byStatus.filter(a => a.type === typeFilter)
+  const sections = groupAssignmentsByCategory(visible, categories)
 
   return (
     <div className="space-y-3">
@@ -74,26 +82,11 @@ export function AssignmentList({ assignments }: { assignments: StudentAssignment
         ))}
       </div>
 
-      <div className="flex items-center gap-2 flex-wrap">
-        {typeFilters.map(f => {
-          const Icon = f.icon
-          return (
-            <button
-              key={f.key}
-              onClick={() => setTypeFilter(f.key)}
-              className={cn(
-                'flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border transition-all',
-                typeFilter === f.key
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'bg-transparent text-muted-foreground border-border hover:bg-muted/50'
-              )}
-            >
-              <Icon size={12} />
-              {f.label} <span className="opacity-70">({f.count})</span>
-            </button>
-          )
-        })}
-      </div>
+      <AssignmentTypeFilter
+        value={typeFilter}
+        onValueChange={setTypeFilter}
+        counts={{ all: assignments.length, exercise: exercises.length, exam: exams.length }}
+      />
 
       {visible.length === 0 ? (
         <Card edge="dashed" padding="2xl" className="text-center">
@@ -103,14 +96,32 @@ export function AssignmentList({ assignments }: { assignments: StudentAssignment
               ? 'ทำครบทุกงานแล้ว เยี่ยมมาก!'
               : statusFilter === 'done' && typeFilter === 'all'
               ? 'ยังไม่มีงานที่ส่งแล้ว'
-              : 'ไม่มีงานในหมวดที่เลือก'}
+              : 'ไม่มีงานในกลุ่มที่เลือก'}
           </p>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {visible.map(a => (
-            <StudentAssignmentCard key={a.id} assignment={a} />
-          ))}
+        <div className="flex flex-col gap-4">
+          {sections.map(section => {
+            const preset = section.category ? groupPreset(section.category.color) : null
+            return (
+              <section key={section.category?.id ?? 'uncategorized'} className="flex flex-col gap-2">
+                {categories.length > 0 && (
+                  <div className="flex items-center gap-2 px-1">
+                    <span className={cn('flex size-7 items-center justify-center rounded-lg', preset?.surface ?? 'bg-muted')}>
+                      <Folder className={cn('size-3.5', preset?.text ?? 'text-muted-foreground')} aria-hidden="true" />
+                    </span>
+                    <h3 className="text-sm font-semibold">{section.category?.name ?? 'งานอื่น ๆ'}</h3>
+                    <span className="text-xs text-muted-foreground">{section.assignments.length} งาน</span>
+                  </div>
+                )}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {section.assignments.map(assignment => (
+                    <StudentAssignmentCard key={assignment.id} assignment={assignment} />
+                  ))}
+                </div>
+              </section>
+            )
+          })}
         </div>
       )}
     </div>
@@ -134,8 +145,10 @@ function StudentAssignmentCard({ assignment: a }: { assignment: StudentAssignmen
   const passed = isDone
     ? computePassed(a.submission?.total_score ?? null, a.submission?.max_score ?? 0, a.passing_type, a.passing_value)
     : null
-  const attemptsRemaining = a.max_attempts == null || a.attempts_used < a.max_attempts
-  const canRetry = !isInProgress && isDone && attemptsRemaining
+  const attemptLimit = completionAttemptLimit({ ...a, type: a.type === 'exam' ? 'exam' : 'exercise' })
+  const attemptsRemaining = attemptLimit == null || a.attempts_used < attemptLimit
+  const masteryComplete = completionChoiceFor(a) !== 'complete' && isCompleted(a)
+  const canRetry = !isInProgress && isDone && attemptsRemaining && !masteryComplete
   const passingThreshold = formatPassingThreshold(a.passing_type, a.passing_value)
 
   return (

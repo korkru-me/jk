@@ -13,10 +13,60 @@ import {
 /** The Storage host attachments must come from, checked on every write. */
 const STORAGE_BASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 
+export interface ReusableAnnouncement {
+  id: string
+  body: string
+  attachments: PostAttachment[]
+  created_at: string
+}
+
 async function getAuthUser() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   return user
+}
+
+export async function getReusableAnnouncements(classroomId: string): Promise<
+  { announcements: ReusableAnnouncement[] } | { error: string }
+> {
+  const user = await getAuthUser()
+  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+
+  const admin = createAdminClient()
+  const { data: classroom } = await admin
+    .from('classrooms')
+    .select('teacher_id, status')
+    .eq('id', classroomId)
+    .maybeSingle()
+  if (!classroom || classroom.status !== 'active') return { error: 'ไม่พบห้องเรียนต้นทาง' }
+
+  if (classroom.teacher_id !== user.id) {
+    const { data: coTeacher } = await admin
+      .from('classroom_co_teachers')
+      .select('permission')
+      .eq('classroom_id', classroomId)
+      .eq('user_id', user.id)
+      .in('permission', ['admin', 'manage'])
+      .maybeSingle()
+    if (!coTeacher) return { error: 'ไม่มีสิทธิ์นำประกาศจากห้องนี้มาใช้ซ้ำ' }
+  }
+
+  const { data, error } = await admin
+    .from('classroom_posts')
+    .select('id, body, attachments, created_at')
+    .eq('classroom_id', classroomId)
+    .order('created_at', { ascending: false })
+    .limit(100)
+  if (error) return { error: 'อ่านประกาศของห้องต้นทางไม่สำเร็จ กรุณาลองใหม่' }
+
+  return {
+    announcements: (data ?? []).map(post => ({
+      id: post.id,
+      body: post.body,
+      attachments: sanitizeAttachments(post.attachments as PostAttachment[] | null, STORAGE_BASE_URL),
+      created_at: post.created_at,
+    })),
+  }
 }
 
 export async function getClassroomPosts(classroomId: string): Promise<ClassroomPost[]> {

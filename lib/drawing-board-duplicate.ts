@@ -99,6 +99,7 @@ export function duplicateDrawingScene(
       appState: structuredClone(source.appState),
       files,
       background: source.background,
+      ...(source.pageCount ? { pageCount: source.pageCount } : {}),
     },
     elementIdMap,
     fileIdMap,

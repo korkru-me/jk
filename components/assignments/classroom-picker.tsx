@@ -1,12 +1,19 @@
 'use client'
 
-import { useState } from 'react'
-import { BookOpen, Check, Search } from 'lucide-react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
+import { Check, ChevronDown, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { coverOf, parseDescription, type CoverPreset } from '@/app/(app)/classrooms/_components/classroom-meta'
 import type { AssignmentClassroomOption } from '@/components/assignments/create-assignment-form'
+import { ClassroomIcon } from '@/components/classrooms/classroom-icon'
+import type { ClassroomIconKey } from '@/lib/classroom-icons'
 
 /** Past this many ห้องเรียน the list gets a search box. Below it, everything
  *  is on screen at once and a search field is one more thing to read past. */
@@ -16,11 +23,19 @@ interface Props {
   classrooms: AssignmentClassroomOption[]
   selectedIds: string[]
   onToggle: (id: string) => void
+  /** The room the teacher came from. It stays selected while other rooms are
+   *  tucked behind an explicit "assign elsewhere too" disclosure. */
+  primaryClassroomId?: string
+  /** A larger visual section that should still count as "inside" the picker.
+   *  The contextual assignment flow keeps its group-target controls in the
+   *  same card, just below this disclosure. */
+  outsideClickBoundaryRef?: RefObject<HTMLElement | null>
 }
 
 interface Row {
   classroom: AssignmentClassroomOption
   cover: CoverPreset | null
+  iconKey?: ClassroomIconKey
   /** The one line under the name: ระดับ · ภาคเรียน · what the teacher typed. */
   meta: string
   /** Everything a search should match, lowercased once. */
@@ -35,8 +50,36 @@ interface Row {
  * rest of the form. It is now a fixed-height, scrollable list of compact rows
  * with a search box once there are enough rooms to need one.
  */
-export function ClassroomPicker({ classrooms, selectedIds, onToggle }: Props) {
+export function ClassroomPicker({
+  classrooms,
+  selectedIds,
+  onToggle,
+  primaryClassroomId,
+  outsideClickBoundaryRef,
+}: Props) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
+
+  useEffect(() => {
+    if (!open) return
+
+    function closeOnOutsideClick(event: MouseEvent) {
+      const container = outsideClickBoundaryRef?.current ?? containerRef.current
+      const target = event.target
+      if (!container || !(target instanceof Node)) return
+      // Selecting a room moves its row to the top. Keep the disclosure open
+      // even if React moves or replaces the original target before bubbling
+      // reaches this document listener.
+      if (container.contains(target) || event.composedPath().includes(container)) return
+      setOpen(false)
+    }
+
+    // Collapse only after the outside control receives its click, so switching
+    // sections or choosing a group works on the first click.
+    document.addEventListener('click', closeOnOutsideClick)
+    return () => document.removeEventListener('click', closeOnOutsideClick)
+  }, [open, outsideClickBoundaryRef])
 
   const rows: Row[] = classrooms.map(classroom => {
     // `description` carries the create wizard's whole form flattened into text
@@ -47,6 +90,7 @@ export function ClassroomPicker({ classrooms, selectedIds, onToggle }: Props) {
     return {
       classroom,
       cover: coverOf(meta),
+      iconKey: meta.iconKey,
       meta: [meta.gradeLevel, meta.academicTerm, meta.description.trim()].filter(Boolean).join(' · '),
       haystack: [classroom.name, meta.gradeLevel, meta.academicTerm, meta.tags.join(' '), meta.description]
         .join(' ')
@@ -56,17 +100,23 @@ export function ClassroomPicker({ classrooms, selectedIds, onToggle }: Props) {
 
   const term = query.trim().toLowerCase()
   const picked = new Set(selectedIds)
+  const primaryRow = primaryClassroomId
+    ? rows.find(row => row.classroom.id === primaryClassroomId)
+    : undefined
+  const selectableRows = primaryRow
+    ? rows.filter(row => row.classroom.id !== primaryRow.classroom.id)
+    : rows
   // Picked rooms stay at the top and stay visible even when the search would
   // hide them: this field decides who sits the งาน, so what is already chosen
   // must never scroll — or filter — out of sight where it cannot be undone.
-  const selectedRows = rows.filter(r => picked.has(r.classroom.id))
-  const otherRows = rows.filter(r => !picked.has(r.classroom.id) && (!term || r.haystack.includes(term)))
+  const selectedRows = selectableRows.filter(r => picked.has(r.classroom.id))
+  const otherRows = selectableRows.filter(r => !picked.has(r.classroom.id) && (!term || r.haystack.includes(term)))
 
-  return (
-    <div className="space-y-2">
-      {classrooms.length > SEARCH_THRESHOLD && (
+  const classroomList = (
+    <>
+      {selectableRows.length > SEARCH_THRESHOLD && (
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
             onChange={e => setQuery(e.target.value)}
@@ -78,17 +128,17 @@ export function ClassroomPicker({ classrooms, selectedIds, onToggle }: Props) {
 
       {term && (
         <p className="text-xs text-muted-foreground">
-          พบ {otherRows.length} ห้อง จากทั้งหมด {classrooms.length} ห้อง
+          พบ {otherRows.length} ห้อง จากทั้งหมด {selectableRows.length} ห้อง
         </p>
       )}
 
-      <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
+      <div className="flex max-h-64 flex-col gap-2 overflow-y-auto pr-1">
         {selectedRows.map(row => (
           <ClassroomRow key={row.classroom.id} row={row} selected onToggle={onToggle} />
         ))}
 
-        {selectedRows.length > 0 && otherRows.length > 0 && (
-          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide px-1 pt-1">
+        {!primaryRow && selectedRows.length > 0 && otherRows.length > 0 && (
+          <p className="px-1 pt-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
             ห้องเรียนอื่น
           </p>
         )}
@@ -103,25 +153,55 @@ export function ClassroomPicker({ classrooms, selectedIds, onToggle }: Props) {
           </p>
         )}
       </div>
+    </>
+  )
+
+  return (
+    <div ref={containerRef} className="flex flex-col gap-2">
+      {primaryRow && selectableRows.length > 0 ? (
+        <Collapsible open={open} onOpenChange={setOpen}>
+          <CollapsibleTrigger
+            render={(
+              <Button
+                type="button"
+                variant="outline"
+                className="group h-auto w-full justify-between rounded-xl p-3 text-left aria-expanded:bg-background aria-expanded:hover:bg-background dark:aria-expanded:bg-input/30 dark:aria-expanded:hover:bg-input/30"
+              />
+            )}
+          >
+            <span className="flex min-w-0 flex-col items-start gap-0.5 whitespace-normal">
+              <span className="font-medium text-foreground">มอบหมายให้ห้องเรียนอื่นด้วย</span>
+              <span data-assignment-description className="text-xs font-normal text-muted-foreground">
+                {selectedRows.length > 0
+                  ? `เลือกเพิ่มแล้ว ${selectedRows.length} ห้องเรียน`
+                  : 'หากไม่เลือกเพิ่ม งานจะอยู่ในห้องนี้เท่านั้น'}
+              </span>
+            </span>
+            <ChevronDown className="size-4 shrink-0 transition-transform group-data-panel-open:rotate-180" aria-hidden="true" />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 ease-out data-ending-style:h-0 data-starting-style:h-0">
+            <div className="flex flex-col gap-2 pt-2">
+              {classroomList}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      ) : !primaryRow ? classroomList : null}
     </div>
   )
 }
 
-function ClassroomRow({ row, selected, onToggle }: { row: Row; selected: boolean; onToggle: (id: string) => void }) {
+function ClassroomRow({
+  row,
+  selected,
+  onToggle,
+}: {
+  row: Row
+  selected: boolean
+  onToggle: (id: string) => void
+}) {
   const { classroom, cover, meta } = row
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      onClick={() => onToggle(classroom.id)}
-      aria-pressed={selected}
-      className={cn(
-        'h-auto w-full justify-start gap-2.5 rounded-xl border p-2.5 text-left font-normal',
-        selected
-          ? 'border-primary bg-primary/10 hover:bg-primary/10 dark:hover:bg-primary/10'
-          : 'border-border hover:border-ring',
-      )}
-    >
+  const content = (
+    <>
       {/* The cover colour the teacher gave this room, so the list can be
           recognised the same way the หน้าห้องเรียน grid is. */}
       <div
@@ -130,13 +210,31 @@ function ClassroomRow({ row, selected, onToggle }: { row: Row; selected: boolean
           cover ? `${cover.surface} ${cover.text}` : 'bg-muted text-muted-foreground border-transparent',
         )}
       >
-        <BookOpen className="size-3.5" />
+        <ClassroomIcon iconKey={row.iconKey} className="size-3.5" />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-foreground truncate">{classroom.name}</p>
         {meta && <p className="text-xs text-muted-foreground truncate">{meta}</p>}
       </div>
-      {selected && <Check className="size-4 text-primary shrink-0" />}
+      {selected && <Check className="size-4 shrink-0 text-primary" />}
+    </>
+  )
+  const rowClassName = cn(
+    'flex h-auto w-full items-center justify-start gap-2.5 rounded-xl border p-2.5 text-left font-normal',
+    selected
+      ? 'border-border bg-primary/10 shadow-sm'
+      : 'border-border hover:bg-muted/50',
+  )
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      onClick={() => onToggle(classroom.id)}
+      aria-pressed={selected}
+      className={cn(rowClassName, selected && 'hover:bg-primary/10')}
+    >
+      {content}
     </Button>
   )
 }

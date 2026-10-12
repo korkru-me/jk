@@ -15,7 +15,7 @@ import type { Question } from '@/lib/types'
  */
 type BankQuestionFields = Pick<
   Question,
-  'id' | 'title' | 'question_text' | 'difficulty' | 'question_type' | 'tags'
+  'id' | 'title' | 'question_text' | 'difficulty' | 'question_type' | 'subject' | 'tags'
 >
 
 export type BankQuestion = BankQuestionFields & {
@@ -34,7 +34,7 @@ type ShapedQuestion = CountableQuestion & { variables?: unknown }
 /** The row as it comes back, before the jsonb is counted and dropped. */
 type BankRow = BankQuestionFields & ShapedQuestion
 
-const BANK_FIELDS = 'id, title, question_text, difficulty, question_type, tags'
+const BANK_FIELDS = 'id, title, question_text, difficulty, question_type, subject, tags'
 
 /** The jsonb a point value — and whether the numbers are drawn at random — is
  *  read from. `question_type` decides which of them is read, and BANK_FIELDS

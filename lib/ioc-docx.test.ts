@@ -159,6 +159,19 @@ describe('iocDocxFileName', () => {
     expect(iocDocxFileName({ doc: 'blank', examTitle: '', generatedAt: at }))
       .toBe('IOC-ฟอร์มเปล่า-IOC-2026-09-14.docx')
   })
+
+  // 03:00 on 15 ก.ย. in Thailand is still 14 ก.ย. in UTC, where Vercel runs this.
+  it('dates the file by the Thai calendar, even on a UTC server', () => {
+    const previous = process.env.TZ
+    process.env.TZ = 'UTC'
+    try {
+      expect(iocDocxFileName({ doc: 'summary', examTitle: 'กลางภาค', generatedAt: new Date('2026-09-14T20:00:00Z') }))
+        .toBe('IOC-สรุปผล-กลางภาค-2026-09-15.docx')
+    } finally {
+      if (previous === undefined) delete process.env.TZ
+      else process.env.TZ = previous
+    }
+  })
 })
 
 describe('buildIocDocxDocument', () => {

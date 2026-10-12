@@ -71,6 +71,13 @@ describe('student scratchpad revision state', () => {
     }))
   })
 
+  it('treats extra paper pages as semantic without changing one-page fingerprints', () => {
+    expect(scratchpadSemanticFingerprint(scene({ pageCount: 1 })))
+      .toBe(scratchpadSemanticFingerprint(scene()))
+    expect(scratchpadSemanticFingerprint(scene({ pageCount: 2 })))
+      .not.toBe(scratchpadSemanticFingerprint(scene()))
+  })
+
   it('increments only for semantic edits', () => {
     const initial = initialScratchpadRevision(scene())
     expect(reviseScratchpad(initial, scene({ appState: { scrollX: 20 } }))).toBe(initial)
@@ -105,6 +112,7 @@ describe('student scratchpad revision state', () => {
       elements: [{ id: 'deleted', type: 'line', isDeleted: true }],
     }))).toBe(false)
     expect(scratchpadHasMeaningfulDraft(scene({ background: 'grid' }))).toBe(true)
+    expect(scratchpadHasMeaningfulDraft(scene({ pageCount: 2 }))).toBe(true)
     expect(scratchpadHasMeaningfulDraft(scene({
       elements: [{ id: 'line-1', type: 'line', isDeleted: false }],
     }))).toBe(true)

@@ -22,7 +22,7 @@ import {
 import type { StudentSortDir } from '@/lib/student-sort'
 import {
   ChartTypeToggle, MiniBarChart, MiniRadarChart, RADAR_MIN_ASSIGNMENTS, isUnscored,
-  type AbilityChartType, type AbilityDatum,
+  type AbilityChartType, type AbilityDatum, type AbilityLabelMode,
 } from './ability-charts'
 import { StudentAbilityDialog } from './student-ability-dialog'
 import type { ClassroomAssignmentRow } from './classroom-assignments-tab'
@@ -56,10 +56,15 @@ interface Props {
   pendingReviewByAssignment: Record<string, number>
 }
 
-// Which งาน are ticked, which chart is showing and how many students a page
-// holds are remembered per classroom in this browser only — a viewing
-// preference, not class data.
-interface StoredPrefs { selected?: string[]; chart?: AbilityChartType; pageSize?: number }
+// Viewing choices are remembered per classroom in this browser only — they
+// are not classroom data and do not need a database write.
+interface StoredPrefs {
+  selected?: string[]
+  chart?: AbilityChartType
+  pageSize?: number
+  labelMode?: AbilityLabelMode
+  showClassAverage?: boolean
+}
 
 function prefsKey(classroomId: string) {
   return `korkru.student-ability.${classroomId}`
@@ -70,11 +75,13 @@ function readPrefs(classroomId: string): StoredPrefs {
   try {
     const parsed: unknown = JSON.parse(window.localStorage.getItem(prefsKey(classroomId)) ?? '{}')
     if (!parsed || typeof parsed !== 'object') return {}
-    const { selected, chart, pageSize } = parsed as Record<string, unknown>
+    const { selected, chart, pageSize, labelMode, showClassAverage } = parsed as Record<string, unknown>
     return {
       selected: Array.isArray(selected) ? selected.filter((id): id is string => typeof id === 'string') : undefined,
       chart: chart === 'bar' || chart === 'radar' ? chart : undefined,
       pageSize: PAGE_SIZE_OPTIONS.find(size => size === pageSize),
+      labelMode: labelMode === 'number' || labelMode === 'title' ? labelMode : undefined,
+      showClassAverage: typeof showClassAverage === 'boolean' ? showClassAverage : undefined,
     }
   } catch {
     return {}
@@ -104,11 +111,15 @@ export function StudentAbilityTab({
   const [selectedIds, setSelectedIds] = useState<string[]>(() => usable.map(a => a.id))
   const [chartType, setChartType] = useState<AbilityChartType>('bar')
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE)
+  const [labelMode, setLabelMode] = useState<AbilityLabelMode>('number')
+  const [showClassAverage, setShowClassAverage] = useState(true)
   useLayoutEffect(() => {
     const prefs = readPrefs(classroomId)
     setSelectedIds(restoreSelection(prefs.selected, usable.map(a => a.id)))
     if (prefs.chart) setChartType(prefs.chart)
     if (prefs.pageSize) setPageSize(prefs.pageSize)
+    if (prefs.labelMode) setLabelMode(prefs.labelMode)
+    if (prefs.showClassAverage !== undefined) setShowClassAverage(prefs.showClassAverage)
     // Once per classroom: later changes to the list must not undo what the
     // teacher ticks while the tab is open.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -160,7 +171,14 @@ export function StudentAbilityTab({
   const openStudent = openIndex >= 0 ? visible[openIndex] : null
 
   function remember(change: StoredPrefs) {
-    writePrefs(classroomId, { selected: selectedIds, chart: chartType, pageSize, ...change })
+    writePrefs(classroomId, {
+      selected: selectedIds,
+      chart: chartType,
+      pageSize,
+      labelMode,
+      showClassAverage,
+      ...change,
+    })
   }
 
   function changeSelection(next: string[]) {
@@ -172,6 +190,16 @@ export function StudentAbilityTab({
   function changeChart(next: AbilityChartType) {
     setChartType(next)
     remember({ chart: next })
+  }
+
+  function changeLabelMode(next: AbilityLabelMode) {
+    setLabelMode(next)
+    remember({ labelMode: next })
+  }
+
+  function changeClassAverage(next: boolean) {
+    setShowClassAverage(next)
+    remember({ showClassAverage: next })
   }
 
   // Keeps the first student of the current page in view at the new size.
@@ -217,7 +245,7 @@ export function StudentAbilityTab({
   if (students.length === 0) {
     return (
       <Card className="py-12 text-center text-sm text-muted-foreground">
-        ยังไม่มีนักเรียนในห้องนี้ — เชิญนักเรียนได้ที่แท็บ &ldquo;เชิญเข้าร่วม&rdquo;
+        ยังไม่มีนักเรียนในห้องนี้ — แชร์รหัสห้องเรียนหรือลิงก์เชิญจากกรอบข้อมูลด้านบน
       </Card>
     )
   }
@@ -429,6 +457,10 @@ export function StudentAbilityTab({
         returnFocusTo={() => (lastShownId.current ? cardButtons.current.get(lastShownId.current) ?? null : null)}
         chartType={chartType}
         onChartTypeChange={changeChart}
+        labelMode={labelMode}
+        onLabelModeChange={changeLabelMode}
+        showClassAverage={showClassAverage}
+        onShowClassAverageChange={changeClassAverage}
         radarAllowed={radarAllowed}
       />
     </div>

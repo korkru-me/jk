@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { renderMathInHtml } from '@/lib/math/latex'
+import { renderRichTextHtml } from '@/lib/rich-text-html'
 import {
   groupRowsByStandard,
   type DocHeader,
@@ -318,16 +318,16 @@ function EvaluationRow({
       <td>
         {row.sectionLabel ? <p className="ioc-section-label">{row.sectionLabel}</p> : null}
         {row.groupIntro ? (
-          <div className="ioc-group-intro" dangerouslySetInnerHTML={{ __html: renderMathInHtml(row.groupIntro) }} />
+          <div className="ioc-group-intro" dangerouslySetInnerHTML={{ __html: renderRichTextHtml(row.groupIntro) }} />
         ) : null}
         <div className="ioc-prompt">
           <b>{row.itemLabel}. </b>
-          <span dangerouslySetInnerHTML={{ __html: renderMathInHtml(row.prompt) }} />
+          <span dangerouslySetInnerHTML={{ __html: renderRichTextHtml(row.prompt) }} />
         </div>
         {row.choices.length > 0 ? (
           <div className="ioc-choices">
             {row.choices.map(choice => (
-              <span key={choice} dangerouslySetInnerHTML={{ __html: renderMathInHtml(choice) }} />
+              <span key={choice} dangerouslySetInnerHTML={{ __html: renderRichTextHtml(choice) }} />
             ))}
           </div>
         ) : null}

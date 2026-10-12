@@ -50,7 +50,7 @@ export function GroupTargetPicker({ classrooms, groupsByClassroom, value, onChan
 
   if (withGroups.length === 0) {
     return (
-      <p className="text-xs text-muted-foreground">
+      <p data-assignment-description className="text-xs text-muted-foreground">
         นักเรียนทุกคนในห้องที่เลือกจะได้รับงานนี้ · อยากมอบหมายเฉพาะบางกลุ่ม แบ่งกลุ่มได้ที่แท็บ “กลุ่มย่อย” ของห้องเรียน
       </p>
     )
@@ -131,7 +131,7 @@ export function GroupTargetPicker({ classrooms, groupsByClassroom, value, onChan
                 ) : chosen.length === 0 ? (
                   <p className="text-xs text-destructive">เลือกอย่างน้อย 1 กลุ่ม</p>
                 ) : (
-                  <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <p data-assignment-description className="flex items-center gap-1 text-xs text-muted-foreground">
                     <Grid3x3 className="size-3" aria-hidden="true" />
                     นักเรียน {reached} คนในกลุ่มที่เลือกจะเห็นงานนี้ · คนนอกกลุ่มจะมองไม่เห็น
                   </p>

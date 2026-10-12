@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { randomizeVariables, evaluateFormula, evaluateStudentAnswer } from '@/lib/math/evaluator'
 import { gradeValue, naturalMaxScore } from '@/lib/assignment-attempt'
-import { containsMath, renderMathInHtml } from '@/lib/math/latex'
+import { containsMath } from '@/lib/math/latex'
+import { renderRichTextHtml } from '@/lib/rich-text-html'
 import { RichText } from '@/components/ui/rich-text'
 import { Button } from '@/components/ui/button'
 import { WorkImageUpload } from '@/components/exam/work-image-upload'
@@ -80,7 +81,7 @@ function substituteVars(text: string, values: Record<string, number>) {
 }
 
 function renderUnit(unit: string) {
-  if (isHtml(unit)) return <span className="[&_p]:inline" dangerouslySetInnerHTML={{ __html: renderMathInHtml(unit) }} />
+  if (isHtml(unit)) return <span className="[&_p]:inline" dangerouslySetInnerHTML={{ __html: renderRichTextHtml(unit) }} />
   return <span>{unit}</span>
 }
 
@@ -98,7 +99,7 @@ function RenderText({ text }: { text: string }) {
   if (!text) return <p className="text-muted-foreground italic text-[15px]">ยังไม่มีเนื้อหาโจทย์</p>
   if (isHtml(text)) return (
     <div className="text-foreground leading-relaxed text-[15px] rich-text-content"
-      dangerouslySetInnerHTML={{ __html: renderMathInHtml(text) }} />
+      dangerouslySetInnerHTML={{ __html: renderRichTextHtml(text) }} />
   )
   return <p className="text-foreground leading-relaxed whitespace-pre-line text-[15px]">{text}</p>
 }
@@ -945,7 +946,7 @@ export function QuestionPreviewContent({
                 )
               })}
               <div className="mt-2">
-                <WorkImageUpload value={workImages[0] ?? null} onChange={url => setWorkImage(0, url)} localOnly />
+                <WorkImageUpload value={workImages[0] ?? null} onChange={url => setWorkImage(0, url)} localOnly showPreviewHelp />
               </div>
             </div>
           )}
@@ -989,30 +990,10 @@ export function QuestionPreviewContent({
                     </div>
                   </>
                 )}
-                <WorkImageUpload value={workImages[i] ?? null} onChange={url => setWorkImage(i, url)} localOnly />
+                <WorkImageUpload value={workImages[i] ?? null} onChange={url => setWorkImage(i, url)} localOnly showPreviewHelp />
               </div>
             )
           })}
-
-          {/* อธิบายช่องแนบรูปวิธีทำ — สวิตช์ไม่ได้อยู่ในหน้าสร้างโจทย์ ครูจึงหาไม่เจอถ้าไม่บอก */}
-          <div className="text-xs text-muted-foreground bg-muted rounded-lg px-3 py-2 leading-relaxed space-y-1">
-            <p className="font-medium text-foreground">ช่องแนบรูปวิธีทำคืออะไร</p>
-            <p>
-              เป็นช่องให้นักเรียน<span className="font-medium text-foreground">ถ่ายรูปกระดาษทดที่แสดงวิธีทำ</span>แนบมาพร้อมคำตอบ
-              (เปิดกล้องหลังของมือถือโดยตรง ย่อรูปให้เองก่อนส่ง — เป็นรูปภาพ ไม่ใช่ไฟล์ PDF)
-              ระบบไม่ตรวจรูป ครูเป็นคนเปิดดูเองตอนตรวจ จึงใช้ดูว่านักเรียนคิดมาอย่างไร ไม่ใช่แค่ตอบเลขถูก
-            </p>
-            <p>
-              สวิตช์อยู่ที่ <span className="font-medium text-foreground">ขั้นตั้งค่าของหน้าสร้างงาน</span> ชื่อ “ให้นักเรียนแนบรูปแสดงวิธีทำ”
-              ไม่ได้อยู่ในหน้าสร้างโจทย์ — เปิดครั้งเดียวมีผลกับข้อเติมคำตอบตัวเลขทุกข้อในงานนั้น
-              ค่าเริ่มต้นคือปิด และเมื่อเปิด นักเรียนต้องแนบให้ครบทุกข้อย่อยก่อนจึงจะกดส่งได้
-            </p>
-            <p>
-              ในหน้าตัวอย่างนี้แนบไฟล์จริงจากเครื่องได้ เพื่อดูว่าหน้าตาเป็นอย่างไรและรูปจะไปโผล่ตรงไหนตอนครูตรวจ
-              — แต่<span className="font-medium text-foreground">ไฟล์ไม่ถูกอัปโหลด</span> อยู่ในเบราว์เซอร์ของคุณเท่านั้น
-              และหายไปเองเมื่อปิดตัวอย่าง จึงไม่มีไฟล์ค้างในระบบให้ต้องตามลบ
-            </p>
-          </div>
 
           {!writtenChecked ? (
             <button

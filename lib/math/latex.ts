@@ -9,7 +9,9 @@ import katex from 'katex'
  * display, which used to show up verbatim as backslashes and braces. This
  * turns those spans into KaTeX markup before the HTML reaches the DOM, so
  * every existing render site keeps working unchanged — it stays a plain
- * string → string transform.
+ * string → string transform. Render sites call it through
+ * `renderRichTextHtml` (lib/rich-text-html.ts), which sanitises the teacher's
+ * HTML first; KaTeX's own markup is added after that, never filtered by it.
  *
  * Only the two backslash delimiters are recognised. `$...$` is deliberately
  * left alone: a lone dollar sign is ordinary text in a physics question
@@ -39,24 +41,33 @@ export function containsMath(html: string): boolean {
 export function renderMathInHtml(html: string | null | undefined): string {
   if (!html || !containsMath(html)) return html ?? ''
 
-  return html.replace(MATH_PATTERN, (whole: string, inline?: string, display?: string) => {
-    const tex = inline ?? display ?? ''
-    if (!tex.trim()) return whole
-    try {
-      return katex.renderToString(decodeEntities(tex), {
-        displayMode: display !== undefined,
-        throwOnError: false,
-        // Malformed TeX renders in KaTeX's error colour instead of throwing,
-        // so one bad formula can't blank out a whole question.
-        errorColor: 'currentColor',
-        // Default 'htmlAndMathml', not 'html': the visual layer is marked
-        // aria-hidden, so dropping the MathML twin leaves the formula missing
-        // from the accessibility tree entirely rather than merely unstyled.
-        strict: false,
-      })
-    } catch {
-      // Anything KaTeX still refuses stays as the author typed it.
-      return whole
-    }
-  })
+  // Text between tags only. A formula written into an attribute — a picture's
+  // alt text — would otherwise have KaTeX's markup spliced into the middle of
+  // the tag. Splitting on `>` is sound for HTML that has been through
+  // `sanitizeRichTextHtml`, which never leaves one inside a tag.
+  return html
+    .split(/(<[^>]*>)/)
+    .map((part, index) => (index % 2 === 1 ? part : part.replace(MATH_PATTERN, renderFormula)))
+    .join('')
+}
+
+function renderFormula(whole: string, inline?: string, display?: string): string {
+  const tex = inline ?? display ?? ''
+  if (!tex.trim()) return whole
+  try {
+    return katex.renderToString(decodeEntities(tex), {
+      displayMode: display !== undefined,
+      throwOnError: false,
+      // Malformed TeX renders in KaTeX's error colour instead of throwing,
+      // so one bad formula can't blank out a whole question.
+      errorColor: 'currentColor',
+      // Default 'htmlAndMathml', not 'html': the visual layer is marked
+      // aria-hidden, so dropping the MathML twin leaves the formula missing
+      // from the accessibility tree entirely rather than merely unstyled.
+      strict: false,
+    })
+  } catch {
+    // Anything KaTeX still refuses stays as the author typed it.
+    return whole
+  }
 }

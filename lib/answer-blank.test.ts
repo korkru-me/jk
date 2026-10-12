@@ -29,6 +29,13 @@ describe('splitAnswerBlankHtml', () => {
   it('does not match the numbered marker used by the main question stem', () => {
     expect(splitAnswerBlankHtml('ตอบ [คำตอบ 1] หน่วย')).toBeNull()
   })
+
+  it('returns balanced rich-text fragments identically during SSR and hydration', () => {
+    expect(splitAnswerBlankHtml('<p><strong>ตอบ [คำตอบ]</strong> m/s</p>')).toEqual([
+      '<p><strong>ตอบ </strong></p>',
+      '<p><strong></strong> m/s</p>',
+    ])
+  })
 })
 
 describe('numbered answer blanks', () => {
@@ -42,6 +49,17 @@ describe('numbered answer blanks', () => {
     const { parts, numbers } = splitNumberedAnswerBlanks('ก. [คำตอบ] ข. [คำตอบ 5]')
     expect(numbers).toEqual([1, 5])
     expect(parts).toHaveLength(numbers.length + 1)
+  })
+
+  it('balances every rich-text fragment around numbered blanks', () => {
+    expect(splitNumberedAnswerBlanks('<p>ก [คำตอบ 1] และ <em>ข [คำตอบ 2]</em></p>')).toEqual({
+      parts: [
+        '<p>ก </p>',
+        '<p> และ <em>ข </em></p>',
+        '<p><em></em></p>',
+      ],
+      numbers: [1, 2],
+    })
   })
 
   it('picks the next number past the highest already used', () => {

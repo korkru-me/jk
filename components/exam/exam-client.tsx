@@ -3,7 +3,7 @@
 import { lazy, Suspense, useState, useEffect, useCallback, useMemo, useRef, type ReactNode, type RefObject } from 'react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
-import { checkAnswer, drawNextStreakQuestion, saveWorkImage, submitSubmission } from '@/lib/actions/submissions'
+import { checkAnswer, drawNextStreakQuestion, rerollCheckedRandomAnswer, saveWorkImage, submitSubmission } from '@/lib/actions/submissions'
 import { StreakEndScreen, StreakMeter, type StreakView } from '@/components/exam/streak-progress'
 import type { StreakEnding } from '@/lib/streak-run'
 // Type-only: `gradeAnswer` pulls in mathjs (~640 KB), which only a teacher's
@@ -40,12 +40,13 @@ import {
   Pencil, Calculator as CalculatorIcon, NotebookPen, Loader2, Paperclip, Trash2, ListChecks, X,
 } from 'lucide-react'
 import { RichText } from '@/components/ui/rich-text'
-import { containsMath, renderMathInHtml } from '@/lib/math/latex'
+import { containsMath } from '@/lib/math/latex'
+import { renderRichTextHtml } from '@/lib/rich-text-html'
 import { partLabels } from '@/lib/part-labels'
-import { groupQuestionsBySection, sectionByQuestionId, type QuestionSetSection } from '@/lib/question-set-sections'
+import { sectionByQuestionId, type QuestionSetSection } from '@/lib/question-set-sections'
 import { getBlankType, splitFillBlankHtml, extractBlankNumbers } from '@/lib/fill-blank'
 import { splitAnswerBlankHtml, countAnswerBlanks, splitNumberedAnswerBlanks } from '@/lib/answer-blank'
-import type { AnswerPart, MatchingAnswerMode, MathInputMode, TrueFalseConfig, TrueFalseStatement, TrueFalseExplanationMode, FillBlankConfig, OrderingConfig, OrderingItem, RandomQuestionConfig, FileUploadConfig, SubmittedFile, CompositeConfig, ClassifyConfig, ImageLabelConfig } from '@/lib/types'
+import type { AnswerPart, AssignmentType, MatchingAnswerMode, MathInputMode, TrueFalseConfig, TrueFalseStatement, TrueFalseExplanationMode, FillBlankConfig, OrderingConfig, OrderingItem, RandomQuestionConfig, FileUploadConfig, SubmittedFile, CompositeConfig, ClassifyConfig, ImageLabelConfig, LogicRule, Question } from '@/lib/types'
 import { CLASSIFY_UNSET, parseClassifyGrid } from '@/lib/classify'
 import { normalizeImageLabelMode, parseImageLabelAnswer } from '@/lib/image-label'
 import { ImageLabelInput } from './image-label-input'
@@ -74,6 +75,8 @@ import {
   type FingerInputMode,
 } from '@/lib/drawing-board-input'
 import type { StudentAttachmentState } from '@/lib/scratchpad-state'
+import { cn } from '@/lib/utils'
+import { shouldDetectTabSwitch } from '@/lib/exam-tab-switch'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -128,6 +131,10 @@ interface AnswerRow extends Omit<SafeExamAnswer, 'questions'> {
     mcq_options: Array<{ text?: string; image_url?: string; index?: number; left_text?: string; left_image?: string }> | null
     matching_options?: Array<{ right_text: string; right_image?: string }> | null
     variables: Array<{ name: string; unit?: string; type?: string }>
+    // Preview-only ingredients for drawing the next random-number variant.
+    // Student DTOs omit them and the real retry is rebuilt server-side.
+    logic_rules?: LogicRule[]
+    answer_formula?: string
     answer_parts: SafeAnswerPart[] | AnswerPart[] | null
     extra_data: SafeExamAnswer['questions']['extra_data'] | TrueFalseConfig | FillBlankConfig | OrderingConfig | RandomQuestionConfig | CompositeConfig
     image_urls: string[] | null
@@ -137,6 +144,7 @@ interface AnswerRow extends Omit<SafeExamAnswer, 'questions'> {
 }
 
 export interface ExamConfig {
+  assignmentType: AssignmentType
   proctoringEnabled: boolean
   isFullscreenEnforced: boolean
   blockClipboard: boolean
@@ -268,7 +276,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   // ── Core state ──────────────────────────────────────────────────────────────
   const {
     localAnswers, localAnswersRef, localMathInputModes, localMathInputModesRef,
-    setAnswer, setMathInputMode, flushQueuedAnswers, retryPending, clearSavedAnswers,
+    setAnswer, setMathInputMode, replaceAnswerFromServer, flushQueuedAnswers, retryPending, clearSavedAnswers,
     saving, pendingCount,
   } = useAnswerAutosave({
     submissionId,
@@ -291,11 +299,11 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   const [currentIndex, setCurrentIndex] = useState(0)
   /** -1 for every งาน that is not a streak run, which disables the sync below. */
   const streakLatestIndex = streak != null ? answers.length - 1 : -1
-  // Runs follow the order this student actually sees (shuffling reorders
-  // submission_answers), so a shuffled exam simply breaks into short runs
-  // instead of printing headings over the wrong questions.
+  // The question card may still show the first section that owns it, but the
+  // navigator is deliberately one uninterrupted number sequence. A question
+  // can belong to more than one section, so section headings here implied a
+  // grouping that the student's actual order does not guarantee.
   const sectionOwner = sectionByQuestionId(sections)
-  const sectionRuns = groupQuestionsBySection(answers.map(a => a.question_id), sections)
   // Preview-only: the client-side (never persisted) grading result shown
   // after a teacher clicks submit in previewMode, in place of the real
   // /submissions/[id] results page.
@@ -308,6 +316,8 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   // score — the final ส่งคำตอบ re-grades every ข้อ from what was last saved.
   const [checked, setChecked] = useState<Record<string, AnswerFeedback & { checkCount: number }>>({})
   const [checkingId, setCheckingId] = useState<string | null>(null)
+  const [randomValueOverrides, setRandomValueOverrides] = useState<Record<string, Record<string, number>>>({})
+  const [previewCorrectAnswerOverrides, setPreviewCorrectAnswerOverrides] = useState<Record<string, string>>({})
   const instantCheckOn = config.instantCheck === true
 
   // ── UX state ────────────────────────────────────────────────────────────────
@@ -469,7 +479,11 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   }, [streakLatestIndex])
 
   // ── Anti-cheat ──────────────────────────────────────────────────────────────
-  const { tabSwitchCount, showTabWarning } = useTabSwitchGuard()
+  // Every real exam observes tab changes automatically. Exercises and teacher
+  // previews never do, regardless of the optional live proctor room setting.
+  const { tabSwitchCount, showTabWarning } = useTabSwitchGuard(
+    shouldDetectTabSwitch(config.assignmentType, previewMode),
+  )
   const { status: proctorStatus, activeConnectionCount: proctorActiveConnectionCount } = useExamProctor({
     enabled: config.proctoringEnabled && !previewMode,
     submissionId,
@@ -550,6 +564,58 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
     })
   }, [])
 
+  const handleRetry = useCallback(async (answer: AnswerRow) => {
+    // Withheld answer keys and fixed questions retain the current problem.
+    // Only a checked random-number question whose key was revealed asks the
+    // server to freeze a new value set for the next try.
+    const shouldReroll = config.instantCheckAnswerKey === true
+      && Object.keys(randomValueOverrides[answer.id] ?? answer.random_values ?? {}).length > 0
+    if (!shouldReroll) {
+      clearCheck(answer.id)
+      return
+    }
+
+    if (checkingId) return
+    setCheckingId(answer.id)
+    try {
+      if (previewMode) {
+        const { buildFreshRandomQuestion } = await import('@/lib/assignment-attempt')
+        const next = buildFreshRandomQuestion({
+          id: answer.question_id,
+          ...answer.questions,
+        } as unknown as Question, randomValueOverrides[answer.id] ?? answer.random_values ?? {})
+        if (next) {
+          replaceAnswerFromServer(answer.id, '')
+          setRandomValueOverrides(previous => ({ ...previous, [answer.id]: next.random_values }))
+          setPreviewCorrectAnswerOverrides(previous => ({
+            ...previous,
+            [answer.id]: next.correct_answer,
+          }))
+        }
+        clearCheck(answer.id)
+        return
+      }
+
+      const result = await rerollCheckedRandomAnswer(answer.id)
+      if (!result || 'error' in result) {
+        toast.error(result?.error ?? 'สุ่มตัวเลขชุดใหม่ไม่สำเร็จ กรุณาลองใหม่')
+        return
+      }
+      if (result.rerolled) {
+        replaceAnswerFromServer(answer.id, '')
+        setRandomValueOverrides(previous => ({
+          ...previous,
+          [answer.id]: result.randomValues,
+        }))
+      }
+      clearCheck(answer.id)
+    } catch {
+      toast.error('สุ่มตัวเลขชุดใหม่ไม่สำเร็จ กรุณาลองใหม่')
+    } finally {
+      setCheckingId(null)
+    }
+  }, [checkingId, clearCheck, config.instantCheckAnswerKey, previewMode, randomValueOverrides, replaceAnswerFromServer])
+
   /**
    * ตรวจคำตอบข้อนี้ — the one thing a แบบฝึกหัด does that a ข้อสอบ does not.
    *
@@ -575,7 +641,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
         ])
         const gradable = {
           id: answer.id,
-          correct_answer: answer.correct_answer ?? '',
+          correct_answer: previewCorrectAnswerOverrides[answer.id] ?? answer.correct_answer ?? '',
           student_answer: localAnswersRef.current[answer.id] ?? null,
           math_input_modes: localMathInputModesRef.current[answer.id] ?? {},
           max_score: answer.max_score ?? 0,
@@ -602,7 +668,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
           isCorrect: graded.is_correct,
           score: graded.score,
           maxScore: gradable.max_score,
-          revealAnswerKey: config.instantCheckAnswerKey !== false,
+          revealAnswerKey: config.instantCheckAnswerKey === true,
         })
         setChecked(prev => ({
           ...prev,
@@ -642,7 +708,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
     } finally {
       setCheckingId(null)
     }
-  }, [answers, checkingId, config.instantCheckAnswerKey, flushQueuedAnswers, localAnswersRef, localMathInputModesRef, previewMode])
+  }, [answers, checkingId, config.instantCheckAnswerKey, flushQueuedAnswers, localAnswersRef, localMathInputModesRef, previewCorrectAnswerOverrides, previewMode])
 
   /**
    * Ask the server for the next ข้อ, or find out the attempt is over.
@@ -1109,71 +1175,74 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   const timerUrgent   = secondsLeft !== null && secondsLeft < 300
   const timerDanger   = secondsLeft !== null && secondsLeft < 60
 
-  const renderQuestionNavigation = (touchFriendly = false) => {
-    let numbered = 0
-    return (
-      <>
-        {sectionRuns.map((run, runIndex) => {
-          const startIndex = numbered
-          numbered += run.question_ids.length
-          return (
-            <div key={runIndex} className={runIndex > 0 ? 'mt-3' : undefined}>
-              {run.title && (
-                <p className="mb-1.5 truncate text-[10px] font-semibold text-muted-foreground">{run.title}</p>
-              )}
-              <div className={`grid ${touchFriendly ? 'grid-cols-5 gap-1.5' : 'grid-cols-4 gap-1.5 pointer-coarse:gap-1'}`}>
-                {run.question_ids.map((_, offset) => {
-                  const i = startIndex + offset
-                  const answer = answers[i]
-                  const isCurrent = i >= pageStart && i < pageStart + perPage
-                  const isAnswered = hasAnswered(answer.id)
-                  const isFlagged = flagged.has(answer.id)
-                  const verdict = checked[answer.id]?.verdict
-                  let tone = 'bg-muted text-muted-foreground'
-                  if (isCurrent) tone = 'bg-primary text-white shadow-md shadow-primary/40 scale-110 z-10'
-                  else if (isFlagged) tone = 'bg-flag text-white'
-                  else if (verdict === 'correct') tone = 'bg-success text-success-foreground'
-                  else if (verdict === 'wrong' || verdict === 'partial') tone = 'bg-destructive/15 text-destructive border border-destructive/30'
-                  else if (isAnswered) tone = 'bg-success/10 text-success border border-success/20 dark:bg-success/15'
+  const navigationLegendItems = [
+    { cls: 'bg-primary', label: 'ข้อปัจจุบัน' },
+    { cls: 'border border-success/20 bg-success/10 dark:bg-success/15', label: 'ตอบแล้ว' },
+    ...(instantCheckOn ? [
+      { cls: 'bg-success', label: 'ตรวจแล้ว ถูก' },
+      { cls: 'border border-destructive/30 bg-destructive/15', label: 'ตรวจแล้ว ยังไม่ถูก' },
+    ] : []),
+    { cls: 'bg-flag', label: 'ปักธง' },
+    { cls: 'bg-muted', label: 'ยังไม่ตอบ' },
+  ]
 
-                  return (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => {
-                        navigateTo(i)
-                        if (touchFriendly) setShowQuestionNavigator(false)
-                      }}
-                      aria-label={`ไปข้อ ${i + 1}`}
-                      aria-current={isCurrent ? 'page' : undefined}
-                      className={`${touchFriendly ? 'h-11 w-11' : 'h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11'} rounded-lg text-sm font-bold transition-all hover:scale-105 ${tone}`}
-                    >
-                      {i + 1}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
+  const renderQuestionNavigationLegend = () => (
+    <div className="grid shrink-0 grid-cols-2 gap-x-3 gap-y-1.5 px-1">
+      {navigationLegendItems.map(item => (
+        <div key={item.label} className="flex min-w-0 items-center gap-2">
+          <div className={cn('h-3 w-3 shrink-0 rounded-sm', item.cls)} />
+          <span className="truncate text-[10px] text-muted-foreground">{item.label}</span>
+        </div>
+      ))}
+    </div>
+  )
+
+  const renderQuestionNavigation = (touchFriendly = false) => {
+    const compactNumbers = !touchFriendly && answers.length > 12
+    return (
+      <div className={cn(
+        'grid gap-1.5',
+        touchFriendly || compactNumbers ? 'grid-cols-5' : 'grid-cols-4',
+      )}>
+        {answers.map((answer, i) => {
+          const isCurrent = i >= pageStart && i < pageStart + perPage
+          const isAnswered = hasAnswered(answer.id)
+          const isFlagged = flagged.has(answer.id)
+          const verdict = checked[answer.id]?.verdict
+          let tone = 'bg-muted text-foreground/70'
+          if (isCurrent) tone = 'z-10 scale-105 bg-primary text-primary-foreground shadow-md shadow-primary/40'
+          else if (isFlagged) tone = 'bg-flag text-white'
+          else if (verdict === 'correct') tone = 'bg-success text-success-foreground'
+          else if (verdict === 'wrong' || verdict === 'partial') tone = 'border border-destructive/30 bg-destructive/15 text-destructive'
+          else if (isAnswered) tone = 'border border-success/20 bg-success/10 text-success dark:bg-success/15'
+
+          return (
+            <Button
+              key={answer.id}
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                navigateTo(i)
+                if (touchFriendly) setShowQuestionNavigator(false)
+              }}
+              aria-label={`ไปข้อ ${i + 1}`}
+              aria-current={isCurrent ? 'page' : undefined}
+              className={cn(
+                'rounded-lg font-bold transition-all hover:scale-105',
+                touchFriendly
+                  ? 'h-11 w-11 text-sm'
+                  : compactNumbers
+                    ? 'h-8 w-8 text-xs'
+                    : 'h-10 w-10 text-sm pointer-coarse:h-11 pointer-coarse:w-11',
+                tone,
+              )}
+            >
+              {i + 1}
+            </Button>
           )
         })}
-        <div className="mt-3 space-y-1.5 border-t pt-3">
-          {[
-            { cls: 'bg-primary', label: 'ข้อปัจจุบัน' },
-            { cls: 'bg-success/10 border border-success/20 dark:bg-success/15', label: 'ตอบแล้ว' },
-            ...(instantCheckOn ? [
-              { cls: 'bg-success', label: 'ตรวจแล้ว ถูก' },
-              { cls: 'bg-destructive/15 border border-destructive/30', label: 'ตรวจแล้ว ยังไม่ถูก' },
-            ] : []),
-            { cls: 'bg-flag', label: 'ปักธง' },
-            { cls: 'bg-muted', label: 'ยังไม่ตอบ' },
-          ].map(item => (
-            <div key={item.label} className="flex items-center gap-2">
-              <div className={`h-3 w-3 shrink-0 rounded-sm ${item.cls}`} />
-              <span className="text-[10px] text-muted-foreground">{item.label}</span>
-            </div>
-          ))}
-        </div>
-      </>
+      </div>
     )
   }
 
@@ -1269,7 +1338,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
           // generic standalone "คำตอบ" box(es).
           const currentQuestionText = interpolateValues(
             current.questions.question_text,
-            current.random_values,
+            randomValueOverrides[current.id] ?? current.random_values,
             current.questions.variables,
           )
           const mainInlineBlank = current.questions.question_type === 'written'
@@ -1281,6 +1350,8 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
               id={`exam-q-${questionIndex}`}
               role="region"
               aria-label={`ข้อ ${questionIndex + 1} จาก ${answers.length}`}
+              aria-busy={checkingId === current.id}
+              inert={checkingId === current.id ? true : undefined}
               tabIndex={-1}
               className="flex flex-col gap-3 rounded-2xl scroll-mt-2 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
             >
@@ -1503,7 +1574,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                 disabled={checkingId !== null && checkingId !== current.id}
                 answered={hasAnswered(current.id)}
                 onCheck={() => handleCheck(current.id)}
-                onRetry={() => clearCheck(current.id)}
+                onRetry={() => void handleRetry(current)}
                 allowRetry={!streakOn}
                 checkHint={streakOn
                   ? 'ตรวจได้ครั้งเดียว ผลนับเข้าจำนวนข้อที่ถูกติดต่อกันทันที'
@@ -1602,7 +1673,14 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
       </div>
 
       {/* RIGHT: Nav panel */}
-      <div className={`hidden min-h-0 shrink-0 flex-col gap-3 lg:flex ${focusMode ? 'w-60' : 'w-56'}`}>
+      <div
+        data-exam-desktop-navigation
+        className={`hidden min-h-0 shrink-0 flex-col gap-3 lg:flex ${
+          focusMode
+            ? 'h-full w-60'
+            : 'sticky top-3 h-[calc(100dvh-14.5rem)] w-56 self-start overflow-hidden'
+        }`}
+      >
 
         {/* Timer */}
         {secondsLeft !== null && (
@@ -1671,28 +1749,32 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
         </Card>
         )}
 
-        {/* Anti-cheat counter */}
-        {tabSwitchCount > 0 && (
-          <div className="bg-destructive/10 border border-destructive/30 rounded-xl px-3 py-2 flex items-center gap-2">
-            <ShieldAlert size={14} className="text-destructive shrink-0" />
-            <div>
-              <p className="text-[10px] font-bold text-destructive">สลับแท็บ {tabSwitchCount} ครั้ง</p>
-              <p className="text-[9px] text-muted-foreground">ระบบบันทึกไว้แล้ว</p>
-            </div>
-          </div>
-        )}
+        {!streakOn && renderQuestionNavigationLegend()}
 
-        {/* A streak run has no bulk ส่งคำตอบ: the attempt ends when the run
-            does, and its controls live under the ข้อ itself. */}
-        {!streakOn && (
-          <Button
-            onClick={openSubmitDialog}
-            disabled={submitting}
-            className="w-full bg-success hover:bg-success/90 text-success-foreground border-0"
-          >
-            {submitting ? 'กำลังส่ง...' : 'ส่งคำตอบ ✓'}
-          </Button>
-        )}
+        <div className="flex shrink-0 flex-col gap-2">
+          {/* Anti-cheat counter */}
+          {tabSwitchCount > 0 && (
+            <div className="flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2">
+              <ShieldAlert size={14} className="shrink-0 text-destructive" />
+              <div>
+                <p className="text-[10px] font-bold text-destructive">สลับแท็บ {tabSwitchCount} ครั้ง</p>
+                <p className="text-[9px] text-muted-foreground">ระบบตรวจพบแล้ว</p>
+              </div>
+            </div>
+          )}
+
+          {/* A streak run has no bulk ส่งคำตอบ: the attempt ends when the run
+              does, and its controls live under the ข้อ itself. */}
+          {!streakOn && (
+            <Button
+              onClick={openSubmitDialog}
+              disabled={submitting}
+              className="w-full border-0 bg-success text-success-foreground hover:bg-success/90"
+            >
+              {submitting ? 'กำลังส่ง...' : 'ส่งคำตอบ ✓'}
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -1924,10 +2006,10 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
             role="dialog"
             aria-modal="true"
             aria-labelledby="mobile-question-navigator-title"
-            className="max-h-[calc(var(--app-height,100dvh)-1.5rem)] w-full max-w-sm overflow-y-auto overscroll-contain"
+            className="flex max-h-[calc(var(--app-height,100dvh)-1.5rem)] w-full max-w-sm flex-col overflow-hidden"
             style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
           >
-            <div className="mb-3 flex items-center gap-3">
+            <div className="mb-3 flex shrink-0 items-center gap-3">
               <div className="min-w-0 flex-1">
                 <h2 id="mobile-question-navigator-title" className="font-bold">ดูทุกข้อ</h2>
                 <p className="text-xs text-muted-foreground">ตอบแล้ว {answeredCount}/{answers.length} ข้อ</p>
@@ -1954,12 +2036,17 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                 <X />
               </Button>
             </div>
-            {renderQuestionNavigation(true)}
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-xl border border-border p-3">
+              {renderQuestionNavigation(true)}
+            </div>
+            <div className="mt-3">
+              {renderQuestionNavigationLegend()}
+            </div>
             <Button
               type="button"
               onClick={openSubmitDialog}
               disabled={submitting}
-              className="mt-4 min-h-10 w-full bg-success text-success-foreground hover:bg-success/90 pointer-coarse:min-h-11"
+              className="mt-4 min-h-10 w-full shrink-0 bg-success text-success-foreground hover:bg-success/90 pointer-coarse:min-h-11"
             >
               {submitting ? 'กำลังส่ง...' : 'ส่งคำตอบ ✓'}
             </Button>
@@ -2192,9 +2279,9 @@ function InstantCheckPanel({
           <span className="text-[11px] text-muted-foreground">ตรวจไปแล้ว {feedback.checkCount} ครั้ง</span>
         )}
         {allowRetry && (
-          <Button variant="outline" size="sm" onClick={onRetry} className="ml-auto">
+          <Button variant="outline" size="sm" onClick={onRetry} disabled={busy || disabled} className="ml-auto">
             <RotateCcw size={14} />
-            ทำใหม่
+            {busy ? 'กำลังสุ่ม...' : 'ทำใหม่'}
           </Button>
         )}
       </div>
@@ -3738,7 +3825,7 @@ function interpolateValues(text: string, values: Record<string, number>, variabl
 
 function UnitDisplay({ html }: { html: string }) {
   return /<[a-z][\s\S]*>/i.test(html) || containsMath(html)
-    ? <span className="text-sm text-muted-foreground [&_p]:inline" dangerouslySetInnerHTML={{ __html: renderMathInHtml(html) }} />
+    ? <span className="text-sm text-muted-foreground [&_p]:inline" dangerouslySetInnerHTML={{ __html: renderRichTextHtml(html) }} />
     : <span className="text-sm text-muted-foreground">{html}</span>
 }
 
@@ -3748,7 +3835,7 @@ function QuestionText({ text }: { text: string }) {
     return (
       <div
         className="leading-relaxed rich-text-content text-base [&_math]:my-1 [&_math]:inline-block"
-        dangerouslySetInnerHTML={{ __html: renderMathInHtml(text) }}
+        dangerouslySetInnerHTML={{ __html: renderRichTextHtml(text) }}
       />
     )
   }

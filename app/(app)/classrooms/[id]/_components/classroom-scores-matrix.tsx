@@ -1,36 +1,66 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import {
+  useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useTransition,
+} from 'react'
 import Link from 'next/link'
-import { Bell, Clock, CheckCircle2, CircleDashed, MinusCircle, XCircle, Download, ChevronDown, Info } from 'lucide-react'
+import {
+  Bell, Clock, CheckCircle2, CircleDashed, MinusCircle, XCircle, Download,
+  ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, Folder, GripVertical,
+} from 'lucide-react'
+import {
+  DndContext, DragOverlay, KeyboardSensor, MouseSensor, TouchSensor, closestCenter,
+  useSensor, useSensors, type Announcements, type CollisionDetection, type DragEndEvent, type DragStartEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext, horizontalListSortingStrategy, sortableKeyboardCoordinates, useSortable,
+} from '@dnd-kit/sortable'
+import { CSS as DndCSS } from '@dnd-kit/utilities'
 import { toast } from 'sonner'
 import { notifyNonSubmitters } from '@/lib/actions/notifications'
-import { setAssignmentDisplayOrder } from '@/lib/actions/classrooms'
+import { reorderAssignmentDisplayOrder } from '@/lib/actions/classrooms'
 import { computePassed } from '@/lib/grading'
 import { describeGroupTarget } from '@/lib/classroom-groups'
 import { officialSubmissionsByStudent } from '@/lib/scoring'
-import { downloadTextFile, toCsv, safeFilenamePart } from '@/lib/utils'
+import { cn, downloadTextFile, toCsv, safeFilenamePart } from '@/lib/utils'
+import {
+  moveVisibleAssignmentColumn, reconcileAssignmentOrder,
+} from '@/lib/assignment-column-order'
+import {
+  UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE, type AssignmentCategory,
+} from '@/lib/assignment-categories'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { ExtensionDialog } from './extension-dialog'
 import type { ClassroomAssignmentRow } from './classroom-assignments-tab'
-import type { StudentProfileRow } from './homeroom-overview'
-import type { SortKey as StudentTableSortKey, SortDir as StudentTableSortDir } from './student-table'
-import { sortStudents, STUDENT_SORT_LABEL, type StudentSortKey } from '@/lib/student-sort'
 import { compareAssignmentsForDisplay } from '@/lib/student-ability'
+import {
+  nextScoreMatrixSort, sortScoreMatrixStudents,
+  type ScoreMatrixSort, type ScoreMatrixSortKey,
+} from '@/lib/classroom-score-sort'
 import { Card } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { AssignmentTypeFilter, type AssignmentTypeFilterValue } from '@/components/assignments/assignment-type-filter'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { groupPreset } from '@/app/(app)/classrooms/_components/group-colors'
 
 const STATUS_LABEL: Record<string, string> = {
   submitted: 'ส่งแล้ว', graded: 'ส่งแล้ว', in_progress: 'กำลังทำ',
 }
 
-type TypeFilter = 'all' | 'exercise' | 'exam'
+type TypeFilter = AssignmentTypeFilterValue
 
-interface RealStudent { id: string; full_name: string; email: string }
+interface RealStudent {
+  id: string
+  full_name: string
+  email: string
+  grade_level?: string | null
+  section_number?: number | null
+  class_number?: number | null
+  student_code?: string | null
+}
 
 interface SubmissionRow {
   id: string
@@ -56,65 +86,259 @@ interface Props {
   classroomName: string
   students: RealStudent[]
   assignments: ClassroomAssignmentRow[]
+  categories: AssignmentCategory[]
   submissions: SubmissionRow[]
   extensions: ExtensionRow[]
-  profiles?: Record<string, StudentProfileRow>
   /** The students each กลุ่มย่อย-only งาน was handed to, keyed by assignment id. */
   audienceByAssignment?: Map<string, Set<string>>
   groupNameById?: Map<string, string>
-  /** Same sort state driving the "นักเรียน" tab, so both tabs show
-   *  students in the same order. Falls back to name when the active sort
-   *  is one of that tab's local-only columns (score/status — sample data
-   *  with no counterpart here). */
-  sortKey: StudentTableSortKey
-  sortDir: StudentTableSortDir
-  onViewStudents?: () => void
 }
 
-function isSyncableSortKey(key: StudentTableSortKey): key is StudentSortKey {
-  return key in STUDENT_SORT_LABEL
+const assignmentDndId = (id: string) => `assignment:${id}`
+const rawDndId = (id: string) => id.slice(id.indexOf(':') + 1)
+
+// Opaque token blends keep scrolled score cells from showing through the
+// pinned roster, while following the selected palette in both themes.
+const MATRIX_HEADER_CELL = 'border-b-2 border-primary/20 bg-[color-mix(in_oklab,var(--primary)_9%,var(--card))]'
+const MATRIX_HEADER_TEXT = 'text-[color-mix(in_oklab,var(--primary)_50%,var(--foreground))]'
+const MATRIX_ROW_CELL = 'border-b border-border/60 bg-card transition-colors group-even/row:bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))] group-hover/row:bg-[color-mix(in_oklab,var(--primary)_5%,var(--card))] motion-reduce:transition-none'
+
+interface SortableAssignmentHeaderProps {
+  assignment: ClassroomAssignmentRow
+  disabled: boolean
+  hasNonSubmitter: boolean
+  reminding: boolean
+  groupNameById: Map<string, string>
+  onRemind: () => void
+  sort: ScoreMatrixSort | null
+  onSort: () => void
+  onColumnMotion: (
+    assignmentId: string,
+    transform: string | undefined,
+    transition: string | undefined,
+  ) => void
+}
+
+function sortAria(sort: ScoreMatrixSort | null, key: ScoreMatrixSortKey): 'ascending' | 'descending' | 'none' {
+  const active = sort?.key.type === key.type
+    && (key.type !== 'assignment'
+      || (sort?.key.type === 'assignment' && sort.key.assignmentId === key.assignmentId))
+  if (!active) return 'none'
+  return sort.dir === 'asc' ? 'ascending' : 'descending'
+}
+
+function SortIndicator({ value }: { value: 'ascending' | 'descending' | 'none' }) {
+  if (value === 'ascending') return <ArrowUp className="size-3" aria-hidden="true" />
+  if (value === 'descending') return <ArrowDown className="size-3" aria-hidden="true" />
+  return <ArrowUpDown className="size-3 text-muted-foreground/60" aria-hidden="true" />
+}
+
+interface RosterSortHeaderProps {
+  label: string
+  sortKey: ScoreMatrixSortKey
+  sort: ScoreMatrixSort
+  className: string
+  onSort: (key: ScoreMatrixSortKey) => void
+}
+
+function RosterSortHeader({ label, sortKey, sort, className, onSort }: RosterSortHeaderProps) {
+  const value = sortAria(sort, sortKey)
+  return (
+    <th
+      aria-sort={value}
+      className={cn(
+        'sticky z-20 px-1 py-3 text-xs font-semibold',
+        MATRIX_HEADER_CELL,
+        MATRIX_HEADER_TEXT,
+        className,
+      )}
+    >
+      <Button
+        type="button"
+        variant="ghost"
+        size="xs"
+        onPointerDown={event => event.stopPropagation()}
+        onClick={event => {
+          event.stopPropagation()
+          onSort(sortKey)
+        }}
+        className={cn(
+          'h-auto max-w-full gap-1 px-1 py-1 hover:bg-primary/10',
+          MATRIX_HEADER_TEXT,
+          value !== 'none' && 'bg-primary/10 ring-1 ring-primary/20',
+        )}
+        title={`เรียงตาม${label}`}
+      >
+        <span className="line-clamp-2 whitespace-normal text-center leading-tight">{label}</span>
+        <SortIndicator value={value} />
+      </Button>
+    </th>
+  )
+}
+
+function SortableAssignmentHeader({
+  assignment, disabled, hasNonSubmitter, reminding, groupNameById, onRemind, sort, onSort,
+  onColumnMotion,
+}: SortableAssignmentHeaderProps) {
+  const sortValue = sortAria(sort, { type: 'assignment', assignmentId: assignment.id })
+  const {
+    setNodeRef, setActivatorNodeRef, attributes, listeners, transform, transition, isDragging, isOver,
+  } = useSortable({
+    id: assignmentDndId(assignment.id),
+    disabled,
+    data: { type: 'assignment', assignmentId: assignment.id, title: assignment.title },
+  })
+  const headerTransform = DndCSS.Translate.toString(transform)
+
+  // dnd-kit calculates the exact displacement for each sortable header. The
+  // score cells live in separate table rows, so mirror that same displacement
+  // onto every cell in the column. The active column itself is represented by
+  // the full-height DragOverlay below; only the columns making room for it
+  // need this transform.
+  useLayoutEffect(() => {
+    onColumnMotion(assignment.id, isDragging ? undefined : headerTransform, transition)
+  }, [assignment.id, headerTransform, isDragging, onColumnMotion, transition])
+
+  return (
+    <th
+      ref={setNodeRef}
+      aria-sort={sortValue}
+      style={{ transform: headerTransform, transition }}
+      className={cn(
+        'min-w-32 border-l border-primary/10 px-2 py-3 text-center align-top',
+        MATRIX_HEADER_CELL,
+        isOver && !isDragging && 'bg-[color-mix(in_oklab,var(--primary)_15%,var(--card))]',
+        isDragging && 'relative z-30 opacity-60 shadow-lg ring-1 ring-primary/30',
+      )}
+    >
+      <div className="mx-auto flex min-h-9 max-w-[160px] items-start justify-center gap-0.5">
+        <Button
+          ref={setActivatorNodeRef}
+          {...attributes}
+          {...listeners}
+          type="button"
+          variant="ghost"
+          size="icon-2xs"
+          disabled={disabled}
+          aria-label={`ย้ายคอลัมน์ ${assignment.title}`}
+          title="ลากเพื่อสลับ"
+          className="mt-0.5 shrink-0 cursor-grab touch-manipulation rounded-full text-muted-foreground/70 hover:bg-primary/10 active:cursor-grabbing"
+        >
+          <GripVertical />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="xs"
+          onPointerDown={event => event.stopPropagation()}
+          onClick={event => {
+            event.stopPropagation()
+            onSort()
+          }}
+          className={cn(
+            'h-auto min-w-0 flex-1 whitespace-normal px-1 py-0.5 text-xs font-semibold hover:bg-primary/10',
+            MATRIX_HEADER_TEXT,
+            sortValue !== 'none' && 'bg-primary/10 ring-1 ring-primary/20',
+          )}
+          title={`เรียงนักเรียนตาม ${assignment.title}`}
+        >
+          <span className="line-clamp-2">{assignment.title}</span>
+          <SortIndicator value={sortValue} />
+        </Button>
+      </div>
+      {assignment.group_ids && (
+        <p className="mt-0.5 line-clamp-1 text-[10px] font-medium text-tint-1" title={describeGroupTarget(assignment.group_ids, groupNameById)}>
+          เฉพาะ {describeGroupTarget(assignment.group_ids, groupNameById)}
+        </p>
+      )}
+      <Button
+        type="button"
+        variant="ghost"
+        size="xs"
+        onClick={onRemind}
+        disabled={!hasNonSubmitter || reminding}
+        className={cn(
+          'mt-2 mx-auto flex h-auto items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium',
+          hasNonSubmitter
+            ? 'border-warning/20 bg-warning/10 text-[color-mix(in_oklab,var(--warning)_50%,var(--foreground))] hover:bg-warning/15'
+            : 'border-border bg-muted text-muted-foreground cursor-default',
+        )}
+      >
+        <Bell className="w-2.5 h-2.5" />
+        {reminding ? 'กำลังเตือน...' : 'เตือน'}
+      </Button>
+    </th>
+  )
 }
 
 export function ClassroomScoresMatrix({
-  classroomId, classroomName, students, assignments, submissions, extensions, profiles = {},
-  audienceByAssignment, groupNameById = new Map(), sortKey, sortDir, onViewStudents,
+  classroomId, classroomName, students, assignments, submissions, extensions,
+  categories, audienceByAssignment, groupNameById = new Map(),
 }: Props) {
   const [reminding, setReminding] = useState<string | null>(null)
   const [dialogTarget, setDialogTarget] = useState<{ assignmentId: string; studentId: string } | null>(null)
   const [isPending, startTransition] = useTransition()
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
-  const [orderDrafts, setOrderDrafts] = useState<Record<string, string>>({})
-  const [isOrderPending, startOrderTransition] = useTransition()
+  const [categoryFilter, setCategoryFilter] = useState('all')
+  const [isAssignmentOrderPending, startAssignmentOrderTransition] = useTransition()
+  const defaultAssignmentIds = useMemo(
+    () => assignments.slice().sort(compareAssignmentsForDisplay).map(assignment => assignment.id),
+    [assignments],
+  )
+  const [assignmentOrder, setAssignmentOrder] = useState(defaultAssignmentIds)
+  const [studentSort, setStudentSort] = useState<ScoreMatrixSort>({ key: { type: 'name' }, dir: 'asc' })
+  const [draggingAssignmentId, setDraggingAssignmentId] = useState<string | null>(null)
+  const tableRef = useRef<HTMLTableElement>(null)
+  const dndId = useId()
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
 
-  function commitOrder(assignmentId: string, raw: string) {
-    const trimmed = raw.trim()
-    const parsed = trimmed === '' ? null : Number.parseInt(trimmed, 10)
-    if (parsed !== null && (!Number.isFinite(parsed) || parsed < 1)) {
-      toast.error('ลำดับต้องเป็นตัวเลขตั้งแต่ 1 ขึ้นไป')
-      setOrderDrafts(d => { const next = { ...d }; delete next[assignmentId]; return next })
-      return
+  useEffect(() => {
+    setAssignmentOrder(current => reconcileAssignmentOrder(current, defaultAssignmentIds))
+  }, [defaultAssignmentIds])
+
+  useEffect(() => {
+    if (categoryFilter === 'all' || categoryFilter === UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE) return
+    if (!categories.some(category => category.id === categoryFilter)) setCategoryFilter('all')
+  }, [categories, categoryFilter])
+
+  const moveAssignmentCells = useCallback((
+    assignmentId: string,
+    transform: string | undefined,
+    transition: string | undefined,
+  ) => {
+    const cells = tableRef.current?.querySelectorAll<HTMLTableCellElement>(
+      `[data-assignment-column="${assignmentId}"]`,
+    )
+    if (!cells) return
+    for (const cell of cells) {
+      cell.style.transform = transform ?? ''
+      cell.style.transition = transition ?? ''
+      cell.style.willChange = transform ? 'transform' : ''
+      cell.style.zIndex = transform ? '1' : ''
     }
-    startOrderTransition(async () => {
-      const res = await setAssignmentDisplayOrder(classroomId, assignmentId, parsed)
-      if (res?.error) toast.error(res.error)
-      setOrderDrafts(d => { const next = { ...d }; delete next[assignmentId]; return next })
-    })
-  }
+  }, [])
 
-  // Mirror the same student order as the "นักเรียน" tab. If that tab is
-  // currently sorted by one of its local-only columns (score/status —
-  // sample data with no counterpart here), fall back to name.
-  const effectiveSortKey: StudentSortKey = isSyncableSortKey(sortKey) ? sortKey : 'name'
-  const orderedStudents = sortStudents(students, profiles, effectiveSortKey, sortDir)
-  const sortLabel = STUDENT_SORT_LABEL[effectiveSortKey]
-
-  // Default order (no manual display_order set) is oldest-assigned-first —
-  // whichever assignment the teacher gave to students first leads the table.
-  // A teacher-set display_order always wins over that default.
-  const visibleAssignments = assignments
-    .filter(a => typeFilter === 'all' ? true : a.type === typeFilter)
-    .slice()
-    .sort(compareAssignmentsForDisplay)
+  // Default order (no manual display_order set) is oldest-assigned-first. The
+  // local order then tracks drag-and-drop immediately while the server saves.
+  const orderedAssignments = useMemo(() => {
+    const byId = new Map(assignments.map(assignment => [assignment.id, assignment]))
+    return reconcileAssignmentOrder(assignmentOrder, defaultAssignmentIds)
+      .flatMap(id => byId.get(id) ?? [])
+  }, [assignmentOrder, assignments, defaultAssignmentIds])
+  const sortedCategories = useMemo(
+    () => categories.slice().sort((a, b) => a.position - b.position || a.name.localeCompare(b.name, 'th')),
+    [categories],
+  )
+  const visibleAssignments = orderedAssignments.filter(assignment => {
+    if (typeFilter !== 'all' && assignment.type !== typeFilter) return false
+    if (categoryFilter === 'all') return true
+    if (categoryFilter === UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE) return !assignment.category_id
+    return assignment.category_id === categoryFilter
+  })
 
   // (assignmentId, studentId) -> official submission per that assignment's score_strategy
   const subKey = (aId: string, sId: string) => `${aId}::${sId}`
@@ -134,6 +358,15 @@ export function ClassroomScoresMatrix({
     }
   }
 
+  function scoreFor(studentId: string, assignmentId: string): number | null {
+    const submission = bestSubmission.get(subKey(assignmentId, studentId))
+    if (!submission || (submission.status !== 'submitted' && submission.status !== 'graded')) return null
+    if (submission.max_score <= 0) return submission.total_score ?? 0
+    return (submission.total_score ?? 0) / submission.max_score
+  }
+
+  const orderedStudents = sortScoreMatrixStudents(students, studentSort, scoreFor)
+
   const extensionMap = new Map<string, ExtensionRow>()
   for (const e of extensions) extensionMap.set(subKey(e.assignment_id, e.student_id), e)
 
@@ -146,6 +379,66 @@ export function ClassroomScoresMatrix({
       else if ((res?.notified ?? 0) === 0) toast.info('ไม่มีนักเรียนที่ต้องเตือนเพิ่ม')
       else toast.success(`เตือนนักเรียนที่ยังไม่ส่งแล้ว ${res.notified} คน`)
     })
+  }
+
+  const collisionDetection: CollisionDetection = args => closestCenter({
+    ...args,
+    droppableContainers: args.droppableContainers.filter(container => (
+      container.data.current?.type === args.active.data.current?.type
+    )),
+  })
+
+  function toggleStudentSort(key: ScoreMatrixSortKey) {
+    setStudentSort(current => nextScoreMatrixSort(current, key))
+  }
+
+  function handleDragStart(event: DragStartEvent) {
+    if (event.active.data.current?.type === 'assignment') {
+      setDraggingAssignmentId(rawDndId(String(event.active.id)))
+    }
+  }
+
+  function handleDragCancel() {
+    setDraggingAssignmentId(null)
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const type = event.active.data.current?.type
+    handleDragCancel()
+    if (!event.over || event.active.id === event.over.id) return
+
+    if (type !== 'assignment') return
+    const previousOrder = orderedAssignments.map(assignment => assignment.id)
+    const visibleIds = visibleAssignments.map(assignment => assignment.id)
+    const nextOrder = moveVisibleAssignmentColumn(
+      previousOrder,
+      visibleIds,
+      rawDndId(String(event.active.id)),
+      rawDndId(String(event.over.id)),
+    )
+    if (nextOrder === previousOrder) return
+
+    setAssignmentOrder(nextOrder)
+    startAssignmentOrderTransition(async () => {
+      const result = await reorderAssignmentDisplayOrder(classroomId, nextOrder)
+      if (!result?.error) return
+      toast.error(result.error)
+      setAssignmentOrder(current => (
+        current.length === nextOrder.length && current.every((id, index) => id === nextOrder[index])
+          ? previousOrder
+          : current
+      ))
+    })
+  }
+
+  const assignmentTitleById = new Map(assignments.map(assignment => [assignment.id, assignment.title]))
+  const announcements: Announcements = {
+    onDragStart: ({ active }) => `หยิบคอลัมน์ ${assignmentTitleById.get(rawDndId(String(active.id))) ?? 'งาน'}`,
+    onDragOver: ({ active, over }) => over
+      ? `กำลังย้าย ${assignmentTitleById.get(rawDndId(String(active.id))) ?? 'งาน'} ไปใกล้ ${assignmentTitleById.get(rawDndId(String(over.id))) ?? 'งาน'}`
+      : 'รายการอยู่นอกตำแหน่งที่วางได้',
+    onDragEnd: ({ over }) => over ? 'วางคอลัมน์งานแล้ว' : 'วางรายการไว้ที่เดิม',
+    onDragCancel: () => 'ยกเลิกการย้ายรายการ',
   }
 
   /** This งาน went to some กลุ่มย่อย only, and this student is in none of them. */
@@ -165,9 +458,13 @@ export function ClassroomScoresMatrix({
 
   function exportAll() {
     // Mirrors exactly what's on screen: same columns, same order, same filter.
-    const header = ['ลำดับ', 'นักเรียน', 'อีเมล', ...visibleAssignments.map(a => a.title)]
+    const header = [
+      'ลำดับ', 'นักเรียน', 'อีเมล', 'ชั้น', 'ห้อง', 'เลขที่', 'รหัสนักเรียน',
+      ...visibleAssignments.map(a => a.title),
+    ]
     const rows = orderedStudents.map((s, i) => [
-      i + 1, s.full_name, s.email,
+      i + 1, s.full_name, s.email, s.grade_level ?? '', s.section_number ?? '',
+      s.class_number ?? '', s.student_code ?? '',
       ...visibleAssignments.map(a => cellText(a.id, s.id)),
     ])
     const dateStr = new Date().toLocaleDateString('th-TH').replace(/\//g, '-')
@@ -180,7 +477,10 @@ export function ClassroomScoresMatrix({
   }
 
   function exportAssignment(assignment: ClassroomAssignmentRow) {
-    const header = ['ลำดับ', 'นักเรียน', 'อีเมล', 'สถานะ', 'คะแนน', 'คะแนนเต็ม', 'ผลการประเมิน', 'ส่งเมื่อ', 'ครั้งที่', 'ขยายเวลาถึง']
+    const header = [
+      'ลำดับ', 'นักเรียน', 'อีเมล', 'ชั้น', 'ห้อง', 'เลขที่', 'รหัสนักเรียน',
+      'สถานะ', 'คะแนน', 'คะแนนเต็ม', 'ผลการประเมิน', 'ส่งเมื่อ', 'ครั้งที่', 'ขยายเวลาถึง',
+    ]
     const rows = orderedStudents.map((s, i) => {
       const sub = bestSubmission.get(subKey(assignment.id, s.id))
       const submitted = sub?.status === 'submitted' || sub?.status === 'graded'
@@ -189,7 +489,8 @@ export function ClassroomScoresMatrix({
         : null
       const extension = extensionMap.get(subKey(assignment.id, s.id))
       return [
-        i + 1, s.full_name, s.email,
+        i + 1, s.full_name, s.email, s.grade_level ?? '', s.section_number ?? '',
+        s.class_number ?? '', s.student_code ?? '',
         sub ? (STATUS_LABEL[sub.status] ?? sub.status) : notGiven(assignment.id, s.id) ? 'ไม่ได้มอบหมาย' : 'ยังไม่ทำ',
         submitted ? sub!.total_score ?? 0 : '',
         submitted ? sub!.max_score : '',
@@ -218,24 +519,43 @@ export function ClassroomScoresMatrix({
 
   return (
     <div className="space-y-3">
-      {/* Filter chips + export */}
+      {/* Assignment-type filter + export */}
       <div className="flex items-center gap-2 flex-wrap justify-between">
         <div className="flex items-center gap-2 flex-wrap">
-          {([
-            { key: 'all', label: 'ทั้งหมด' },
-            { key: 'exercise', label: 'แบบฝึกหัด' },
-            { key: 'exam', label: 'ข้อสอบ' },
-          ] as { key: TypeFilter; label: string }[]).map(f => (
-            <button
-              key={f.key}
-              onClick={() => setTypeFilter(f.key)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                typeFilter === f.key ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:bg-accent'
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
+          <AssignmentTypeFilter value={typeFilter} onValueChange={setTypeFilter} />
+          <Select
+            value={categoryFilter}
+            onValueChange={value => { if (value !== null) setCategoryFilter(value) }}
+          >
+            <SelectTrigger size="sm" className="min-w-36 rounded-full bg-muted/60">
+              <Folder className="text-muted-foreground" />
+              <SelectValue>
+                {value => {
+                  if (value === 'all') return 'ทุกกลุ่มงาน'
+                  if (value === UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE) return 'ยังไม่จัดกลุ่ม'
+                  return sortedCategories.find(category => category.id === value)?.name ?? 'ทุกกลุ่มงาน'
+                }}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent align="start">
+              <SelectGroup>
+                <SelectItem value="all">ทุกกลุ่มงาน</SelectItem>
+                {sortedCategories.map(category => {
+                  const preset = groupPreset(category.color)
+                  return (
+                    <SelectItem key={category.id} value={category.id}>
+                      <span className={cn('size-2.5 rounded-full', preset.solid)} aria-hidden="true" />
+                      {category.name}
+                    </SelectItem>
+                  )
+                })}
+                <SelectItem value={UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE}>
+                  <span className="size-2.5 rounded-full bg-muted-foreground/50" aria-hidden="true" />
+                  ยังไม่จัดกลุ่ม
+                </SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         </div>
 
         {visibleAssignments.length > 0 && (
@@ -262,16 +582,9 @@ export function ClassroomScoresMatrix({
       </div>
 
       <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Info className="w-3.5 h-3.5 shrink-0" />
-        รายชื่อเรียงตาม<strong className="font-semibold text-muted-foreground">{sortLabel}</strong> ({sortDir === 'asc' ? 'น้อยไปมาก' : 'มากไปน้อย'}) ตามที่ตั้งไว้ที่แท็บ
-        {onViewStudents ? (
-          <Button variant="link" size="sm" onClick={onViewStudents}>
-            &ldquo;นักเรียน&rdquo;
-          </Button>
-        ) : (
-          <span className="font-medium text-muted-foreground">&ldquo;นักเรียน&rdquo;</span>
-        )}
-        — ไปเปลี่ยนได้ที่นั่น
+        <GripVertical className="w-3.5 h-3.5 shrink-0" />
+        กดหัวตารางเพื่อเรียงนักเรียน หรือกดค้างแล้วลากหัวงานซ้าย–ขวาเพื่อจัดลำดับคอลัมน์
+        {isAssignmentOrderPending && <span className="font-medium text-primary">กำลังบันทึก...</span>}
       </p>
 
       {visibleAssignments.length === 0 ? (
@@ -279,23 +592,70 @@ export function ClassroomScoresMatrix({
           ไม่พบงานที่ตรงกับตัวกรอง
         </Card>
       ) : (
-      <Card edge="ring" className="overflow-x-auto">
+      <DndContext
+        id={dndId}
+        sensors={sensors}
+        collisionDetection={collisionDetection}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
+        accessibility={{
+          announcements,
+          screenReaderInstructions: {
+            draggable: 'กด Space เพื่อหยิบรายการ ใช้ปุ่มลูกศรเพื่อเลื่อน แล้วกด Space อีกครั้งเพื่อวาง หรือกด Escape เพื่อยกเลิก',
+          },
+        }}
+      >
+      <SortableContext items={visibleAssignments.map(assignment => assignmentDndId(assignment.id))} strategy={horizontalListSortingStrategy}>
+      <Card edge="ring" className="overflow-x-auto shadow-sm">
         {/* border-separate (not -collapse): sticky positioning on table
             cells doesn't reliably paint over a collapsed border seam, which
             let scrolled-under content show through the gap between the
             sticky ลำดับ/นักเรียน columns. */}
-        <table className="w-full text-sm border-separate border-spacing-0">
+        <table ref={tableRef} className="w-full text-sm border-separate border-spacing-0 [&_tbody_tr:last-child_td]:border-b-0">
           <thead>
             {/* Row-divider borders live on the cells, not the <tr> — the
                 separated-borders table model (needed above) doesn't render
                 borders set directly on rows. */}
             <tr>
-              <th className="sticky left-0 z-20 bg-card text-center px-2 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-16 min-w-16 max-w-16 border-b border-border">
+              <th className={cn('sticky left-0 z-20 w-10 min-w-10 max-w-10 px-1 py-3 text-center text-xs font-semibold', MATRIX_HEADER_CELL, MATRIX_HEADER_TEXT)}>
                 ลำดับ
               </th>
-              <th className="sticky left-16 z-20 bg-card text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide min-w-[180px] border-b border-border">
-                นักเรียน
-              </th>
+              <RosterSortHeader
+                label="นักเรียน"
+                sortKey={{ type: 'name' }}
+                sort={studentSort}
+                onSort={toggleStudentSort}
+                className="left-10 w-32 min-w-32 max-w-32 border-r border-primary/20 text-left sm:w-40 sm:min-w-40 sm:max-w-40 sm:border-r-0"
+              />
+              <RosterSortHeader
+                label="ชั้น"
+                sortKey={{ type: 'grade' }}
+                sort={studentSort}
+                onSort={toggleStudentSort}
+                className="static left-[calc(var(--spacing)*50)] w-14 min-w-14 max-w-14 text-center sm:sticky"
+              />
+              <RosterSortHeader
+                label="ห้อง"
+                sortKey={{ type: 'section' }}
+                sort={studentSort}
+                onSort={toggleStudentSort}
+                className="static left-64 w-12 min-w-12 max-w-12 text-center sm:sticky"
+              />
+              <RosterSortHeader
+                label="เลขที่"
+                sortKey={{ type: 'number' }}
+                sort={studentSort}
+                onSort={toggleStudentSort}
+                className="static left-[calc(var(--spacing)*76)] w-12 min-w-12 max-w-12 text-center sm:sticky"
+              />
+              <RosterSortHeader
+                label="รหัสนักเรียน"
+                sortKey={{ type: 'code' }}
+                sort={studentSort}
+                onSort={toggleStudentSort}
+                className="static left-[calc(var(--spacing)*88)] w-18 min-w-18 max-w-18 border-r border-primary/20 text-center sm:sticky"
+              />
               {visibleAssignments.map(a => {
                 const hasNonSubmitter = orderedStudents.some(s => {
                   if (notGiven(a.id, s.id)) return false
@@ -303,52 +663,43 @@ export function ClassroomScoresMatrix({
                   return !sub || (sub.status !== 'submitted' && sub.status !== 'graded')
                 })
                 return (
-                  <th key={a.id} className="px-3 py-3 text-center min-w-[140px] border-b border-border">
-                    <Input
-                      type="number"
-                      min={1}
-                      value={orderDrafts[a.id] ?? a.display_order ?? ''}
-                      onChange={e => setOrderDrafts(d => ({ ...d, [a.id]: e.target.value }))}
-                      onBlur={e => commitOrder(a.id, e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
-                      disabled={isOrderPending}
-                      placeholder="-"
-                      title="ลำดับคอลัมน์ (ยิ่งน้อยยิ่งอยู่ซ้าย)" className="w-10 mx-auto mb-1 block text-center transition-all"
-                    />
-                    <Link href={`/assignments/${a.id}`} className="text-xs font-semibold text-muted-foreground hover:text-primary line-clamp-2">
-                      {a.title}
-                    </Link>
-                    {a.group_ids && (
-                      <p className="mt-0.5 line-clamp-1 text-[10px] font-medium text-tint-1" title={describeGroupTarget(a.group_ids, groupNameById)}>
-                        เฉพาะ {describeGroupTarget(a.group_ids, groupNameById)}
-                      </p>
-                    )}
-                    <button
-                      onClick={() => handleRemind(a.id)}
-                      disabled={!hasNonSubmitter || reminding === a.id}
-                      className={`mt-1.5 mx-auto flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full transition-colors ${
-                        hasNonSubmitter
-                          ? 'bg-warning/10 text-warning hover:bg-warning/10'
-                          : 'bg-muted text-muted-foreground/40 cursor-default'
-                      }`}
-                    >
-                      <Bell className="w-2.5 h-2.5" />
-                      {reminding === a.id ? 'กำลังเตือน...' : 'เตือน'}
-                    </button>
-                  </th>
+                  <SortableAssignmentHeader
+                    key={a.id}
+                    assignment={a}
+                    disabled={isAssignmentOrderPending}
+                    hasNonSubmitter={hasNonSubmitter}
+                    reminding={reminding === a.id}
+                    groupNameById={groupNameById}
+                    onRemind={() => handleRemind(a.id)}
+                    sort={studentSort}
+                    onSort={() => toggleStudentSort({ type: 'assignment', assignmentId: a.id })}
+                    onColumnMotion={moveAssignmentCells}
+                  />
                 )
               })}
             </tr>
           </thead>
           <tbody>
             {orderedStudents.map((student, index) => (
-              <tr key={student.id} className="hover:bg-muted/50">
-                <td className="sticky left-0 z-10 bg-card px-2 py-2.5 text-center text-sm text-muted-foreground w-16 min-w-16 max-w-16 border-b border-border">
+              <tr key={student.id} className="group/row">
+                <td className={cn('sticky left-0 z-10 w-10 min-w-10 max-w-10 px-1 py-2.5 text-center text-xs tabular-nums text-muted-foreground', MATRIX_ROW_CELL)}>
                   {index + 1}
                 </td>
-                <td className="sticky left-16 z-10 bg-card px-4 py-2.5 border-b border-border">
-                  <p className="text-sm font-medium text-foreground truncate max-w-[160px]">{student.full_name}</p>
-                  <p className="text-xs text-muted-foreground truncate max-w-[160px]">{student.email}</p>
+                <td className={cn('sticky left-10 z-10 w-32 min-w-32 max-w-32 border-r border-border/70 px-2.5 py-2.5 sm:w-40 sm:min-w-40 sm:max-w-40 sm:border-r-0', MATRIX_ROW_CELL)}>
+                  <p className="truncate text-sm font-semibold text-foreground" title={student.full_name}>{student.full_name}</p>
+                  <p className="truncate text-xs text-muted-foreground" title={student.email}>{student.email}</p>
+                </td>
+                <td className={cn('left-[calc(var(--spacing)*50)] z-10 w-14 min-w-14 max-w-14 px-1 py-2.5 text-center text-xs text-muted-foreground sm:sticky', MATRIX_ROW_CELL)} title={student.grade_level ?? undefined}>
+                  <span className="block truncate">{student.grade_level || '—'}</span>
+                </td>
+                <td className={cn('left-64 z-10 w-12 min-w-12 max-w-12 px-1 py-2.5 text-center text-xs tabular-nums text-muted-foreground sm:sticky', MATRIX_ROW_CELL)}>
+                  {student.section_number ?? '—'}
+                </td>
+                <td className={cn('left-[calc(var(--spacing)*76)] z-10 w-12 min-w-12 max-w-12 px-1 py-2.5 text-center text-xs tabular-nums text-muted-foreground sm:sticky', MATRIX_ROW_CELL)}>
+                  {student.class_number ?? '—'}
+                </td>
+                <td className={cn('left-[calc(var(--spacing)*88)] z-10 w-18 min-w-18 max-w-18 border-r border-border/70 px-1 py-2.5 text-center text-xs tabular-nums text-muted-foreground shadow-[6px_0_10px_-8px_var(--border)] sm:sticky', MATRIX_ROW_CELL)} title={student.student_code ?? undefined}>
+                  <span className="block truncate">{student.student_code || '—'}</span>
                 </td>
                 {visibleAssignments.map(a => {
                   const sub = bestSubmission.get(subKey(a.id, student.id))
@@ -361,20 +712,31 @@ export function ClassroomScoresMatrix({
 
                   if (notGiven(a.id, student.id)) {
                     return (
-                      <td key={a.id} className="px-3 py-2.5 text-center border-b border-border bg-muted/40">
-                        <span className="text-[11px] text-muted-foreground/60">ไม่ได้มอบหมาย</span>
+                      <td key={a.id} data-assignment-column={a.id} className={cn(
+                        'border-l border-border/40 px-3 py-2.5 text-center',
+                        MATRIX_ROW_CELL,
+                        draggingAssignmentId === a.id && 'bg-primary/10 opacity-40',
+                      )}>
+                        <span className="text-[11px] text-muted-foreground">ไม่ได้มอบหมาย</span>
                       </td>
                     )
                   }
 
                   return (
-                    <td key={a.id} className="px-3 py-2.5 text-center group relative border-b border-border">
+                    <td key={a.id} data-assignment-column={a.id} className={cn(
+                      'group relative border-l border-border/40 px-3 py-2.5 text-center',
+                      MATRIX_ROW_CELL,
+                      draggingAssignmentId === a.id && 'bg-primary/5 opacity-40',
+                    )}>
                       {submitted ? (
                         <Link
                           href={`/submissions/${sub!.id}`}
-                          className={`flex items-center justify-center gap-1 hover:underline ${
-                            passed === false ? 'text-destructive' : 'text-success'
-                          }`}
+                          className={cn(
+                            'mx-auto inline-flex min-w-20 items-center justify-center gap-1 rounded-full px-2 py-1 tabular-nums hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                            passed === false
+                              ? 'bg-destructive/10 text-[color-mix(in_oklab,var(--destructive)_55%,var(--foreground))]'
+                              : 'bg-success/10 text-[color-mix(in_oklab,var(--success)_55%,var(--foreground))]',
+                          )}
                         >
                           {passed === false ? <XCircle className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
                           <span className="text-xs font-semibold">
@@ -382,12 +744,12 @@ export function ClassroomScoresMatrix({
                           </span>
                         </Link>
                       ) : inProgress ? (
-                        <div className="flex items-center justify-center gap-1 text-primary">
+                        <div className={cn('mx-auto inline-flex items-center justify-center gap-1 rounded-full bg-primary/10 px-2 py-1', MATRIX_HEADER_TEXT)}>
                           <CircleDashed className="w-3.5 h-3.5" />
                           <span className="text-xs">กำลังทำ</span>
                         </div>
                       ) : (
-                        <div className="flex items-center justify-center gap-1 text-muted-foreground/40">
+                        <div className="flex items-center justify-center gap-1 text-muted-foreground">
                           <MinusCircle className="w-3.5 h-3.5" />
                           <span className="text-xs">ยังไม่ทำ</span>
                         </div>
@@ -412,6 +774,63 @@ export function ClassroomScoresMatrix({
           </tbody>
         </table>
       </Card>
+      </SortableContext>
+      <DragOverlay dropAnimation={null}>
+        {draggingAssignmentId && (() => {
+          const assignment = assignments.find(item => item.id === draggingAssignmentId)
+          if (!assignment) return null
+          return (
+            <Card
+              edge="ring"
+              aria-hidden="true"
+              className="w-32 cursor-grabbing overflow-hidden bg-card shadow-xl ring-2 ring-primary/30"
+            >
+              <div className={cn('flex min-h-28 items-center justify-center gap-1 px-2 py-3 text-center', MATRIX_HEADER_CELL)}>
+                <GripVertical className="size-4 shrink-0 text-primary" />
+                <p className="line-clamp-2 text-xs font-semibold text-foreground">{assignment.title}</p>
+              </div>
+              <div className="max-h-[calc(100dvh-12rem)] overflow-hidden">
+                {orderedStudents.map(student => {
+                  const sub = bestSubmission.get(subKey(assignment.id, student.id))
+                  const submitted = sub?.status === 'submitted' || sub?.status === 'graded'
+                  const inProgress = sub?.status === 'in_progress'
+                  const passed = submitted
+                    ? computePassed(sub!.total_score, sub!.max_score, assignment.passing_type, assignment.passing_value)
+                    : null
+
+                  return (
+                    <div
+                      key={student.id}
+                      className="flex min-h-14 items-center justify-center border-t border-border px-2 py-2 text-center"
+                    >
+                      {notGiven(assignment.id, student.id) ? (
+                        <span className="text-[11px] text-muted-foreground/60">ไม่ได้มอบหมาย</span>
+                      ) : submitted ? (
+                        <span className={cn(
+                          'flex items-center gap-1 text-xs font-semibold',
+                          passed === false ? 'text-destructive' : 'text-success',
+                        )}>
+                          {passed === false ? <XCircle className="size-3.5" /> : <CheckCircle2 className="size-3.5" />}
+                          {sub!.total_score ?? 0}/{sub!.max_score}
+                        </span>
+                      ) : inProgress ? (
+                        <span className="flex items-center gap-1 text-xs text-primary">
+                          <CircleDashed className="size-3.5" /> กำลังทำ
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground/40">
+                          <MinusCircle className="size-3.5" /> ยังไม่ทำ
+                        </span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </Card>
+          )
+        })()}
+      </DragOverlay>
+      </DndContext>
       )}
 
       {dialogTarget && (() => {

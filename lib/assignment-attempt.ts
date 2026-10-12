@@ -1,6 +1,6 @@
 import { randomizeVariables, evaluateFormula, evaluatePartsChained, evaluateStudentAnswer } from '@/lib/math/evaluator'
 import { mathInputPartKey, readMathInputMode } from '@/lib/math/input-mode'
-import { isSharedRandomSeed, questionRandom } from '@/lib/math/shared-random'
+import { drawsRandomValues, isSharedRandomSeed, questionRandom } from '@/lib/math/shared-random'
 import { getBlankType, acceptedAnswers, isBlankCorrect } from '@/lib/fill-blank'
 import {
   CLASSIFY_PREFIX, CLASSIFY_UNSET,
@@ -366,6 +366,30 @@ export function buildAttemptQuestion(
     order_index: opts.orderIndex,
     option_order: optionOrder,
   }
+}
+
+/**
+ * Draw the next numeric variant after a student has read the answer key.
+ *
+ * This deliberately ignores an assignment's shared seed: that seed aligns the
+ * first draw across students, while pressing "ทำใหม่" explicitly asks for a
+ * new set of numbers. Non-random questions return null and therefore keep the
+ * exact question the student just checked.
+ */
+export function buildFreshRandomQuestion(
+  question: Question,
+  previousRandomValues: Record<string, number>,
+): AssignmentAttemptSkeleton | null {
+  if (!drawsRandomValues(question)) return null
+
+  const previous = JSON.stringify(previousRandomValues)
+  let next = buildAttemptQuestion(question, { orderIndex: 0, shuffleOptions: false })
+  // A draw may coincidentally repeat. Try a few more times so "ทำใหม่" changes
+  // the visible numbers whenever the authored range has another outcome.
+  for (let attempt = 0; attempt < 7 && JSON.stringify(next.random_values) === previous; attempt += 1) {
+    next = buildAttemptQuestion(question, { orderIndex: 0, shuffleOptions: false })
+  }
+  return next
 }
 
 // One answer row of the attempt a wrong-only retry is built from. Only the

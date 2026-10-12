@@ -12,7 +12,8 @@ BEGIN
     WHERE jobname IN (
       'homeroom-weekly-digest',
       'exam-proctor-retention-daily',
-      'exam-android-approval-retention-daily'
+      'exam-android-approval-retention-daily',
+      'classroom-trash-retention-daily'
     )
   LOOP
     PERFORM cron.unschedule(v_job.jobid);

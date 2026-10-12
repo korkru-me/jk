@@ -11,7 +11,7 @@ import { Card } from '@/components/ui/card'
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'ถังขยะ — KorKru' }
 
-const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000
+const TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000
 
 export default async function TrashPage() {
   const authUser = await getAuthUser()
@@ -24,15 +24,6 @@ export default async function TrashPage() {
   if (!isTeacher) notFound()
 
   const admin = createAdminClient()
-
-  // Auto-cleanup: permanent-delete classrooms past 3 months
-  const cutoff = new Date(Date.now() - THREE_MONTHS_MS).toISOString()
-  await admin
-    .from('classrooms')
-    .delete()
-    .eq('teacher_id', authUser.id)
-    .eq('status', 'deleted')
-    .lt('deleted_at', cutoff)
 
   const { data } = await admin
     .from('classrooms')
@@ -70,13 +61,13 @@ export default async function TrashPage() {
         <Card edge="ring" className="overflow-hidden">
           <div className="p-4 border-b border-border bg-destructive/10">
             <p className="text-sm text-destructive">
-              ห้องเรียนในถังขยะจะถูกลบถาวรอัตโนมัติหลังจาก 3 เดือน
+              ห้องเรียนในถังขยะจะถูกลบถาวรอัตโนมัติภายใน 30 วัน
             </p>
           </div>
           <div className="divide-y divide-border">
             {classrooms.map((c) => {
               const deletedAt = c.deleted_at ? new Date(c.deleted_at) : new Date()
-              const expiresAt = new Date(deletedAt.getTime() + THREE_MONTHS_MS)
+              const expiresAt = new Date(deletedAt.getTime() + TRASH_RETENTION_MS)
               const daysLeft = Math.max(0, Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
               return (
                 <TrashActionsClient key={c.id} classroom={c} daysLeft={daysLeft} />

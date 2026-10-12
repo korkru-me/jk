@@ -44,15 +44,24 @@ export const ACCESS_TYPES = [
 ]
 
 export function AccessTypePicker({
-  value, onChange, columns = 3,
+  value, onChange, columns = 3, compact = false, includeClosed = true,
 }: {
   value: AccessType
   onChange: (v: AccessType) => void
-  columns?: 1 | 3
+  columns?: 1 | 2 | 3
+  compact?: boolean
+  includeClosed?: boolean
 }) {
+  const options = includeClosed ? ACCESS_TYPES : ACCESS_TYPES.filter(type => type.value !== 'closed')
+
   return (
-    <div className={cn('grid grid-cols-1 gap-3', columns === 3 && 'sm:grid-cols-3')}>
-      {ACCESS_TYPES.map((type) => {
+    <div className={cn(
+      'grid grid-cols-1',
+      compact ? 'gap-2' : 'gap-3',
+      columns === 2 && 'sm:grid-cols-2',
+      columns === 3 && 'sm:grid-cols-3',
+    )}>
+      {options.map((type) => {
         const isSelected = value === type.value
         const Icon = type.Icon
         return (
@@ -60,25 +69,40 @@ export function AccessTypePicker({
             key={type.value}
             type="button"
             onClick={() => onChange(type.value)}
+            aria-pressed={isSelected}
+            aria-label={`${type.label}: ${type.desc}`}
             className={cn(
-              'relative flex flex-col items-start gap-3 rounded-2xl border-2 p-4 text-left transition-all duration-200',
+              'relative flex text-left transition-colors',
+              compact
+                ? 'min-h-12 items-center gap-2 rounded-xl border px-2.5 py-2'
+                : 'flex-col items-start gap-3 rounded-2xl border-2 p-4',
               isSelected ? type.cardActive + ' shadow-sm' : 'border-border bg-card hover:border-muted-foreground/30',
             )}
           >
-            <div className="flex items-center justify-between w-full">
-              <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center', isSelected ? 'bg-card/60' : 'bg-muted')}>
-                <Icon className={cn('w-4 h-4', isSelected ? type.iconColor : 'text-muted-foreground')} />
+            <div className={cn('flex items-center justify-between', compact ? 'shrink-0' : 'w-full')}>
+              <div className={cn('flex items-center justify-center', compact ? 'size-7 rounded-lg' : 'size-9 rounded-xl', isSelected ? 'bg-card/60' : 'bg-muted')}>
+                <Icon className={cn('size-4', isSelected ? type.iconColor : 'text-muted-foreground')} aria-hidden="true" />
               </div>
-              {isSelected && (
+              {isSelected && !compact && (
                 <div className={cn('w-5 h-5 rounded-full flex items-center justify-center', type.chip)}>
                   <Check className={cn('w-3 h-3', type.chipForeground)} />
                 </div>
               )}
             </div>
-            <div>
-              <p className={cn('font-semibold text-sm', isSelected ? type.iconColor : 'text-foreground')}>{type.label}</p>
-              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{type.desc}</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-foreground">{type.label}</p>
+              <p
+                className={cn(
+                  'text-xs leading-snug text-muted-foreground',
+                  isSelected && 'text-foreground/80',
+                  compact && 'line-clamp-2 sm:line-clamp-1',
+                )}
+                title={compact ? type.desc : undefined}
+              >
+                {type.desc}
+              </p>
             </div>
+            {isSelected && compact && <Check className={cn('size-4 shrink-0', type.iconColor)} aria-hidden="true" />}
           </button>
         )
       })}

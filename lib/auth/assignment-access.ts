@@ -61,6 +61,7 @@ export async function studentHasAssignment(
  * This is the same rule the database already enforces on the assignment row
  * itself, spelled out in TypeScript rather than SQL:
  *
+ *   assignments_super_admin_all → user is a trusted super admin
  *   assignments_org_teacher_all  →  created_by = auth.uid()
  *   assignments_co_teacher_all   →  id = ANY(get_my_co_teaching_assignment_ids())
  *                                   i.e. an admin/manage co-teacher on any
@@ -90,13 +91,21 @@ export const canManageAssignment = cache(async (
 ): Promise<boolean> => {
   const admin = createAdminClient()
 
-  const { data: assignment } = await admin
-    .from('assignments')
-    .select('created_by')
-    .eq('id', assignmentId)
-    .maybeSingle()
+  const [{ data: assignment }, { data: superAdmin }] = await Promise.all([
+    admin
+      .from('assignments')
+      .select('created_by')
+      .eq('id', assignmentId)
+      .maybeSingle(),
+    admin
+      .from('super_admins')
+      .select('user_id')
+      .eq('user_id', userId)
+      .maybeSingle(),
+  ])
 
   if (!assignment) return false
+  if (superAdmin) return true
   if (assignment.created_by === userId) return true
 
   // Every classroom this ชุดข้อสอบ was handed to — a งาน can be assigned to

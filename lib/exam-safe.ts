@@ -285,10 +285,15 @@ function sanitizeTrueFalseStatement(value: unknown): SafeTrueFalseStatement {
   }
 }
 
-function sanitizeFillBlank(value: unknown): SafeFillBlankItem {
+function sanitizeFillBlank(
+  value: unknown,
+  legacyMode?: 'auto' | 'manual',
+): SafeFillBlankItem {
   const blank = asRecord(value)
   const rawType = blank.type
-  const type = rawType === 'fixed' || rawType === 'dropdown' ? rawType : 'text'
+  const type = rawType === 'fixed' || rawType === 'dropdown' || rawType === 'text'
+    ? rawType
+    : legacyMode === 'manual' ? 'text' : 'fixed'
   const options = asStringArray(blank.options)
   return {
     id: typeof blank.id === 'number' ? blank.id : 0,
@@ -329,11 +334,14 @@ function sanitizeExtraData(questionType: string, value: unknown, random: () => n
   }
 
   if (questionType === 'fill_blank') {
+    const gradingMode = extra.grading_mode === 'auto' || extra.grading_mode === 'manual'
+      ? extra.grading_mode
+      : undefined
     return {
-      blanks: Array.isArray(extra.blanks) ? extra.blanks.map(sanitizeFillBlank) : [],
-      ...(extra.grading_mode === 'auto' || extra.grading_mode === 'manual'
-        ? { grading_mode: extra.grading_mode }
-        : {}),
+      blanks: Array.isArray(extra.blanks)
+        ? extra.blanks.map(blank => sanitizeFillBlank(blank, gradingMode))
+        : [],
+      ...(gradingMode ? { grading_mode: gradingMode } : {}),
     }
   }
 
@@ -361,7 +369,9 @@ function sanitizeExtraData(questionType: string, value: unknown, random: () => n
             : 'true_false'
           const imageUrls = asStringArray(part.image_urls)
           const choices = Array.isArray(part.choices) ? part.choices.map(sanitizeTrueFalseStatement) : undefined
-          const blanks = Array.isArray(part.blanks) ? part.blanks.map(sanitizeFillBlank) : undefined
+          const blanks = Array.isArray(part.blanks)
+            ? part.blanks.map(blank => sanitizeFillBlank(blank))
+            : undefined
           const items = Array.isArray(part.items)
             ? shuffle(part.items.map(sanitizeOrderingItem), random)
             : undefined

@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin'
+import { startOfThaiDay } from '@/lib/thai-time'
 
 async function getStats() {
   const admin = createAdminClient()
@@ -26,7 +27,7 @@ async function getStats() {
     admin.from('submissions').select('id', { count: 'exact', head: true }),
     admin.from('submissions')
       .select('id', { count: 'exact', head: true })
-      .gte('created_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString()),
+      .gte('created_at', startOfThaiDay().toISOString()),
   ])
 
   return {

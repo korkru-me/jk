@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import { TeachingModeClient, type TeachingQuestionView } from '@/components/assignments/teaching-mode-client'
+import { ShellClient } from '@/components/layout/shell-client'
 import { isExamScreenLabEnabled } from '@/lib/exam-screen-lab-access'
 import { buildExamScreenQaQuestions } from '../_lib/fixture'
 
@@ -23,15 +24,26 @@ export default function DrawingBoardLabPage() {
   }
 
   return (
-    <TeachingModeClient
-      assignmentId="11111111-1111-4111-8111-111111111111"
-      assignmentTitle="ข้อมูลจำลองสำหรับตรวจเฟส Hardening"
-      backHref="/exam-screen-lab"
-      currentUserId="22222222-2222-4222-8222-222222222222"
-      canManage
-      questions={[question]}
-      questionsPerPage={1}
-      initialBoards={[]}
-    />
+    <ShellClient
+      user={{
+        id: '22222222-2222-4222-8222-222222222222',
+        email: 'teacher-qa@korkru.local',
+        full_name: 'ครูทดสอบ',
+        role: 'teacher',
+      }}
+      initialUnreadCount={0}
+    >
+      <TeachingModeClient
+        assignmentId="11111111-1111-4111-8111-111111111111"
+        assignmentTitle="ข้อมูลจำลองสำหรับตรวจเฟส Hardening"
+        backHref="/exam-screen-lab"
+        currentUserId="22222222-2222-4222-8222-222222222222"
+        canManage
+        questions={[question]}
+        questionsPerPage={1}
+        initialBoards={[]}
+        contextualSidebarPath="/exam-screen-lab/drawing-board"
+      />
+    </ShellClient>
   )
 }

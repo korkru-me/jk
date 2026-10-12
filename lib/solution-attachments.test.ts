@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   checkSolutionFile,
   isSolutionTextImageSrc,
@@ -50,6 +50,7 @@ describe('solution attachments', () => {
   })
 
   it('keeps only this app’s own pictures in typed เฉลย', () => {
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://project.supabase.co')
     expect(isSolutionTextImageSrc(`${BUCKET}/solution-inline_1_a.webp`)).toBe(true)
     expect(isSolutionTextImageSrc('blob:http://localhost:3010/0f3c#lab/solution-inline_1_a.png')).toBe(true)
     // Pictures that ride in with text copied off a web page are not hot-linked.
@@ -59,6 +60,12 @@ describe('solution attachments', () => {
     expect(isSolutionTextImageSrc('data:image/png;base64,iVBORw0KGgo=')).toBe(false)
     expect(isSolutionTextImageSrc('javascript:alert(1)')).toBe(false)
     expect(isSolutionTextImageSrc('')).toBe(false)
+    // The same bucket path on another project — Staging, or anyone's — is still another host.
+    expect(isSolutionTextImageSrc('https://other.supabase.co/storage/v1/object/public/question-images/a.png')).toBe(false)
+    // The lab's in-memory pictures exist only in a development build.
+    vi.stubEnv('NODE_ENV', 'production')
+    expect(isSolutionTextImageSrc('blob:http://localhost:3010/0f3c#lab/solution-inline_1_a.png')).toBe(false)
+    vi.unstubAllEnvs()
   })
 
   it('takes a PDF up to 5 MB and a shrunk picture up to 2 MB', () => {

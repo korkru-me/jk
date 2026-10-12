@@ -1,5 +1,5 @@
 import type { StudentWorkArtifactView } from '@/lib/math-work'
-import type { ScratchpadScene } from '@/lib/scratchpad'
+import { scratchpadPageCount, type ScratchpadScene } from '@/lib/scratchpad'
 
 export type StudentDraftState =
   | 'loading'
@@ -114,7 +114,13 @@ export function scratchpadSemanticFingerprint(scene: ScratchpadScene): string {
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([fileId, file]) => [fileId, canonical(file)]),
   )
-  return compactFingerprint(JSON.stringify({ background: scene.background, elements, files }))
+  const pageCount = scratchpadPageCount(scene.pageCount)
+  return compactFingerprint(JSON.stringify({
+    background: scene.background,
+    elements,
+    files,
+    ...(pageCount > 1 ? { pageCount } : {}),
+  }))
 }
 
 export function isScratchpadFingerprint(value: unknown): value is string {
@@ -180,6 +186,7 @@ export function markScratchpadAttached(
 }
 
 export function scratchpadHasMeaningfulDraft(scene: ScratchpadScene): boolean {
-  return scene.background !== 'lined'
+  return scratchpadPageCount(scene.pageCount) > 1
+    || scene.background !== 'lined'
     || scene.elements.some(element => isRecord(element) && element.isDeleted !== true)
 }

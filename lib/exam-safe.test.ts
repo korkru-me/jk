@@ -239,6 +239,32 @@ describe('toSafeExamAnswer', () => {
     expect(fill.json).not.toContain('BLANK_SECRET')
   })
 
+  it('keeps legacy auto fill blanks auto-gradable after removing their keys', () => {
+    const fill = serializedSafe('fill_blank', {
+      extra_data: {
+        grading_mode: 'auto',
+        blanks: [{ id: 1, answer: 'แรง', case_sensitive: false }],
+      },
+    })
+    expect(fill.safe.questions.extra_data).toEqual({
+      grading_mode: 'auto',
+      blanks: [{ id: 1, type: 'fixed', case_sensitive: false }],
+    })
+    expect(fill.json).not.toContain('แรง')
+  })
+
+  it('keeps legacy fill blanks without an explicit grading mode auto-gradable', () => {
+    const fill = serializedSafe('fill_blank', {
+      extra_data: {
+        blanks: [{ id: 1, answer: 'แรง', case_sensitive: false }],
+      },
+    })
+    expect(fill.safe.questions.extra_data).toEqual({
+      blanks: [{ id: 1, type: 'fixed', case_sensitive: false }],
+    })
+    expect(fill.json).not.toContain('แรง')
+  })
+
   it('hands a ตารางจำแนก to the student with no cell key in it', () => {
     // Unlike ปรนัย, where the key is an is_correct flag beside an option, a
     // classify question keeps its entire key inside the rows. If answers

@@ -85,6 +85,7 @@ export interface MathAnswerFieldProps {
   onChange: (value: string) => void
   onModeChange: (mode: MathInputMode) => void
   ariaLabel: string
+  disabled?: boolean
   unit?: ReactNode
   placeholder?: string
   className?: string
@@ -101,11 +102,13 @@ export function MathAnswerField({
   onChange,
   onModeChange,
   ariaLabel,
+  disabled = false,
   unit,
   placeholder = 'เช่น 10, 9+1, √100 หรือ sin(30)',
   className,
   inputClassName,
 }: MathAnswerFieldProps) {
+  const rootRef = useRef<HTMLSpanElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const toggleButtonRef = useRef<HTMLButtonElement>(null)
@@ -117,6 +120,22 @@ export function MathAnswerField({
     onDeactivate()
     requestAnimationFrame(() => toggleButtonRef.current?.focus({ preventScroll: true }))
   }, [onDeactivate])
+
+  useEffect(() => {
+    if (!active) return
+    const closeOnOutsidePointerDown = (event: PointerEvent) => {
+      const target = event.target
+      if (!(target instanceof Node)) return
+      if (rootRef.current?.contains(target) || panelRef.current?.contains(target)) return
+
+      // An outside interaction should keep its own focus. The explicit close
+      // button and Escape return focus to the keypad toggle, but doing that
+      // here would steal focus back from the control the student just chose.
+      onDeactivate()
+    }
+    document.addEventListener('pointerdown', closeOnOutsidePointerDown, true)
+    return () => document.removeEventListener('pointerdown', closeOnOutsidePointerDown, true)
+  }, [active, onDeactivate])
 
   useEffect(() => {
     if (!active) return
@@ -199,7 +218,7 @@ export function MathAnswerField({
   }
 
   return (
-    <span className={cn('inline-flex min-w-0 flex-col gap-1.5 align-middle', className)}>
+    <span ref={rootRef} className={cn('inline-flex min-w-0 flex-col gap-1.5 align-middle', className)}>
       <span className="flex min-w-0 items-center gap-1.5">
         <Input
           ref={inputRef}
@@ -211,6 +230,7 @@ export function MathAnswerField({
           inputMode="none"
           autoComplete="off"
           spellCheck={false}
+          disabled={disabled}
           aria-label={ariaLabel}
           aria-controls={active ? panelId : undefined}
           placeholder={placeholder}
@@ -239,6 +259,7 @@ export function MathAnswerField({
           aria-label={active ? 'ปิดแป้นคณิตศาสตร์' : 'เปิดแป้นคณิตศาสตร์'}
           aria-expanded={active}
           aria-controls={panelId}
+          disabled={disabled}
           className="pointer-coarse:size-11"
           onClick={() => active ? closeKeypad() : focusInput()}
         >
@@ -255,6 +276,7 @@ export function MathAnswerField({
             variant={mode === option ? 'secondary' : 'outline'}
             size="xs"
             aria-pressed={mode === option}
+            disabled={disabled}
             onClick={() => {
               onActivate()
               onModeChange(option)
@@ -311,13 +333,14 @@ export function MathAnswerField({
                   variant={mode === option ? 'secondary' : 'outline'}
                   size="xs"
                   aria-pressed={mode === option}
+                  disabled={disabled}
                   onClick={() => onModeChange(option)}
                   className={cn('pointer-coarse:min-h-11', mode === option && 'border-primary bg-primary/10 text-primary')}
                 >
                   {option.toUpperCase()}
                 </Button>
               ))}
-              <Button type="button" variant="ghost" size="sm" className="ml-auto pointer-coarse:min-h-11" onClick={() => setAdvanced(show => !show)}>
+              <Button type="button" variant="ghost" size="sm" disabled={disabled} className="ml-auto pointer-coarse:min-h-11" onClick={() => setAdvanced(show => !show)}>
                 {advanced ? <ChevronUp /> : <ChevronDown />}
                 ขั้นสูง
               </Button>
@@ -332,6 +355,7 @@ export function MathAnswerField({
                 variant="outline"
                 className="h-9 min-w-0 px-1 font-mono pointer-coarse:h-11"
                 aria-label={mathKey.ariaLabel ?? mathKey.label}
+                disabled={disabled}
                 onClick={() => runAction(mathKey.action)}
               >
                 {mathKey.action.kind === 'backspace' ? <Delete /> : mathKey.label}
@@ -348,6 +372,7 @@ export function MathAnswerField({
                   variant="secondary"
                   className="h-9 min-w-0 px-1 font-mono text-xs pointer-coarse:h-11"
                   aria-label={mathKey.ariaLabel ?? mathKey.label}
+                  disabled={disabled}
                   onClick={() => runAction(mathKey.action)}
                 >
                   {mathKey.label}
