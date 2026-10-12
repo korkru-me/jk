@@ -1,11 +1,18 @@
 # Feature status
 
-### คลังฝึกไม่มีคะแนน — เริ่ม Phase 1 (12 ตุลาคม 2026)
+### คลังฝึกไม่มีคะแนน — Phase 1–7 implementation candidate หลัง feature flag (13 ตุลาคม 2026)
 
-- อนุมัติทิศทางเป็นโดเมน `คลังฝึก` แยกจาก assignment/submission แต่ใช้ทางเข้าสร้าง คลังโจทย์ การค้นหา ตัวแสดงโจทย์ และ evaluator ที่ปลอดภัยร่วมกันได้; แผนใน `docs/PRACTICE_LIBRARY_PLAN.md` แบ่ง 7 เฟสพร้อม acceptance gate และกำหนด compact-Y เป็นข้อบังคับของ UI
-- เพิ่ม pure contract ที่ `lib/practice-library.ts`: หลายแท็กตรงทุกแท็กแบบ exact AND โดย reuse กติกาคลังโจทย์เดิม, นับเฉพาะการกด “ตรวจคำตอบ” ที่มีคำตอบไม่ว่าง และสร้าง metadata allowlist 5 field พร้อม UUID idempotency key โดยตัด answer/correctness/score ออก
-- Phase 1 ยังไม่มี route, component, feature flag, schema, RLS หรือ production navigation; ภาพทั้งหกใน `docs/practice/mockups/` เป็น reference ของ flow ไม่ใช่หลักฐานว่าฟีเจอร์ใช้งานจริง และ Phase 2 จะเริ่มได้ต่อเมื่อ migration ledger/environment พร้อมและแบบสิทธิ์ผ่าน gate
-- focused Vitest ของ contract ผ่าน 11/11 เคส, full suite ผ่าน 228 files / 3,073 cases, TypeScript, design-token lint, production build และ `git diff --check` ผ่าน; ยังไม่แตะฐานข้อมูลหรือ migration
+- `คลังฝึก` เป็นโดเมนแยกจาก assignment/submission โดยโครงสร้าง ใช้คลังโจทย์ แท็ก ตัวแสดงโจทย์ และ evaluator ที่ปลอดภัยร่วมกันเท่านั้น; ไม่มี `AssignmentType` ค่าใหม่ ไม่มี submission/score และไม่มีทาง export progress เป็นคะแนน
+- เส้นทางครูอยู่ที่ `/practice`, `/practice/new`, `/practice/[id]/edit` และหน้าความคืบหน้าที่ `/practice/[id]/progress`; เส้นทางนักเรียนใช้ `/practice/[id]` กับหน้าทำโจทย์รายข้อ ครูเห็นเพียงข้อที่เคยตอบและจำนวนครั้ง ส่วนผลตรวจถูกส่งกลับให้นักเรียนใน request ของตน
+- โจทย์จับคู่ใน practice รองรับตัวเลือกที่มีเฉพาะรูปแล้ว โดยคำตอบชั่วคราวใช้ token จากเนื้อหาที่แสดงจริง ไม่ใช้ลำดับที่ครูสร้าง รูปแบบเก็บคำตอบจับคู่ของ assignment/exam ไม่เปลี่ยนและไม่มี migration เพิ่มจากจุดนี้
+- หลายแท็กใช้ exact **AND**, URL เก็บ search/filter/page, การกดตรวจที่มีคำตอบไม่ว่างหนึ่งครั้งสร้าง accepted-check event ได้ไม่เกินหนึ่งแถวด้วย UUID idempotency key และ DTO ครูปฏิเสธ answer, correctness, score, verdict, solution และเวลา activity
+- รายการนักเรียนค้น/รวมจำนวนด้วย RPC เดียวต่อหน้า (24 ข้อ), progress รายคนแบ่งหน้า 50 ข้อ และ mutation draft/duplicate/bulk tag เป็น transaction เดียว; co-teacher `admin/manage` รักษา owner-private membership เดิมได้โดยไม่เปิดสิทธิ์อ่านหรือแนบโจทย์ส่วนตัวอื่น
+- variant receipt ไม่เปิด seed หรือ raw question revision ใน browser; nonce ถูกผูก actor/library/question/revision ด้วย HMAC ฝั่ง server และการตรวจคำตอบตัวเลขส่งโหมด DEG/RAD ชั่วคราวเข้า evaluator โดยไม่เพิ่มข้อมูลถาวร
+- สิทธิ์จัดการและดู progress ให้เฉพาะเจ้าของห้องกับครูร่วม `admin/manage`; ครูร่วม `view` อ่านได้เฉพาะ metadata คลังฝึกและ **ห้ามเห็น roster progress** นักเรียนอ่านได้เฉพาะคลังที่เผยแพร่ในห้องที่ตนยังเป็นสมาชิกและเห็น progress ของตนเองเท่านั้น
+- UI ใช้ compact list/table ไม่ใช้การ์ดสูงต่อโจทย์: toolbar ราว 96px, แถวโจทย์ 64–72px, แถว progress 44–48px และป้าย “ไม่มีคะแนน” อยู่ทุกทางเข้าที่อาจสับสนกับแบบฝึกหัด
+- navigation และทางเข้าสร้างถูกซ่อนด้วย server-only `PRACTICE_LIBRARY_ENABLED=true`; flag เป็น presentation/rollout gate ไม่ใช่ authorization และค่าเริ่มต้นปิด ข้อมูลการตรวจ Phase 7 กับ owner sign-off ต้องบันทึกใน `docs/SELF_PRACTICE_UAT.md` ก่อนเปิด Production
+- Candidate ผ่าน TypeScript, design-token lint, full Vitest 238 files / 3,192 tests, SQL/RLS/RPC contract บน PGlite 31 เคส, webpack production build และ Next 16 runtime diagnostics; local unauthenticated route guard redirect `/practice` ไป `/login` และ viewport 320 px ไม่ล้นแนวนอน ส่วน authenticated multi-role/1,000-question/physical-device/owner sign-off ยังเป็น Production release gate
+- สถานะ deploy ต้องอ่านจากหลักฐาน UAT ล่าสุด ไม่อนุมานจากการมี route ใน repository; migration ต้องผ่าน local/Staging ledger audit, database lint และ negative RLS cases ก่อนถือว่าพร้อมเปิดใช้
 
 ### ตำแหน่งไอคอน Sidebar ตรงกันทุกสถานะ — 12 ตุลาคม 2026
 

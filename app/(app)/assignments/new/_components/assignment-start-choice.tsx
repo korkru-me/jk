@@ -1,7 +1,8 @@
 import Link from 'next/link'
-import { ArrowLeft, ClipboardPenLine, Copy, Plus, Repeat2 } from 'lucide-react'
+import { ArrowLeft, BookOpenCheck, ClipboardPenLine, Copy, Plus, Repeat2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 
 interface AssignmentStartChoiceProps {
   createHref: string
@@ -67,12 +68,14 @@ interface AssignmentTypeChoiceProps {
   backHref: string
   exerciseHref: string
   examHref: string
+  practiceHref?: string
 }
 
 export function AssignmentTypeChoice({
   backHref,
   exerciseHref,
   examHref,
+  practiceHref,
 }: AssignmentTypeChoiceProps) {
   return (
     <div className="flex max-w-3xl flex-col gap-6">
@@ -87,8 +90,8 @@ export function AssignmentTypeChoice({
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card padding="lg" className="flex min-w-0 flex-col gap-5">
+      <div className={cn('grid gap-4 md:grid-cols-2', practiceHref && 'lg:grid-cols-3')}>
+        <Card padding="md" className="flex min-w-0 flex-col gap-3">
           <div className="flex items-start gap-3">
             <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <Repeat2 className="size-5" aria-hidden="true" />
@@ -105,7 +108,7 @@ export function AssignmentTypeChoice({
           </Button>
         </Card>
 
-        <Card padding="lg" className="flex min-w-0 flex-col gap-5">
+        <Card padding="md" className="flex min-w-0 flex-col gap-3">
           <div className="flex items-start gap-3">
             <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <ClipboardPenLine className="size-5" aria-hidden="true" />
@@ -121,6 +124,25 @@ export function AssignmentTypeChoice({
             <ClipboardPenLine data-icon="inline-start" /> สร้างข้อสอบ
           </Button>
         </Card>
+
+        {practiceHref && (
+          <Card padding="md" className="flex min-w-0 flex-col gap-3">
+            <div className="flex items-start gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <BookOpenCheck className="size-5" aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <h2 className="font-semibold text-foreground">คลังฝึก</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  ให้นักเรียนเลือกฝึกเอง ครูเห็นจำนวนครั้ง แต่ไม่มีคะแนน
+                </p>
+              </div>
+            </div>
+            <Button variant="outline" className="mt-auto w-full" render={<Link href={practiceHref} />}>
+              <BookOpenCheck data-icon="inline-start" /> สร้างคลังฝึก · ไม่มีคะแนน
+            </Button>
+          </Card>
+        )}
       </div>
     </div>
   )

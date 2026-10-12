@@ -72,6 +72,18 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 - รักษา backward compatibility ระหว่างช่วง deploy code และ schema
 - อย่าใส่ secret หรือข้อมูลผู้ใช้จริงใน SQL
 
+## คลังฝึกไม่มีคะแนน
+
+- `practice_libraries`, `practice_library_questions` และ `practice_answer_attempts` เป็น security boundary แยกจาก assignment/submission; ห้ามใช้การซ่อนคะแนนใน UI แทนการแยก schema และห้ามเขียน accepted-check เข้า gradebook, analytics, homeroom score หรือ question statistics
+- server-only `PRACTICE_LIBRARY_ENABLED` คุมเพียงการเปิด route/navigation ค่า false ต้องตอบ 404/ซ่อนทางเข้า แต่ค่า true ไม่ให้สิทธิ์เพิ่ม ทุก page, Server Action และ RPC ต้องตรวจ session, role, exact organization, classroom relation และ resource ID ใหม่
+- owner และ co-teacher `admin/manage` จัดการคลังและอ่าน roster progress ได้ ครูร่วม `view` อ่านได้เฉพาะ metadata library และต้องถูกปฏิเสธเมื่อเปิด progress URL/RPC โดยตรง นักเรียนต้องอยู่ใน roster ของ exact classroom และ library ต้อง `published`
+- browser ไม่มี direct write grant บน `practice_answer_attempts`; `record_practice_answer_attempt` เรียกได้เฉพาะ service boundary หลัง validate คำตอบที่ไม่ว่างและ evaluate แล้ว และตรวจ `p_actor_id`/library/question/idempotency ซ้ำใน transaction
+- event ถาวรเก็บเพียง library, student, question, database time และ UUID idempotency key ห้ามเก็บคำตอบ ความถูกต้อง คะแนน answer key เหตุผลที่ผิด solution หรือ derived accuracy; application/error/analytics log ห้ามพิมพ์ payload และ feedback
+- query นักเรียนต้อง select allowlist และห้ามส่ง answer-bearing `questions` row เต็มเข้า Client Component; randomized question ใช้ HMAC receipt อายุจำกัดที่ผูก actor + library + question + exact revision ด้วย keyed binding แต่ payload ฝั่ง browserต้องไม่มีทั้ง seed และ raw revision ซึ่งใช้เดา permutation/answer key ได้ Server อนุมาน seed จาก nonce ด้วย `PRACTICE_VARIANT_SECRET` อย่างน้อย 32 ตัวอักษรหลังตรวจลายเซ็นเท่านั้น
+- service-only read RPC ต้องตรวจ exact actor/resource ใหม่ใน SQL และไม่เปิด execute ให้ browser; manager RPC อนุญาต owner/admin/manage อ่านเฉพาะสมาชิกของ library นั้นเพื่อรักษา owner-private membership แต่การเพิ่ม UUID ใหม่และ bulk tag ต้องผ่าน visibility/ownership ที่แคบกว่า การสร้าง แก้ และทำสำเนาต้อง atomic เพื่อไม่ให้ metadata กับลำดับสมาชิกค้างคนละสถานะ
+- DTO ครูเป็น allowlist และมี regression guard ต่อชื่อ field ต้องห้าม; ไม่มี export path, leaderboard, ranking, red/green mastery หรือ timeline activity ใน MVP
+- negative test ขั้นต่ำต้องครอบคลุม anon, student คนอื่น, ถอน roster, draft/closed library, view-only co-teacher, ครูนอกห้อง, ต่าง organization, question ที่ไม่อยู่ใน library, UUID ซ้ำ และ concurrent retry ตาม `docs/SELF_PRACTICE_UAT.md`
+
 ## Grading integrity
 
 - random values และ correct answer ต้องตรึงต่อ attempt

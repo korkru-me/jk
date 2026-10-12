@@ -85,6 +85,8 @@ export function QuestionPicker({
   }
 
   const baseline = baselineIds ?? []
+  const baselineSet = new Set(baseline)
+  const selectedOrder = new Map(selectedIds.map((id, index) => [id, index + 1]))
   const filteredById = new Map(filteredQs.map(question => [question.id, question]))
   // Keep a review copy of each pick at the top, but leave the original row in
   // its bank position too. Teachers can keep scanning from the same place and
@@ -117,14 +119,13 @@ export function QuestionPicker({
 
   function questionRow(q: AssignmentQuestionOption, toggle: () => void, location: 'selected' | 'bank') {
     const diff = DIFF_META[q.difficulty]
-    const isSelected = selectedIds.includes(q.id)
-    const wasSelected = baseline.includes(q.id)
+    const orderNumber = selectedOrder.get(q.id) ?? null
+    const isSelected = orderNumber !== null
+    const wasSelected = baselineSet.has(q.id)
     const pending = !baselineIds ? null
       : isSelected && !wasSelected ? 'add'
       : !isSelected && wasSelected ? 'remove'
       : null
-    const orderNumber = isSelected ? selectedIds.indexOf(q.id) + 1 : null
-
     return (
       <div
         className={cn(

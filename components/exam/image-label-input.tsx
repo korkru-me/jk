@@ -151,6 +151,9 @@ export function ImageLabelInput({
   // Only the wide layout measures anything: it is the only one that draws
   // leader lines, and it is the only one in the document when it is on screen.
   const inlineRef = useRef<HTMLDivElement | null>(null)
+  const dialogRef = useRef<HTMLDivElement | null>(null)
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null)
+  const restoreFocusRef = useRef<HTMLElement | null>(null)
   const frameRef = useRef<HTMLDivElement | null>(null)
   const boxRefs = useRef<Array<HTMLElement | null>>([])
   const dotRefs = useRef<Array<HTMLElement | null>>([])
@@ -167,9 +170,14 @@ export function ImageLabelInput({
     setPointed(current => (current === index ? null : current))
 
   function openExpanded() {
+    restoreFocusRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null
     setReserved(inlineRef.current?.getBoundingClientRect().height ?? null)
     setExpanded(true)
   }
+
+  const closeExpanded = useCallback(() => setExpanded(false), [])
 
   /**
    * Escape closes it, and the page behind stops scrolling while it is open.
@@ -182,15 +190,42 @@ export function ImageLabelInput({
    */
   useEffect(() => {
     if (!expanded) return
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setExpanded(false) }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        closeExpanded()
+        return
+      }
+      if (event.key !== 'Tab') return
+      const focusable = [...(dialogRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+      ) ?? [])]
+      if (focusable.length === 0) {
+        event.preventDefault()
+        dialogRef.current?.focus()
+        return
+      }
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     window.addEventListener('keydown', onKey)
+    const frame = requestAnimationFrame(() => closeButtonRef.current?.focus())
     return () => {
+      cancelAnimationFrame(frame)
       window.removeEventListener('keydown', onKey)
       document.body.style.overflow = previousOverflow
+      requestAnimationFrame(() => restoreFocusRef.current?.focus({ preventScroll: true }))
     }
-  }, [expanded])
+  }, [expanded, closeExpanded])
 
   // Anything that can move an element has to force a re-measure: a resize, a
   // font swap, an answer that makes a box taller, or the picture arriving.
@@ -409,7 +444,7 @@ export function ImageLabelInput({
               value={answer}
               disabled={locked}
               onChange={event => write([[index, event.target.value]])}
-              className="h-8 min-w-0 flex-1 border-0 bg-transparent px-1 text-sm shadow-none focus-visible:ring-0"
+              className="min-h-11 min-w-0 flex-1 border-0 bg-transparent px-1 text-sm shadow-none focus-visible:ring-0"
               placeholder={`จุดที่ ${index + 1}`}
               aria-label={`คำตอบของจุดที่ ${index + 1}`}
             />
@@ -420,7 +455,7 @@ export function ImageLabelInput({
               value={answer}
               disabled={locked}
               onChange={event => write([[index, event.target.value]])}
-              className="min-w-0 flex-1 border-0 bg-transparent text-sm shadow-none"
+              className="min-h-11 min-w-0 flex-1 border-0 bg-transparent text-sm shadow-none"
               aria-label={`คำตอบของจุดที่ ${index + 1}`}
             >
               <option value="">เลือกคำตอบ</option>
@@ -452,7 +487,7 @@ export function ImageLabelInput({
                   // margin is about 160px at the narrow end of that layout, and
                   // "แอมมิเตอร์" does not fit — truncating hides which answer is
                   // in the box, which is the one thing the box is for.
-                  'h-auto min-w-0 flex-1 justify-start whitespace-normal break-words px-1 py-1.5 text-left text-sm font-normal',
+                  'min-h-11 min-w-0 flex-1 justify-start whitespace-normal break-words px-1 py-1.5 text-left text-sm font-normal',
                   !locked && 'touch-none select-none',
                   !locked && answer && 'cursor-grab active:cursor-grabbing',
                   !answer && 'text-muted-foreground',
@@ -467,7 +502,7 @@ export function ImageLabelInput({
                   label={`เอาคำตอบของจุดที่ ${index + 1} ออก`}
                   onPointerDown={event => event.stopPropagation()}
                   onClick={() => { setHeld(null); write([[index, '']]) }}
-                  className="shrink-0"
+                  className="size-11 shrink-0"
                 >
                   <X size={14} />
                 </IconButton>
@@ -520,11 +555,11 @@ export function ImageLabelInput({
       {!tall && (
         <IconButton
           type="button"
-          size="xs"
+          size="sm"
           variant="outline"
           label="ดูรูปเต็มจอ — เหลือแค่รูปกับช่องตอบ"
           onClick={openExpanded}
-          className="absolute top-2 right-2 bg-card/85"
+          className="absolute top-2 right-2 size-11 bg-card/85"
         >
           <Maximize2 size={14} />
         </IconButton>
@@ -709,9 +744,11 @@ export function ImageLabelInput({
           carried to. */}
       {expanded && typeof document !== 'undefined' && createPortal(
         <div
+          ref={dialogRef}
           role="dialog"
           aria-modal="true"
           aria-label="ดูรูปเต็มจอ"
+          tabIndex={-1}
           className="fixed inset-0 z-[55] flex flex-col bg-background"
         >
           <div className="flex shrink-0 items-center gap-3 border-b bg-card px-4 py-2">
@@ -737,13 +774,13 @@ export function ImageLabelInput({
                 onClick={() => setHeadingOpen(open => !open)}
                 aria-expanded={headingOpen}
                 aria-label={headingOpen ? 'ย่อโจทย์' : 'อ่านโจทย์เต็ม'}
-                className="shrink-0"
+                className="min-h-11 shrink-0"
               >
                 <ChevronDown className={cn('transition-transform', headingOpen && 'rotate-180')} />
                 <span className="hidden sm:inline">{headingOpen ? 'ย่อโจทย์' : 'อ่านโจทย์เต็ม'}</span>
               </Button>
             )}
-            <Button type="button" variant="outline" size="sm" onClick={() => setExpanded(false)} className="shrink-0">
+            <Button ref={closeButtonRef} type="button" variant="outline" size="sm" onClick={closeExpanded} className="min-h-11 shrink-0">
               <Minimize2 /> ออก
             </Button>
           </div>

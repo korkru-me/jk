@@ -6,6 +6,7 @@ import { usePathname, useSearchParams } from 'next/navigation'
 import {
   ChevronDown,
   ChevronLeft,
+  BookOpenCheck,
   ClipboardCheck,
   ClipboardList,
   FilePlus2,
@@ -31,6 +32,7 @@ import { Separator } from '@/components/ui/separator'
 import { sidebarSearchKey, useSidebarContext } from './sidebar-context'
 import { SidebarDisplayProvider, SidebarLabel, SidebarSectionLabel, useSidebarCompact } from './sidebar-display'
 import type { UserRole } from '@/lib/types'
+import { useAppFeatureFlags } from './app-feature-flags'
 
 interface NavItem {
   href: string
@@ -53,35 +55,45 @@ function isGroup(entry: NavEntry): entry is NavGroup {
 
 const homeNav: NavItem = { href: '/dashboard', label: 'หน้าหลัก', icon: House }
 
-const teacherNav: NavEntry[] = [
-  homeNav,
-  {
-    label: 'จัดการโจทย์',
-    icon: NotebookPen,
-    children: [
-      { href: '/questions/new', label: 'สร้างโจทย์', icon: FilePlus2 },
-      { href: '/questions/import', label: 'นำเข้าโจทย์', icon: FileUp },
-      { href: '/questions/sets', label: 'คลังโจทย์', icon: LibraryBig },
-    ],
-  },
-  { href: '/classrooms', label: 'ห้องเรียน', icon: School },
-  {
-    label: 'วิจัยการศึกษา',
-    icon: FlaskConical,
-    children: [
-      { href: '/research', label: 'โครงการวิจัย', icon: FolderKanban },
-      { href: '/research/ioc', label: 'ฟอร์ม IOC', icon: ClipboardCheck },
-    ],
-  },
-  { href: '/settings/profile', label: 'ตั้งค่า', icon: Settings },
-]
+function teacherNavigation(practiceLibrary: boolean): NavEntry[] {
+  return [
+    homeNav,
+    {
+      label: 'จัดการโจทย์',
+      icon: NotebookPen,
+      children: [
+        { href: '/questions/new', label: 'สร้างโจทย์', icon: FilePlus2 },
+        { href: '/questions/import', label: 'นำเข้าโจทย์', icon: FileUp },
+        { href: '/questions/sets', label: 'คลังโจทย์', icon: LibraryBig },
+      ],
+    },
+    ...(practiceLibrary
+      ? [{ href: '/practice', label: 'คลังฝึก · ไม่มีคะแนน', icon: BookOpenCheck } satisfies NavItem]
+      : []),
+    { href: '/classrooms', label: 'ห้องเรียน', icon: School },
+    {
+      label: 'วิจัยการศึกษา',
+      icon: FlaskConical,
+      children: [
+        { href: '/research', label: 'โครงการวิจัย', icon: FolderKanban },
+        { href: '/research/ioc', label: 'ฟอร์ม IOC', icon: ClipboardCheck },
+      ],
+    },
+    { href: '/settings/profile', label: 'ตั้งค่า', icon: Settings },
+  ]
+}
 
-const studentNav: NavEntry[] = [
-  homeNav,
-  { href: '/classrooms', label: 'ห้องเรียนของฉัน', icon: School },
-  { href: '/my-submissions', label: 'สรุปงานของฉัน', icon: ClipboardList },
-  { href: '/settings/profile', label: 'ข้อมูลส่วนตัว', icon: UserRound },
-]
+function studentNavigation(practiceLibrary: boolean): NavEntry[] {
+  return [
+    homeNav,
+    { href: '/classrooms', label: 'ห้องเรียนของฉัน', icon: School },
+    ...(practiceLibrary
+      ? [{ href: '/practice', label: 'คลังฝึก · ไม่มีคะแนน', icon: BookOpenCheck } satisfies NavItem]
+      : []),
+    { href: '/my-submissions', label: 'สรุปงานของฉัน', icon: ClipboardList },
+    { href: '/settings/profile', label: 'ข้อมูลส่วนตัว', icon: UserRound },
+  ]
+}
 
 function isNavActive(pathname: string, href: string): boolean {
   if (href === '/dashboard') return pathname === '/dashboard'
@@ -281,13 +293,14 @@ export function Sidebar({
   const [desktopPreviewOpen, setDesktopPreviewOpen] = useState(false)
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const { practiceLibrary } = useAppFeatureFlags()
   const search = sidebarSearchKey(searchParams.toString())
   const previewNavigationOnly = previewNavigationOnlyOverride ?? isAssignmentStudentPreviewPath(pathname)
   const navItems = previewNavigationOnly
     ? [homeNav]
     : role === 'teacher' || role === 'admin'
-      ? teacherNav
-      : studentNav
+      ? teacherNavigation(practiceLibrary)
+      : studentNavigation(practiceLibrary)
   const { contextualSidebar, pendingSidebar, clearPendingSidebar } = useSidebarContext()
   const usesTeacherNavigation = role === 'teacher' || role === 'admin'
   const usesClassroomSidebar = !previewNavigationOnly

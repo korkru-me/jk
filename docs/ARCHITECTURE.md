@@ -111,6 +111,19 @@ Vercel รันโค้ดฝั่ง server ด้วยเขตเวล�
 
 ## เส้นทางข้อมูลหลัก
 
+### คลังฝึกไม่มีคะแนน
+
+1. Server อ่าน `PRACTICE_LIBRARY_ENABLED` แล้วส่งเพียง boolean presentation gate เข้า app shell; sidebar และทางเข้าสร้างจึงไม่อ่าน environment ฝั่ง browser ค่า flag ไม่ใช่สิทธิ์ และ route/action/RPC ยังตรวจ authorization ทุกครั้ง
+2. ทางเข้าจากเมนูมอบหมายลิงก์ตรงไป `/practice/new?classroom=<uuid>` โดยไม่เพิ่มค่าใน `AssignmentType`; lifecycle และตารางของคลังฝึกไม่แตะ assignment/submission
+3. หน้าครู `/practice`, `/practice/new`, `/practice/[id]/edit` ใช้ session-bound client และตรวจเจ้าของห้องหรือ co-teacher `admin/manage`; create/update/duplicate/reorder เป็น RPC แบบ atomic ส่วน owner-private membership เดิมอ่านผ่าน service-only manager RPC ที่ผูก exact actor + library โดยไม่ขยายให้ครูร่วมอ่านคลังส่วนตัวทั้งก้อน
+4. หน้านักเรียน `/practice/[id]` รับ `q`, `tag` ซ้ำ และ `page` ที่ validate แล้ว แล้วเรียก `search_practice_library_questions` หนึ่งครั้งต่อหน้าเพื่อกรองคำค้น + exact multi-tag AND, รวม attempt count และ total ก่อนส่ง allowlisted list DTO 24 แถว; answer-bearing field ไม่อยู่ใน initial RSC payload
+5. หน้ารายข้อใช้ `get_practice_question_for_student` ตรวจ published library, roster และ exact membership ใน statement เดียว จากนั้นสุ่ม/ประเมินคำตอบผ่าน server boundary; browser ส่งคำตอบกับ UUID idempotency key และรับเฉพาะ feedback ของ request ตนเอง ใบรับรองพกเพียง nonce กับ keyed binding ไม่พก seed หรือ raw question revision และ server อนุมาน seed ด้วย HMAC หลังตรวจลายเซ็น
+6. หน้าความคืบหน้า `/practice/[id]/progress` และ `/practice/[id]/progress/[studentId]` ใช้ aggregate RPC แบบแบ่งหน้า 50 แถว รวม append-only event เป็น DTO เฉพาะชื่อ/เลขที่ จำนวนข้อที่เคยตอบ จำนวนครั้ง ชื่อโจทย์และแท็ก ไม่ query raw answer table ของ assignment และไม่มี ranking/default sort ตามจำนวน
+7. คำตอบจับคู่ใน practice ใช้ ephemeral token ที่สร้างจาก `right_text + right_image` ที่นักเรียนเห็น ไม่พก authored index จึงรองรับตัวเลือกที่มีเฉพาะรูปโดยไม่เผย mapping; รูปแบบ `right_text[]` ของ assignment/exam เดิมไม่เปลี่ยน และไม่ต้องมี migration เพิ่ม
+8. query ของคลัง/นักเรียน/progress ต้องอยู่ภายใต้ `org_id` + classroom relation เสมอ; admin client ใช้ได้หลัง server authorization และจำกัด exact IDs เท่านั้น ไม่ใช้ขยายการค้น roster
+
+DTO และ schema contract อยู่ใน `lib/practice-library-contracts.ts`; search/attempt/progress pure helpers มี tests แยก และ release evidence อยู่ใน `docs/SELF_PRACTICE_UAT.md`
+
 ### โจทย์ถึงคะแนน
 
 1. ครูสร้าง `questions` และ optional configuration ตาม `question_type`

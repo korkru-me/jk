@@ -25,6 +25,7 @@ import { Button } from '@/components/ui/button'
 import { canManageAssignment } from '@/lib/auth/assignment-access'
 import { loadAssignmentQuestionsByProvenance } from '@/lib/assignment-question-access.server'
 import { loadAssignmentSettingPresets } from '@/lib/actions/assignment-setting-presets'
+import { isPracticeLibraryEnabled } from '@/lib/practice-question'
 
 interface Props {
   searchParams: Promise<{
@@ -82,6 +83,7 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
   const requestedAssignmentType = resolveAssignmentTypePreset(typeParam)
   const requestedFlow = firstSearchParam(flowValue)
   const copyParam = firstSearchParam(copyValue)
+  const practiceLibraryEnabled = isPracticeLibraryEnabled(process.env)
 
   const supabase = await createClient()
   const user = await getAuthUser()
@@ -321,6 +323,11 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
           backHref={flowHref({})}
           exerciseHref={flowHref({ type: 'exercise' })}
           examHref={flowHref({ type: 'exam' })}
+          practiceHref={practiceLibraryEnabled
+            ? `/practice/new${preselectedClassroomId
+              ? `?${new URLSearchParams({ classroom: preselectedClassroomId })}`
+              : ''}`
+            : undefined}
         />
       </>
     )

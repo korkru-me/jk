@@ -1,7 +1,7 @@
 # แผนพัฒนา “คลังฝึก” แบบไม่มีคะแนน
 
-อัปเดตล่าสุด: 12 ตุลาคม 2026
-สถานะ: เริ่มเฟส 1 แล้ว — มี pure domain contract และ tests; ยังไม่มี schema, route หรือ production UI
+อัปเดตล่าสุด: 13 ตุลาคม 2026
+สถานะ: Phase 1–7 implementation candidate หลัง feature flag; เปิด Production ได้เมื่อ migration/RLS/Staging UAT และ owner sign-off ใน `SELF_PRACTICE_UAT.md` ผ่านเท่านั้น
 
 ## ข้อสรุปการออกแบบ
 
@@ -68,7 +68,7 @@
 - ครูสร้าง แก้ไข ทำสำเนา เผยแพร่ ปิด และลบคลังฝึกตาม lifecycle ที่กำหนด
 - ตั้งชื่อ คำชี้แจง ห้องเรียนเป้าหมาย และเลือกโจทย์จากคลังโจทย์เดิม
 - ใช้แท็กของโจทย์เดิมและแก้แท็กหลายข้อพร้อมกันจาก flow จัดการโจทย์
-- นักเรียนค้นหาจากชื่อ/ข้อความโจทย์ และเลือกแท็กได้ไม่จำกัดจำนวน
+- นักเรียนค้นหาจากชื่อ/ข้อความโจทย์ และเลือกแท็กได้หลายค่า สูงสุด 20 แท็กต่อการค้นหา; UI ต้องแจ้งเพดานและจำนวนแท็กที่ไม่ถูกใช้ ห้ามตัดทิ้งเงียบ ๆ
 - หลายแท็กใช้ความหมาย **ตรงทุกแท็ก (AND)** เป็นค่าเริ่มต้น เช่น `สอวน. ค่าย 1` + `ไฟฟ้า`
 - แสดงแท็กที่เลือกเป็น chip ที่ลบทีละรายการและล้างทั้งหมดได้ พร้อมเก็บ filter ใน URL เพื่อย้อนกลับมาได้
 - ผลลัพธ์แบ่งหน้า หรือใช้การโหลดเพิ่มแบบมีเพดาน ไม่ส่งโจทย์ร้อยกว่าข้อทั้งหมดพร้อม answer-bearing data ตั้งแต่เปิดหน้า
@@ -357,6 +357,16 @@ Acceptance gate:
 - เฟส 3–5 อยู่หลัง feature flag จน student flow และ teacher flow เชื่อมครบ
 - เฟส 6 ห้าม query ตาราง raw answer ของระบบเดิมเพื่อเติมข้อมูลที่ progress ไม่มี
 - เฟส 7 เป็น release gate ไม่ใช่งานเก็บรายละเอียดที่ข้ามได้
+
+## สถานะการส่งมอบรอบ Phase 1–7
+
+- Phase 1: contract “ไม่มีคะแนน”, exact multi-tag AND, accepted-check/idempotency และภาพอ้างอิงถูกตรึงแล้ว
+- Phase 2: schema/RLS/RPC contract กำหนดเป็น 3 ตารางแยกและ service-only accepted-check; สถานะ apply จริงต้องยืนยันจาก migration ledger ของ environment ไม่ใช่จากไฟล์ใน Git
+- Phase 3: ทางเข้าครู, list/create/edit/lifecycle และตัวเลือกโจทย์อยู่หลัง server-only `PRACTICE_LIBRARY_ENABLED`; ไม่เพิ่ม `AssignmentType`
+- Phase 4: student library ใช้ search + tag AND + pagination ใน URL และ list DTO ที่ไม่บรรทุกเฉลย
+- Phase 5: หน้าทำโจทย์ใช้ server evaluator/feedback ส่วนตัวและ append event แบบ idempotent โดยไม่เขียน submission
+- Phase 6: overview/detail progress ใช้ DTO allowlist และปฏิเสธ view-only co-teacher; ไม่มีคะแนน ความถูกต้อง ranking หรือ activity timeline
+- Phase 7: automated/browser/database evidence, viewport QA, performance fixture และ owner sign-off บันทึกใน `docs/SELF_PRACTICE_UAT.md`; ถ้ารายการ release gate ใดยังไม่ผ่าน ให้คง flag ปิดใน Production แม้ code path จะ build ผ่าน
 
 ## Definition of done ของ MVP
 

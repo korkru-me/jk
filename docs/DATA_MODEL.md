@@ -1,6 +1,6 @@
 # Data model และ invariants
 
-อัปเดตล่าสุด: 29 กันยายน 2026
+อัปเดตล่าสุด: 12 ตุลาคม 2026
 
 เอกสารนี้เป็นแผนที่เชิงแนวคิด ไม่ใช่ schema dump ก่อนแก้ฐานข้อมูลต้องอ่าน migration ที่เกี่ยวข้องและตรวจสถานะฐานข้อมูลจริง
 
@@ -52,6 +52,19 @@ Invariant สำคัญ:
 - **การเพิ่ม `post_reads` เคยทำให้ประกาศหายทั้งระบบ** — ตารางนี้มี FK ไปทั้ง `classroom_posts` และ `users` PostgREST จึงเห็นทาง embed `users` จาก `classroom_posts` ได้ 2 ทางและปฏิเสธที่จะเดา (`more than one relationship was found`) query ที่เขียน `users(full_name)` เฉย ๆ เลย error แล้วกลายเป็นรายการว่าง · embed ที่มีตารางเชื่อมแบบนี้ต้องระบุชื่อ FK เช่น `users!classroom_posts_author_id_fkey(full_name)`
 
 ห้อง `homeroom` และ `subject` ใช้ตารางเดียวกัน แต่มี business behavior ต่างกัน
+
+## คลังฝึกด้วยตนเอง
+
+- `practice_libraries` — คลังฝึกหนึ่งห้องต่อแถว มี `org_id`, `classroom_id`, `created_by`, ชื่อ/คำชี้แจง, `status = draft|published|closed`, นโยบาย `reveal_answer_key` และเวลาจากฐาน `published_at`, `closed_at`, `created_at`, `updated_at`; ไม่มีคะแนน กำหนดส่ง เวลา เกณฑ์ผ่าน หรือวิธีคิดคะแนน
+- `practice_library_questions` — สมาชิกโจทย์และ `position` ของคลัง คีย์หลัก `(library_id, question_id)` และ unique `(library_id, position)`; FK คู่ยืนยันว่า accepted-check อ้างได้เฉพาะโจทย์ที่อยู่ใน exact library สมาชิกเปลี่ยนได้เฉพาะ `draft` และการลบโจทย์ต้นทางที่ถูกใช้ต้องไม่ทำลายประวัติแบบเงียบ ๆ
+- `practice_answer_attempts` — append-only accepted-check event มีเพียง `library_id`, `student_id`, `question_id`, `checked_at` จากนาฬิกาฐานข้อมูล และ `idempotency_key`; unique `(library_id, student_id, idempotency_key)` ทำให้ retry ของการกดเดียวกันไม่นับซ้ำ
+- ตาราง event **ห้ามมี** answer payload, answer key, correctness, score, points, verdict, solution หรือ field ที่อนุมานคุณภาพคำตอบได้ จำนวนครั้งคำนวณด้วย `count(*)` และจำนวนข้อที่เคยตอบด้วย `count(distinct question_id)` ไม่เก็บ aggregate counter คู่ขนาน
+- browser ไม่มี direct insert/update/delete บน event; accepted-check เขียนผ่าน `record_practice_answer_attempt(p_actor_id, p_library_id, p_question_id, p_idempotency_key)` ที่ service boundary เรียกหลังตรวจรูปทรงคำตอบ/evaluator แล้ว RPC ตรวจ actor, roster, published library และ membership ซ้ำแบบ atomic
+- read path ที่ต้องรวมข้อมูลใช้ service-only RPC ตาม exact resource: `search_practice_library_questions` (คำค้น/แท็ก AND + count + total), `get_practice_question_for_student`, `get_practice_library_student_progress`, `get_practice_student_question_progress` และ `get_practice_library_questions_for_manager`; browser ไม่ได้สิทธิ์ execute และผลลัพธ์ฝั่งนักเรียน/ครูถูกแปลงเป็น allowlisted DTO ก่อนออกจาก server
+- การสร้าง/แก้ draft/แทนสมาชิก/ทำสำเนา/แก้แท็กหลายข้อใช้ RPC แบบ transaction เดียว จำกัดไม่เกิน 1,000 UUID ไม่ซ้ำ; co-manager รักษาหรือเรียง owner-private membership ที่อยู่ในคลังเดิมได้ แต่เพิ่ม UUID ใหม่ได้เฉพาะโจทย์ที่สิทธิ์ปกติมองเห็น และแก้แท็กได้เฉพาะโจทย์ที่ตนเป็นเจ้าของ
+- เจ้าของห้องและครูร่วม `admin/manage` อ่าน progress ตาม exact classroom ได้; ครูร่วม `view` อ่านได้เฉพาะ metadata library ไม่อ่าน event/roster progress นักเรียนอ่านได้เฉพาะ event ของตนภายใน published library ที่ตนยังอยู่ใน roster
+- ตารางทั้งสามแยกจาก `assignments`, `assignment_classrooms`, `submissions`, `submission_answers`, gradebook, homeroom score และ question statistics; ไม่มี trigger หรือ FK ที่ทำให้ accepted-check กลายเป็นผลการเรียน
+- schema ใน repository ยังไม่เท่ากับ deploy truth: ก่อนเปิด flag ต้องยืนยัน migration ledger ของ environment เป้าหมาย, checksum ของ migration ที่ commit, RLS negative cases และ `supabase db lint` ตาม `docs/SELF_PRACTICE_UAT.md`
 
 ## งานและการส่งคำตอบ
 

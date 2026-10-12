@@ -3,8 +3,10 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { ShellClient, type ShellUser } from '@/components/layout/shell-client'
 import { getAuthUser } from '@/lib/auth/server'
+import { isPracticeLibraryEnabled } from '@/lib/practice-question'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  const practiceLibraryEnabled = isPracticeLibraryEnabled(process.env)
   const supabase = await createClient()
   const authUser = await getAuthUser()
 
@@ -56,10 +58,26 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       .single()
     if (!newProfile) redirect('/login')
     if (newProfile.role !== 'admin' && !newProfile.survey_role) redirect('/complete-profile')
-    return <ShellClient user={newProfile as ShellUser} initialUnreadCount={initialUnreadCount}>{children}</ShellClient>
+    return (
+      <ShellClient
+        user={newProfile as ShellUser}
+        initialUnreadCount={initialUnreadCount}
+        practiceLibraryEnabled={practiceLibraryEnabled}
+      >
+        {children}
+      </ShellClient>
+    )
   }
 
   if (profile.role !== 'admin' && !profile.survey_role) redirect('/complete-profile')
 
-  return <ShellClient user={profile as ShellUser} initialUnreadCount={initialUnreadCount}>{children}</ShellClient>
+  return (
+    <ShellClient
+      user={profile as ShellUser}
+      initialUnreadCount={initialUnreadCount}
+      practiceLibraryEnabled={practiceLibraryEnabled}
+    >
+      {children}
+    </ShellClient>
+  )
 }

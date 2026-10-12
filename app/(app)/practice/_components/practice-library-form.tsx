@@ -1,0 +1,585 @@
+'use client'
+
+import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
+import {
+  Archive,
+  ChevronDown,
+  ChevronUp,
+  CircleAlert,
+  Save,
+  Send,
+  Trash2,
+} from 'lucide-react'
+import { toast } from 'sonner'
+import type { BankQuestion } from '@/lib/question-bank'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { ConfirmDialog, useConfirm } from '@/components/ui/confirm-dialog'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
+import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import { NativeSelect } from '@/components/ui/native-select'
+import { Separator } from '@/components/ui/separator'
+import { Textarea } from '@/components/ui/textarea'
+import { QuestionPicker } from '@/components/assignments/question-picker'
+import {
+  closePracticeLibrary,
+  createPracticeLibrary,
+  deletePracticeLibrary,
+  getPracticeQuestionPreviewDetails,
+  publishPracticeLibrary,
+  updatePracticeLibrary,
+} from '../_actions'
+import {
+  PRACTICE_LIBRARY_STATUS_LABELS,
+  type PracticeClassroomOption,
+  type PracticeLibraryStatus,
+} from '../_lib/teacher-contract'
+import { PracticeBulkTagEditor } from './practice-bulk-tag-editor'
+
+interface InitialPracticeLibrary {
+  id: string
+  title: string
+  description: string | null
+  classroomId: string
+  questionIds: string[]
+  status: PracticeLibraryStatus
+  revealAnswerKey: boolean
+}
+
+interface PracticeLibraryFormProps {
+  classrooms: PracticeClassroomOption[]
+  questions: BankQuestion[]
+  initialClassroomId?: string
+  initialLibrary?: InitialPracticeLibrary
+  missingQuestionIds?: string[]
+  unsupportedQuestionIds?: string[]
+  loadingWarning?: string | null
+  editableQuestionIds?: string[]
+}
+
+function statusBadgeVariant(status: PracticeLibraryStatus) {
+  if (status === 'published') return 'statusSuccess' as const
+  if (status === 'closed') return 'outline' as const
+  return 'secondary' as const
+}
+
+export function PracticeLibraryForm({
+  classrooms,
+  questions,
+  initialClassroomId,
+  initialLibrary,
+  missingQuestionIds = [],
+  unsupportedQuestionIds = [],
+  loadingWarning,
+  editableQuestionIds = [],
+}: PracticeLibraryFormProps) {
+  const previewLibraryId = initialLibrary?.id
+  const loadPracticePreview = useCallback(
+    (ids: readonly string[]) => previewLibraryId
+      ? getPracticeQuestionPreviewDetails(previewLibraryId, ids)
+      : Promise.resolve({ data: [] }),
+    [previewLibraryId],
+  )
+  const router = useRouter()
+  const [confirm, confirmDialog] = useConfirm()
+  const [isPending, startTransition] = useTransition()
+  const [title, setTitle] = useState(initialLibrary?.title ?? '')
+  const [description, setDescription] = useState(initialLibrary?.description ?? '')
+  const [classroomId, setClassroomId] = useState(
+    initialLibrary?.classroomId
+      ?? (classrooms.some(classroom => classroom.id === initialClassroomId)
+        ? initialClassroomId
+        : classrooms[0]?.id)
+      ?? '',
+  )
+  const [selectedIds, setSelectedIds] = useState<string[]>(initialLibrary?.questionIds ?? [])
+  const [revealAnswerKey, setRevealAnswerKey] = useState(initialLibrary?.revealAnswerKey ?? false)
+  const [search, setSearch] = useState('')
+  const [difficulty, setDifficulty] = useState('all')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
+  const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify({
+    title: initialLibrary?.title ?? '',
+    description: initialLibrary?.description ?? '',
+    classroomId: initialLibrary?.classroomId ?? classroomId,
+    selectedIds: initialLibrary?.questionIds ?? [],
+    revealAnswerKey: initialLibrary?.revealAnswerKey ?? false,
+  }))
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+
+  const currentSnapshot = JSON.stringify({
+    title,
+    description,
+    classroomId,
+    selectedIds,
+    revealAnswerKey,
+  })
+  const isDirty = currentSnapshot !== savedSnapshot
+  const membershipFrozen = initialLibrary?.status !== undefined && initialLibrary.status !== 'draft'
+  const initialQuestionIds = initialLibrary?.questionIds ?? []
+  const membershipDirty = Boolean(initialLibrary) && (
+    selectedIds.length !== initialQuestionIds.length
+    || selectedIds.some((id, index) => id !== initialQuestionIds[index])
+  )
+  const editableQuestionIdSet = useMemo(
+    () => new Set(editableQuestionIds),
+    [editableQuestionIds],
+  )
+  const bulkEditableIds = selectedIds.filter(id => editableQuestionIdSet.has(id))
+  const questionById = useMemo(
+    () => new Map(questions.map(question => [question.id, question])),
+    [questions],
+  )
+  const selectedMissingIds = missingQuestionIds.filter(id => selectedIds.includes(id))
+  const selectedUnsupportedIds = unsupportedQuestionIds.filter(id => selectedIds.includes(id))
+  const blockedQuestionIds = [...new Set([...selectedMissingIds, ...selectedUnsupportedIds])]
+  const hasDraftQuestionBlock = !membershipFrozen
+    && (blockedQuestionIds.length > 0 || Boolean(loadingWarning))
+
+  useEffect(() => {
+    if (!isDirty) return
+    const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = true
+    }
+    window.addEventListener('beforeunload', warnBeforeLeaving)
+    return () => window.removeEventListener('beforeunload', warnBeforeLeaving)
+  }, [isDirty])
+
+  function toggleQuestion(id: string) {
+    if (membershipFrozen) return
+    setSelectedIds(current => (
+      current.includes(id) ? current.filter(questionId => questionId !== id) : [...current, id]
+    ))
+  }
+
+  function removeBlockedQuestions() {
+    if (membershipFrozen) return
+    const blocked = new Set(blockedQuestionIds)
+    setSelectedIds(current => current.filter(id => !blocked.has(id)))
+  }
+
+  function moveQuestion(index: number, direction: -1 | 1) {
+    if (membershipFrozen) return
+    setSelectedIds(current => {
+      const target = index + direction
+      if (target < 0 || target >= current.length) return current
+      const next = [...current]
+      ;[next[index], next[target]] = [next[target], next[index]]
+      return next
+    })
+  }
+
+  function runSave(intent: 'draft' | 'publish' = 'draft') {
+    setFieldErrors({})
+    startTransition(async () => {
+      const result = initialLibrary
+        ? await updatePracticeLibrary({
+            libraryId: initialLibrary.id,
+            title,
+            description,
+            questionIds: selectedIds,
+            revealAnswerKey,
+          })
+        : await createPracticeLibrary({
+            title,
+            description,
+            classroomId,
+            questionIds: selectedIds,
+            revealAnswerKey,
+            intent,
+          })
+
+      if (!result.ok) {
+        setFieldErrors(result.fields ?? {})
+        toast.error(result.error)
+        return
+      }
+
+      setSavedSnapshot(currentSnapshot)
+      if (initialLibrary) {
+        toast.success('บันทึกคลังฝึกแล้ว')
+        router.refresh()
+      } else {
+        toast.success(intent === 'publish' ? 'สร้างและเผยแพร่คลังฝึกแล้ว' : 'บันทึกร่างคลังฝึกแล้ว')
+        router.push(`/practice/${result.id}/edit`)
+      }
+    })
+  }
+
+  function runLifecycle(action: 'publish' | 'close') {
+    if (!initialLibrary) return
+    startTransition(async () => {
+      const result = action === 'publish'
+        ? await publishPracticeLibrary({ libraryId: initialLibrary.id })
+        : await closePracticeLibrary({ libraryId: initialLibrary.id })
+      if (!result.ok) {
+        toast.error(result.error)
+        return
+      }
+      toast.success(action === 'publish' ? 'เผยแพร่คลังฝึกแล้ว' : 'ปิดคลังฝึกแล้ว')
+      router.refresh()
+    })
+  }
+
+  async function leaveForm() {
+    if (isDirty) {
+      const shouldLeave = await confirm({
+        title: 'ออกโดยไม่บันทึก?',
+        description: 'ชื่อ คำชี้แจง หรือรายการโจทย์ที่ยังไม่ได้บันทึกจะหายไป',
+        confirmLabel: 'ออกโดยไม่บันทึก',
+        cancelLabel: 'กลับไปแก้ไข',
+        variant: 'destructive',
+      })
+      if (!shouldLeave) return
+    }
+    router.push('/practice')
+  }
+
+  function runDelete() {
+    if (!initialLibrary) return
+    startTransition(async () => {
+      const result = await deletePracticeLibrary({ libraryId: initialLibrary.id })
+      if (!result.ok) {
+        toast.error(result.error)
+        return
+      }
+      toast.success('ลบคลังฝึกแล้ว โจทย์ต้นฉบับยังอยู่ในคลังโจทย์')
+      router.push('/practice')
+    })
+  }
+
+  return (
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-4">
+      <header className="flex min-h-16 flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-bold text-foreground">
+              {initialLibrary ? 'ตั้งค่าคลังฝึก' : 'สร้างคลังฝึก'}
+            </h1>
+            <Badge variant="outline">ไม่มีคะแนน</Badge>
+            {initialLibrary && (
+              <Badge variant={statusBadgeVariant(initialLibrary.status)}>
+                {PRACTICE_LIBRARY_STATUS_LABELS[initialLibrary.status]}
+              </Badge>
+            )}
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            ครูเห็นเพียงข้อที่นักเรียนเคยตอบและจำนวนครั้ง ไม่เห็นคำตอบหรือผลถูกผิด
+          </p>
+        </div>
+        {initialLibrary && (
+          <div className="flex min-h-11 flex-wrap items-center justify-end gap-2">
+            {initialLibrary.status === 'draft' && (
+              <Button
+                type="button"
+                size="sm"
+                className="min-h-11"
+                onClick={() => runLifecycle('publish')}
+                disabled={isPending || isDirty || selectedIds.length === 0 || hasDraftQuestionBlock}
+              >
+                <Send data-icon="inline-start" />
+                เผยแพร่
+              </Button>
+            )}
+            {initialLibrary.status === 'published' && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="min-h-11"
+                onClick={() => runLifecycle('close')}
+                disabled={isPending || isDirty}
+              >
+                <Archive data-icon="inline-start" />
+                ปิดคลังฝึก
+              </Button>
+            )}
+          </div>
+        )}
+      </header>
+
+      <form
+        className="flex flex-col gap-4"
+        onSubmit={event => {
+          event.preventDefault()
+          runSave('draft')
+        }}
+      >
+        <section aria-labelledby="practice-basic-heading" className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 id="practice-basic-heading" className="text-sm font-semibold text-foreground">ข้อมูลพื้นฐาน</h2>
+            {isDirty && <span className="text-xs text-muted-foreground" role="status">มีการแก้ไขที่ยังไม่ได้บันทึก</span>}
+          </div>
+          <FieldGroup className="grid gap-3 md:grid-cols-2">
+            <Field data-invalid={Boolean(fieldErrors.title)}>
+              <FieldLabel htmlFor="practice-title">ชื่อคลังฝึก</FieldLabel>
+              <Input
+                id="practice-title"
+                className="min-h-11"
+                value={title}
+                onChange={event => setTitle(event.target.value)}
+                placeholder="เช่น สอวน. ค่าย 1 · ไฟฟ้า"
+                maxLength={160}
+                required
+                aria-invalid={Boolean(fieldErrors.title)}
+              />
+              <FieldError>{fieldErrors.title?.[0]}</FieldError>
+            </Field>
+            <Field data-invalid={Boolean(fieldErrors.classroomId)}>
+              <FieldLabel htmlFor="practice-classroom">ห้องเรียน</FieldLabel>
+              <NativeSelect
+                id="practice-classroom"
+                className="min-h-11"
+                value={classroomId}
+                onChange={event => setClassroomId(event.target.value)}
+                disabled={Boolean(initialLibrary)}
+                required
+                aria-invalid={Boolean(fieldErrors.classroomId)}
+              >
+                {classrooms.length === 0 && <option value="">ไม่มีห้องเรียนที่จัดการได้</option>}
+                {classrooms.map(classroom => (
+                  <option key={classroom.id} value={classroom.id}>{classroom.name}</option>
+                ))}
+              </NativeSelect>
+              <FieldError>{fieldErrors.classroomId?.[0]}</FieldError>
+            </Field>
+            <Field className="md:col-span-2" data-invalid={Boolean(fieldErrors.description)}>
+              <FieldLabel htmlFor="practice-description">คำชี้แจง</FieldLabel>
+              <Textarea
+                id="practice-description"
+                value={description}
+                onChange={event => setDescription(event.target.value)}
+                rows={2}
+                maxLength={2_000}
+                placeholder="บอกนักเรียนว่าคลังนี้เหมาะกับการฝึกแนวใด"
+                aria-invalid={Boolean(fieldErrors.description)}
+              />
+              <FieldError>{fieldErrors.description?.[0]}</FieldError>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="practice-answer-key">ผลตรวจที่นักเรียนเห็น</FieldLabel>
+              <NativeSelect
+                id="practice-answer-key"
+                className="min-h-11"
+                value={revealAnswerKey ? 'answer_key' : 'feedback_only'}
+                onChange={event => setRevealAnswerKey(event.target.value === 'answer_key')}
+              >
+                <option value="feedback_only">บอกเพียงว่าตรงหรือยังไม่ตรง</option>
+                <option value="answer_key">เฉลยคำตอบหลังตรวจ</option>
+              </NativeSelect>
+            </Field>
+          </FieldGroup>
+        </section>
+
+        <Separator />
+
+        <section aria-labelledby="practice-questions-heading" className="flex min-w-0 flex-col gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <h2 id="practice-questions-heading" className="text-sm font-semibold text-foreground">โจทย์ในคลังฝึก</h2>
+              <Badge variant="secondary">{selectedIds.length} ข้อ</Badge>
+            </div>
+            {membershipFrozen && (
+              <span className="text-xs text-muted-foreground">รายการโจทย์ถูกตรึงหลังเผยแพร่ครั้งแรก</span>
+            )}
+          </div>
+          {(loadingWarning || blockedQuestionIds.length > 0) && (
+            <div
+              role="alert"
+              className="flex flex-wrap items-center gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm"
+            >
+              <CircleAlert className="shrink-0 text-warning-foreground" aria-hidden="true" />
+              <p className="min-w-0 flex-1 text-warning-foreground">
+                {loadingWarning
+                  ?? (selectedMissingIds.length > 0
+                    ? `แสดงรายละเอียดโจทย์เดิมไม่ได้ ${selectedMissingIds.length} ข้อ`
+                    : `มีโจทย์เดิมที่ตรวจอัตโนมัติไม่ได้ ${selectedUnsupportedIds.length} ข้อ`)}
+                {membershipFrozen
+                  ? ' รายการถูกตรึงแล้ว กรุณาตรวจโจทย์ต้นฉบับก่อนเปิดให้นักเรียนใช้ต่อ'
+                  : ' เอาโจทย์เหล่านี้ออกก่อนบันทึกหรือเผยแพร่'}
+              </p>
+              {!membershipFrozen && blockedQuestionIds.length > 0 && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="min-h-11"
+                  onClick={removeBlockedQuestions}
+                >
+                  เอาข้อที่มีปัญหาออก
+                </Button>
+              )}
+            </div>
+          )}
+          {membershipFrozen ? (
+            <div className="max-h-80 overflow-y-auto rounded-lg border border-border" role="list">
+              {selectedIds.map((id, index) => {
+                const question = questionById.get(id)
+                return (
+                  <div
+                    key={id}
+                    role="listitem"
+                    className="flex min-h-11 items-center gap-3 border-b border-border px-3 py-2 last:border-b-0"
+                  >
+                    <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{index + 1}</span>
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium" title={question?.title}>
+                      {question?.title ?? 'โจทย์ที่ไม่สามารถแสดงรายละเอียดได้'}
+                    </span>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {question?.question_type ?? 'ไม่พร้อมใช้'}
+                    </span>
+                  </div>
+                )
+              })}
+              {selectedIds.length === 0 && (
+                <p className="px-3 py-6 text-center text-sm text-muted-foreground">ไม่พบโจทย์ในคลังนี้</p>
+              )}
+            </div>
+          ) : (
+            <QuestionPicker
+              questions={questions}
+              selectedIds={selectedIds}
+              baselineIds={initialLibrary?.questionIds ?? []}
+              onToggle={toggleQuestion}
+              search={search}
+              onSearchChange={setSearch}
+              diffFilter={difficulty}
+              onDiffFilterChange={setDifficulty}
+              showHeader={false}
+              showSelectedFooter={false}
+              surface="plain"
+              collectionNoun="คลังฝึก"
+              loadPreviewQuestions={previewLibraryId ? loadPracticePreview : undefined}
+            />
+          )}
+          {!membershipFrozen && selectedIds.length > 1 && (
+            <Collapsible>
+              <div className="flex min-h-10 flex-wrap items-center justify-between gap-2 border-y border-border py-1.5">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">ลำดับโจทย์</p>
+                  <p className="text-xs text-muted-foreground">นักเรียนเห็นเลขข้อตามลำดับนี้</p>
+                </div>
+                <CollapsibleTrigger
+                  render={<Button type="button" size="sm" variant="outline" className="min-h-11" />}
+                >
+                  จัดลำดับ
+                </CollapsibleTrigger>
+              </div>
+              <CollapsibleContent className="max-h-72 overflow-y-auto py-1">
+                {selectedIds.map((id, index) => {
+                  const question = questionById.get(id)
+                  return (
+                    <div
+                      key={id}
+                      className="flex min-h-11 items-center gap-2 border-b border-border px-1 py-1 last:border-b-0"
+                    >
+                      <span className="w-7 shrink-0 text-center text-xs tabular-nums text-muted-foreground">
+                        {index + 1}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-sm" title={question?.title}>
+                        {question?.title ?? 'โจทย์ที่ไม่สามารถแสดงรายละเอียดได้'}
+                      </span>
+                      <Button
+                        type="button"
+                        size="icon-sm"
+                        variant="ghost"
+                        className="size-11"
+                        aria-label={`เลื่อน ${question?.title ?? `ข้อ ${index + 1}`} ขึ้น`}
+                        disabled={index === 0}
+                        onClick={() => moveQuestion(index, -1)}
+                      >
+                        <ChevronUp />
+                      </Button>
+                      <Button
+                        type="button"
+                        size="icon-sm"
+                        variant="ghost"
+                        className="size-11"
+                        aria-label={`เลื่อน ${question?.title ?? `ข้อ ${index + 1}`} ลง`}
+                        disabled={index === selectedIds.length - 1}
+                        onClick={() => moveQuestion(index, 1)}
+                      >
+                        <ChevronDown />
+                      </Button>
+                    </div>
+                  )
+                })}
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+          <FieldError>{fieldErrors.questionIds?.[0]}</FieldError>
+          {initialLibrary && selectedIds.length > 0 && (
+            <PracticeBulkTagEditor
+              libraryId={initialLibrary.id}
+              questionIds={bulkEditableIds}
+              disabled={membershipDirty || bulkEditableIds.length === 0}
+              disabledReason={membershipDirty
+                ? 'บันทึกรายการโจทย์ก่อนใช้เครื่องมือนี้'
+                : 'บัญชีนี้ไม่มีโจทย์ในคลังที่แก้แท็กได้'}
+              questions={bulkEditableIds.map(id => {
+                const question = questionById.get(id)
+                return { id, title: question?.title ?? 'โจทย์ที่ไม่สามารถแสดงรายละเอียดได้' }
+              })}
+            />
+          )}
+        </section>
+
+        <Separator />
+
+        <footer className="flex min-h-11 flex-wrap items-center justify-between gap-2 pb-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button className="min-h-11" type="button" variant="outline" onClick={leaveForm} disabled={isPending}>ยกเลิก</Button>
+            {initialLibrary?.status === 'draft' && (
+              <Button
+                type="button"
+                variant="destructive"
+                className="min-h-11"
+                onClick={() => setConfirmingDelete(true)}
+                disabled={isPending}
+              >
+                <Trash2 data-icon="inline-start" />
+                ลบคลังฝึก
+              </Button>
+            )}
+          </div>
+          <div className="flex flex-1 flex-wrap items-center justify-end gap-2 sm:flex-none">
+            <Button className="min-h-11" type="submit" variant={initialLibrary ? 'default' : 'outline'} disabled={isPending || !isDirty || !title.trim() || !classroomId || hasDraftQuestionBlock}>
+              <Save data-icon="inline-start" />
+              {isPending ? 'กำลังบันทึก...' : initialLibrary ? 'บันทึก' : 'บันทึกร่าง'}
+            </Button>
+            {!initialLibrary && (
+              <Button
+                type="button"
+                className="min-h-11"
+                onClick={() => runSave('publish')}
+                disabled={isPending || !title.trim() || !classroomId || selectedIds.length === 0 || hasDraftQuestionBlock}
+              >
+                <Send data-icon="inline-start" />
+                สร้างและเผยแพร่
+              </Button>
+            )}
+          </div>
+        </footer>
+      </form>
+
+      {confirmDialog}
+      {initialLibrary?.status === 'draft' && (
+        <ConfirmDialog
+          open={confirmingDelete}
+          onOpenChange={setConfirmingDelete}
+          title={`ลบคลังฝึก “${initialLibrary.title}”?`}
+          description="ร่างและรายการโจทย์ในคลังนี้จะถูกลบ แต่โจทย์ต้นฉบับยังอยู่ในคลังโจทย์"
+          confirmLabel="ลบถาวร"
+          variant="destructive"
+          onConfirm={runDelete}
+        />
+      )}
+    </div>
+  )
+}

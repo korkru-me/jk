@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import {
   ClipboardPenLine,
+  BookOpenCheck,
   Copy,
   Plus,
   Repeat2,
@@ -11,6 +12,7 @@ import { assignmentCreationHref, assignmentReuseHref } from '@/lib/assignment-cr
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useOptionalSidebarContext } from '@/components/layout/sidebar-context'
+import { useAppFeatureFlags } from '@/components/layout/app-feature-flags'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,8 +35,8 @@ interface AssignmentCreationMenuProps {
 }
 
 /**
- * Shared classroom entry point for assigning work. The choice happens in-place;
- * only a terminal action navigates to the reuse tool or the typed creator.
+ * Shared classroom entry point for assignments and no-score self-practice.
+ * Only a terminal action navigates to the destination domain.
  */
 export function AssignmentCreationMenu({
   classroomId,
@@ -48,6 +50,8 @@ export function AssignmentCreationMenu({
   onNavigate,
 }: AssignmentCreationMenuProps) {
   const sidebar = useOptionalSidebarContext()
+  const { practiceLibrary } = useAppFeatureFlags()
+  const practiceHref = `/practice/new?${new URLSearchParams({ classroom: classroomId })}`
   function navigate(href: string) {
     sidebar?.prepareSidebarNavigation(href, classroomId)
     onNavigate?.()
@@ -72,7 +76,7 @@ export function AssignmentCreationMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align={align} className="min-w-56">
         <DropdownMenuGroup>
-          <DropdownMenuLabel>เลือกงานที่ต้องการมอบหมาย</DropdownMenuLabel>
+          <DropdownMenuLabel>เลือกสิ่งที่ต้องการสร้าง</DropdownMenuLabel>
           <DropdownMenuItem
             variant="primary"
             className="py-2"
@@ -94,6 +98,21 @@ export function AssignmentCreationMenu({
             <Repeat2 aria-hidden="true" />
             <span>แบบฝึกหัด</span>
           </DropdownMenuItem>
+          {practiceLibrary && (
+            <DropdownMenuItem
+              variant="primary"
+              className="py-2"
+              render={(
+                <Link
+                  href={practiceHref}
+                  onNavigate={() => navigate(practiceHref)}
+                />
+              )}
+            >
+              <BookOpenCheck aria-hidden="true" />
+              <span>คลังฝึก · ไม่มีคะแนน</span>
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem
             variant="primary"
             className="py-2"

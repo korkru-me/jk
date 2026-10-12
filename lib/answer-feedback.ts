@@ -107,7 +107,7 @@ export interface FeedbackInput {
   revealAnswerKey: boolean
 }
 
-const CHOICE_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ']
+const CHOICE_LABELS = partLabels('thai')
 
 function parseJson<T>(raw: string | null | undefined, fallback: T): T {
   if (!raw) return fallback
@@ -197,7 +197,10 @@ export function buildAnswerFeedback(input: FeedbackInput): AnswerFeedback {
       ? parseJson<{ answer?: string }>(studentAns, {})
       : { answer: studentAns }
     const picked = (payload.answer ?? '').trim()
-    const label = (v: string) => (v === 'true' ? 'ถูก' : v === 'false' ? 'ผิด' : '—')
+    const selectMode = question.extra_data?.answer_mode === 'select_matching'
+    const label = (v: string) => selectMode
+      ? (v === 'true' ? 'เลือก' : v === 'false' ? 'ไม่ได้เลือก' : '—')
+      : (v === 'true' ? 'ถูก' : v === 'false' ? 'ผิด' : '—')
     return {
       ...base,
       rows: [{
@@ -213,7 +216,10 @@ export function buildAnswerFeedback(input: FeedbackInput): AnswerFeedback {
     const correctList = parseJson<string[]>(correctAns.slice(3), [])
     const studentList = parseJson<{ answers?: string[] }>(studentAns, {}).answers ?? []
     const labels = partLabels((question.extra_data?.part_label_style as PartLabelStyle) ?? null)
-    const label = (v: string) => (v === 'true' ? 'ถูก' : v === 'false' ? 'ผิด' : '—')
+    const selectMode = question.extra_data?.answer_mode === 'select_matching'
+    const label = (v: string) => selectMode
+      ? (v === 'true' ? 'เลือก' : v === 'false' ? 'ไม่ได้เลือก' : '—')
+      : (v === 'true' ? 'ถูก' : v === 'false' ? 'ผิด' : '—')
     return {
       ...base,
       rows: correctList.map((correct, i) => ({
@@ -341,11 +347,15 @@ export function buildAnswerFeedback(input: FeedbackInput): AnswerFeedback {
     const correctParts = parseJson<CorrectPart[]>(correctAns.slice(5), [])
     const studentList = parseJson<string[]>(studentAns, [])
     const labels = partLabels((question.extra_data?.part_label_style as PartLabelStyle) ?? null)
+    const displayParts = Array.isArray(question.extra_data?.parts)
+      ? question.extra_data.parts as Array<Record<string, any>>
+      : []
     let hasManual = false
 
     const rows: FeedbackRow[] = correctParts.map((part, i) => {
       const label = labels[i] ?? String(i + 1)
       const student = studentList[i] ?? ''
+      const displayPart = displayParts[i]
 
       // A fill_blank part with no accepted values is its ครูตรวจเอง sub-type.
       if (part.type === 'fill_blank' && Array.isArray(part.correct) && part.correct.length === 0) {
@@ -358,7 +368,7 @@ export function buildAnswerFeedback(input: FeedbackInput): AnswerFeedback {
         const picks = parseJson<string[]>(student, [])
         const matched = targets.filter((t, j) => (picks[j] ?? '').trim() === t).length
         const readable = (list: string[]) =>
-          list.map(v => (v === 'true' ? 'ถูก' : v === 'false' ? 'ผิด' : '—')).join(', ')
+          list.map(v => (v === 'true' ? 'เลือก' : v === 'false' ? 'ไม่ได้เลือก' : '—')).join(', ')
         return {
           label,
           student: picks.length > 0 ? readable(picks) : '—',
@@ -378,10 +388,15 @@ export function buildAnswerFeedback(input: FeedbackInput): AnswerFeedback {
       }
 
       if (part.type === 'mcq') {
+        const readable = (token: string) => {
+          const position = token.startsWith('MCQ:') ? Number.parseInt(token.slice(4), 10) : NaN
+          const text = Number.isSafeInteger(position) ? displayPart?.options?.[position]?.text : null
+          return typeof text === 'string' && stripTags(text) ? stripTags(text) : blank(token)
+        }
         return {
           label,
-          student: blank(student),
-          ...reveal(String(part.correct ?? '—')),
+          student: readable(student),
+          ...reveal(readable(String(part.correct ?? ''))),
           status: rowStatus(student === part.correct),
         }
       }
@@ -404,11 +419,21 @@ export function buildAnswerFeedback(input: FeedbackInput): AnswerFeedback {
         const ok = correctOrder.length > 0
           && studentOrder.length === correctOrder.length
           && correctOrder.every((id, idx) => studentOrder[idx] === id)
-        // The stored order is a list of item ids, which would mean nothing on
-        // screen — the ordering UI itself already shows the sequence.
+        const items = Array.isArray(displayPart?.items)
+          ? displayPart.items as Array<{ id?: unknown; text?: unknown }>
+          : []
+        const textById = new Map(items.flatMap(item => (
+          typeof item.id === 'string' && typeof item.text === 'string'
+            ? [[item.id, stripTags(item.text)] as const]
+            : []
+        )))
+        const readableOrder = (ids: string[]) => ids
+          .map(id => textById.get(id) ?? id)
+          .join(' → ')
         return {
           label,
-          student: studentOrder.length > 0 ? (ok ? 'เรียงถูกต้อง' : 'ยังเรียงไม่ถูก') : '—',
+          student: studentOrder.length > 0 ? readableOrder(studentOrder) : '—',
+          ...reveal(readableOrder(correctOrder)),
           status: rowStatus(ok),
         }
       }
