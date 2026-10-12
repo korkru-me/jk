@@ -103,7 +103,7 @@ import {
   INSTANT_CHECK_SETTING_DESCRIPTION,
   INSTANT_CHECK_SETTING_LABEL,
 } from '@/components/assignments/instant-check-setting-label'
-import { AssignmentSettingHoverLabel } from '@/components/assignments/assignment-setting-hover-label'
+import { AssignmentSettingToggle } from '@/components/assignments/assignment-setting-toggle'
 import { RESULT_VISIBILITY_OPTIONS } from '@/components/assignments/result-visibility-options'
 
 const QuestionPicker = dynamic(
@@ -1790,27 +1790,15 @@ export function CreateAssignmentForm({
                 ) as React.ReactNode,
               }] : []),
             ].map(opt => (
-              <div key={opt.label} className="space-y-1.5">
-                <label className="flex min-h-10 items-center justify-between rounded-xl border border-border px-3 py-2 cursor-pointer transition-colors hover:border-ring">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">
-                      {'descriptionOnHover' in opt && opt.descriptionOnHover
-                        ? <AssignmentSettingHoverLabel label={opt.label} description={opt.desc} />
-                        : opt.label}
-                    </p>
-                    {!('descriptionOnHover' in opt && opt.descriptionOnHover) && (
-                      <p data-assignment-description className="text-xs text-muted-foreground">{opt.desc}</p>
-                    )}
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={opt.value}
-                    onChange={e => opt.set(e.target.checked)}
-                    className="accent-primary w-4 h-4 shrink-0"
-                  />
-                </label>
-                {opt.footer}
-              </div>
+              <AssignmentSettingToggle
+                key={opt.label}
+                label={opt.label}
+                description={opt.desc}
+                descriptionOnHover={'descriptionOnHover' in opt && opt.descriptionOnHover}
+                checked={opt.value}
+                onCheckedChange={opt.set}
+                footer={opt.footer}
+              />
             ))}
             {randomDrawOn && canRepeat && (
               <p data-assignment-description className="text-xs text-muted-foreground px-1">

@@ -559,6 +559,8 @@ export async function updateAssignmentStatus(id: string, status: AssignmentStatu
 interface UpdateAssignmentData {
   title: string
   description: string
+  /** Entry gate for future attempts. NULL removes the gate. */
+  access_code?: string | null
   start_at: string | null
   /** Omit both to leave the late policy unchanged. Supplying only one is
    * refused so an older/stale form cannot silently erase half the policy. */
@@ -570,6 +572,9 @@ interface UpdateAssignmentData {
   score_strategy: ScoreStrategy
   retry_scope?: RetryScope
   questions_per_page?: number | null
+  /** Attempt delivery order. Omit either value to leave it untouched. */
+  shuffle_questions?: boolean
+  shuffle_options?: boolean
   /** Omit either to leave the งาน's answer untouched. */
   instant_check?: boolean
   instant_check_answer_key?: boolean
@@ -631,7 +636,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   // has also made service-role reads safe for co-teacher submission checks.
   const { data: existing } = await supabase
     .from('assignments')
-    .select('created_by, org_id, question_ids, sections, type, mode, status, start_at, due_at, late_bands, end_at, random_question_count, shared_random_seed, calculator_enabled, scratchpad_enabled, secure_browser_mode, android_exam_mode, completion_rule, passing_type, passing_value, streak_target, streak_question_cap, streak_recycle_pool')
+    .select('created_by, org_id, question_ids, sections, type, mode, status, start_at, due_at, late_bands, end_at, random_question_count, shared_random_seed, calculator_enabled, scratchpad_enabled, shuffle_questions, shuffle_options, secure_browser_mode, android_exam_mode, completion_rule, passing_type, passing_value, streak_target, streak_question_cap, streak_recycle_pool')
     .eq('id', id)
     .maybeSingle()
   if (!existing) return { error: 'ไม่พบชุดข้อสอบ' }
@@ -924,11 +929,34 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
     }
   }
 
+  const nextShuffleQuestions = data.shuffle_questions === undefined
+    ? existing.shuffle_questions
+    : data.shuffle_questions
+  const nextShuffleOptions = data.shuffle_options === undefined
+    ? existing.shuffle_options
+    : data.shuffle_options
+  if (
+    nextShuffleQuestions !== existing.shuffle_questions
+    || nextShuffleOptions !== existing.shuffle_options
+  ) {
+    const { data: startedSubmission, error: startedSubmissionError } = await admin
+      .from('submissions')
+      .select('id')
+      .eq('assignment_id', id)
+      .limit(1)
+      .maybeSingle()
+    if (startedSubmissionError) return { error: 'ตรวจสอบสถานะผู้เข้าสอบไม่สำเร็จ กรุณาลองใหม่' }
+    if (startedSubmission) {
+      return { error: 'เปลี่ยนการสลับข้อหรือตัวเลือกไม่ได้หลังมีนักเรียนเริ่มทำแล้ว' }
+    }
+  }
+
   const { error } = await supabase
     .from('assignments')
     .update({
       title: data.title.trim(),
       description: sanitizeRichTextForStorage(data.description.trim()) || null,
+      ...(data.access_code === undefined ? {} : { access_code: data.access_code?.trim() || null }),
       ...(data.show_sections === undefined ? {} : { show_sections: data.show_sections }),
       ...(questionSet ? { question_ids: questionSet.question_ids, sections: questionSet.sections } : {}),
       start_at: data.start_at || null,
@@ -948,6 +976,8 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
             questions_per_page: forced?.questions_per_page
               ?? normalizeQuestionsPerPage(existing.mode, data.questions_per_page),
           }),
+      ...(data.shuffle_questions === undefined ? {} : { shuffle_questions: nextShuffleQuestions }),
+      ...(data.shuffle_options === undefined ? {} : { shuffle_options: nextShuffleOptions }),
       // A streak งาน must keep instant_check on whatever the form sent — the
       // database refuses the row otherwise, and the run has nothing to count.
       // This is also the only path by which a ข้อสอบ gets instant_check.

@@ -1,0 +1,20 @@
+---
+description: Keep creation flows and their later settings/edit surfaces in sync
+globs: "{app/**/*.tsx,components/**/*.tsx,lib/actions/**/*.ts}"
+alwaysApply: false
+---
+
+# Creation and settings parity
+
+When a page creates something that can be adjusted later through a Settings or Edit action, treat the creation flow and the later settings surface as one product contract.
+
+- Before finishing a change to the creation flow, identify its later Settings/Edit surface and compare every editable field, label, default, validation rule, dependency, and locked state.
+- Carry new or changed settings through the complete path: data read, initial state, control, validation, mutation payload, server enforcement, and persisted value.
+- Keep the information order, grouping, terminology, control style, spacing density, and helper/warning treatment recognizably consistent between creation and later editing.
+- Do not copy creation-only choices into Settings when they are intentionally immutable. Instead, omit them or show a clear read-only state, and preserve the server-side restriction.
+- Prefer shared components and shared constants for controls that appear in both flows so later UI changes cannot silently drift.
+- Preserve historical rows with explicit safe defaults, and preserve locks once student/user activity makes a setting unsafe to change.
+- Verify both creation and later settings for every relevant type or mode, including responsive layout, keyboard labels, save feedback, and persisted behavior.
+- Update the relevant architecture, design-system, and feature-status documentation when this contract changes.
+
+Example: if a new assignment option is added to “สร้างข้อสอบ”, also decide whether “ตั้งค่าข้อสอบ” must read and edit it; do not stop after adding only the create payload.

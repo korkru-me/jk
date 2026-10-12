@@ -1,6 +1,6 @@
 # Architecture
 
-อัปเดตล่าสุด: 25 กันยายน 2026
+อัปเดตล่าสุด: 12 ตุลาคม 2026
 
 เอกสารนี้อธิบายสถาปัตยกรรมที่พบใน repository ปัจจุบัน ไม่ใช่การรับรองว่าทุกส่วนถูก deploy หรือผ่านการทดสอบ production แล้ว
 
@@ -59,6 +59,8 @@ App shell มี contextual sidebar registry ฝั่ง client ที่ผู
 ตาม UI-096 view `AssignmentSettingPresetsSave` เป็นปุ่มท้ายฟอร์มที่เปิด controlled `Dialog` สำหรับตั้งชื่อชุดใหม่และจัดการชุดเดิม โดย provider และ state ของรายการ/เป้าหมายบันทึกยัง mount ตลอด wizard เหมือนเดิม การเปิดหรือปิด Dialog จึงเป็นเพียง presentation state ฝั่ง client ไม่เรียก Server Action ไม่แก้ draft และไม่เปลี่ยน payload งาน; `saveTargetId` ยังคงแยกจากชุดที่เรียกใช้อยู่เพื่อไม่ให้การเลือกปลายทางเขียนทับฟอร์ม และการบันทึกชุดไม่ผูกกับ action บันทึกร่างหรือสร้างงาน · outside-press ถูก cancel ที่ controlled root แล้วเปิด `ConfirmDialog` เป็น sibling root เพื่อให้ Dialog หลักและข้อมูลที่กรอกยังอยู่จนกว่าผู้ใช้ยืนยันปิด รวมทั้งคืน focus ได้ตามรูปแบบ dialog แก้ไขอื่นของระบบ
 
 ตาม UI-028/UI-031/UI-115 `ShellClient` วัดกึ่งกลาง element `data-notification-anchor` ใน Topbar ด้วย `ResizeObserver` แล้วเก็บระยะจากขอบขวาไว้ใน CSS custom property ของ shell; selector ที่จำกัดเฉพาะ direct child `.assignment-create-stage`, `.assignment-edit-stage`, `.assignment-waiting-stage` และ `.classroom-create-stage` คำนวณ `max-width` จาก content box กับค่านี้ จึงตรึงขอบขวาไว้ที่กระดิ่งโดยอัตโนมัติเมื่อ sidebar/viewport/topbar actions เปลี่ยน และไม่กระทบหน้าชนิดอื่นหรือ mobile breakpoint
+
+ตาม UI-117 ฟอร์มสร้างงานและฟอร์มตั้งค่างานใช้ `AssignmentSettingToggle` เป็น primitive ร่วมสำหรับแถว on/off และเรียงกลุ่มโดเมนชุดเดียวกัน แม้หน้าสร้างยังเป็น wizard แต่หน้าแก้ไขเป็นฟอร์มต่อเนื่อง · `/assignments/[id]/edit` อ่านและส่ง `access_code`, `shuffle_questions` และ `shuffle_options` ครบเหมือน create; `updateAssignment` อนุญาตให้เปลี่ยนรหัสเข้าของผู้ที่จะเริ่มในอนาคต แต่ตรวจ submission และปฏิเสธการเปลี่ยนการสลับข้อ/ตัวเลือกหลังมี attempt เพื่อไม่ให้คนที่เริ่มก่อนและหลังได้รับรูปแบบต่างกัน · local-only `/exam-screen-lab/assignment-settings` render ฟอร์มจริงด้วย fixture exam/exercise และสถานะ `started=1` โดยไม่อ่านหรือเขียน Supabase
 
 UI-034 เคยให้ browser อัปโหลดรูปหน้าปกไป `question-images/{teacher_id}/classroom-cover_*`; UI-036 ถอด uploader และ renderer ออกจากทุกหน้าห้องเรียนแล้ว แต่ `classroom-meta.ts` ยัง parse/compose URL เก่าและ mutation ยังตรวจ origin, bucket, owner และรูปแบบ path เพื่อให้การแก้ห้องเก่าไม่ทำ metadata สูญหายหรือเปิดทางให้ URL ที่ไม่เชื่อถือได้ · orphan sweep ยังรวม reference จาก description ก่อนลบไฟล์ และ `releaseQuestionFiles` ยังไม่ลบ prefix เดิม
 
