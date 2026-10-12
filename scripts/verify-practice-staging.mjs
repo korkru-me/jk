@@ -1,0 +1,492 @@
+// Authenticated self-practice integration gate for the isolated Korkru Staging
+// project. The runner creates only synthetic rows and always attempts cleanup.
+// It never prints API keys, passwords, tokens, or answer payloads.
+import { randomUUID } from 'node:crypto'
+import { readFileSync, writeFileSync } from 'node:fs'
+import { createClient } from '@supabase/supabase-js'
+import { parseEnvFile } from './check-seb-readiness-core.mjs'
+
+const OFFICIAL_SITE_ORIGIN = 'https://staging.korkru.com'
+const OFFICIAL_PROJECT_REF = 'dyuxkrzeveknqgtuzpbh'
+const CONFIRMATION = 'practice-staging-synthetic'
+const args = new Set(process.argv.slice(2))
+const keepForBrowser = args.has('--keep-for-browser')
+
+function assert(condition, message) {
+  if (!condition) throw new Error(message)
+}
+
+function successful(result, message) {
+  if (result.error) throw new Error(`${message}: ${result.error.code ?? 'request_failed'}`)
+  return result.data
+}
+
+function loadEnvironment() {
+  const parsed = parseEnvFile(
+    readFileSync(new URL('../.env.qa.local', import.meta.url), 'utf8'),
+    process.env,
+  )
+  assert(parsed.warnings.length === 0, 'QA environment file could not be parsed')
+  const inherited = Object.fromEntries(
+    Object.entries(process.env).filter(([, value]) => typeof value === 'string' && value !== ''),
+  )
+  return { ...parsed.values, ...inherited }
+}
+
+function assertExactStaging(environment) {
+  assert(args.has('--execute'), 'Missing --execute')
+  assert(args.has(`--confirm=${CONFIRMATION}`), 'Missing exact synthetic confirmation')
+  assert(environment.EXAM_QA_ENVIRONMENT === 'staging', 'QA environment is not Staging')
+  assert(environment.KORKRU_DEPLOYMENT_ENV === 'staging', 'Deployment is not Staging')
+  assert(environment.VERCEL_ENV === 'preview', 'Deployment is not Vercel Preview')
+  assert(environment.NEXT_PUBLIC_SITE_URL === OFFICIAL_SITE_ORIGIN, 'Unexpected Staging origin')
+  assert(environment.NEXT_PUBLIC_SITE_URL !== environment.EXAM_QA_PRODUCTION_SITE_URL,
+    'Staging and Production site origins must differ')
+  const stagingUrl = new URL(environment.NEXT_PUBLIC_SUPABASE_URL)
+  const productionUrl = new URL(environment.EXAM_QA_PRODUCTION_SUPABASE_URL)
+  assert(stagingUrl.protocol === 'https:', 'Staging Supabase must use HTTPS')
+  assert(stagingUrl.hostname === `${OFFICIAL_PROJECT_REF}.supabase.co`,
+    'Unexpected Staging Supabase project')
+  assert(stagingUrl.hostname !== productionUrl.hostname,
+    'Staging and Production Supabase projects must differ')
+  assert((environment.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '').length >= 20,
+    'Missing Staging anonymous key')
+  assert((environment.SUPABASE_SERVICE_ROLE_KEY ?? '').length >= 20,
+    'Missing Staging secret key')
+}
+
+const environment = loadEnvironment()
+assertExactStaging(environment)
+
+const options = {
+  auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+}
+const admin = createClient(
+  environment.NEXT_PUBLIC_SUPABASE_URL,
+  environment.SUPABASE_SERVICE_ROLE_KEY,
+  options,
+)
+const anonymous = createClient(
+  environment.NEXT_PUBLIC_SUPABASE_URL,
+  environment.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  options,
+)
+
+const runId = randomUUID()
+const runLabel = runId.replaceAll('-', '').slice(0, 12)
+const createdAccounts = []
+const questionIds = []
+let classroomId = null
+let libraryId = null
+let verified = false
+let deferredManifestPath = null
+
+async function createAccount(role, label) {
+  const email = `practice-qa-${runLabel}-${label}@qa.staging.korkru.com`
+  const password = `Qa!${randomUUID()}aA9`
+  const created = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: { full_name: `Practice QA ${label} ${runLabel}`, qa_run: runId },
+  })
+  assert(!created.error && created.data.user, `Could not create synthetic ${label}`)
+  const account = {
+    id: created.data.user.id,
+    label,
+    email,
+    password,
+    orgIds: [],
+    membershipVerified: false,
+    client: createClient(
+      environment.NEXT_PUBLIC_SUPABASE_URL,
+      environment.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      options,
+    ),
+  }
+  createdAccounts.push(account)
+
+  const memberships = await admin
+    .from('organization_members')
+    .select('org_id, org_role')
+    .eq('user_id', account.id)
+  const rows = successful(memberships, `Could not read synthetic ${label} membership`)
+  assert(rows.length === 1 && rows[0].org_role === 'owner',
+    `Unexpected synthetic ${label} organization membership`)
+  account.orgIds = rows.map(row => row.org_id)
+  account.membershipVerified = true
+
+  const profile = await admin
+    .from('users')
+    .update({
+      role,
+      status: 'active',
+      full_name: `Practice QA ${label} ${runLabel}`,
+      survey_role: role,
+      instructor_type: role === 'teacher' ? 'teacher' : null,
+    })
+    .eq('id', account.id)
+    .select('id')
+  assert(successful(profile, `Could not configure synthetic ${label}`).length === 1,
+    `Synthetic ${label} profile was not updated`)
+
+  const login = await account.client.auth.signInWithPassword({ email, password })
+  assert(!login.error && login.data.user?.id === account.id,
+    `Could not authenticate synthetic ${label}`)
+  return account
+}
+
+async function insertQuestions(ownerId, orgId) {
+  for (let start = 1; start <= 1000; start += 100) {
+    const rows = Array.from({ length: Math.min(100, 1001 - start) }, (_, offset) => {
+      const number = start + offset
+      const id = randomUUID()
+      questionIds.push(id)
+      const electricity = number % 2 === 0
+      return {
+        id,
+        org_id: orgId,
+        created_by: ownerId,
+        visibility: 'private',
+        title: `Practice QA ${runLabel} โจทย์ ${number}`,
+        question_text: `<p>โจทย์สังเคราะห์ ${number} ตอบ 1</p>`,
+        question_type: 'written',
+        difficulty: 'medium',
+        subject: 'ฟิสิกส์',
+        tags: electricity
+          ? ['สอวน. ค่าย 1', 'ไฟฟ้า']
+          : ['สอวน. ค่าย 1', 'นิวตัน'],
+        is_random: false,
+        variables: [],
+        logic_rules: [],
+        answer_parts: null,
+        answer_formula: '1',
+        answer_unit: null,
+        answer_tolerance: 0.01,
+        mcq_options: null,
+        extra_data: {},
+        solution_text: '<p>คำตอบสังเคราะห์ 1</p>',
+        solution_image_urls: [],
+        image_urls: [],
+        requires_work_image: false,
+        team_edit_allowed: true,
+        is_research_snapshot: false,
+      }
+    })
+    successful(await admin.from('questions').insert(rows),
+      `Could not insert synthetic questions ${start}-${start + rows.length - 1}`)
+  }
+}
+
+async function cleanup() {
+  let clean = true
+  if (classroomId) {
+    const removedClassroom = await admin.from('classrooms').delete().eq('id', classroomId)
+    if (removedClassroom.error) clean = false
+  }
+  for (let start = 0; start < questionIds.length; start += 100) {
+    const removedQuestions = await admin
+      .from('questions')
+      .delete()
+      .in('id', questionIds.slice(start, start + 100))
+    if (removedQuestions.error) clean = false
+  }
+  for (const account of createdAccounts.toReversed()) {
+    await account.client.auth.signOut().catch(() => undefined)
+    if (!account.membershipVerified) {
+      clean = false
+      continue
+    }
+    for (const orgId of account.orgIds) {
+      const members = await admin
+        .from('organization_members')
+        .select('user_id, org_role')
+        .eq('org_id', orgId)
+      if (members.error || members.data.length !== 1
+        || members.data[0].user_id !== account.id
+        || members.data[0].org_role !== 'owner') {
+        clean = false
+        continue
+      }
+      if ((await admin.from('organizations').delete().eq('id', orgId)).error) clean = false
+    }
+    if ((await admin.auth.admin.deleteUser(account.id)).error) clean = false
+  }
+  if (libraryId) {
+    const remaining = await admin
+      .from('practice_libraries')
+      .select('id')
+      .eq('id', libraryId)
+    if (remaining.error || remaining.data.length !== 0) clean = false
+  }
+  return clean
+}
+
+try {
+  const owner = await createAccount('teacher', 'owner')
+  const coAdmin = await createAccount('teacher', 'co-admin')
+  const coManage = await createAccount('teacher', 'co-manage')
+  const coView = await createAccount('teacher', 'co-view')
+  const studentA = await createAccount('student', 'student-a')
+  const studentB = await createAccount('student', 'student-b')
+  const outsider = await createAccount('student', 'outsider')
+  const foreignTeacher = await createAccount('teacher', 'foreign-teacher')
+  const ownerOrgId = owner.orgIds[0]
+
+  classroomId = randomUUID()
+  successful(await admin.from('classrooms').insert({
+    id: classroomId,
+    org_id: ownerOrgId,
+    teacher_id: owner.id,
+    name: `Practice QA ${runLabel}`,
+    description: 'Synthetic Staging UAT only',
+    class_code: `P${runLabel.slice(0, 5).toUpperCase()}`,
+    status: 'active',
+    classroom_type: 'subject',
+  }), 'Could not create synthetic classroom')
+  successful(await admin.from('classroom_co_teachers').insert([
+    { classroom_id: classroomId, user_id: coAdmin.id, permission: 'admin', invited_by: owner.id },
+    { classroom_id: classroomId, user_id: coManage.id, permission: 'manage', invited_by: owner.id },
+    { classroom_id: classroomId, user_id: coView.id, permission: 'view', invited_by: owner.id },
+  ]), 'Could not attach synthetic co-teachers')
+  successful(await admin.from('classroom_students').insert([
+    { classroom_id: classroomId, student_id: studentA.id, roster_order: 2 },
+    { classroom_id: classroomId, student_id: studentB.id, roster_order: 1 },
+  ]), 'Could not attach synthetic students')
+  successful(await admin.from('student_profiles').upsert([
+    { student_id: studentA.id, class_number: 8 },
+    { student_id: studentB.id, class_number: 3 },
+  ]), 'Could not configure synthetic student profiles')
+
+  await insertQuestions(owner.id, ownerOrgId)
+  const createdLibrary = await owner.client.rpc('create_practice_library', {
+    p_org_id: ownerOrgId,
+    p_classroom_id: classroomId,
+    p_title: `Practice QA ${runLabel} 1,000 questions`,
+    p_description: 'Synthetic Staging UAT only',
+    p_reveal_answer_key: false,
+    p_question_ids: questionIds,
+    p_publish: true,
+  })
+  libraryId = successful(createdLibrary, 'Could not create published practice library')
+  assert(typeof libraryId === 'string', 'Practice library id was not returned')
+
+  const anonymousRead = await anonymous.from('practice_libraries').select('id').eq('id', libraryId)
+  assert(anonymousRead.error?.code === '42501', 'Anonymous practice read was not denied')
+  const outsiderRead = successful(await outsider.client
+    .from('practice_libraries').select('id').eq('id', libraryId),
+  'Outsider library read failed unexpectedly')
+  assert(outsiderRead.length === 0, 'Outsider could see the practice library')
+  const studentRead = successful(await studentA.client
+    .from('practice_libraries').select('id, status').eq('id', libraryId),
+  'Roster student library read failed')
+  assert(studentRead.length === 1 && studentRead[0].status === 'published',
+    'Roster student could not see the published practice library')
+
+  const startedAt = process.hrtime.bigint()
+  const search = await admin.rpc('search_practice_library_questions', {
+    p_actor_id: studentA.id,
+    p_library_id: libraryId,
+    p_terms: ['โจทย์'],
+    p_tags: ['สอวน. ค่าย 1', 'ไฟฟ้า'],
+    p_limit: 24,
+    p_offset: 0,
+  })
+  const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000
+  const searchRows = successful(search, 'Student practice search failed')
+  assert(searchRows.length === 24, 'Student practice search was not page-bounded')
+  assert(searchRows.every(row => Number(row.total_count) === 500),
+    'Student practice search total was not exact')
+  assert(searchRows.every(row => row.tags.includes('สอวน. ค่าย 1') && row.tags.includes('ไฟฟ้า')),
+    'Student practice search did not preserve tag AND semantics')
+  const payloadBytes = Buffer.byteLength(JSON.stringify(searchRows), 'utf8')
+  assert(payloadBytes < 64 * 1024, 'Student practice search payload exceeded 64 KiB')
+  assert(elapsedMs < 5000, 'Student practice search exceeded the 5 second UAT budget')
+
+  const firstQuestionId = searchRows[0].question_id
+  const sameKey = randomUUID()
+  const nextKey = randomUUID()
+  const firstAttempt = successful(await admin.rpc('record_practice_answer_attempt', {
+    p_actor_id: studentA.id,
+    p_library_id: libraryId,
+    p_question_id: firstQuestionId,
+    p_idempotency_key: sameKey,
+  }), 'Could not record first practice attempt')[0]
+  const retryAttempt = successful(await admin.rpc('record_practice_answer_attempt', {
+    p_actor_id: studentA.id,
+    p_library_id: libraryId,
+    p_question_id: firstQuestionId,
+    p_idempotency_key: sameKey,
+  }), 'Could not retry practice attempt')[0]
+  const nextAttempt = successful(await admin.rpc('record_practice_answer_attempt', {
+    p_actor_id: studentA.id,
+    p_library_id: libraryId,
+    p_question_id: firstQuestionId,
+    p_idempotency_key: nextKey,
+  }), 'Could not record second logical practice attempt')[0]
+  assert(firstAttempt.created === true && retryAttempt.created === false
+    && nextAttempt.created === true, 'Practice attempt idempotency failed')
+  successful(await admin.rpc('record_practice_answer_attempt', {
+    p_actor_id: studentB.id,
+    p_library_id: libraryId,
+    p_question_id: firstQuestionId,
+    p_idempotency_key: randomUUID(),
+  }), 'Could not record second student practice attempt')
+
+  const ownAttempts = successful(await studentA.client
+    .from('practice_answer_attempts').select('question_id').eq('library_id', libraryId),
+  'Student own progress read failed')
+  const otherAttempts = successful(await studentB.client
+    .from('practice_answer_attempts').select('question_id').eq('library_id', libraryId),
+  'Second student own progress read failed')
+  const outsideAttempts = successful(await outsider.client
+    .from('practice_answer_attempts').select('question_id').eq('library_id', libraryId),
+  'Outsider progress read failed unexpectedly')
+  assert(ownAttempts.length === 2 && otherAttempts.length === 1 && outsideAttempts.length === 0,
+    'Student progress isolation failed')
+  const directWrite = await studentA.client.from('practice_answer_attempts').insert({
+    library_id: libraryId,
+    student_id: studentA.id,
+    question_id: firstQuestionId,
+    idempotency_key: randomUUID(),
+  })
+  assert(directWrite.error?.code === '42501', 'Student direct attempt write was not denied')
+
+  for (const manager of [owner, coAdmin, coManage]) {
+    const overview = successful(await admin.rpc('get_practice_library_student_progress', {
+      p_actor_id: manager.id,
+      p_library_id: libraryId,
+    }), `Progress overview failed for ${manager.label}`)
+    assert(overview.length === 2
+      && overview.every(row => !('answer' in row) && !('is_correct' in row) && !('score' in row)),
+    `Unsafe or incomplete progress overview for ${manager.label}`)
+  }
+  const viewOnly = await admin.rpc('get_practice_library_student_progress', {
+    p_actor_id: coView.id,
+    p_library_id: libraryId,
+  })
+  assert(viewOnly.error?.code === '42501', 'View-only co-teacher could read roster progress')
+  const foreignProgress = await admin.rpc('get_practice_library_student_progress', {
+    p_actor_id: foreignTeacher.id,
+    p_library_id: libraryId,
+  })
+  assert(foreignProgress.error?.code === '42501', 'Foreign teacher could read roster progress')
+  const outsideSearch = await admin.rpc('search_practice_library_questions', {
+    p_actor_id: outsider.id,
+    p_library_id: libraryId,
+    p_terms: [],
+    p_tags: [],
+    p_limit: 24,
+    p_offset: 0,
+  })
+  assert(outsideSearch.error?.code === '42501', 'Outsider could search the practice library')
+
+  const detail = successful(await admin.rpc('get_practice_student_question_progress', {
+    p_actor_id: owner.id,
+    p_library_id: libraryId,
+    p_student_id: studentA.id,
+    p_query: '',
+    p_limit: 50,
+    p_offset: 0,
+  }), 'Teacher student-detail progress failed')
+  const attempted = detail.find(row => row.question_id === firstQuestionId)
+  assert(attempted && Number(attempted.attempt_count) === 2
+    && !('checked_at' in attempted) && !('answer' in attempted)
+    && !('is_correct' in attempted) && !('score' in attempted),
+  'Teacher detail exposed unsafe data or returned the wrong count')
+
+  const frozenMembership = await owner.client
+    .from('practice_library_questions')
+    .delete()
+    .eq('library_id', libraryId)
+    .eq('question_id', firstQuestionId)
+    .select('question_id')
+  assert(!frozenMembership.error && frozenMembership.data.length === 0,
+    'Published practice membership was not frozen')
+
+  if (!keepForBrowser) {
+    const closed = successful(await owner.client
+      .from('practice_libraries')
+      .update({ status: 'closed' })
+      .eq('id', libraryId)
+      .select('status'),
+    'Could not close the published practice library')
+    assert(closed.length === 1 && closed[0].status === 'closed',
+      'Practice library did not close')
+    const searchAfterClose = await admin.rpc('search_practice_library_questions', {
+      p_actor_id: studentA.id,
+      p_library_id: libraryId,
+      p_terms: [],
+      p_tags: [],
+      p_limit: 24,
+      p_offset: 0,
+    })
+    assert(searchAfterClose.error?.code === '42501', 'Closed library remained searchable')
+  }
+
+  verified = true
+  if (keepForBrowser) {
+    deferredManifestPath = `/private/tmp/korkru-practice-staging-${runLabel}.json`
+    writeFileSync(deferredManifestPath, JSON.stringify({
+      version: 1,
+      target: OFFICIAL_SITE_ORIGIN,
+      projectRef: OFFICIAL_PROJECT_REF,
+      runId,
+      runLabel,
+      classroomId,
+      libraryId,
+      questionIds,
+      accounts: createdAccounts.map(account => ({
+        id: account.id,
+        label: account.label,
+        email: account.email,
+        password: account.password,
+        orgIds: account.orgIds,
+        membershipVerified: account.membershipVerified,
+      })),
+    }), { encoding: 'utf8', mode: 0o600 })
+  }
+  console.log(JSON.stringify({
+    status: 'PASS',
+    environment: 'Korkru Staging',
+    syntheticAccounts: createdAccounts.length,
+    questions: questionIds.length,
+    matchingQuestions: 500,
+    requestDatabaseCalls: 1,
+    returnedRows: searchRows.length,
+    payloadBytes,
+    elapsedMs: Number(elapsedMs.toFixed(2)),
+    checks: [
+      'authenticated role matrix',
+      'tag AND plus pagination',
+      'idempotent append-only progress',
+      'student progress isolation',
+      'teacher-safe progress DTO',
+      'published membership freeze',
+      ...(!keepForBrowser ? ['closed-library denial'] : []),
+    ],
+  }))
+} catch (error) {
+  console.log(JSON.stringify({
+    status: 'FAIL',
+    message: error instanceof Error ? error.message : 'Unknown Staging integration failure',
+  }))
+} finally {
+  if (verified && keepForBrowser && deferredManifestPath) {
+    console.log(JSON.stringify({
+      cleanup: 'DEFERRED_FOR_BROWSER_UAT',
+      manifestPath: deferredManifestPath,
+      syntheticAccounts: createdAccounts.length,
+      syntheticQuestions: questionIds.length,
+    }))
+    process.exitCode = 0
+  } else {
+    const cleanupComplete = await cleanup()
+    console.log(JSON.stringify({
+      cleanup: cleanupComplete ? 'PASS' : 'FAIL',
+      syntheticAccounts: createdAccounts.length,
+      syntheticQuestions: questionIds.length,
+    }))
+    process.exitCode = verified && cleanupComplete ? 0 : 1
+  }
+}
