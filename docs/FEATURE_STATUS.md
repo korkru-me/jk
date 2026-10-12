@@ -1,5 +1,11 @@
 # Feature status
 
+### รวมสถิติและการตั้งค่าไว้ในหัวหน้ารายละเอียดงาน (12 ตุลาคม 2026)
+
+- **UI-112** — ย้ายคำสั่งแก้ไขจากหัวตารางโจทย์ขึ้นไปไว้ใน Card สรุปสีหลักด้านบนและเปลี่ยนเป็น “ตั้งค่าข้อสอบ” หรือ “ตั้งค่าแบบฝึกหัด” ตามชนิดงาน; contextual sidebar ใช้คำเดียวกันแทน “แก้ไขรายละเอียด” จึงไม่เรียกงานสองประเภทปะปนกัน
+- งานที่เผยแพร่หรือปิดแล้วรวม “ส่งแล้ว”, “กำลังทำ”, “คะแนนเฉลี่ย” และแถบ `Progress` ความคืบหน้าการส่งไว้ใน Card สรุปเดียวกับชื่อและกำหนดการ พร้อม layout กะทัดรัด 3 ช่องบน mobile และแถวเดียวบน desktop; นำ Card สถิติเดิมด้านล่างออก ส่วนข้อความรอตรวจคะแนนยังแสดงแยกเฉพาะเมื่อมีงานที่ครูต้องตรวจเอง · ไม่มีการเปลี่ยนการคำนวณคะแนน ข้อมูลการส่ง สิทธิ์ หรือ schema
+- local fixtures `/exam-screen-lab/assignment-detail?type=exam|exercise` และ `/exam-screen-lab/sidebar-navigation?assignmentType=exam|exercise` ยืนยันข้อความตั้งค่าแยกตามชนิดงาน สถิติอยู่ภายใน Card สรุป ไม่มีปุ่มแก้ไขซ้ำในหัวโจทย์ และ viewport 390px ไม่ล้นแนวนอน; axe เฉพาะ Card สรุปไม่พบ violation/incomplete, Next MCP compilation/runtime ไม่พบ error และ React tree ยืนยัน `AssignmentSubmissionSummary`/`Progress` อยู่ใต้ Card เดิม · TypeScript, design-token lint, unit tests 2,981 รายการ และ webpack production build ผ่าน
+
 ### อนุมัติเผยแพร่หน้ารอสอบและตัวอย่างนักเรียนขึ้นเว็บจริง — 12 ตุลาคม 2026
 
 - เจ้าของอนุมัติ merge/deploy เฉพาะ ordinary exam waiting และ teacher preview จาก `c270c40` โดยยังพัก W7; รวม `master` ล่าสุด `7e74dee` แล้วรักษาการนำทาง/หน้าตาและ return types ของฟอร์มห้องเรียนล่าสุด ไม่มีการเปลี่ยน SEB native release, ไฟล์, คีย์, activation flags, alias Staging, สูตรคะแนน หรือ database schema จาก master รอบนี้

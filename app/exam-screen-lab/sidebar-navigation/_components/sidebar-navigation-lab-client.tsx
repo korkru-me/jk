@@ -58,9 +58,10 @@ export function SidebarNavigationLabSource() {
   const [mode, setMode] = useState<'classroom' | 'assignment' | 'global' | 'teaching'>('classroom')
   const searchParams = useSearchParams()
   const previewNavigationOnly = searchParams.get('preview') === '1'
+  const assignmentType = searchParams.get('assignmentType') === 'exercise' ? 'exercise' : 'exam'
   const render = useCallback((onClose?: () => void) => mode === 'global' ? null : mode === 'classroom' ? <LabSidebar onClose={onClose} /> : mode === 'teaching' ? <LabTeachingSidebar onClose={onClose} /> : (
     <AssignmentContextNavigation
-      assignment={{ id: CLASSROOM_ID, classroom_id: CLASSROOM_ID, title: 'ข้อสอบจำลอง', type: 'exam', mode: 'online', status: 'draft', question_ids: ['one'], random_question_count: null, completion_rule: 'fixed', streak_target: null, classrooms: { name: 'ฟิสิกส์ ห้องจำลอง' } }}
+      assignment={{ id: CLASSROOM_ID, classroom_id: CLASSROOM_ID, title: assignmentType === 'exam' ? 'ข้อสอบจำลอง' : 'แบบฝึกหัดจำลอง', type: assignmentType, mode: 'online', status: 'draft', question_ids: ['one'], random_question_count: null, completion_rule: 'fixed', streak_target: null, classrooms: { name: 'ฟิสิกส์ ห้องจำลอง' } }}
       gradeHref={SOURCE}
       studentCount={63}
       pendingCount={5}
@@ -73,7 +74,7 @@ export function SidebarNavigationLabSource() {
       onDelete={() => undefined}
       onClose={onClose}
     />
-  ), [mode])
+  ), [assignmentType, mode])
   useContextualSidebar(SOURCE, render, CLASSROOM_ID)
   const { prepareSidebarNavigation } = useSidebarContext()
   const reuseHref = `${TARGET}?classroom=${CLASSROOM_ID}`

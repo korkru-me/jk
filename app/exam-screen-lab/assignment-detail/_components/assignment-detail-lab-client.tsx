@@ -62,20 +62,24 @@ const assignment: Assignment & { classrooms: { name: string } } = {
 }
 
 const submissions: SubmissionRow[] = Array.from({ length: 63 }, (_, index) => ({
-  id: null,
+  id: index < 25 ? `00000000-0000-4000-f000-${String(index + 1).padStart(12, '0')}` : null,
   student_id: `00000000-0000-4000-e000-${String(index + 1).padStart(12, '0')}`,
-  status: 'not_started',
-  total_score: null,
-  max_score: 0,
-  submitted_at: null,
-  started_at: '1970-01-01T00:00:00.000Z',
+  status: index < 18 ? 'submitted' : index < 25 ? 'in_progress' : 'not_started',
+  total_score: index < 18 ? 14 + (index % 7) : null,
+  max_score: index < 18 ? 20 : 0,
+  submitted_at: index < 18 ? NOW : null,
+  started_at: index < 25 ? NOW : '1970-01-01T00:00:00.000Z',
   users: { full_name: `นักเรียนตัวอย่าง ${index + 1}` },
 }))
 
-export function AssignmentDetailLabClient() {
+export function AssignmentDetailLabClient({ assignmentType = 'exercise' }: { assignmentType?: 'exam' | 'exercise' }) {
   return (
     <AssignmentDetailClient
-      assignment={assignment}
+      assignment={{
+        ...assignment,
+        title: assignmentType === 'exam' ? 'ข้อสอบกลางภาค ฟิสิกส์' : assignment.title,
+        type: assignmentType,
+      }}
       questions={[]}
       submissions={submissions}
       pendingSubmissionIds={[]}
