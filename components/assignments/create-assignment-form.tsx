@@ -1111,7 +1111,7 @@ export function CreateAssignmentForm({
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label>ประกาศในห้องรอ (ไม่บังคับ)</Label>
+              <Label>ชี้แจงรายละเอียดเพิ่มเติม</Label>
               <p className="text-xs text-muted-foreground">
                 นักเรียนจะเห็นข้อความและรูปนี้ก่อนเข้าทำ{assignmentNoun} สามารถพิมพ์ วาง หรือลากรูปลงในช่องได้
               </p>
