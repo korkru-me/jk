@@ -18,6 +18,7 @@ export interface ExamTakingData {
     streak_reached: boolean
   }
   assignment: {
+    type: 'exercise' | 'exam'
     duration_minutes: number | null
     require_work_image: boolean | null
     sections: unknown
@@ -154,6 +155,7 @@ export async function getExamTakingData(submissionId: string): Promise<ExamTakin
       streak_reached: submission.streak_reached === true,
     },
     assignment: {
+      type: assignment.type === 'exercise' ? 'exercise' : 'exam',
       duration_minutes: assignment.duration_minutes,
       require_work_image: assignment.require_work_image,
       sections: assignment.sections,

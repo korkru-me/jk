@@ -37,7 +37,8 @@ beforeEach(() => {
 })
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers() })
 
-describe('ordinary exam page composition (mocked external reads)', () => {
+describe.each(['exam', 'exercise'] as const)('ordinary %s page composition (mocked external reads)', type => {
+  beforeEach(() => m.entry.mockResolvedValue({ waitingRoom: { ...waiting, assignmentType: type } }))
   it.each([undefined, 'foreign-receipt', [receipt]])('default/stale/forged GET %j returns only waiting without exam data', async hint => {
     expect((await page(hint) as ReactElement).type).toBe(m.waiting)
     expect(m.exam).not.toHaveBeenCalled(); expect(m.draw).not.toHaveBeenCalled()
@@ -71,11 +72,9 @@ describe('ordinary exam page composition (mocked external reads)', () => {
     expect((await page(receipt) as ReactElement).type).toBe(m.waiting)
     expect(m.draw).not.toHaveBeenCalled()
   })
-  it('keeps legacy exercise first-draw behavior', async () => {
+  it('fails closed on legacy bare-receipt entry without drawing on GET', async () => {
     m.entry.mockResolvedValue({ submissionId: receipt })
-    m.exam.mockResolvedValueOnce({ assignment: { completion_rule: 'streak' }, answers: [] })
-    m.draw.mockResolvedValue({ success: true })
-    await page()
-    expect(m.draw).toHaveBeenCalledExactlyOnceWith(receipt)
+    await expect(page()).rejects.toThrow('redirect:/assignments')
+    expect(m.draw).not.toHaveBeenCalled(); expect(m.exam).not.toHaveBeenCalled()
   })
 })

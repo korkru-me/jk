@@ -34,6 +34,7 @@ import {
   type AssignmentLateSchedule,
   type AssignmentLateBandInput,
 } from '@/lib/late-submission'
+import { sanitizeRichTextForStorage } from '@/lib/rich-text-sanitize'
 
 const SHOW_RESULTS_MODES: ShowResultsMode[] = ['immediate', 'score_only', 'after_due', 'never']
 
@@ -385,7 +386,7 @@ export async function createAssignment(data: CreateAssignmentData) {
       classroom_id: data.classroom_ids[0],
       created_by: user.id,
       title: data.title.trim(),
-      description: data.description.trim() || null,
+      description: sanitizeRichTextForStorage(data.description.trim()) || null,
       question_ids: questionIds,
       question_points: questionPoints,
       display_max_score: displayMaxScore,
@@ -927,7 +928,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
     .from('assignments')
     .update({
       title: data.title.trim(),
-      description: data.description.trim() || null,
+      description: sanitizeRichTextForStorage(data.description.trim()) || null,
       ...(data.show_sections === undefined ? {} : { show_sections: data.show_sections }),
       ...(questionSet ? { question_ids: questionSet.question_ids, sections: questionSet.sections } : {}),
       start_at: data.start_at || null,

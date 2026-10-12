@@ -34,7 +34,7 @@ import { validateStoredExamAttachmentUrl } from '@/lib/exam-attachment-access.se
 import { loadAssignmentQuestionsByProvenance } from '@/lib/assignment-question-access.server'
 import { completionAttemptLimit, findPassingCompletion } from '@/lib/assignment-completion'
 import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
-import type { ExamWaitingSummary } from '@/lib/exam-waiting-room'
+import { exerciseWaitingDetails, type ExamWaitingSummary } from '@/lib/exam-waiting-room'
 
 export async function startSubmission(
   assignmentId: string,
@@ -44,14 +44,14 @@ export async function startSubmission(
   return submissionEntry(assignmentId, accessCode, sebChallenge)
 }
 
-/** Exams render question-free metadata. Exercises preserve start-on-open. */
+/** Exams and exercises both render question-free metadata before explicit start. */
 export async function readSubmissionEntry(assignmentId: string, sebChallenge?: string) {
-  return submissionEntry(assignmentId, undefined, sebChallenge, { readOnlyExam: true })
+  return submissionEntry(assignmentId, undefined, sebChallenge, { readOnlyWaiting: true })
 }
 
 /** Deliberate waiting-room POST. The predecessor is a stale-view fence only;
  * identity, assignment access, schedule and native session are checked again. */
-export async function startExamFromWaiting(
+export async function startAssignmentFromWaiting(
   assignmentId: string,
   previousSubmissionId: string | null,
   operation: 'start' | 'resume' | 'recover',
@@ -64,13 +64,13 @@ export async function startExamFromWaiting(
     || !['start', 'resume', 'recover'].includes(operation)
     || (operation !== 'start' && previousSubmissionId === null)
     || (accessCode !== undefined && (typeof accessCode !== 'string' || accessCode.length > 256))) {
-    return { error: 'คำขอเริ่มสอบไม่ถูกต้อง กรุณาโหลดหน้ารอสอบใหม่' }
+    return { error: 'คำขอเริ่มทำงานไม่ถูกต้อง กรุณาโหลดหน้ารอใหม่' }
   }
   const result = await submissionEntry(assignmentId, accessCode, sebChallenge, { previousSubmissionId, operation })
   if (result.submissionId && !result.alreadySubmitted && 'requiresStreakDraw' in result && result.requiresStreakDraw) {
     const { data: firstAnswer, error } = await createAdminClient().from('submission_answers')
       .select('id').eq('submission_id', result.submissionId).limit(1).maybeSingle()
-    if (error) return { error: 'ตรวจสอบโจทย์ของรอบเดิมไม่สำเร็จ กรุณาโหลดหน้ารอสอบใหม่' }
+    if (error) return { error: 'ตรวจสอบโจทย์ของรอบเดิมไม่สำเร็จ กรุณาโหลดหน้ารอใหม่' }
     // Draw only the first row of an empty attempt. Resuming a checked,
     // nonempty streak must not allocate the next question or change its score.
     if (!firstAnswer) {
@@ -81,11 +81,19 @@ export async function startExamFromWaiting(
   return result
 }
 
+/** Compatibility for existing exam callers; both paths use the same checks. */
+export async function startExamFromWaiting(
+  assignmentId: string, previousSubmissionId: string | null, operation: 'start' | 'resume' | 'recover',
+  accessCode?: string, sebChallenge?: string,
+) {
+  return startAssignmentFromWaiting(assignmentId, previousSubmissionId, operation, accessCode, sebChallenge)
+}
+
 async function submissionEntry(
   assignmentId: string,
   accessCode?: string,
   sebChallenge?: string,
-  waiting?: { readOnlyExam: true } | { previousSubmissionId: string | null; operation: 'start' | 'resume' | 'recover' },
+  waiting?: { readOnlyWaiting: true } | { previousSubmissionId: string | null; operation: 'start' | 'resume' | 'recover' },
 ) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -126,11 +134,11 @@ async function submissionEntry(
 
   if (!assignment) return { error: 'ไม่พบชุดข้อสอบ' }
 
-  const readOnlyExam = waiting && 'readOnlyExam' in waiting && assignment.type === 'exam'
-  if (waiting && 'previousSubmissionId' in waiting && assignment.type !== 'exam') {
-    return { error: 'หน้ารอสอบใช้สำหรับข้อสอบเท่านั้น' }
+  if (waiting && assignment.type !== 'exam' && assignment.type !== 'exercise') {
+    return { error: 'ประเภทงานไม่รองรับหน้ารอ กรุณาติดต่อครูผู้สอน' }
   }
-  if (!readOnlyExam && assignment.start_at && new Date(assignment.start_at) > new Date()) {
+  const readOnlyWaiting = waiting && 'readOnlyWaiting' in waiting
+  if (!readOnlyWaiting && assignment.start_at && new Date(assignment.start_at) > new Date()) {
     return { error: 'ยังไม่ถึงเวลาเปิดสอบ' }
   }
 
@@ -145,7 +153,7 @@ async function submissionEntry(
   const extension = extensionRes.data
 
   const effectiveEndAt = extension?.extended_end_at ?? assignment.end_at
-  if (!readOnlyExam && effectiveEndAt && new Date(effectiveEndAt) < new Date()) {
+  if (!readOnlyWaiting && effectiveEndAt && new Date(effectiveEndAt) < new Date()) {
     return { error: 'หมดเวลาส่งแล้ว' }
   }
 
@@ -211,7 +219,7 @@ async function submissionEntry(
     }
   }
 
-  if (readOnlyExam) {
+  if (readOnlyWaiting) {
     if (examAccess?.mode === 'seb' && existing?.status === 'in_progress'
       && existing.seb_config_revision !== examAccess.assignmentConfigRevision) {
       return { error: 'ไฟล์ตั้งค่าของรอบสอบนี้ไม่ตรงกัน กรุณาแจ้งครูผู้คุมสอบ' }
@@ -230,11 +238,13 @@ async function submissionEntry(
       completedSubmissionId = passed?.id ?? (limit && existing.attempt_number >= limit ? existing.id : null)
     }
     const blockedReason = assignment.start_at && new Date(assignment.start_at) > new Date()
-      ? 'ยังไม่ถึงเวลาเปิดสอบ กรุณาโหลดหน้านี้ใหม่เมื่อถึงเวลา'
+      ? `ยังไม่ถึงเวลาเปิด${assignment.type === 'exercise' ? 'แบบฝึกหัด' : 'สอบ'} กรุณาโหลดหน้านี้ใหม่เมื่อถึงเวลา`
       : effectiveEndAt && new Date(effectiveEndAt) < new Date()
         ? 'หมดเวลาส่งแล้ว กรุณาติดต่อครูผู้สอน'
         : null
     const summary: ExamWaitingSummary = {
+      assignmentType: assignment.type,
+      ...(assignment.type === 'exercise' ? { exerciseDetails: exerciseWaitingDetails(assignment) } : {}),
       title: assignment.title,
       description: assignment.description ?? null,
       durationMinutes: assignment.duration_minutes ?? null,
@@ -253,7 +263,7 @@ async function submissionEntry(
     return { waitingRoom: summary }
   }
   if (waiting && 'previousSubmissionId' in waiting && (existing?.id ?? null) !== waiting.previousSubmissionId) {
-    return { error: 'รอบสอบเปลี่ยนแล้ว กรุณาโหลดหน้ารอสอบใหม่ก่อนดำเนินการต่อ' }
+    return { error: 'รอบทำงานเปลี่ยนแล้ว กรุณาโหลดหน้ารอใหม่ก่อนดำเนินการต่อ' }
   }
   if (waiting && 'previousSubmissionId' in waiting && waiting.operation !== 'start'
     && existing && existing.status !== 'in_progress') {

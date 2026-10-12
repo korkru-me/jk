@@ -12,7 +12,7 @@ vi.mock('@/lib/exam-access-session', () => ({ getExamAccessSession: m.access }))
 vi.mock('@/lib/seb-assignment-release.server', () => ({ readCurrentAssignmentSebRelease: m.release, createAssignmentSebSignedDownloadUrl: async () => 'https://synthetic.invalid/seed.seb' }))
 vi.mock('@/lib/seb-session', () => ({ createSebChallenge: () => 'challenge', validateSebChallenge: () => null, getSebSession: vi.fn() }))
 
-import { readSubmissionEntry, startExamFromWaiting } from './submissions'
+import { readSubmissionEntry, startAssignmentFromWaiting as startExamFromWaiting } from './submissions'
 import { waitingResumeId, type ExamWaitingSummary } from '@/lib/exam-waiting-room'
 
 /** Real entry/action/grading/snapshot code; external Auth/DB/native boundaries
@@ -121,14 +121,16 @@ beforeEach(() => {
 })
 afterEach(() => { expect(fetch).not.toHaveBeenCalled(); vi.unstubAllGlobals(); vi.useRealTimers() })
 
-describe('question-free exam entry', () => {
+describe.each(['exam', 'exercise'])('question-free %s entry', type => {
+  beforeEach(() => { db.assignments[0].type = type })
   it('GET/prefetch reads safe metadata without allocating, revealing questions or starting time', async () => {
     const first = await summary()
     vi.setSystemTime(NOW + 20 * 60_000)
     expect(await summary()).toEqual(first)
     expect(Object.keys(first).sort()).toEqual(['title', 'description', 'durationMinutes', 'questionCount', 'endAt',
       'accessMode', 'requiresAccessCode', 'previousSubmissionId', 'activeSubmissionId', 'completedSubmissionId',
-      'expired', 'startedAt', 'blockedReason'].sort())
+      'expired', 'startedAt', 'blockedReason', 'assignmentType', ...(type === 'exercise' ? ['exerciseDetails'] : [])].sort())
+    expect(first.assignmentType).toBe(type)
     expect(JSON.stringify(first)).not.toMatch(/must-not-serialize|question_ids|correct_answer|private_secret|access_code|total_score/)
     expect(first.startedAt).toBeNull(); expect(db.submissions).toEqual([])
     noExamMutation()
@@ -220,7 +222,8 @@ describe('question-free exam entry', () => {
   })
 })
 
-describe('deliberate waiting-room POST', () => {
+describe.each(['exam', 'exercise'])('deliberate %s waiting-room POST', type => {
+  beforeEach(() => { db.assignments[0].type = type })
   it('keeps the adjusted passing receipt on explicit start without allocating a retry', async () => {
     Object.assign(db.assignments[0], { passing_type: 'percent', passing_value: 70 })
     db.submissions = [attempt({ status: 'graded', total_score: 6, score_adjustment: 2, max_score: 10 })]
@@ -267,12 +270,11 @@ describe('deliberate waiting-room POST', () => {
     expect(await startExamFromWaiting(A, S, 'recover')).toEqual({ error: 'หมดเวลาส่งแล้ว' })
     noExamMutation()
   })
-  it('rejects exercise use of the exam button but preserves legacy exercise open', async () => {
-    db.assignments[0].type = 'exercise'
+  it('rejects unknown assignment types without mutation', async () => {
+    db.assignments[0].type = 'unknown'
     expect(await startExamFromWaiting(A, null, 'start')).toHaveProperty('error')
+    expect(await readSubmissionEntry(A)).toHaveProperty('error')
     noExamMutation()
-    expect(await readSubmissionEntry(A)).toHaveProperty('submissionId', S)
-    expect(db.submissions).toHaveLength(1)
   })
   it('initializes the first streak question on POST, not on GET', async () => {
     Object.assign(db.assignments[0], { completion_rule: 'streak', streak_target: 1, streak_recycle_pool: true })
@@ -312,6 +314,59 @@ describe('URL resume selection', () => {
     for (const hint of [undefined, null, '', [S], { attempt: S }, 'foreign-or-stale']) expect(waitingResumeId(view, hint)).toBeNull()
     expect(waitingResumeId({ ...view, activeSubmissionId: null }, S)).toBeNull()
     expect(waitingResumeId({ ...view, blockedReason: 'blocked' }, S)).toBeNull()
+    noExamMutation()
+  })
+})
+
+describe('exercise-specific quotas and retry snapshots through explicit start', () => {
+  beforeEach(() => { db.assignments[0].type = 'exercise' })
+  it('legacy unlimited practice remains unlimited but a retry is allocated only on POST', async () => {
+    db.assignments[0].max_attempts = null
+    db.submissions = [attempt({ status: 'submitted', attempt_number: 100 })]
+    const view = await summary()
+    expect(view.exerciseDetails).toMatchObject({ completion: 'complete', maxAttempts: null })
+    expect(view.completedSubmissionId).toBeNull(); noExamMutation()
+    expect(await startExamFromWaiting(A, S, 'start')).toHaveProperty('submissionId', S)
+    expect(db.submissions).toHaveLength(2)
+    expect(db.submissions[1].attempt_number).toBe(101)
+  })
+  it('streak mastery keeps the passing receipt even when a later legacy run failed', async () => {
+    Object.assign(db.assignments[0], { completion_rule: 'streak', streak_target: 3, max_attempts: 1 })
+    db.submissions = [attempt({ status: 'graded', streak_reached: true }),
+      attempt({ id: '70000000-0000-4000-8000-000000000002', status: 'graded', attempt_number: 2, streak_reached: false })]
+    expect((await summary()).completedSubmissionId).toBe(S)
+    expect((await summary()).exerciseDetails).toMatchObject({ completion: 'streak', maxAttempts: null, streakTarget: 3 })
+    expect(await startExamFromWaiting(A, db.submissions[1].id as string, 'start')).toEqual({ submissionId: S, alreadySubmitted: true })
+    noExamMutation()
+  })
+  it('wrong-only retry waits, then carries full marks and re-asks only the missed question', async () => {
+    const Q2 = '60000000-0000-4000-8000-000000000002'
+    Object.assign(db.assignments[0], { retry_scope: 'wrong_only', question_ids: [Q, Q2] })
+    db.submissions = [attempt({ status: 'graded', total_score: 1, max_score: 2 })]
+    const question = { question_type: 'mcq', variables: [], logic_rules: [], answer_formula: null,
+      answer_parts: null, extra_data: {}, mcq_options: [{ text: 'A', is_correct: true }, { text: 'B', is_correct: false }] }
+    m.pool.mockResolvedValue({ questions: [{ ...question, id: Q }, { ...question, id: Q2 }], missingQuestionIds: [], duplicateQuestionCount: 0 })
+    const previous = { submission_id: S, random_values: {}, correct_answer: 'MCQ:0', max_score: 1,
+      teacher_feedback: null, option_order: [0, 1], work_images: [], math_input_modes: {}, score_edited_by: null, score_edited_at: null }
+    db.submission_answers = [{ ...previous, question_id: Q, student_answer: 'MCQ:0', is_correct: true, score: 1, order_index: 0 },
+      { ...previous, question_id: Q2, student_answer: 'MCQ:1', is_correct: false, score: 0, order_index: 1 }]
+    expect((await summary()).exerciseDetails?.retryWrongOnly).toBe(true); noExamMutation()
+    expect(await startExamFromWaiting(A, S, 'start')).toHaveProperty('submissionId', S)
+    expect(db.submissions).toHaveLength(2); expect(db.submissions[1].max_score).toBe(2)
+    const rows = writes.filter(write => write.table === 'submission_answers').map(write => write.row)
+    expect(rows).toHaveLength(2)
+    expect(rows.find(row => row.question_id === Q)).toMatchObject({ carried_over: true, score: 1, max_score: 1, student_answer: 'MCQ:0' })
+    expect(rows.find(row => row.question_id === Q2)).toMatchObject({ carried_over: false, max_score: 1 })
+    // Fresh answer uses the database's NULL default, never the old answer.
+    expect(rows.find(row => row.question_id === Q2)).not.toHaveProperty('student_answer')
+  })
+  it('rechecks roster and schedule on POST even after successful waiting metadata', async () => {
+    await summary(); noExamMutation()
+    m.membership.mockResolvedValue(false)
+    expect(await startExamFromWaiting(A, null, 'start')).toEqual({ error: 'งานนี้ไม่ได้มอบหมายให้คุณ' })
+    m.membership.mockResolvedValue(true)
+    db.assignments[0].start_at = new Date(NOW + 60_000).toISOString()
+    expect(await startExamFromWaiting(A, null, 'start')).toHaveProperty('error')
     noExamMutation()
   })
 })

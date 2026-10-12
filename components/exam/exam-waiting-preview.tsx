@@ -15,7 +15,7 @@ export function ExamWaitingPreviewClient({ assignmentId, summary }: {
     returnHref={`/assignments/${assignmentId}`}
     onReload={() => router.refresh()}
     onStartPreview={() => startTransition(() => {
-      router.push(`/assignments/${assignmentId}/preview?preview=exam`)
+      router.push(`/assignments/${assignmentId}/preview?preview=${summary.assignmentType ?? 'exam'}`)
     })} />
 }
 

@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { drawNextStreakQuestion, readSubmissionEntry } from '@/lib/actions/submissions'
+import { readSubmissionEntry } from '@/lib/actions/submissions'
 import { ExamClient, type ExamConfig } from '@/components/exam/exam-client'
 import { AccessCodeForm } from '@/components/exam/access-code-form'
 import { parseSections } from '@/lib/question-set-sections'
@@ -23,8 +23,8 @@ export default async function TakeExamPage({
   const rawChallenge = query.sebChallenge
   const sebChallenge = typeof rawChallenge === 'string' ? rawChallenge : undefined
 
-  // Exam GET/prefetch never creates or grades an attempt. Only the waiting
-  // room's explicit POST starts one; exercises keep their existing behavior.
+  // Exam/exercise GET/prefetch never creates or grades an attempt. Only the
+  // waiting room's explicit POST starts one.
   const result = await readSubmissionEntry(id, sebChallenge)
 
   if ('unauthenticated' in result && result.unauthenticated) {
@@ -66,17 +66,15 @@ export default async function TakeExamPage({
     redirect(`/submissions/${result.submissionId}`)
   }
 
-  let submissionId = result.submissionId
-  if (result.waitingRoom) {
-    const resumeId = waitingResumeId(result.waitingRoom, query.attempt)
-    if (!resumeId) {
-      return <ExamWaitingClient key={`${id}:${result.waitingRoom.previousSubmissionId ?? 'new'}`}
-        assignmentId={id} summary={result.waitingRoom} sebChallenge={sebChallenge} />
-    }
-    submissionId = resumeId
+  // A bare receipt from an old entry implementation must not restore the
+  // former start-on-GET path. Only current, authorized waiting metadata counts.
+  if (!result.waitingRoom) redirect('/assignments')
+  const submissionId = waitingResumeId(result.waitingRoom, query.attempt)
+  if (!submissionId) {
+    return <ExamWaitingClient key={`${id}:${result.waitingRoom.previousSubmissionId ?? 'new'}`}
+      assignmentId={id} summary={result.waitingRoom} sebChallenge={sebChallenge} />
   }
-  if (!submissionId) redirect('/assignments')
-  let exam = await getExamTakingData(submissionId)
+  const exam = await getExamTakingData(submissionId)
   if (!exam) redirect('/assignments')
   if (result.waitingRoom) {
     // A slow safe-data read may cross the timer/deadline boundary. Do not
@@ -90,30 +88,12 @@ export default async function TakeExamPage({
     }
   }
 
-  // A "ถูกติดต่อกัน" attempt is created with no ข้อ at all — its length is an
-  // outcome, so startSubmission has nothing to freeze. Exam initialization is
-  // now performed by the explicit waiting POST; only legacy exercises draw
-  // here. Both use the same action as the ข้อต่อไป button.
+  // A streak has variable length. Initialize its first row only in the
+  // explicit waiting POST for both exams and exercises, never on GET.
   if (result.waitingRoom && exam.assignment.completion_rule === 'streak' && exam.answers.length === 0) {
     // An interrupted POST may have opened a header before drawing. Resume it
     // deliberately from the waiting room; GET/prefetch must not draw or grade.
     return <ExamWaitingClient assignmentId={id} summary={result.waitingRoom} sebChallenge={sebChallenge} />
-  }
-  if (!result.waitingRoom && exam.assignment.completion_rule === 'streak' && exam.answers.length === 0) {
-    const drawn = await drawNextStreakQuestion(submissionId)
-    if (drawn && 'error' in drawn) {
-      return (
-        <div className="max-w-md mx-auto mt-16 text-center">
-          <p className="text-4xl mb-4">⚠️</p>
-          <p className="text-lg font-semibold text-foreground">{drawn.error}</p>
-          <a href="/assignments" className="text-primary hover:underline text-sm mt-4 inline-block">
-            ← กลับ
-          </a>
-        </div>
-      )
-    }
-    exam = await getExamTakingData(submissionId)
-    if (!exam) redirect('/assignments')
   }
 
   const { assignment, submission, answers, artifacts } = exam
@@ -134,6 +114,7 @@ export default async function TakeExamPage({
   }
 
   const examConfig: ExamConfig = {
+    assignmentType: assignment.type,
     proctoringEnabled: assignment.proctoring_enabled,
     // SEB already owns OS-level kiosk/fullscreen behavior. Asking the DOM to
     // enter fullscreen on top of it causes false overlays on iOS/macOS.

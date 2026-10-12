@@ -1,5 +1,28 @@
 # Feature status
 
+### ประกาศจากครูในห้องรอ — 12 ตุลาคม 2026
+
+- **UI-114** — หน้าสร้างและตั้งค่าข้อสอบ/แบบฝึกหัดเปลี่ยน `assignments.description` เดิมให้เป็น “ประกาศในห้องรอ” แบบ rich text ครูพิมพ์ จัดรูปแบบ วาง/ลาก หรือกดแนบรูป JPG, PNG, WebP, GIF ได้ รูปถูกย่อในเบราว์เซอร์และเก็บใน `question-images` ใต้โฟลเดอร์ของผู้ใช้ ไม่มีคอลัมน์หรือ migration ใหม่ และการทำสำเนา assignment ยังเก็บประกาศเดิม แต่การเริ่มจากแฟ้มโจทย์ไม่ดึงคำอธิบายภายในแฟ้มมาเป็นประกาศให้นักเรียนโดยอัตโนมัติ
+- ห้องรอจริงและ “ดูตัวอย่างนักเรียน” ของทั้งข้อสอบและแบบฝึกหัดแสดง Card “ประกาศจากครู” แยกจากกติกามาตรฐาน รองรับข้อมูล plain text เดิมและ HTML/รูปใหม่; Server Action sanitize ก่อนบันทึกและทุก render sanitize ซ้ำด้วย allowlist เดิม รูปรับเฉพาะ public URL ของ `question-images` ใน Supabase project นี้ ไม่รับ external/data/signed URL หรือ event handler
+- orphan sweep ของ `question-images` ตรวจ `assignments.description` เพิ่มแบบ fail-closed และไม่กรองตามผู้สร้าง assignment เพื่อไม่ลบรูปของครูร่วมที่อัปโหลดในงานที่จัดการร่วมกัน ไฟล์ที่อัปแล้วไม่บันทึกยังอยู่ใน grace period 7 วันก่อนเสนอให้ลบตามกติกาเดิม
+- local Chrome lab ยืนยันทั้ง exam/exercise ว่าช่อง `contenteditable` มีชื่อสำหรับ accessibility และปุ่มแทรกรูป, ห้องรอ 390px แสดงประกาศก่อนกติกาโดยไม่ล้นแนวนอน, axe ห้องรอ 0 violation/0 incomplete และหน้าสร้าง 0 violation (เหลือ contrast incomplete เดิมของวงกลมขั้นตอน 2 จุด), Next MCP compilation/runtime ไม่มี error; unit tests 227 files / 3,062 cases, TypeScript, design-token lint และ production build ผ่าน ไม่มี migration หรือการทดสอบเขียน Storage/ฐานข้อมูลจริง
+
+### หน้ารอเข้าห้องทำแบบฝึกหัด — 12 ตุลาคม 2026 / W7 ยังพัก
+
+- ใช้ `ExamWaitingRoom` ชุดเดียวกับข้อสอบทั้งนักเรียนจริงและ “ดูตัวอย่างนักเรียน” เปลี่ยนชื่อ/ปุ่ม/กติกาเป็นแบบฝึกหัด แสดงเวลา จำนวนข้อ เวลาปิดรับ คำชี้แจง จำนวนครั้งทั้งหมดหรือเกณฑ์ผ่าน/streak วิธีเลือกคะแนน ตรวจรายข้อ ทำซ้ำเฉพาะข้อที่ไม่ได้เต็ม และภาพวิธีทำตามการตั้งค่าจริง ไม่มีการเปิดโจทย์หรือจับเวลาตัวอย่างก่อนกดปุ่ม
+- `readSubmissionEntry` ของทั้ง exam/exercise ส่งเฉพาะ metadata หลัง Auth/roster/native gates; GET/prefetch ไม่สร้าง/grade/draw รอบ ปุ่มใช้ `startAssignmentFromWaiting` ซึ่งตรวจสิทธิ์/กำหนดการ/รหัส/receipt ใหม่และใช้ core เดิม `startExamFromWaiting` เป็น compatibility wrapper Resume ใช้รอบและเวลาเดิม Expired POST ยืนยันผลรอบเดิมเท่านั้น ไม่เปิด successor ในคำขอเดียวกัน ลบ legacy GET first-draw fallback จาก take route แล้ว
+- Teacher preview ตรวจ session + `canManageAssignment` ก่อน metadata/answer-bearing reads และต้องกดนำทาง `?preview=exercise` สำหรับแบบฝึกหัด (`?preview=exam` สำหรับข้อสอบ); scalar query เป็น presentation hint เท่านั้น โหมดตัวอย่างไม่สร้าง submission/บันทึกคะแนนจริง และไม่ตรวจรหัสจริง
+- ตรวจ full suite 225 files / 3,053 tests (focused waiting/details/navigation 6 files / 126 cases) ด้วย mocked Auth/DB/native boundaries พร้อม Chrome shared UI lab: idle 0 simulated requests, explicit start 1 receipt, preview code-required disabled จนกรอกค่า, untimed resume ใช้รอบเดิมไม่อ้างเวลาเดิน, 320px ไม่มี horizontal overflow/ปุ่มถูกตัด, desktop preview และ axe 0 violations/0 incomplete/28 passes Next MCP compilation/runtime ไม่มี errors; ไม่ใช่ hosted authenticated Auth-to-DB หรือ native W7 proof TypeScript/token lint และ guarded TEST-only webpack build ผ่าน
+- ไม่แก้ grading/threshold adjustment/quotas/retry snapshots/instant-check authority/RLS/schema/native SEB files/keys/activation flags ไม่มี migration ใหม่; ordinary header/answers ยังคง separate inserts ไม่อ้าง atomic guarantee หรือ native W7 proof เพิ่ม Branch `codex/exercise-waiting-room` ยังไม่เผยแพร่ Production ระหว่างรอคำตอบเจ้าของว่าจะ deploy หรือดูตัวอย่างก่อน
+- รวม master ล่าสุด `3bb600b` ด้วย merge `f820ea2` แล้ว เก็บ UI-112/Progress/การตั้งค่าบนหัวรายละเอียดงานครบ แก้ conflict เฉพาะเอกสาร Feature status โดยเก็บทั้งสองรายการ; full suite 225 files / 3,053 tests, TypeScript/token lint, guarded TEST-only build และ Chrome/MCP หลังรวมผ่านทั้งหมด ขั้นต่อไปคือเจ้าของเลือกเผยแพร่เว็บจริงหรือดูตัวอย่างก่อน ไม่ต้อง migration หรือเตรียม Windows/native files และยังไม่เริ่ม W7
+
+### เรียงเลขข้อและตรึงคำสั่งท้ายแถบนำทาง (12 ตุลาคม 2026)
+
+- **UI-113** — เมนู “นำทางข้อ” เรียงเลขทุกข้อต่อเนื่องโดยไม่แทรกชื่อแฟ้มย่อย เช่น “คาน”; ชื่อแฟ้มบนการ์ดโจทย์ยังอยู่ตามเดิม เลขย่อและเพิ่มเป็น 5 คอลัมน์เมื่อมีมากกว่า 12 ข้อ และสีข้อปัจจุบันครอบคลุมเฉพาะเลขของทุกข้อที่แสดงอยู่ในหน้าปัจจุบัน
+- ย้ายคำอธิบายสีออกจากกรอบเลขและเรียง 2 รายการต่อแถว ทั้ง desktop และ dialog mobile; เฉพาะกรอบเลขเป็นส่วนที่เลื่อนได้ ส่วนคำอธิบายสี สัญญาณสลับแท็บ และปุ่ม “ส่งคำตอบ” อยู่ค้างด้านล่าง จึงไม่ต้องเลื่อนรายการเลขหรือหน้าไปท้ายสุดเพื่อกดส่ง
+- การนับ/เตือนสลับแท็บตัดสินจากชนิดงานโดยไม่เพิ่ม setting: ข้อสอบจริงตรวจอัตโนมัติทุกครั้ง ส่วนแบบฝึกหัดและ teacher preview ไม่ตรวจ; `proctoring_enabled` ยังคุมเฉพาะห้องคุมสอบสดและการส่งสัญญาณให้ครูตามเดิม ฟอร์มสร้าง/แก้ไขจึงอธิบายว่าการนับในข้อสอบไม่ขึ้นกับสวิตช์ห้องคุมสอบ ไม่มี schema ใหม่
+- local fixture `/exam-screen-lab?perPage=3` ยืนยันที่ 1280×720 ว่าเลข 1–16 ต่อเนื่อง กดข้อ 11 แล้วไฮไลต์เฉพาะ 10–12 และปุ่มส่งอยู่ใน viewport ทั้งก่อน/หลังเลื่อนถึงท้ายหน้า; ที่ 390×844 dialog ไม่มี scroll ทั้งก้อน เลขอยู่ในกรอบเลื่อนของตัวเอง คำอธิบายอยู่ภายนอก 2 คอลัมน์ และปุ่มส่งมองเห็นตลอด · axe เฉพาะแถบนำทาง 0 violation/0 incomplete, Next MCP compilation/runtime ไม่มี error, TypeScript, design-token lint, unit tests 226 files / 3,056 cases และ production build ผ่าน; ไม่มี migration (การตรวจ preflight พบ local migration ที่ยังไม่อยู่ remote หลายรายการ จึงไม่แตะฐานข้อมูลตาม guardrail)
+
 ### รวมสถิติและการตั้งค่าไว้ในหัวหน้ารายละเอียดงาน (12 ตุลาคม 2026)
 
 - **UI-112** — ย้ายคำสั่งแก้ไขจากหัวตารางโจทย์ขึ้นไปไว้ใน Card สรุปสีหลักด้านบนและเปลี่ยนเป็น “ตั้งค่าข้อสอบ” หรือ “ตั้งค่าแบบฝึกหัด” ตามชนิดงาน; contextual sidebar ใช้คำเดียวกันแทน “แก้ไขรายละเอียด” จึงไม่เรียกงานสองประเภทปะปนกัน

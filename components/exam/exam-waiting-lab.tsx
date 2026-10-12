@@ -14,6 +14,11 @@ const base: ExamWaitingSummary = {
   requiresAccessCode: false, previousSubmissionId: null, activeSubmissionId: null,
   completedSubmissionId: null, expired: false, startedAt: null, blockedReason: null,
 }
+const exercise: ExamWaitingSummary = { ...base, assignmentType: 'exercise',
+  title: 'แบบฝึกหัดตัวอย่าง · การเคลื่อนที่', durationMinutes: 60, questionCount: 30,
+  exerciseDetails: { completion: 'complete', maxAttempts: 3, scoreStrategy: 'best',
+    passingType: null, passingValue: null, streakTarget: null, streakQuestionCap: null,
+    retryWrongOnly: false, instantCheck: true, revealCheckAnswer: false, requireWorkImage: false } }
 const cases: Record<string, ExamWaitingSummary> = {
   ready: base,
   code: { ...base, requiresAccessCode: true },
@@ -28,18 +33,29 @@ const cases: Record<string, ExamWaitingSummary> = {
   lost: base,
   preview: base,
   preview_code: { ...base, requiresAccessCode: true },
+  exercise,
+  exercise_untimed: { ...exercise, durationMinutes: null },
+  exercise_code: { ...exercise, requiresAccessCode: true },
+  exercise_active: { ...exercise, durationMinutes: null, previousSubmissionId: receipt, activeSubmissionId: receipt, startedAt: '2026-10-10T03:00:00Z' },
+  exercise_expired: { ...exercise, previousSubmissionId: receipt, expired: true },
+  exercise_completed: { ...exercise, previousSubmissionId: receipt, completedSubmissionId: receipt },
+  exercise_retry: { ...exercise, exerciseDetails: { ...exercise.exerciseDetails!, retryWrongOnly: true } },
+  exercise_threshold: { ...exercise, exerciseDetails: { ...exercise.exerciseDetails!, completion: 'threshold', maxAttempts: null, passingType: 'percent', passingValue: 70 } },
+  exercise_streak: { ...exercise, questionCount: null, exerciseDetails: { ...exercise.exerciseDetails!, completion: 'streak', maxAttempts: null, streakTarget: 3, streakQuestionCap: 10 } },
+  preview_exercise: exercise,
+  preview_exercise_code: { ...exercise, requiresAccessCode: true },
 }
 
 export function ExamWaitingLab() {
   const [mode, setMode] = useState('ready')
   const [starts, setStarts] = useState(0)
-  const [entered, setEntered] = useState('ยังไม่มีการเริ่มหรือส่งรอบสอบ')
+  const [entered, setEntered] = useState('ยังไม่มีการเริ่มหรือส่งรอบทำงาน')
   return <div className="mx-auto flex max-w-2xl flex-col gap-4">
-    <p className="text-sm text-muted-foreground">ตัวอย่าง UI เท่านั้น · ไม่มี Auth/ฐานข้อมูล/SEB จริง ไม่มีการเปิดข้อสอบหรือจับเวลา</p>
+    <p className="text-sm text-muted-foreground">ตัวอย่าง UI เท่านั้น · ไม่มี Auth/ฐานข้อมูล/SEB จริง ไม่มีการเปิดโจทย์หรือจับเวลา</p>
     <FieldGroup><Field>
       <FieldLabel htmlFor="waiting-lab-mode">สถานการณ์ตัวอย่าง</FieldLabel>
       <NativeSelect id="waiting-lab-mode" value={mode} onChange={event => {
-        setMode(event.target.value); setStarts(0); setEntered('ยังไม่มีการเริ่มหรือส่งรอบสอบ')
+        setMode(event.target.value); setStarts(0); setEntered('ยังไม่มีการเริ่มหรือส่งรอบทำงาน')
       }}>
         {Object.keys(cases).map(value => <option key={value} value={value}>{value}</option>)}
       </NativeSelect>
@@ -54,8 +70,8 @@ export function ExamWaitingLab() {
       await new Promise(resolve => setTimeout(resolve, 250))
       if (mode === 'lost') throw new Error('simulated lost response')
       if (mode === 'failure') return { error: 'ตัวอย่าง: เซิร์ฟเวอร์ปฏิเสธคำขอเริ่มสอบ' }
-      if (mode === 'code' && code !== 'TEST') return { error: 'รหัสผ่านไม่ถูกต้อง' }
-      return { submissionId: receipt, alreadySubmitted: mode === 'expired' }
+      if (cases[mode].requiresAccessCode && code !== 'TEST') return { error: 'รหัสผ่านไม่ถูกต้อง' }
+      return { submissionId: receipt, alreadySubmitted: cases[mode].expired }
     }} onEntered={result => setEntered(`ยืนยัน receipt เดิม · ${result.alreadySubmitted ? 'ไปหน้าผลรอบสอบ' : 'ไปหน้าทำข้อสอบ'}`)}
       onReload={() => setEntered('โหลดข้อมูลใหม่เท่านั้น ไม่ส่งคำขอเริ่ม')} />}
   </div>

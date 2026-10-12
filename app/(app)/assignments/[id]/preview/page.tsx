@@ -10,6 +10,7 @@ import { canManageAssignment } from '@/lib/auth/assignment-access'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { loadAssignmentQuestionsByProvenance } from '@/lib/assignment-question-access.server'
 import { ExamWaitingPreviewClient } from '@/components/exam/exam-waiting-preview'
+import { exerciseWaitingDetails } from '@/lib/exam-waiting-room'
 
 export const metadata = { title: 'ตัวอย่างมุมมองนักเรียน — KorKru' }
 
@@ -40,12 +41,14 @@ export default async function AssignmentPreviewPage({
   if (!assignment || !canManage) notFound()
   const a = assignment as Assignment
 
-  // Teacher-only preview has the same question-free entrance as a real exam.
+  // Teacher-only preview has the same question-free entrance as real work.
   // Do not build/load answer-bearing preview props until the teacher explicitly
   // opens the simulated exam. This query is presentation, never student access.
   const query = await searchParams
-  if (a.type === 'exam' && query.preview !== 'exam') {
+  if (query.preview !== a.type) {
     return <ExamWaitingPreviewClient assignmentId={id} summary={{
+      assignmentType: a.type,
+      ...(a.type === 'exercise' ? { exerciseDetails: exerciseWaitingDetails(a) } : {}),
       title: a.title,
       description: a.description,
       durationMinutes: a.duration_minutes,
@@ -56,7 +59,7 @@ export default async function AssignmentPreviewPage({
       requiresAccessCode: Boolean(a.access_code),
       previousSubmissionId: null, activeSubmissionId: null, completedSubmissionId: null,
       expired: false, startedAt: null,
-      blockedReason: a.question_ids.length === 0 ? 'ชุดข้อสอบนี้ยังไม่มีโจทย์' : null,
+      blockedReason: a.question_ids.length === 0 ? `ชุด${a.type === 'exercise' ? 'แบบฝึกหัด' : 'ข้อสอบ'}นี้ยังไม่มีโจทย์` : null,
     }} />
   }
 
@@ -168,6 +171,7 @@ export default async function AssignmentPreviewPage({
   })
 
   const examConfig = {
+    assignmentType: a.type,
     proctoringEnabled: false,
     isFullscreenEnforced: false,
     blockClipboard: false,

@@ -192,7 +192,7 @@ export default async function ClassroomDetailPage({
     for (const s of subRows) {
       attemptsUsed[s.assignment_id] = Math.max(attemptsUsed[s.assignment_id] ?? 0, s.attempt_number)
       // An abandoned in-progress attempt whose timer already ran out gets
-      // force-finalized by startSubmission() on the next visit rather than
+      // finalized only by an explicit waiting-room recovery POST rather than
       // resumed — don't offer "ทำต่อ" for it here either.
       if (s.status === 'in_progress' && !isAttemptExpired(s.started_at, durationByAssignment.get(s.assignment_id) ?? null)) {
         hasInProgress[s.assignment_id] = true

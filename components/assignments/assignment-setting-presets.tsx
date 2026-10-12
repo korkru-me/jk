@@ -59,7 +59,7 @@ const SETTING_LABELS: Record<keyof AssignmentPresetSettings, string> = {
   retry_scope: 'โจทย์ในรอบใหม่', questions_per_page: 'จำนวนข้อต่อหนึ่งหน้า',
   instant_check: 'ตรวจคำตอบทีละข้อ', instant_check_answer_key: 'แสดงเฉลยหลังจากกดตรวจคำตอบ',
   calculator_enabled: 'เครื่องคิดเลข', scratchpad_enabled: 'กระดาษทด',
-  proctoring_enabled: 'ตรวจจับการออกนอกหน้าสอบ', fullscreen_required: 'เต็มหน้าจอ',
+  proctoring_enabled: 'ห้องคุมสอบสด', fullscreen_required: 'เต็มหน้าจอ',
   block_clipboard: 'ป้องกันคัดลอกและวาง', exam_watermark_enabled: 'ลายน้ำข้อสอบ',
   secure_browser_mode: 'เบราว์เซอร์ที่ใช้สอบ', android_exam_mode: 'การสอบบน Android',
   completion_rule: 'เงื่อนไขจบงาน', streak_target: 'จำนวนข้อถูกติดต่อกัน',
