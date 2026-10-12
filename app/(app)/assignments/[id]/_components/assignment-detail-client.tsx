@@ -21,7 +21,6 @@ import { useConfirm } from '@/components/ui/confirm-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Separator } from '@/components/ui/separator'
-import { RichText } from '@/components/ui/rich-text'
 import {
   Table,
   TableBody,
@@ -207,16 +206,6 @@ export function AssignmentDetailClient({
             </div>
             <h1 className="text-xl font-bold leading-tight sm:text-2xl">{a.title}</h1>
             {a.classrooms?.name && <p className="mt-1 text-sm text-foreground/70">ห้องหลัก · {a.classrooms.name}</p>}
-            {a.description && (
-              <Card radius="sm" edge="none" padding="sm" className="mt-2 bg-background/70">
-                <p className="mb-1 text-xs font-medium text-foreground/70">ประกาศในห้องรอ</p>
-                <RichText
-                  text={a.description}
-                  blocks
-                  className="whitespace-pre-wrap break-words text-sm text-foreground/70 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5"
-                />
-              </Card>
-            )}
           </div>
           <Button
             size="sm"

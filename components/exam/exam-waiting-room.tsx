@@ -1,6 +1,17 @@
 'use client'
 
-import { Clock3, Loader2, LogIn } from 'lucide-react'
+import Image from 'next/image'
+import {
+  CalendarClock,
+  Clock3,
+  ListChecks,
+  Loader2,
+  LogIn,
+  Repeat2,
+  Target,
+  Trophy,
+  type LucideIcon,
+} from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
@@ -32,48 +43,99 @@ export function ExamWaitingRoom({ summary, busy, error, code, onCodeChange, onSt
   const round = exercise ? 'รอบทำแบบฝึกหัด' : 'รอบสอบ'
   const details = exercise ? summary.exerciseDetails : undefined
   const actionClassName = 'h-auto min-h-8 whitespace-normal py-1.5'
+  const facts: Array<{ icon: LucideIcon; text: string }> = [
+    {
+      icon: Clock3,
+      text: summary.durationMinutes == null
+        ? 'ไม่จำกัดเวลาต่อรอบ'
+        : `เวลาทำ${task} ${summary.durationMinutes} นาที`,
+    },
+    {
+      icon: ListChecks,
+      text: summary.questionCount == null
+        ? `จำนวนข้อขึ้นอยู่กับเงื่อนไขการทำ${task}`
+        : `ชุด${task}ที่กำหนด ${summary.questionCount} ข้อ`,
+    },
+  ]
+  if (details?.completion === 'streak') {
+    facts.push({ icon: Target, text: `เงื่อนไขจบ: ตอบถูกติดต่อกัน ${details.streakTarget} ข้อ หากตอบผิดจะเริ่มนับใหม่` })
+  } else if (details?.completion === 'threshold') {
+    facts.push({
+      icon: Target,
+      text: `เงื่อนไขผ่าน: ได้คะแนนอย่างน้อย ${details.passingValue}${details.passingType === 'percent' ? '%' : ' คะแนน'} ทำซ้ำได้จนกว่าจะผ่านภายในเวลาปิดรับ`,
+    })
+  } else if (details) {
+    facts.push({
+      icon: Repeat2,
+      text: `จำนวนครั้งที่ทำได้ทั้งหมด: ${details.maxAttempts == null ? 'ไม่จำกัดครั้ง' : `${details.maxAttempts} ครั้ง`}`,
+    })
+  }
+  if (details?.completion === 'complete') {
+    facts.push({
+      icon: Trophy,
+      text: `คะแนนที่ใช้: ${details.scoreStrategy === 'average' ? 'ค่าเฉลี่ยทุกรอบ' : details.scoreStrategy === 'latest' ? 'รอบล่าสุด' : 'รอบที่ได้คะแนนดีที่สุด'}`,
+    })
+  }
+  if (details?.completion === 'streak' && details.streakQuestionCap != null) {
+    facts.push({
+      icon: ListChecks,
+      text: `แต่ละรอบทำได้สูงสุด ${details.streakQuestionCap} ข้อ หากยังไม่ครบเงื่อนไขจะจบรอบเป็นยังไม่ผ่าน`,
+    })
+  }
+  if (summary.endAt) {
+    facts.push({
+      icon: CalendarClock,
+      text: `ปิดรับวันที่ ${new Date(summary.endAt).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}`,
+    })
+  }
+
   return (
-    <Card padding="xl" className="mx-auto flex w-full max-w-2xl flex-col gap-6">
-      <header className="flex flex-col gap-2">
+    <Card padding="lg" className="assignment-waiting-stage relative isolate flex w-full max-w-5xl flex-col gap-4 overflow-hidden">
+      <Image
+        src="/brand/deer-mark.svg"
+        alt=""
+        aria-hidden="true"
+        width={585}
+        height={1045}
+        loading="eager"
+        className="pointer-events-none absolute right-8 top-5 -z-10 hidden h-72 w-auto opacity-5 md:block dark:brightness-0 dark:invert"
+      />
+      <header className="flex max-w-3xl flex-col gap-1.5 md:pr-52">
         <p className="text-sm font-medium text-primary">หน้ารอเข้า{room}{summary.accessMode === 'seb' ? ' · Safe Exam Browser' : ''}</p>
-        <h1 className="text-2xl font-semibold text-foreground">{summary.title}</h1>
-        {previewMode && <p className="text-sm text-muted-foreground">มุมมองตัวอย่างสำหรับครู · ไม่สร้าง{round} ไม่บันทึกคำตอบหรือคะแนนจริง และไม่ตรวจ{exercise ? `รหัสเข้าทำ${task}จริง` : 'เครื่อง SEB หรือรหัสเข้าทำข้อสอบจริง'}</p>}
+        <h1 className="text-2xl font-semibold leading-tight text-foreground sm:text-3xl">{summary.title}</h1>
+        {previewMode && <p className="text-sm leading-5 text-muted-foreground">มุมมองตัวอย่างสำหรับครู · ไม่สร้าง{round} ไม่บันทึกคำตอบหรือคะแนนจริง และไม่ตรวจ{exercise ? `รหัสเข้าทำ${task}จริง` : 'เครื่อง SEB หรือรหัสเข้าทำข้อสอบจริง'}</p>}
       </header>
+      <Separator />
       <section aria-label={`ข้อมูลก่อนเข้า${room}`} className="flex flex-col gap-3">
-        <p className="flex items-center gap-2 text-sm">
-          <Clock3 className="size-5 text-muted-foreground" aria-hidden="true" />
-          {summary.durationMinutes == null ? 'ไม่จำกัดเวลาต่อรอบ' : `เวลาทำ${task} ${summary.durationMinutes} นาที`}
-        </p>
-        <p className="text-sm text-muted-foreground">
-          {summary.questionCount == null ? `จำนวนข้อขึ้นอยู่กับเงื่อนไขการทำ${task}` : `ชุด${task}ที่กำหนด ${summary.questionCount} ข้อ`}
-        </p>
-        {details && <>
-          <p className="text-sm text-muted-foreground">
-            {details.completion === 'streak' ? `เงื่อนไขจบ: ตอบถูกติดต่อกัน ${details.streakTarget} ข้อ หากตอบผิดจะเริ่มนับใหม่`
-              : details.completion === 'threshold' ? `เงื่อนไขผ่าน: ได้คะแนนอย่างน้อย ${details.passingValue}${details.passingType === 'percent' ? '%' : ' คะแนน'} ทำซ้ำได้จนกว่าจะผ่านภายในเวลาปิดรับ`
-                : `จำนวนครั้งที่ทำได้ทั้งหมด: ${details.maxAttempts == null ? 'ไม่จำกัดครั้ง' : `${details.maxAttempts} ครั้ง`}`}
-          </p>
-          {details.completion === 'complete' && <p className="text-sm text-muted-foreground">คะแนนที่ใช้: {details.scoreStrategy === 'average' ? 'ค่าเฉลี่ยทุกรอบ' : details.scoreStrategy === 'latest' ? 'รอบล่าสุด' : 'รอบที่ได้คะแนนดีที่สุด'}</p>}
-          {details.completion === 'streak' && details.streakQuestionCap != null && <p className="text-sm text-muted-foreground">แต่ละรอบทำได้สูงสุด {details.streakQuestionCap} ข้อ หากยังไม่ครบเงื่อนไขจะจบรอบเป็นยังไม่ผ่าน</p>}
-        </>}
-        {summary.endAt && <p className="text-sm text-muted-foreground">ปิดรับวันที่ {new Date(summary.endAt).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}</p>}
-        <p role="status" className="text-sm font-medium">
+        <div className="grid gap-x-6 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
+          {facts.map(({ icon: Icon, text }) => (
+            <p key={text} className="flex items-start gap-2 text-sm text-muted-foreground">
+              <Icon className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+              <span>{text}</span>
+            </p>
+          ))}
+        </div>
+        <Card role="status" radius="sm" edge="none" padding="sm" className="bg-muted/60 text-sm font-medium">
           {summary.completedSubmissionId ? `ทำ${task}ครบตามเงื่อนไขแล้ว สามารถดูผลรอบเดิมได้`
             : summary.expired ? 'รอบเดิมหมดเวลาทำแล้ว กดตรวจสอบเพื่อยืนยันผลรอบเดิม โดยยังไม่เริ่มรอบใหม่'
               : active ? summary.durationMinutes == null ? `รอบนี้เริ่มทำ${task}แล้ว การกลับเข้าหน้านี้จะทำต่อในรอบเดิม ไม่เปิดรอบใหม่`
                 : `รอบนี้เริ่มทำ${task}แล้ว เวลายังเดินต่อจากเวลาเริ่มเดิม การกลับเข้าหน้านี้ไม่เริ่มเวลาใหม่`
                 : `ยังไม่เปิดโจทย์ และยังไม่เริ่ม${summary.durationMinutes == null ? `ทำ${task}` : 'จับเวลา'} เมื่อพร้อมแล้วจึงกดเข้า${room}`}
-        </p>
-        {summary.accessMode === 'seb' && <p className="text-sm text-muted-foreground">ใช้การตั้งค่า SEB ที่ผ่านการตรวจแล้ว กรณีฉุกเฉินให้ติดต่อครูเพื่อขอรหัสออก</p>}
-        {summary.accessMode === 'android_monitored' && <p className="text-sm text-muted-foreground">ใช้โหมด Android ที่ครูอนุมัติ ไม่ใช่ Safe Exam Browser</p>}
-        {summary.blockedReason && <p role="alert" className="text-sm text-destructive">{summary.blockedReason}</p>}
-        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+        </Card>
+        {(summary.accessMode === 'seb' || summary.accessMode === 'android_monitored' || summary.blockedReason || error) && (
+          <div className="flex flex-col gap-1">
+            {summary.accessMode === 'seb' && <p className="text-sm text-muted-foreground">ใช้การตั้งค่า SEB ที่ผ่านการตรวจแล้ว กรณีฉุกเฉินให้ติดต่อครูเพื่อขอรหัสออก</p>}
+            {summary.accessMode === 'android_monitored' && <p className="text-sm text-muted-foreground">ใช้โหมด Android ที่ครูอนุมัติ ไม่ใช่ Safe Exam Browser</p>}
+            {summary.blockedReason && <p role="alert" className="text-sm text-destructive">{summary.blockedReason}</p>}
+            {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+          </div>
+        )}
       </section>
       {summary.description && <>
         <Separator />
         <section aria-labelledby="exam-waiting-announcement">
-          <Card radius="md" edge="none" padding="md" className="flex flex-col gap-2 bg-primary/10">
-            <h2 id="exam-waiting-announcement" className="text-lg font-semibold text-foreground">ประกาศจากครู</h2>
+          <Card radius="md" edge="none" padding="md" className="flex flex-col gap-1.5 bg-primary/10">
+            <h2 id="exam-waiting-announcement" className="text-lg font-semibold text-foreground">คำชี้แจง</h2>
             <RichText
               text={summary.description}
               blocks
@@ -83,9 +145,9 @@ export function ExamWaitingRoom({ summary, busy, error, code, onCodeChange, onSt
         </section>
       </>}
       <Separator />
-      <section aria-labelledby="exam-waiting-rules" className="flex flex-col gap-3">
+      <section aria-labelledby="exam-waiting-rules" className="flex flex-col gap-2.5">
         <h2 id="exam-waiting-rules" className="text-lg font-semibold">กติกาก่อนเข้า{room}</h2>
-        <ul className="flex list-disc flex-col gap-2 pl-5 text-sm text-muted-foreground">
+        <ul className="grid list-disc gap-x-8 gap-y-2 pl-5 text-sm text-muted-foreground md:grid-cols-2">
           <li>อ่านคำชี้แจงและเตรียมอุปกรณ์ให้พร้อม แล้วจึงกดเข้า{room}</li>
           <li>{summary.completedSubmissionId ? `รอบเดิมสิ้นสุดแล้ว การดูผลไม่เริ่ม${round}ใหม่`
             : summary.expired ? 'รอบเดิมหมดเวลาแล้ว การตรวจสอบผลยืนยันเฉพาะรอบเดิม ไม่เริ่มรอบใหม่'
@@ -100,12 +162,12 @@ export function ExamWaitingRoom({ summary, busy, error, code, onCodeChange, onSt
           <li>หากพบปัญหาระหว่าง{exercise ? 'ทำแบบฝึกหัด ให้แจ้งครูผู้สอน' : 'สอบ ให้แจ้งครูผู้คุมสอบ'}ก่อนดำเนินการต่อ</li>
         </ul>
       </section>
-      <form className="flex flex-col gap-4" onSubmit={event => {
+      <form className="flex flex-col gap-3" onSubmit={event => {
         event.preventDefault()
         if (!busy && !summary.blockedReason && !summary.completedSubmissionId
           && (!summary.requiresAccessCode || code.trim())) onStart()
       }}>
-        {summary.requiresAccessCode && <FieldGroup>
+        {summary.requiresAccessCode && <FieldGroup className="max-w-xl">
           <Field data-invalid={Boolean(error)} data-disabled={busy}>
             <FieldLabel htmlFor="exam-entry-code">รหัสเข้าทำ{task}ที่ครูกำหนด</FieldLabel>
             <Input id="exam-entry-code" value={code} onChange={event => onCodeChange(event.target.value)} disabled={busy}

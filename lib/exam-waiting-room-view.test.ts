@@ -16,7 +16,8 @@ describe('shared exam waiting presentation', () => {
   it.each([false, true])('shows the same rules without question inputs for preview=%s', previewMode => {
     const html = renderToStaticMarkup(createElement(ExamWaitingRoom, { summary, busy: false, code: '', error: null,
       previewMode, returnHref: '/assignments/test', ...callbacks() }))
-    expect(html).toContain('กติกาก่อนเข้าห้องสอบ'); expect(html).toContain('ประกาศจากครู'); expect(html).toContain('คำชี้แจงของครู')
+    expect(html).toContain('กติกาก่อนเข้าห้องสอบ'); expect(html).toContain('>คำชี้แจง<'); expect(html).toContain('คำชี้แจงของครู')
+    expect(html).toContain('/brand/deer-mark.svg')
     expect(html).not.toContain('<input'); expect(html).not.toContain('<textarea')
     if (previewMode) {
       expect(html).toContain('ไม่สร้างรอบสอบ'); expect(html).toContain('เข้าห้องสอบตัวอย่าง')
@@ -27,7 +28,7 @@ describe('shared exam waiting presentation', () => {
     const html = renderToStaticMarkup(createElement(ExamWaitingRoom, { summary: { ...summary, description: '<p><strong>อ่านก่อนเริ่ม</strong><img src=x onerror=alert(1)></p>' },
       busy: false, code: '', error: null, ...callbacks() }))
     expect(html).toContain('<strong>อ่านก่อนเริ่ม</strong>')
-    expect(html).not.toContain('<img')
+    expect(html).not.toContain('src="x"')
     expect(html).not.toContain('onerror')
   })
   it.each(['busy', 'blocked', 'completed', 'empty-code'])('form submission cannot bypass disabled %s state with Enter', state => {
@@ -63,7 +64,8 @@ describe('exercise uses the same waiting presentation with exercise-specific rul
     expect(html).toContain('หน้ารอเข้าห้องทำแบบฝึกหัด'); expect(html).toContain('กติกาก่อนเข้าห้องทำแบบฝึกหัด')
     expect(html).toContain('เวลาทำแบบฝึกหัด 30 นาที'); expect(html).toContain('ชุดแบบฝึกหัดที่กำหนด 3 ข้อ')
     expect(html).toContain('จำนวนครั้งที่ทำได้ทั้งหมด: 3 ครั้ง'); expect(html).toContain('รอบที่ได้คะแนนดีที่สุด')
-    expect(html).toContain('mx-auto flex w-full max-w-2xl flex-col gap-6')
+    expect(html).toContain('assignment-waiting-stage')
+    expect(html).toContain('max-w-5xl')
     expect(html).not.toMatch(/ข้อสอบ|ห้องสอบ|SEB|<input|<textarea/)
     expect(html).toContain(previewMode ? 'เข้าห้องทำแบบฝึกหัดตัวอย่าง' : 'เข้าห้องทำแบบฝึกหัดและเริ่มจับเวลา')
   })

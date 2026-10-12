@@ -1,9 +1,16 @@
 # Feature status
 
+### ห้องรอกะทัดรัดและกรอบตรงแนวกระดิ่ง — 12 ตุลาคม 2026
+
+- **UI-115** — หน้าตั้งค่าข้อสอบ/แบบฝึกหัดและหน้ารอทั้งนักเรียนจริงกับตัวอย่างครูใช้แนวขอบขวาเดียวกับกึ่งกลางกระดิ่งบน Topbar และเริ่มจากขอบเนื้อหาข้างเมนูบน desktop; mobile ยังคงเต็มพื้นที่ภายใน padding เดิม โดยไม่ใช้ความกว้างคงที่ที่ตรงเฉพาะหน้าจอเดียว
+- หน้ารอจัดเวลา จำนวนข้อ เงื่อนไขทำซ้ำ/ผ่าน คะแนน และเวลาปิดรับเป็น grid ข้อมูลสั้นแทนการเรียงลงทีละบรรทัด ลดช่องว่างหัวหน้าและวางกติกา 2 คอลัมน์เมื่อพื้นที่พอ; Card ประกาศเปลี่ยนหัวข้อเป็น “คำชี้แจง” และแสดงเฉพาะหน้ารอ ไม่ซ้ำใน Card สรุปหน้ารายละเอียดงาน
+- เพิ่ม `deer-mark.svg` ที่เจ้าของอนุมัติแล้วเป็นภาพพื้นหลังโปร่งบางด้านขวาของกรอบห้องรอบน desktop โดยเป็นภาพตกแต่งที่ screen reader ข้าม และไม่บังข้อความ/ปุ่ม; ไม่มีการเปลี่ยนข้อมูล assignment, สิทธิ์, flow เริ่มรอบ หรือ schema
+- local Chrome fixture ที่ใช้ Shell/Topbar จริงยืนยัน viewport 1440px ว่าขอบขวากรอบและกึ่งกลางกระดิ่งอยู่ที่พิกัด 1,145px เท่ากัน ทั้งข้อสอบและแบบฝึกหัดไม่ล้นแนวนอน; viewport 390px ซ่อนภาพกวางและมี `scrollWidth` เท่ากับ 390px, axe 0 violation/0 incomplete, browser console และ Next MCP ไม่มี runtime/config/compilation error · unit tests 227 files / 3,062 cases, TypeScript, design-token lint และ production build ผ่าน
+
 ### ประกาศจากครูในห้องรอ — 12 ตุลาคม 2026
 
 - **UI-114** — หน้าสร้างและตั้งค่าข้อสอบ/แบบฝึกหัดเปลี่ยน `assignments.description` เดิมให้เป็น “ประกาศในห้องรอ” แบบ rich text ครูพิมพ์ จัดรูปแบบ วาง/ลาก หรือกดแนบรูป JPG, PNG, WebP, GIF ได้ รูปถูกย่อในเบราว์เซอร์และเก็บใน `question-images` ใต้โฟลเดอร์ของผู้ใช้ ไม่มีคอลัมน์หรือ migration ใหม่ และการทำสำเนา assignment ยังเก็บประกาศเดิม แต่การเริ่มจากแฟ้มโจทย์ไม่ดึงคำอธิบายภายในแฟ้มมาเป็นประกาศให้นักเรียนโดยอัตโนมัติ
-- ห้องรอจริงและ “ดูตัวอย่างนักเรียน” ของทั้งข้อสอบและแบบฝึกหัดแสดง Card “ประกาศจากครู” แยกจากกติกามาตรฐาน รองรับข้อมูล plain text เดิมและ HTML/รูปใหม่; Server Action sanitize ก่อนบันทึกและทุก render sanitize ซ้ำด้วย allowlist เดิม รูปรับเฉพาะ public URL ของ `question-images` ใน Supabase project นี้ ไม่รับ external/data/signed URL หรือ event handler
+- ห้องรอจริงและ “ดูตัวอย่างนักเรียน” ของทั้งข้อสอบและแบบฝึกหัดแสดง Card “คำชี้แจง” แยกจากกติกามาตรฐาน รองรับข้อมูล plain text เดิมและ HTML/รูปใหม่; Server Action sanitize ก่อนบันทึกและทุก render sanitize ซ้ำด้วย allowlist เดิม รูปรับเฉพาะ public URL ของ `question-images` ใน Supabase project นี้ ไม่รับ external/data/signed URL หรือ event handler
 - orphan sweep ของ `question-images` ตรวจ `assignments.description` เพิ่มแบบ fail-closed และไม่กรองตามผู้สร้าง assignment เพื่อไม่ลบรูปของครูร่วมที่อัปโหลดในงานที่จัดการร่วมกัน ไฟล์ที่อัปแล้วไม่บันทึกยังอยู่ใน grace period 7 วันก่อนเสนอให้ลบตามกติกาเดิม
 - local Chrome lab ยืนยันทั้ง exam/exercise ว่าช่อง `contenteditable` มีชื่อสำหรับ accessibility และปุ่มแทรกรูป, ห้องรอ 390px แสดงประกาศก่อนกติกาโดยไม่ล้นแนวนอน, axe ห้องรอ 0 violation/0 incomplete และหน้าสร้าง 0 violation (เหลือ contrast incomplete เดิมของวงกลมขั้นตอน 2 จุด), Next MCP compilation/runtime ไม่มี error; unit tests 227 files / 3,062 cases, TypeScript, design-token lint และ production build ผ่าน ไม่มี migration หรือการทดสอบเขียน Storage/ฐานข้อมูลจริง
 
