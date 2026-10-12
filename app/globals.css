@@ -73,8 +73,8 @@
 }
 
 :root {
-  /* Approved wordmark orange; preserve brand identity across UI presets. */
-  --brand-accent: #fe5d00;
+  /* The deer mark and wordmark accent follow the active KorKru theme. */
+  --brand-accent: var(--primary);
   /* Dominant navy sampled from the approved deer mark, not UI text black. */
   --brand-foreground: #002262;
   --background: oklch(1 0 0);

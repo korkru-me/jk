@@ -260,6 +260,30 @@ export function setQuestionInSection(
   return normalizeSetSections(next, questionIds)
 }
 
+/**
+ * Adds several questions to every chosen section without removing any of their
+ * existing section labels. Membership inside each section follows the set's
+ * question order, so a bulk action cannot quietly reshuffle the student-facing
+ * order or append duplicate ids.
+ */
+export function addQuestionsToSections(
+  sections: readonly QuestionSetSection[],
+  questionIds: readonly string[],
+  addingIds: readonly string[],
+  sectionIds: readonly string[]
+): { sections: QuestionSetSection[]; question_ids: string[] } {
+  const adding = new Set(addingIds)
+  const targets = new Set(sectionIds)
+
+  const next = sections.map(section => {
+    if (!targets.has(section.id)) return section
+    const members = new Set([...section.question_ids, ...adding])
+    return { ...section, question_ids: questionIds.filter(id => members.has(id)) }
+  })
+
+  return normalizeSetSections(next, questionIds)
+}
+
 /** Takes one question out of every section, leaving it in the แฟ้ม. */
 export function clearQuestionSections(
   sections: readonly QuestionSetSection[],

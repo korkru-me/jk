@@ -1,6 +1,7 @@
 'use client'
 
 import { useTransition } from 'react'
+import { Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { deleteClassroom } from '@/lib/actions/classrooms'
@@ -36,6 +37,7 @@ export function DeleteClassroomButton({ id }: { id: string }) {
         onClick={handleDelete}
         disabled={isPending}
       >
+        <Trash2 data-icon="inline-start" aria-hidden="true" />
         {isPending ? 'กำลังย้าย...' : 'ย้ายไปถังขยะ'}
       </Button>
       {confirmDialog}

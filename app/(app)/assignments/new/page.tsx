@@ -194,6 +194,7 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
         question_text: question.question_text,
         difficulty: question.difficulty,
         question_type: question.question_type,
+        subject: question.subject,
         tags: question.tags,
         sub_question_count: counted.sub_question_count,
         default_points: counted.default_points,

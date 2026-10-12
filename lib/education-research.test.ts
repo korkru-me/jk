@@ -33,8 +33,8 @@ describe('education research helpers', () => {
 
   it('totals only questions that are present in the available bank', () => {
     expect(selectedResearchMaxScore(['q2', 'missing', 'q1'], [
-      { id: 'q1', title: '1', question_text: '', question_type: 'mcq', difficulty: 'easy', tags: null, max_score: 1 },
-      { id: 'q2', title: '2', question_text: '', question_type: 'matching', difficulty: 'medium', tags: null, max_score: 4 },
+      { id: 'q1', title: '1', question_text: '', question_type: 'mcq', difficulty: 'easy', subject: null, tags: null, max_score: 1 },
+      { id: 'q2', title: '2', question_text: '', question_type: 'matching', difficulty: 'medium', subject: null, tags: null, max_score: 4 },
     ])).toBe(5)
   })
 })

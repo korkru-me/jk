@@ -13,6 +13,7 @@ const questions: AssignmentQuestionOption[] = [1, 2, 3].map(i => ({
   question_text: `<p>คำถามจำลองข้อ ${i}</p>`,
   question_type: 'mcq',
   difficulty: 'easy',
+  subject: 'ฟิสิกส์',
   tags: [],
   sub_question_count: 1,
   default_points: 1,
@@ -20,15 +21,11 @@ const questions: AssignmentQuestionOption[] = [1, 2, 3].map(i => ({
 }))
 
 export function AssignmentCreationLabClient({ contextual, type }: { contextual: boolean; type: AssignmentType }) {
-  const [savedSetName, setSavedSetName] = useState('')
   const [receivedAssignment, setReceivedAssignment] = useState('')
   const actions = useMemo<NonNullable<ComponentProps<typeof CreateAssignmentForm>['actions']>>(() => ({
-    async createQuestionSet(data) {
-      setSavedSetName(data.title)
-      return { id: '00000000-0000-4000-8200-000000000001' }
-    },
     async createAssignment(data) {
-      setReceivedAssignment(`${data.title} · ${data.classroom_ids?.length ?? 0} ห้อง · ${data.random_question_count ?? 'ทุก'} ข้อ · จำนวนครั้ง: ${data.max_attempts ?? 'ไม่จำกัด'} · คะแนน: ${data.score_strategy} · จบ: ${data.completion_rule} · เกณฑ์: ${data.passing_value ?? 'ไม่มี'}`)
+      const pointValues = Object.values(data.question_points ?? {}).join(',') || 'ไม่มี'
+      setReceivedAssignment(`${data.title} · ${data.classroom_ids?.length ?? 0} ห้อง · ${data.random_question_count ?? 'ทุก'} ข้อ · คะแนนรายข้อ: ${pointValues} · จำนวนครั้ง: ${data.max_attempts ?? 'ไม่จำกัด'} · คะแนน: ${data.score_strategy} · จบ: ${data.completion_rule} · เกณฑ์: ${data.passing_value ?? 'ไม่มี'}`)
       return { error: '(ห้องทดลอง) รับข้อมูลแล้ว ไม่มีการบันทึกฐานข้อมูล' }
     },
     async getQuestionPreviewDetails(ids) {
@@ -54,19 +51,31 @@ export function AssignmentCreationLabClient({ contextual, type }: { contextual: 
         }}
         questions={questions}
         questionSets={[
-          { id: 'lab-all', title: 'แฟ้มจำลองสามข้อ', description: null, question_ids: questions.map(q => q.id), sections: [] },
+          {
+            id: 'lab-all',
+            title: 'แฟ้มจำลองสามข้อ',
+            description: null,
+            question_ids: questions.map(q => q.id),
+            sections: [
+              { id: 'lab-force', title: 'แรงและการเคลื่อนที่', question_ids: [questions[0].id, questions[1].id] },
+              { id: 'lab-energy', title: 'งานและพลังงาน', question_ids: [questions[1].id, questions[2].id] },
+              { id: 'lab-empty-section', title: 'แฟ้มย่อยว่าง', question_ids: [] },
+            ],
+          },
           { id: 'lab-overlap', title: 'แฟ้มจำลองข้อซ้ำ', description: null, question_ids: [questions[0].id, questions[1].id], sections: [] },
           { id: 'lab-missing', title: 'แฟ้มจำลองมีข้อที่หายไป', description: null, question_ids: [questions[2].id, '00000000-0000-4000-8100-000000000099'], sections: [] },
+          { id: 'lab-one', title: 'แฟ้มทบทวนก่อนเรียน', description: null, question_ids: [questions[0].id], sections: [] },
+          { id: 'lab-two', title: 'แฟ้มแบบฝึกหัดท้ายบท', description: null, question_ids: [questions[1].id], sections: [] },
+          { id: 'lab-three', title: 'แฟ้มข้อสอบเก็บคะแนน', description: null, question_ids: [questions[2].id], sections: [] },
           { id: 'lab-empty', title: 'แฟ้มจำลองว่าง', description: null, question_ids: [], sections: [] },
         ]}
         preselectedClassroomId={contextual ? ROOM_ONE : undefined}
         preselectedAssignmentType={type}
         actions={actions}
       />
-      {(savedSetName || receivedAssignment) && (
+      {receivedAssignment && (
         <Card padding="md" className="space-y-2">
           <p className="text-sm font-semibold">ข้อมูลที่รับในหน่วยความจำ (จำลอง)</p>
-          <output aria-label="ชื่อแฟ้มที่รับ">{savedSetName}</output>
           <output aria-label="งานที่รับ" className="block">{receivedAssignment}</output>
         </Card>
       )}

@@ -2,8 +2,9 @@
 
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Camera, Loader2, X } from 'lucide-react'
+import { Camera, CircleHelp, Loader2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 import { downscaleImage } from '@/lib/image-downscale'
 import { uploadErrorMessage } from '@/lib/upload-error'
 
@@ -33,6 +34,8 @@ interface WorkImageUploadProps {
    * ปิดแท็บ เน็ตหลุด หรือเบราว์เซอร์ถูกฆ่าระหว่างนั้น ไฟล์ก็ค้างอยู่ดี
    */
   localOnly?: boolean
+  /** แสดงคำอธิบายสำหรับครูในหน้าตัวอย่าง โดยไม่กินพื้นที่แนวตั้ง */
+  showPreviewHelp?: boolean
 }
 
 function isLocalUrl(url: string) {
@@ -49,6 +52,7 @@ export function WorkImageUpload({
   onChange,
   required,
   localOnly,
+  showPreviewHelp,
 }: WorkImageUploadProps) {
   const [uploading, setUploading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -152,51 +156,92 @@ export function WorkImageUpload({
         className="hidden"
         onChange={handleFileChange}
       />
-      {value ? (
-        <div className="relative inline-block group">
-          <Button
-            type="button"
-            variant="ghost"
-            aria-label="เปิดรูปวิธีทำขนาดเต็ม"
-            onClick={() => window.open(value, '_blank')}
-            className="block h-auto w-auto rounded-lg p-0"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={value}
-              alt=""
-              className="h-28 w-28 cursor-pointer rounded-lg border object-cover"
-            />
-          </Button>
+      <div className="flex items-start gap-1.5">
+        {value ? (
+          <div className="relative inline-block group">
+            <Button
+              type="button"
+              variant="ghost"
+              aria-label="เปิดรูปวิธีทำขนาดเต็ม"
+              onClick={() => window.open(value, '_blank')}
+              className="block h-auto w-auto rounded-lg p-0"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={value}
+                alt=""
+                className="h-28 w-28 cursor-pointer rounded-lg border object-cover"
+              />
+            </Button>
+            <button
+              type="button"
+              onClick={handleRemove}
+              className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-destructive text-destructive-foreground opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
+              aria-label="นำรูปวิธีทำออก"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        ) : (
           <button
             type="button"
-            onClick={handleRemove}
-            className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-destructive text-destructive-foreground opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
-            aria-label="นำรูปวิธีทำออก"
+            onClick={() => inputRef.current?.click()}
+            disabled={uploading}
+            className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-all ${
+              required
+                ? 'border-warning bg-warning/8 text-foreground'
+                : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted'
+            }`}
+            aria-label="แนบรูปวิธีทำจากกล้องหรือเครื่อง"
           >
-            <X className="w-3 h-3" />
+            {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
+            {uploading ? 'กำลังอัปโหลด...' : 'แนบรูปวิธีทำ'}
           </button>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          disabled={uploading}
-          className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-all ${
-            required
-              ? 'border-warning bg-warning/8 text-foreground'
-              : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted'
-          }`}
-          aria-label="แนบรูปวิธีทำจากกล้องหรือเครื่อง"
-        >
-          {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
-          {uploading ? 'กำลังอัปโหลด...' : 'แนบรูปวิธีทำ'}
-        </button>
-      )}
+        )}
+        {showPreviewHelp && (
+          <HoverCard>
+            <HoverCardTrigger
+              delay={160}
+              closeDelay={80}
+              render={(
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="คำอธิบายการแนบรูปวิธีทำ"
+                  className="cursor-help rounded-full text-muted-foreground"
+                >
+                  <CircleHelp aria-hidden="true" className="size-4" />
+                </Button>
+              )}
+            />
+            <HoverCardContent align="start" side="top" className="w-80 max-w-[calc(100vw-2rem)]">
+              <div className="space-y-2 text-xs leading-relaxed text-muted-foreground">
+                <p className="text-sm font-semibold text-foreground">ช่องแนบรูปวิธีทำคืออะไร</p>
+                <p>
+                  เป็นช่องให้นักเรียน<span className="font-medium text-foreground">ถ่ายรูปกระดาษทดที่แสดงวิธีทำ</span>แนบมาพร้อมคำตอบ
+                  (เปิดกล้องหลังของมือถือโดยตรง ย่อรูปให้เองก่อนส่ง — เป็นรูปภาพ ไม่ใช่ไฟล์ PDF)
+                  ระบบไม่ตรวจรูป ครูเป็นคนเปิดดูเองตอนตรวจ จึงใช้ดูว่านักเรียนคิดมาอย่างไร ไม่ใช่แค่ตอบเลขถูก
+                </p>
+                <p>
+                  สวิตช์อยู่ที่ <span className="font-medium text-foreground">ขั้นตั้งค่าของหน้าสร้างงาน</span> ชื่อ “ให้นักเรียนแนบรูปแสดงวิธีทำ”
+                  ไม่ได้อยู่ในหน้าสร้างโจทย์ — เปิดครั้งเดียวมีผลกับข้อเติมคำตอบตัวเลขทุกข้อในงานนั้น
+                  ค่าเริ่มต้นคือปิด และเมื่อเปิด นักเรียนต้องแนบให้ครบทุกข้อย่อยก่อนจึงจะกดส่งได้
+                </p>
+                <p>
+                  ในหน้าตัวอย่างนี้แนบไฟล์จริงจากเครื่องได้ เพื่อดูตำแหน่งรูปตอนครูตรวจ
+                  — แต่<span className="font-medium text-foreground">ไฟล์ไม่ถูกอัปโหลด</span> อยู่ในเบราว์เซอร์ของคุณเท่านั้น
+                  และหายไปเมื่อปิดตัวอย่าง จึงไม่มีไฟล์ค้างในระบบ
+                </p>
+              </div>
+            </HoverCardContent>
+          </HoverCard>
+        )}
+      </div>
       {required && !value && !localOnly && (
         <p className="text-[10px] font-medium text-foreground">ต้องแนบรูปวิธีทำก่อนส่งคำตอบ</p>
       )}
-      {localOnly && (
+      {localOnly && !showPreviewHelp && (
         <p className="text-[10px] text-muted-foreground">ตัวอย่าง — ไฟล์อยู่ในเครื่องคุณ ไม่ถูกอัปโหลด</p>
       )}
     </div>

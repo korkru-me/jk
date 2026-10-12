@@ -27,6 +27,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { loadAssignmentQuestionsByProvenance } from '@/lib/assignment-question-access.server'
 import { shouldClearExpiredEndAt } from '@/lib/assignment-status'
 import { completionAttemptSettings, completionChoiceFor, streakRandomSubsetError } from '@/lib/assignment-completion'
+import { normalizeAssignmentQuestionPoints } from '@/lib/assignment-question-points'
 import {
   assignmentLateScheduleEquals,
   normalizeAssignmentLateSchedule,
@@ -358,15 +359,14 @@ export async function createAssignment(data: CreateAssignmentData) {
   }, data.score_strategy)
   if (attemptSettings.error) return { error: attemptSettings.error }
 
-  // Only keep overrides for questions actually in this assignment, with a
-  // valid positive point value — drops anything a tampered client might add.
-  const questionIdSet = new Set(questionIds)
-  const sanitizedPoints = Object.fromEntries(
-    Object.entries(data.question_points ?? {}).filter(
-      ([qid, pts]) => questionIdSet.has(qid) && Number.isFinite(pts) && pts > 0
-    )
+  // The server owns scoring semantics. A random subset always stores every
+  // pool question as one point, even if a stale or tampered client submits
+  // different per-question weights.
+  const questionPoints = normalizeAssignmentQuestionPoints(
+    questionIds,
+    data.question_points,
+    randomQuestionCount ?? null,
   )
-  const questionPoints = Object.keys(sanitizedPoints).length > 0 ? sanitizedPoints : null
   const displayMaxScore = Number.isFinite(data.display_max_score) && (data.display_max_score as number) > 0
     ? data.display_max_score
     : null
@@ -727,15 +727,6 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
     }
   }
 
-  // Same sanitization as createAssignment — only keep overrides for
-  // questions actually in this assignment, with a valid positive value.
-  const questionIdSet = new Set(nextIds)
-  const sanitizedPoints = Object.fromEntries(
-    Object.entries(data.question_points ?? {}).filter(
-      ([qid, pts]) => questionIdSet.has(qid) && Number.isFinite(pts) && pts > 0
-    )
-  )
-  const questionPoints = Object.keys(sanitizedPoints).length > 0 ? sanitizedPoints : null
   const displayMaxScore = Number.isFinite(data.display_max_score) && (data.display_max_score as number) > 0
     ? data.display_max_score
     : null
@@ -783,6 +774,15 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
     && data.random_question_count < nextIds.length
       ? data.random_question_count
       : null
+
+  // Match createAssignment: random delivery is counted by correct questions,
+  // so client-provided weights cannot make one sampled question worth more
+  // than another. All-question assignments retain their validated overrides.
+  const questionPoints = normalizeAssignmentQuestionPoints(
+    nextIds,
+    data.question_points,
+    randomQuestionCount,
+  )
 
   const nextRequestedCompletionRule = data.completion_rule ?? existing.completion_rule
   const preservesLegacyFixedPoolStreak = existing.completion_rule === 'streak'

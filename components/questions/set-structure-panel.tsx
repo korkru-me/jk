@@ -1,14 +1,23 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import {
-  Plus, ChevronUp, ChevronDown, MoreVertical, Folder, FolderOpen, X, Layers, Search, Eye, Edit2,
+  DndContext, KeyboardSensor, MouseSensor, TouchSensor, closestCenter,
+  useSensor, useSensors, type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext, arrayMove, rectSortingStrategy, sortableKeyboardCoordinates, useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import {
+  Plus, ChevronUp, ChevronDown, MoreVertical, Folder, FolderOpen, FolderPlus,
+  X, Layers, Search, Eye, Trash2, Check, Pencil,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { IconButton } from '@/components/ui/icon-button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Field, FieldLabel } from '@/components/ui/field'
 import { Card } from '@/components/ui/card'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import {
@@ -16,29 +25,30 @@ import {
 } from '@/components/ui/dialog'
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
-  DropdownMenuItem, DropdownMenuSeparator,
+  DropdownMenuItem,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
-import { questionExcerpt } from '@/lib/question-display'
+import { DIFF_META, TYPE_LABEL, questionExcerpt } from '@/lib/question-display'
 import {
-  moveQuestionInSet, moveSection, newSectionId, normalizeSetSections,
+  addQuestionsToSections, moveQuestionInSet, newSectionId, normalizeSetSections,
   removeQuestionsFromSet, sectionsByQuestionId, ungroupedQuestionIds,
   type QuestionSetSection,
 } from '@/lib/question-set-sections'
-import { useRouter } from 'next/navigation'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import dynamic from 'next/dynamic'
 import { getQuestionClientDetail } from '@/lib/actions/questions'
-import { getQuestionCardData } from '@/lib/actions/question-card-data'
-import { questionEditHref, RETURN_SET_PARAM } from '@/lib/question-return'
 import { SetQuestionList, type SetListQuestion } from './set-question-list'
+import { QuestionSectionBadges } from './question-section-badges'
 import type { QuestionDetailWithCategory as PreviewQuestion } from './preview-modal'
+import { QuestionListPreviewDialog } from '@/components/assignments/question-list-preview-dialog'
+import type { getQuestionPreviewDetails } from '@/lib/actions/question-previews'
+import { matchesSearch } from '@/lib/question-search'
 
 const PreviewModal = dynamic(
   () => import('./preview-modal').then(mod => mod.PreviewModal),
   { ssr: false },
 )
 import type { QuestionCardData } from '@/lib/question-card-data'
-import { DIFF_META, TYPE_LABEL } from '@/lib/question-display'
 
 /**
  * A โจทย์ as this panel receives it.
@@ -64,10 +74,14 @@ interface Props {
   myTeams: { id: string; name: string }[]
   /** The แฟ้ม's id, absent while it is still being created. */
   setId?: string
-  /** Writes the แฟ้ม draft down before a card leaves for the โจทย์ editor. */
+  /** Flushes the แฟ้ม's newest autosave before leaving for the โจทย์ editor. */
   onSaveBeforeEdit?: () => Promise<boolean>
   /** Card data for the แฟ้ม's first page, fetched with the page. */
   initialCardData?: QuestionCardData
+  /** Local visual fixtures may supply synthetic previews without Supabase. */
+  loadQuestionPreviews?: typeof getQuestionPreviewDetails
+  /** Height of the information card above this workflow on the create page. */
+  compactQuestionsHeight?: number
 }
 
 const UNNAMED = 'แฟ้มย่อยที่ยังไม่ตั้งชื่อ'
@@ -99,19 +113,32 @@ function namesPreview(ids: readonly string[], byId: Map<string, PanelQuestion>):
  * stray click used to drop one instantly — leaving the teacher to work out
  * which one vanished and hunt it down in the bank again.
  *
- * Reordering is buttons, not drag-and-drop: teachers arrange sets on phones
- * too, and a drag target that small is unusable there.
+ * The whole แฟ้มย่อย card is sortable: mouse users drag after moving 8px,
+ * touch users press briefly before dragging so a normal swipe still scrolls,
+ * and keyboard users can use the sortable button's Space + arrow controls.
  */
 export function SetStructurePanel({
   questions, questionIds, sections, onChange, onAddQuestions,
-  allTags, myTeams, setId, onSaveBeforeEdit, initialCardData,
+  allTags, myTeams, setId, onSaveBeforeEdit, initialCardData, loadQuestionPreviews,
+  compactQuestionsHeight,
 }: Props) {
   // The แฟ้มย่อย whose dialog is open — an id, or NEW_SECTION while creating.
   const [dialogSectionId, setDialogSectionId] = useState<string | null>(null)
   const [selected, setSelected] = useState<string[]>([])
+  const [bulkSectionOpen, setBulkSectionOpen] = useState(false)
+  const [previewSectionId, setPreviewSectionId] = useState<string | null>(null)
+  const [questionsExpanded, setQuestionsExpanded] = useState(false)
+  const questionsPanelRef = useRef<HTMLDivElement>(null)
+  const questionsRegionId = useId()
   // Pending confirmations.
   const [removeIds, setRemoveIds] = useState<string[] | null>(null)
   const [deleteSectionId, setDeleteSectionId] = useState<string | null>(null)
+  const sectionDndId = useId()
+  const sectionSensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
 
   const byId = useMemo(() => new Map(questions.map(q => [q.id, q])), [questions])
   const owners = useMemo(() => sectionsByQuestionId(sections), [sections])
@@ -127,6 +154,22 @@ export function SetStructurePanel({
   const isNewSection = dialogSectionId === NEW_SECTION
   const dialogSection = isNewSection ? null : sections.find(s => s.id === dialogSectionId) ?? null
   const sectionToDelete = sections.find(s => s.id === deleteSectionId) ?? null
+  const previewSection = sections.find(s => s.id === previewSectionId) ?? null
+
+  useEffect(() => {
+    if (setId || !questionsExpanded) return
+
+    // Use click rather than pointerdown so an outside control receives the
+    // complete gesture before this long panel folds and shifts the page.
+    function closeQuestionsOnOutsideClick(event: MouseEvent) {
+      const target = event.target
+      if (!(target instanceof Node) || questionsPanelRef.current?.contains(target)) return
+      setQuestionsExpanded(false)
+    }
+
+    document.addEventListener('click', closeQuestionsOnOutsideClick)
+    return () => document.removeEventListener('click', closeQuestionsOnOutsideClick)
+  }, [questionsExpanded, setId])
 
   function apply(next: { sections: QuestionSetSection[]; question_ids: string[] }) {
     onChange({ sections: next.sections, questionIds: next.question_ids })
@@ -139,13 +182,13 @@ export function SetStructurePanel({
     if (isNewSection) {
       const section = { id: newSectionId(), title, question_ids: ordered }
       apply(normalizeSetSections([...sections, section], questionIds))
-      toast.success(`สร้างแฟ้มย่อย “${title || UNNAMED}” แล้ว — อย่าลืมกดบันทึกการแก้ไข`)
+      toast.success(`สร้างแฟ้มย่อย “${title || UNNAMED}” และบันทึกแล้ว`)
     } else if (dialogSectionId) {
       apply(normalizeSetSections(
         sections.map(s => (s.id === dialogSectionId ? { ...s, title, question_ids: ordered } : s)),
         questionIds
       ))
-      toast.success('บันทึกแฟ้มย่อยแล้ว — อย่าลืมกดบันทึกการแก้ไข')
+      toast.success('บันทึกแฟ้มย่อยแล้ว')
     }
     setDialogSectionId(null)
   }
@@ -159,6 +202,14 @@ export function SetStructurePanel({
     toast.success(`ลบแฟ้มย่อย “${name}” แล้ว โจทย์ยังอยู่ในแฟ้ม`)
   }
 
+  function renameSection(id: string, title: string) {
+    apply(normalizeSetSections(
+      sections.map(section => section.id === id ? { ...section, title } : section),
+      questionIds,
+    ))
+    toast.success('เปลี่ยนชื่อแฟ้มย่อยแล้ว')
+  }
+
   function toggleSelected(id: string) {
     setSelected(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]))
   }
@@ -166,101 +217,32 @@ export function SetStructurePanel({
   function removeQuestions(ids: string[]) {
     apply(removeQuestionsFromSet(sections, questionIds, ids))
     setSelected(prev => prev.filter(id => !ids.includes(id)))
-    toast.success(`เอาออกจากแฟ้ม ${ids.length} ข้อแล้ว — อย่าลืมกดบันทึกการแก้ไข`)
+    toast.success(`เอาออกจากแฟ้ม ${ids.length} ข้อและบันทึกแล้ว`)
+  }
+
+  function addSelectedToSections(sectionIds: string[]) {
+    apply(addQuestionsToSections(sections, questionIds, selected, sectionIds))
+    toast.success(`เพิ่มโจทย์ ${selected.length} ข้อเข้าแฟ้มย่อย ${sectionIds.length} แฟ้มและบันทึกแล้ว`)
+    setSelected([])
+    setBulkSectionOpen(false)
+  }
+
+  function reorderSections(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIndex = sections.findIndex(section => section.id === active.id)
+    const newIndex = sections.findIndex(section => section.id === over.id)
+    if (oldIndex < 0 || newIndex < 0) return
+    apply(normalizeSetSections(arrayMove(sections, oldIndex, newIndex), questionIds))
   }
 
   const allSelected = questionIds.length > 0 && questionIds.every(id => selected.includes(id))
 
-  return (
-    <div className="space-y-4">
-      {/* ── แฟ้มย่อย ─────────────────────────────────────────────── */}
-      <Card padding="xl" className="space-y-3">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-2 flex-wrap min-w-0">
-            <Folder className="w-4 h-4 text-primary shrink-0" />
-            <h2 className="font-semibold text-foreground whitespace-nowrap">แฟ้มย่อย</h2>
-            {sections.length > 0 && (
-              <span className="text-xs text-muted-foreground whitespace-nowrap">
-                {sections.length} แฟ้มย่อย · {grouped} ข้อ
-              </span>
-            )}
-          </div>
-          {sections.length > 0 && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setDialogSectionId(NEW_SECTION)}
-              className="gap-1.5 shrink-0"
-            >
-              <Plus className="w-3.5 h-3.5" /> สร้างแฟ้มย่อย
-            </Button>
-          )}
-        </div>
-
-        {sections.length === 0 ? (
-          <Card edge="dashed" padding="lg" className="text-center space-y-3">
-            <p className="text-sm text-muted-foreground">
-              ยังไม่มีแฟ้มย่อย — ถ้าแฟ้มนี้มีหลายเรื่อง แบ่งโจทย์เป็นแฟ้มย่อยได้ (ไม่บังคับ)
-            </p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setDialogSectionId(NEW_SECTION)}
-              className="gap-1.5"
-            >
-              <Plus className="w-3.5 h-3.5" /> สร้างแฟ้มย่อย
-            </Button>
-          </Card>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
-              {sections.map((section, index) => (
-                <SectionCard
-                  key={section.id}
-                  section={section}
-                  index={index}
-                  total={sections.length}
-                  onOpen={() => setDialogSectionId(section.id)}
-                  onMove={delta => apply(moveSection(sections, section.id, delta, questionIds))}
-                  onDelete={() => setDeleteSectionId(section.id)}
-                />
-              ))}
-
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setDialogSectionId(NEW_SECTION)}
-                className="h-auto min-h-[62px] gap-2 rounded-2xl border border-dashed border-border text-muted-foreground hover:text-primary hover:border-primary/40 hover:bg-primary/[0.03]"
-              >
-                <Plus className="w-5 h-5" />
-                <span className="text-sm font-medium">สร้างแฟ้มย่อย</span>
-              </Button>
-            </div>
-
-            <p className="text-xs text-muted-foreground">
-              โจทย์ข้อเดียวอยู่ได้หลายแฟ้มย่อย · ลำดับเลขข้อที่นักเรียนเห็นมาจากรายการโจทย์ด้านล่าง ไม่ใช่ลำดับแฟ้มย่อย
-            </p>
-          </>
-        )}
-      </Card>
-
-      {/* ── โจทย์ทั้งหมดในแฟ้ม ───────────────────────────────────── */}
-      <Card padding="xl" className="space-y-3">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-2 flex-wrap min-w-0">
-            <Layers className="w-4 h-4 text-primary shrink-0" />
-            <h2 className="font-semibold text-foreground whitespace-nowrap">โจทย์ในแฟ้มนี้</h2>
-            <span className="text-xs text-muted-foreground whitespace-nowrap">{questionIds.length} ข้อ</span>
-          </div>
-          <Button type="button" size="sm" onClick={onAddQuestions} className="gap-1.5">
-            <Plus className="w-3.5 h-3.5" /> เพิ่มโจทย์จากคลัง
-          </Button>
-        </div>
-
+  function renderQuestionList(compact: boolean) {
+    return (
+      <>
         {questionIds.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-8 text-center">
+          <p className="py-8 text-center text-sm text-muted-foreground">
             ยังไม่มีโจทย์ในแฟ้มนี้ — กด “เพิ่มโจทย์จากคลัง” เพื่อเลือกโจทย์เข้ามา
           </p>
         ) : (
@@ -282,9 +264,23 @@ export function SetStructurePanel({
         )}
 
         {selected.length > 0 && (
-          <div className="sticky bottom-0 -mx-6 -mb-6 px-6 py-3 border-t border-border bg-muted/80 backdrop-blur-sm rounded-b-2xl flex items-center gap-2 flex-wrap">
+          <div className={cn(
+            'sticky bottom-0 mt-3 flex flex-wrap items-center gap-2 rounded-b-2xl border-t border-border bg-muted/80 py-3 backdrop-blur-sm',
+            compact ? '-mx-5 -mb-5 px-5' : '-mx-6 -mb-6 px-6',
+          )}>
             <span className="text-sm font-medium text-foreground">เลือก {selected.length} ข้อ</span>
-            <div className="flex items-center gap-2 ml-auto flex-wrap">
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={sections.length === 0}
+                title={sections.length === 0 ? 'สร้างแฟ้มย่อยก่อนจึงจะเพิ่มโจทย์ได้' : undefined}
+                onClick={() => setBulkSectionOpen(true)}
+              >
+                <FolderPlus data-icon="inline-start" aria-hidden="true" />
+                เพิ่มเข้าแฟ้มย่อย
+              </Button>
               <Button type="button" variant="destructive" size="sm" onClick={() => setRemoveIds(selected)}>
                 เอาออกจากแฟ้ม
               </Button>
@@ -294,7 +290,167 @@ export function SetStructurePanel({
             </div>
           </div>
         )}
-      </Card>
+      </>
+    )
+  }
+
+  const questionsPanel = setId ? (
+    <Card padding="xl" className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <Layers className="size-4 shrink-0 text-primary" aria-hidden="true" />
+          <h2 className="whitespace-nowrap font-semibold text-foreground">โจทย์ในแฟ้มนี้</h2>
+          <span className="whitespace-nowrap text-xs text-muted-foreground">{questionIds.length} ข้อ</span>
+        </div>
+        <Button type="button" size="sm" onClick={onAddQuestions}>
+          <Plus data-icon="inline-start" aria-hidden="true" />
+          เพิ่มโจทย์จากคลัง
+        </Button>
+      </div>
+      {renderQuestionList(false)}
+    </Card>
+  ) : (
+    <Card
+      ref={questionsPanelRef}
+      data-question-list-panel
+      data-expanded={questionsExpanded}
+      className={cn(
+        'overflow-hidden',
+        questionIds.length > 0 && !questionsExpanded && 'flex flex-col',
+      )}
+      style={questionIds.length > 0 && !questionsExpanded
+        ? { height: compactQuestionsHeight ?? 360 }
+        : undefined}
+    >
+      <div className="flex min-h-[72px] shrink-0 items-center gap-2 p-5">
+        <Button
+          type="button"
+          variant="ghost"
+          aria-expanded={questionsExpanded}
+          aria-controls={questionIds.length > 0 || questionsExpanded ? questionsRegionId : undefined}
+          aria-label={questionsExpanded
+            ? 'ย่อรายการโจทย์ให้เลื่อนภายในกรอบ'
+            : 'ขยายรายการโจทย์ทั้งหมด'}
+          title={questionsExpanded ? 'ย่อรายการโจทย์' : 'ขยายรายการโจทย์ทั้งหมด'}
+          onClick={() => setQuestionsExpanded(expanded => !expanded)}
+          className="group h-auto min-w-0 flex-1 justify-start gap-2 p-0 text-left hover:bg-transparent"
+        >
+          <Layers className="size-4 shrink-0 text-primary" aria-hidden="true" />
+          <span className="whitespace-nowrap font-semibold text-foreground">โจทย์ในแฟ้มนี้</span>
+          <span className="whitespace-nowrap text-xs text-muted-foreground">{questionIds.length} ข้อ</span>
+          <ChevronDown
+            className={cn(
+              'ml-auto size-4 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none',
+              questionsExpanded && 'rotate-180',
+            )}
+            aria-hidden="true"
+          />
+        </Button>
+        <Button type="button" size="sm" onClick={onAddQuestions} className="shrink-0">
+          <Plus data-icon="inline-start" aria-hidden="true" />
+          <span className="hidden sm:inline">เพิ่มโจทย์จากคลัง</span>
+          <span className="sm:hidden">เพิ่มโจทย์</span>
+        </Button>
+      </div>
+
+      {(questionIds.length > 0 || questionsExpanded) && (
+        <div
+          id={questionsRegionId}
+          data-question-list-region
+          className={cn(
+            'border-t border-border px-5 pb-5 pt-4',
+            questionIds.length > 0 && !questionsExpanded && 'min-h-0 flex-1 overflow-y-auto overscroll-contain',
+          )}
+        >
+          {renderQuestionList(true)}
+        </div>
+      )}
+    </Card>
+  )
+
+  const sectionsPanel = (
+    <Card padding="lg" className="flex flex-col gap-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <Folder className="size-4 shrink-0 text-primary" aria-hidden="true" />
+          <h2 className="whitespace-nowrap font-semibold text-foreground">แฟ้มย่อย</h2>
+          {sections.length > 0 && (
+            <span className="whitespace-nowrap text-xs text-muted-foreground">
+              {sections.length} แฟ้มย่อย · {grouped} ข้อ
+            </span>
+          )}
+        </div>
+        {sections.length > 0 && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setDialogSectionId(NEW_SECTION)}
+            className="shrink-0"
+          >
+            <Plus data-icon="inline-start" aria-hidden="true" />
+            สร้างแฟ้มย่อย
+          </Button>
+        )}
+      </div>
+
+      {sections.length === 0 ? (
+        <Card edge="dashed" padding="lg" className="flex flex-col items-center gap-3 text-center">
+          <p className="text-sm text-muted-foreground">
+            ยังไม่มีแฟ้มย่อย — ถ้าแฟ้มนี้มีหลายเรื่อง แบ่งโจทย์เป็นแฟ้มย่อยได้ (ไม่บังคับ)
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setDialogSectionId(NEW_SECTION)}
+          >
+            <Plus data-icon="inline-start" aria-hidden="true" />
+            สร้างแฟ้มย่อย
+          </Button>
+        </Card>
+      ) : (
+        <DndContext
+          id={`question-set-sections-${sectionDndId}`}
+          sensors={sectionSensors}
+          collisionDetection={closestCenter}
+          onDragEnd={reorderSections}
+        >
+          <SortableContext items={sections.map(section => section.id)} strategy={rectSortingStrategy}>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {sections.map(section => (
+                <SectionCard
+                  key={section.id}
+                  section={section}
+                  onOpen={() => setDialogSectionId(section.id)}
+                  onPreview={() => setPreviewSectionId(section.id)}
+                  onDelete={() => setDeleteSectionId(section.id)}
+                />
+              ))}
+
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setDialogSectionId(NEW_SECTION)}
+                className="h-auto min-h-[62px] gap-2 rounded-2xl border border-dashed border-border text-muted-foreground hover:border-primary/40 hover:bg-primary/[0.03] hover:text-primary"
+              >
+                <Plus data-icon="inline-start" aria-hidden="true" />
+                <span className="text-sm font-medium">สร้างแฟ้มย่อย</span>
+              </Button>
+            </div>
+          </SortableContext>
+        </DndContext>
+      )}
+    </Card>
+  )
+
+  return (
+    <div className="space-y-4">
+      {setId ? (
+        <>{sectionsPanel}{questionsPanel}</>
+      ) : (
+        <>{questionsPanel}{sectionsPanel}</>
+      )}
 
       <SectionDialog
         open={dialogSectionId !== null}
@@ -305,8 +461,25 @@ export function SetStructurePanel({
         byId={byId}
         onCancel={() => setDialogSectionId(null)}
         onConfirm={applySectionDraft}
-        setId={setId}
-        onSaveBeforeEdit={onSaveBeforeEdit}
+        onRename={dialogSection ? title => renameSection(dialogSection.id, title) : undefined}
+        onDelete={dialogSection ? () => setDeleteSectionId(dialogSection.id) : undefined}
+        loadQuestionPreviews={loadQuestionPreviews}
+      />
+
+      <QuestionListPreviewDialog
+        ids={previewSection?.question_ids ?? []}
+        open={previewSection !== null}
+        title={previewSection ? `โจทย์ทั้งหมดในแฟ้มย่อย “${previewSection.title || UNNAMED}”` : undefined}
+        onOpenChange={open => { if (!open) setPreviewSectionId(null) }}
+        loadQuestions={loadQuestionPreviews}
+      />
+
+      <BulkAddToSectionsDialog
+        open={bulkSectionOpen}
+        sections={sections}
+        selectedQuestionIds={selected}
+        onCancel={() => setBulkSectionOpen(false)}
+        onConfirm={addSelectedToSections}
       />
 
       <ConfirmDialog
@@ -342,6 +515,137 @@ export function SetStructurePanel({
 }
 
 /**
+ * Adds one bulk selection to one or more แฟ้มย่อย. This is intentionally an
+ * add-only dialog: choosing another destination must not erase any labels the
+ * selected questions already carry.
+ */
+function BulkAddToSectionsDialog({
+  open, sections, selectedQuestionIds, onCancel, onConfirm,
+}: {
+  open: boolean
+  sections: QuestionSetSection[]
+  selectedQuestionIds: string[]
+  onCancel: () => void
+  onConfirm: (sectionIds: string[]) => void
+}) {
+  const [targetSectionIds, setTargetSectionIds] = useState<string[]>([])
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false)
+  const selectedKey = selectedQuestionIds.join(',')
+
+  useEffect(() => {
+    if (!open) return
+    setTargetSectionIds([])
+    setConfirmingDiscard(false)
+  }, [open, selectedKey])
+
+  function requestClose() {
+    if (targetSectionIds.length > 0) {
+      setConfirmingDiscard(true)
+      return
+    }
+    onCancel()
+  }
+
+  function discardDraft() {
+    setConfirmingDiscard(false)
+    setTargetSectionIds([])
+    onCancel()
+  }
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={nextOpen => { if (!nextOpen) requestClose() }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FolderPlus aria-hidden="true" />
+              เพิ่มโจทย์เข้าแฟ้มย่อย
+            </DialogTitle>
+            <DialogDescription>
+              เลือกแฟ้มย่อยสำหรับโจทย์ {selectedQuestionIds.length} ข้อ เลือกได้มากกว่าหนึ่งแฟ้ม และโจทย์จะยังอยู่ในแฟ้มย่อยเดิม
+            </DialogDescription>
+          </DialogHeader>
+
+          <ToggleGroup
+            value={targetSectionIds}
+            onValueChange={setTargetSectionIds}
+            orientation="vertical"
+            spacing={2}
+            variant="outline"
+            aria-label="เลือกแฟ้มย่อยที่จะเพิ่มโจทย์เข้าไป"
+            className="w-full items-stretch"
+          >
+            {sections.map(section => {
+              const alreadyCount = selectedQuestionIds.filter(id => section.question_ids.includes(id)).length
+              const allAlreadyMembers = alreadyCount === selectedQuestionIds.length
+              const remainingCount = selectedQuestionIds.length - alreadyCount
+              const status = allAlreadyMembers
+                ? 'อยู่ในแฟ้มย่อยนี้ครบแล้ว'
+                : alreadyCount > 0
+                  ? `อยู่แล้ว ${alreadyCount} ข้อ · จะเพิ่มอีก ${remainingCount} ข้อ`
+                  : `จะเพิ่ม ${selectedQuestionIds.length} ข้อ`
+              const active = targetSectionIds.includes(section.id)
+
+              return (
+                <ToggleGroupItem
+                  key={section.id}
+                  value={section.id}
+                  disabled={allAlreadyMembers}
+                  aria-label={`${section.title || UNNAMED} — ${status}`}
+                  className="h-auto min-h-11 w-full min-w-0 justify-start whitespace-normal rounded-xl border border-border px-3 py-2.5 text-left aria-pressed:border-primary/30 aria-pressed:bg-primary/10 aria-pressed:text-foreground data-[state=on]:border-primary/30 data-[state=on]:bg-primary/10 data-[state=on]:text-foreground"
+                >
+                  <span className="flex w-full min-w-0 items-center gap-3">
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <Folder aria-hidden="true" />
+                    </span>
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="truncate text-sm font-medium text-foreground">
+                        {section.title || UNNAMED}
+                      </span>
+                      <span className="text-xs text-muted-foreground">{status}</span>
+                    </span>
+                    {active && <Check className="shrink-0 text-primary" aria-hidden="true" />}
+                  </span>
+                </ToggleGroupItem>
+              )
+            })}
+          </ToggleGroup>
+
+          <DialogFooter className="sm:items-center sm:justify-between">
+            <span className="text-sm text-muted-foreground">
+              {targetSectionIds.length > 0
+                ? `เลือก ${targetSectionIds.length} แฟ้มย่อย`
+                : 'เลือกอย่างน้อย 1 แฟ้มย่อย'}
+            </span>
+            <span className="flex items-center gap-2">
+              <Button type="button" variant="outline" onClick={requestClose}>ยกเลิก</Button>
+              <Button
+                type="button"
+                disabled={targetSectionIds.length === 0}
+                onClick={() => onConfirm(targetSectionIds)}
+              >
+                ยืนยัน
+              </Button>
+            </span>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={confirmingDiscard}
+        onOpenChange={setConfirmingDiscard}
+        title="ออกโดยไม่เพิ่มเข้าแฟ้มย่อย?"
+        description="แฟ้มย่อยที่เลือกไว้ยังไม่ได้กด “ยืนยัน” หากออกตอนนี้ รายการที่เลือกครั้งนี้จะหายไป"
+        confirmLabel="ออกโดยไม่บันทึก"
+        cancelLabel="กลับไปเลือกต่อ"
+        variant="destructive"
+        onConfirm={discardDraft}
+      />
+    </>
+  )
+}
+
+/**
  * One แฟ้มย่อย, as small as it can be and still be recognised.
  *
  * It used to print the first two โจทย์ inside it, which read well with three
@@ -350,29 +654,41 @@ export function SetStructurePanel({
  * themselves are one click away, in the dialog that can actually change them.
  */
 function SectionCard({
-  section, index, total, onOpen, onMove, onDelete,
+  section, onOpen, onPreview, onDelete,
 }: {
   section: QuestionSetSection
-  index: number
-  total: number
   onOpen: () => void
-  onMove: (delta: number) => void
+  onPreview: () => void
   onDelete: () => void
 }) {
+  const {
+    attributes, listeners, setNodeRef, setActivatorNodeRef,
+    transform, transition, isDragging,
+  } = useSortable({ id: section.id })
+
   return (
     <Card
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
       edge="ring"
       padding="sm"
-      className="group relative flex items-center gap-2.5 transition-colors hover:ring-primary/30"
+      className={cn(
+        'group relative flex items-center gap-2.5 transition-colors hover:ring-primary/30',
+        isDragging && 'z-10 opacity-70 ring-primary/40',
+      )}
     >
-      {/* The whole card opens the แฟ้มย่อย. It is laid over the content, not
-          wrapped around it, so the ⋮ menu keeps its own clicks (z-10). */}
+      {/* This transparent button is both the click target and the sortable
+          activator, so every non-menu part of the card can be held and dragged. */}
       <Button
+        ref={setActivatorNodeRef}
         type="button"
         variant="ghost"
         onClick={onOpen}
         aria-label={`เปิดแฟ้มย่อย ${section.title || UNNAMED}`}
-        className="absolute inset-0 h-auto rounded-2xl hover:bg-transparent"
+        title="กดเพื่อเปิด หรือกดค้างแล้วลากเพื่อสลับตำแหน่ง"
+        className="absolute inset-0 h-auto cursor-grab touch-manipulation rounded-2xl hover:bg-transparent active:cursor-grabbing"
+        {...attributes}
+        {...listeners}
       />
 
       <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -386,18 +702,23 @@ function SectionCard({
         <p className="text-xs text-muted-foreground">{section.question_ids.length} ข้อ</p>
       </div>
 
-      <div className="relative z-10 shrink-0">
+      <div className="relative z-10 flex shrink-0 items-center gap-1">
+        <IconButton
+          type="button"
+          size="2xs"
+          label={`ดูโจทย์ทั้งหมดในแฟ้มย่อย ${section.title || UNNAMED}`}
+          disabled={section.question_ids.length === 0}
+          onClick={onPreview}
+        >
+          <Eye />
+        </IconButton>
         <DropdownMenu>
           <DropdownMenuTrigger render={<Button variant="ghost" size="icon-xs" aria-label="ตัวเลือกแฟ้มย่อย" />}>
-            <MoreVertical className="w-4 h-4" />
+            <MoreVertical />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={onOpen}>เปิดแฟ้มย่อย</DropdownMenuItem>
-            <DropdownMenuItem disabled={index === 0} onClick={() => onMove(-1)}>ย้ายไปก่อนหน้า</DropdownMenuItem>
-            <DropdownMenuItem disabled={index === total - 1} onClick={() => onMove(1)}>ย้ายไปถัดไป</DropdownMenuItem>
-            <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onClick={onDelete}>
-              ลบแฟ้มย่อย (โจทย์ยังอยู่ในแฟ้ม)
+              ลบแฟ้มย่อย
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -416,8 +737,8 @@ function SectionCard({
  * creating, the แฟ้มย่อย itself.
  */
 function SectionDialog({
-  open, isNew, section, sections, questionIds, byId, onCancel, onConfirm,
-  setId, onSaveBeforeEdit,
+  open, isNew, section, sections, questionIds, byId, onCancel, onConfirm, onRename, onDelete,
+  loadQuestionPreviews,
 }: {
   open: boolean
   isNew: boolean
@@ -427,18 +748,24 @@ function SectionDialog({
   byId: Map<string, PanelQuestion>
   onCancel: () => void
   onConfirm: (title: string, memberIds: string[]) => void
-  /** The แฟ้ม's id, absent while it is still being created. */
-  setId?: string
-  /** Writes the แฟ้ม draft down before leaving for the โจทย์ editor. */
-  onSaveBeforeEdit?: () => Promise<boolean>
+  /** Existing sections rename only after the explicit pencil/check flow. */
+  onRename?: (title: string) => void
+  /** Existing แฟ้มย่อย only; deletion is confirmed by the parent dialog. */
+  onDelete?: () => void
+  loadQuestionPreviews?: typeof getQuestionPreviewDetails
 }) {
-  const router = useRouter()
+  const titleInputRef = useRef<HTMLInputElement>(null)
+  const questionListRef = useRef<HTMLDivElement>(null)
+  const bankRowRefs = useRef(new Map<string, HTMLLIElement>())
+  const pendingAnchorRef = useRef<{ id: string; top: number } | null>(null)
   const [search, setSearch] = useState('')
   const [draftTitle, setDraftTitle] = useState('')
   const [draftIds, setDraftIds] = useState<string[]>([])
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [previewAllOpen, setPreviewAllOpen] = useState(false)
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false)
   const [previewQ, setPreviewQ] = useState<PreviewQuestion | null>(null)
   const [previewLoadingId, setPreviewLoadingId] = useState<string | null>(null)
-  const [leavingId, setLeavingId] = useState<string | null>(null)
 
   const baselineTitle = section?.title ?? ''
   const baselineIds = useMemo(() => section?.question_ids ?? [], [section])
@@ -449,6 +776,8 @@ function SectionDialog({
     setDraftTitle(section?.title ?? '')
     setDraftIds(section?.question_ids ?? [])
     setSearch('')
+    setEditingTitle(isNew)
+    setPreviewAllOpen(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, section?.id])
 
@@ -457,19 +786,37 @@ function SectionDialog({
   const added = draftIds.filter(id => !baselineIds.includes(id))
   const removed = baselineIds.filter(id => !draftIds.includes(id))
   const titleChanged = draftTitle.trim() !== baselineTitle
-  const canConfirm = isNew || added.length > 0 || removed.length > 0 || titleChanged
+  // Closing a dialog should protect everything the teacher can see disappear,
+  // including title whitespace that cannot be confirmed but may still be an
+  // unfinished thought. Membership has no order of its own, so added/removed
+  // is the exact dirty check for the ticks.
+  const draftDirty = draftTitle !== baselineTitle || added.length > 0 || removed.length > 0
+  const canConfirm = isNew || added.length > 0 || removed.length > 0
 
-  /**
-   * Ticking in here is a draft too, and แก้ไข leaves the page.
-   *
-   * Rather than saving the ticks behind the teacher's back — which would
-   * quietly create an unnamed แฟ้มย่อย when they were only browsing — แก้ไข is
-   * simply unavailable until ยืนยัน has settled what this แฟ้มย่อย holds.
-   * ดูตัวอย่าง opens over the dialog and navigates nowhere, so it is always
-   * offered.
-   */
-  const hasPendingChanges = isNew || added.length > 0 || removed.length > 0 || titleChanged
-  const canEditQuestions = !!setId && !!onSaveBeforeEdit
+  function requestClose() {
+    if (draftDirty) {
+      setConfirmingDiscard(true)
+      return
+    }
+    onCancel()
+  }
+
+  function discardDraft() {
+    setConfirmingDiscard(false)
+    onCancel()
+  }
+
+  function finishTitleEdit() {
+    const nextTitle = draftTitle.trim()
+    setDraftTitle(nextTitle)
+    setEditingTitle(false)
+    if (!isNew && titleChanged) onRename?.(nextTitle)
+  }
+
+  function cancelTitleEdit() {
+    setDraftTitle(baselineTitle)
+    setEditingTitle(false)
+  }
 
   async function openPreview(id: string) {
     setPreviewLoadingId(id)
@@ -479,37 +826,109 @@ function SectionDialog({
     setPreviewQ(result.data as unknown as PreviewQuestion)
   }
 
-  /**
-   * A โจทย์หลายขั้นตอน is edited by its group, not by its row, and nothing in
-   * this dialog knows which rows are one. Asked for the single โจทย์ being
-   * opened, on the click that opens it.
-   */
-  async function editQuestion(id: string) {
-    if (!setId || !onSaveBeforeEdit) return
-    setLeavingId(id)
-    const [data, saved] = await Promise.all([
-      getQuestionCardData([id]),
-      onSaveBeforeEdit(),
-    ])
-    if (!saved) { setLeavingId(null); return }
-    const detail = data.details[id]
-    const path = detail?.order_in_group === 0 && detail.group_id
-      ? `/questions/multi/${detail.group_id}`
-      : `/questions/${id}/edit`
-    router.push(questionEditHref(path, '', { [RETURN_SET_PARAM]: setId }))
-  }
-
   const term = search.trim().toLowerCase()
   const visibleIds = term
-    ? questionIds.filter(id => questionLabel(byId.get(id)).toLowerCase().includes(term))
+    ? questionIds.filter(id => {
+      const question = byId.get(id)
+      return question ? matchesSearch({ ...question, question_text: question.question_text ?? '' }, search) : false
+    })
     : questionIds
+
+  // Adding a review copy above the bank must not move the original row under
+  // the teacher's pointer. Keep the bank row at the same visual Y position,
+  // matching the behaviour of the shared คลังโจทย์ picker.
+  useLayoutEffect(() => {
+    const pendingAnchor = pendingAnchorRef.current
+    const list = questionListRef.current
+    const row = pendingAnchor ? bankRowRefs.current.get(pendingAnchor.id) : null
+    if (pendingAnchor && list && row) {
+      list.scrollTop += row.getBoundingClientRect().top - pendingAnchor.top
+    }
+    pendingAnchorRef.current = null
+  }, [draftIds])
 
   function toggle(id: string) {
     setDraftIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]))
   }
 
+  function toggleFromBank(id: string) {
+    const row = bankRowRefs.current.get(id)
+    if (row) pendingAnchorRef.current = { id, top: row.getBoundingClientRect().top }
+    toggle(id)
+  }
+
+  function questionRow(id: string, location: 'selected' | 'bank') {
+    const isMember = draftIds.includes(id)
+    const wasMember = baselineIds.includes(id)
+    const pending = isMember && !wasMember ? 'add' : !isMember && wasMember ? 'remove' : null
+    const ownerTitles = (owners.get(id) ?? []).map(owner => owner.title || UNNAMED)
+    const q = byId.get(id)
+
+    return (
+      <div
+        className={cn(
+          'flex items-start gap-3 p-2.5 rounded-xl border transition-colors min-w-0',
+          pending === 'add' ? 'bg-success/10 border-success/30'
+            : pending === 'remove' ? 'bg-destructive/10 border-destructive/30'
+            : isMember ? 'bg-primary/10 border-primary/20'
+            : 'border-transparent hover:bg-muted'
+        )}
+      >
+        {/* Ticking is still the whole row, so the target stays large. The
+            preview control sits outside the label and never toggles it. */}
+        <label className="flex flex-1 items-start gap-3 min-w-0 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={isMember}
+            onChange={() => location === 'bank' ? toggleFromBank(id) : toggle(id)}
+            aria-label={`${isMember ? 'เอาออกจาก' : 'เพิ่มเข้า'}แฟ้มย่อย ${questionLabel(q)}${location === 'selected' ? ' จากกลุ่มโจทย์ในแฟ้มย่อยนี้' : ''}`}
+            className="mt-0.5 accent-primary shrink-0"
+          />
+          <span className="flex-1 min-w-0">
+            <span className="flex items-center gap-1.5 flex-wrap mb-0.5">
+              {q && (
+                <>
+                  <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${DIFF_META[q.difficulty]?.badge}`}>
+                    {DIFF_META[q.difficulty]?.label}
+                  </span>
+                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                    {TYPE_LABEL[q.question_type] ?? q.question_type}
+                  </span>
+                </>
+              )}
+            </span>
+            <span className="block text-sm text-foreground truncate">
+              {questionLabel(q)}
+            </span>
+            {pending === 'remove' && (
+              <span className="block text-[11px] font-medium mt-0.5 text-destructive">
+                − จะเอาออกจากแฟ้มย่อยนี้
+              </span>
+            )}
+            <QuestionSectionBadges
+              titles={ownerTitles}
+              showEmpty
+              className="mt-1"
+            />
+          </span>
+        </label>
+
+        <IconButton
+          label={`ดูตัวอย่างโจทย์ ${questionLabel(q)}`}
+          size="2xs"
+          disabled={!q}
+          onClick={() => void openPreview(id)}
+          className="shrink-0"
+        >
+          <Eye className="w-3.5 h-3.5" />
+        </IconButton>
+      </div>
+    )
+  }
+
   return (
-    <Dialog open={open} onOpenChange={o => { if (!o) onCancel() }}>
+    <>
+    <Dialog open={open} onOpenChange={o => { if (!o) requestClose() }}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader className="min-w-0">
           <DialogTitle className="flex items-center gap-2">
@@ -520,142 +939,139 @@ function SectionDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-1.5 min-w-0">
-          <Label htmlFor="section-title">ชื่อแฟ้มย่อย</Label>
-          <Input
-            id="section-title"
-            autoFocus={isNew}
-            value={draftTitle}
-            onChange={e => setDraftTitle(e.target.value)}
-            placeholder="เช่น โปรเจกไทล์"
-          />
-        </div>
+        <Field className="min-w-0">
+          <FieldLabel htmlFor="section-title">ชื่อแฟ้มย่อย</FieldLabel>
+          {isNew || editingTitle ? (
+            <div className="flex min-w-0 items-center gap-2">
+              <Input
+                ref={titleInputRef}
+                id="section-title"
+                autoFocus
+                value={draftTitle}
+                onChange={event => setDraftTitle(event.target.value)}
+                onKeyDown={event => {
+                  if (!isNew && event.key === 'Enter') {
+                    event.preventDefault()
+                    finishTitleEdit()
+                  }
+                  if (!isNew && event.key === 'Escape') {
+                    event.preventDefault()
+                    cancelTitleEdit()
+                  }
+                }}
+                placeholder="เช่น โปรเจกไทล์"
+              />
+              {!isNew && (
+                <>
+                  <IconButton type="button" label="ยืนยันชื่อแฟ้มย่อย" onClick={finishTitleEdit}>
+                    <Check />
+                  </IconButton>
+                  <IconButton type="button" label="ยกเลิกการแก้ไขชื่อแฟ้มย่อย" onClick={cancelTitleEdit}>
+                    <X />
+                  </IconButton>
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-border bg-muted/30 px-3 py-2">
+              <p className="min-w-0 truncate font-medium text-foreground">{draftTitle || UNNAMED}</p>
+              <Button type="button" variant="outline" size="sm" onClick={() => setEditingTitle(true)}>
+                <Pencil data-icon="inline-start" aria-hidden="true" />
+                แก้ไขชื่อ
+              </Button>
+            </div>
+          )}
+        </Field>
 
         <div className="space-y-2 min-w-0">
-          <p className="text-sm font-medium text-foreground">
-            โจทย์ในแฟ้มย่อยนี้{' '}
-            <span className="text-xs font-normal text-muted-foreground">
-              {draftIds.length} จาก {questionIds.length} ข้อในแฟ้ม
-            </span>
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-medium text-foreground">
+              โจทย์ในแฟ้มย่อยนี้{' '}
+              <span className="text-xs font-normal text-muted-foreground">
+                {draftIds.length} จาก {questionIds.length} ข้อในแฟ้ม
+              </span>
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={draftIds.length === 0}
+              onClick={() => setPreviewAllOpen(true)}
+            >
+              <Eye data-icon="inline-start" aria-hidden="true" />
+              ดูโจทย์ทั้งหมด
+            </Button>
+          </div>
 
           {questionIds.length === 0 ? (
             <p className="text-sm text-muted-foreground py-6 text-center">
               ยังไม่มีโจทย์ในแฟ้มนี้ — ปิดหน้าต่างนี้แล้วกด “เพิ่มโจทย์จากคลัง” ก่อน
             </p>
           ) : (
-            <>
+            <div ref={questionListRef} className="max-h-72 overflow-y-auto space-y-2 pr-1 min-w-0">
+              {draftIds.length > 0 && (
+                <div className="space-y-1 min-w-0">
+                  <p className="px-1 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    อยู่ในแฟ้มย่อยนี้ ({draftIds.length} ข้อ)
+                  </p>
+                  <ul className="space-y-1 min-w-0">
+                    {draftIds.map(id => (
+                      <li key={`selected-${id}`} className="min-w-0">
+                        {questionRow(id, 'selected')}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {questionIds.length > 8 && (
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
                     value={search}
                     onChange={e => setSearch(e.target.value)}
-                    placeholder="ค้นหาโจทย์ในแฟ้มนี้..."
+                    placeholder="ค้นหาจากชื่อ เนื้อหา หรือแท็ก..."
+                    aria-label="ค้นหาโจทย์ทั้งหมดในแฟ้มนี้"
                     className="pl-9"
                   />
                 </div>
               )}
 
+              <p className="px-1 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                โจทย์ทั้งหมด{term ? ` (${visibleIds.length} ข้อที่พบ)` : ''}
+              </p>
               {visibleIds.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-6 text-center">ไม่พบโจทย์ที่ตรงกัน</p>
               ) : (
-                <ul className="max-h-72 overflow-y-auto space-y-1 pr-1 min-w-0">
-                  {visibleIds.map(id => {
-                    const isMember = draftIds.includes(id)
-                    const wasMember = baselineIds.includes(id)
-                    const pending = isMember && !wasMember ? 'add' : !isMember && wasMember ? 'remove' : null
-                    const elsewhere = (owners.get(id) ?? []).filter(s => s.id !== section?.id)
-                    const q = byId.get(id)
-
-                    return (
-                      <li key={id} className="min-w-0">
-                        <div
-                          className={cn(
-                            'flex items-start gap-3 p-2.5 rounded-xl border transition-colors min-w-0',
-                            pending === 'add' ? 'bg-success/10 border-success/30'
-                              : pending === 'remove' ? 'bg-destructive/10 border-destructive/30'
-                              : isMember ? 'bg-primary/10 border-primary/20'
-                              : 'border-transparent hover:bg-muted'
-                          )}
-                        >
-                          {/* Ticking is still the whole row, so the target stays
-                              as big as it was — only the two controls on the
-                              right sit outside the label. */}
-                          <label className="flex flex-1 items-start gap-3 min-w-0 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={isMember}
-                              onChange={() => toggle(id)}
-                              className="mt-0.5 accent-primary shrink-0"
-                            />
-                            <span className="flex-1 min-w-0">
-                              <span className="flex items-center gap-1.5 flex-wrap mb-0.5">
-                                {q && (
-                                  <>
-                                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${DIFF_META[q.difficulty]?.badge}`}>
-                                      {DIFF_META[q.difficulty]?.label}
-                                    </span>
-                                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                                      {TYPE_LABEL[q.question_type] ?? q.question_type}
-                                    </span>
-                                  </>
-                                )}
-                              </span>
-                              <span className="block text-sm text-foreground truncate">
-                                {questionLabel(q)}
-                              </span>
-                              {pending ? (
-                                <span className={cn(
-                                  'block text-[11px] font-medium mt-0.5',
-                                  pending === 'add' ? 'text-success' : 'text-destructive'
-                                )}>
-                                  {pending === 'add' ? '+ จะเพิ่มเข้าแฟ้มย่อยนี้' : '− จะเอาออกจากแฟ้มย่อยนี้'}
-                                </span>
-                              ) : elsewhere.length > 0 ? (
-                                <span className="block text-[11px] text-muted-foreground mt-0.5 truncate">
-                                  อยู่ใน {elsewhere.map(s => `“${s.title || UNNAMED}”`).join(' · ')} ด้วย
-                                </span>
-                              ) : null}
-                            </span>
-                          </label>
-
-                          <span className="flex items-center shrink-0">
-                            <IconButton
-                              label="ดูตัวอย่าง"
-                              size="2xs"
-                              disabled={!q}
-                              onClick={() => void openPreview(id)}
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                            </IconButton>
-                            <IconButton
-                              label={hasPendingChanges
-                                ? 'กดยืนยันการเปลี่ยนแปลงก่อน จึงจะไปแก้ไขโจทย์ได้'
-                                : 'แก้ไขโจทย์ข้อนี้'}
-                              size="2xs"
-                              disabled={!q || !canEditQuestions || hasPendingChanges || leavingId !== null}
-                              onClick={() => void editQuestion(id)}
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </IconButton>
-                          </span>
-                        </div>
-                      </li>
-                    )
-                  })}
+                <ul className="space-y-1 min-w-0">
+                  {visibleIds.map(id => (
+                    <li
+                      key={`bank-${id}`}
+                      ref={node => {
+                        if (node) bankRowRefs.current.set(id, node)
+                        else bankRowRefs.current.delete(id)
+                      }}
+                      className="min-w-0"
+                    >
+                      {questionRow(id, 'bank')}
+                    </li>
+                  ))}
                 </ul>
               )}
-            </>
+            </div>
           )}
         </div>
 
         <DialogFooter className="min-w-0 sm:items-center sm:justify-between">
-          <span className="text-sm min-w-0">
+          <span className="flex items-center gap-2 text-sm min-w-0 flex-wrap">
+            {!isNew && onDelete && (
+              <Button type="button" variant="destructive" onClick={onDelete}>
+                <Trash2 data-icon="inline-start" aria-hidden="true" />
+                ลบแฟ้มย่อย
+              </Button>
+            )}
             {added.length === 0 && removed.length === 0 ? (
-              <span className="text-muted-foreground">
-                {isNew ? 'ตั้งชื่อแล้วติ๊กโจทย์ที่ต้องการ' : 'โจทย์ที่เอาออกจากแฟ้มย่อยจะยังอยู่ในแฟ้ม'}
-              </span>
+              isNew && <span className="text-muted-foreground">ตั้งชื่อแล้วติ๊กโจทย์ที่ต้องการ</span>
             ) : (
               <span className="flex items-center gap-2 flex-wrap">
                 {added.length > 0 && <span className="text-success font-medium">+ เพิ่ม {added.length} ข้อ</span>}
@@ -664,13 +1080,13 @@ function SectionDialog({
             )}
           </span>
           <span className="flex items-center gap-2">
-            <Button type="button" variant="outline" onClick={onCancel}>ยกเลิก</Button>
+            <Button type="button" variant="outline" onClick={requestClose}>ยกเลิก</Button>
             <Button
               type="button"
-              disabled={!canConfirm}
+              disabled={!canConfirm || (!isNew && editingTitle)}
               onClick={() => onConfirm(draftTitle.trim(), draftIds)}
             >
-              {isNew ? 'สร้างแฟ้มย่อย' : 'ยืนยันการเปลี่ยนแปลง'}
+              {isNew ? 'สร้างแฟ้มย่อย' : 'ยืนยัน'}
             </Button>
           </span>
         </DialogFooter>
@@ -690,5 +1106,30 @@ function SectionDialog({
         )}
       </DialogContent>
     </Dialog>
+
+    <QuestionListPreviewDialog
+      ids={draftIds}
+      open={previewAllOpen}
+      title={`โจทย์ทั้งหมดในแฟ้มย่อย “${draftTitle || UNNAMED}”`}
+      onOpenChange={setPreviewAllOpen}
+      loadQuestions={loadQuestionPreviews}
+    />
+
+    <ConfirmDialog
+      open={confirmingDiscard}
+      onOpenChange={setConfirmingDiscard}
+      title="ออกโดยไม่ยืนยันการเปลี่ยนแปลง?"
+      description={isNew
+        ? 'ชื่อแฟ้มย่อยหรือโจทย์ที่เลือกไว้ยังไม่ได้กด “สร้างแฟ้มย่อย” หากออกตอนนี้ ข้อมูลที่กรอกและเลือกไว้จะหายไป'
+        : editingTitle
+          ? 'ชื่อแฟ้มย่อยที่กำลังแก้ไขยังไม่ได้กดยืนยัน และรายการโจทย์ที่เปลี่ยนยังไม่ได้บันทึก หากออกตอนนี้ การเปลี่ยนแปลงครั้งนี้จะหายไป'
+          : 'รายการโจทย์ที่เปลี่ยนยังไม่ได้กด “ยืนยัน” หากออกตอนนี้ การเปลี่ยนแปลงครั้งนี้จะหายไป'}
+      confirmLabel="ออกโดยไม่บันทึก"
+      cancelLabel={isNew ? 'กลับไปสร้างต่อ' : 'กลับไปแก้ไขต่อ'}
+      variant="destructive"
+      onConfirm={discardDraft}
+      finalFocus={titleInputRef}
+    />
+    </>
   )
 }

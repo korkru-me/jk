@@ -22,6 +22,7 @@ type ResearchQuestionRow = Pick<
   | 'question_text'
   | 'question_type'
   | 'difficulty'
+  | 'subject'
   | 'tags'
   | 'extra_data'
   | 'answer_parts'
@@ -33,7 +34,7 @@ export default async function NewResearchProjectPage() {
   if (!user) redirect('/login')
 
   const supabase = await createClient()
-  const questionFields = 'id, title, question_text, question_type, difficulty, tags, extra_data, answer_parts, mcq_options'
+  const questionFields = 'id, title, question_text, question_type, difficulty, subject, tags, extra_data, answer_parts, mcq_options'
   const questionsPromise = fetchAllRows<ResearchQuestionRow>((from, to) =>
     supabase
       .from('questions')
@@ -105,6 +106,7 @@ export default async function NewResearchProjectPage() {
     question_text: question.question_text,
     question_type: question.question_type,
     difficulty: question.difficulty,
+    subject: question.subject,
     tags: question.tags,
     max_score: researchQuestionMaxScore(question),
   }))
@@ -130,4 +132,3 @@ export default async function NewResearchProjectPage() {
     />
   )
 }
-

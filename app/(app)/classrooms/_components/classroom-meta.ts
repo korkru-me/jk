@@ -9,6 +9,11 @@
 
 import { DEFAULT_CLASSROOM_ICON, isClassroomIconKey, type ClassroomIconKey } from '@/lib/classroom-icons'
 import { isClassroomCoverUrl } from '@/lib/classroom-cover'
+import {
+  isClassroomCoverPatternKey,
+  randomClassroomCoverPatternKey,
+  type ClassroomCoverPatternKey,
+} from '@/lib/classroom-cover-patterns'
 
 export type AccessType = 'open' | 'request' | 'closed'
 
@@ -20,6 +25,8 @@ export interface ClassroomMeta {
   coverImageUrl: string
   /** Optional so untouched legacy metadata round-trips without an added field. */
   iconKey?: ClassroomIconKey
+  /** Original KorKru line-art used on the colour cover. */
+  coverPattern?: ClassroomCoverPatternKey
   gradeLevel: string
   academicTerm: string
   tags: string[]
@@ -149,12 +156,13 @@ export const EMPTY_META: ClassroomMeta = {
 const SEPARATOR = ' · '
 
 // Field order here is also the order `composeDescription` writes them in.
-const META_KEYS = ['หน้าปก', 'รูปหน้าปก', 'ไอคอน', 'ระดับ', 'ภาคเรียน', 'แท็ก', 'การเข้าร่วม', 'ที่นั่ง', 'เปิด', 'ปิด'] as const
+const META_KEYS = ['หน้าปก', 'รูปหน้าปก', 'ลายปก', 'ไอคอน', 'ระดับ', 'ภาคเรียน', 'แท็ก', 'การเข้าร่วม', 'ที่นั่ง', 'เปิด', 'ปิด'] as const
 
 export function composeDescription(meta: ClassroomMeta): string {
   const parts: string[] = []
   if (meta.cover) parts.push(`หน้าปก: ${meta.cover}`)
   if (meta.coverImageUrl) parts.push(`รูปหน้าปก: ${meta.coverImageUrl}`)
+  if (isClassroomCoverPatternKey(meta.coverPattern)) parts.push(`ลายปก: ${meta.coverPattern}`)
   if (isClassroomIconKey(meta.iconKey) && meta.iconKey !== DEFAULT_CLASSROOM_ICON) parts.push(`ไอคอน: ${meta.iconKey}`)
   if (meta.gradeLevel)   parts.push(`ระดับ: ${meta.gradeLevel}`)
   if (meta.academicTerm) parts.push(`ภาคเรียน: ${meta.academicTerm}`)
@@ -205,6 +213,9 @@ export function parseDescription(raw: string | null): ClassroomMeta {
         meta.cover = COVER_PRESETS.some(preset => preset.id === value) ? value : ''
         break
       case 'รูปหน้าปก': meta.coverImageUrl = value; break
+      case 'ลายปก':
+        if (isClassroomCoverPatternKey(value)) meta.coverPattern = value
+        break
       case 'ไอคอน':
         if (isClassroomIconKey(value)) meta.iconKey = value
         break
@@ -229,6 +240,17 @@ export function parseDescription(raw: string | null): ClassroomMeta {
   return meta
 }
 
+/** Add a random cover only while creating a new room; edit flows must not call this. */
+export function ensureRandomClassroomCoverPattern(
+  raw: string,
+  random: () => number = Math.random,
+): string {
+  const normalized = raw.trim()
+  const meta = parseDescription(normalized)
+  if (isClassroomCoverPatternKey(meta.coverPattern)) return normalized
+  return composeDescription({ ...meta, coverPattern: randomClassroomCoverPatternKey(random) })
+}
+
 // What a teacher should read on a card or header: everything they entered
 // except presentation-only cover/icon keys. Strip even unknown keys so stale
 // or invalid metadata never leaks into the teacher's visible description.
@@ -239,7 +261,10 @@ export function displayDescription(raw: string | null): string {
   if (!isMetaLine(last)) return text
   const visible = last.split(SEPARATOR).filter(segment => {
     const pair = splitSegment(segment)
-    return pair?.[0] !== 'หน้าปก' && pair?.[0] !== 'รูปหน้าปก' && pair?.[0] !== 'ไอคอน'
+    return pair?.[0] !== 'หน้าปก'
+      && pair?.[0] !== 'รูปหน้าปก'
+      && pair?.[0] !== 'ลายปก'
+      && pair?.[0] !== 'ไอคอน'
   }).join(SEPARATOR)
   return [...lines.slice(0, -1), ...(visible ? [visible] : [])].join('\n')
 }

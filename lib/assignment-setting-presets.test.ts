@@ -12,6 +12,7 @@ describe('private assignment settings allowlist', () => {
     expect(values.scratchpad_enabled).toBe(type === 'exercise')
     expect(values.instant_check_answer_key).toBe(false)
     expect(values.shuffle_options).toBe(true)
+    expect(values.questions_per_page).toBe(5)
   })
 
   it.each(['question_ids', 'question_points', 'classroom_ids', 'group_ids', 'title', 'description',

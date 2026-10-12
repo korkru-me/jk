@@ -31,6 +31,7 @@ import {
 } from '@/lib/actions/assignment-categories'
 import { groupPreset } from '@/app/(app)/classrooms/_components/group-colors'
 import { GroupColorSwatches } from './group-dialogs'
+import { useDismissOnOutsideClick } from '@/hooks/use-dismiss-on-outside-click'
 
 interface Props {
   classroomId: string
@@ -197,6 +198,7 @@ export function AssignmentCategoryManager({
                 submitLabel="เพิ่มกลุ่ม"
                 onNameChange={setName}
                 onToggleColors={() => setColorPickerTarget(current => current === NEW_CATEGORY ? null : NEW_CATEGORY)}
+                onCloseColors={() => setColorPickerTarget(null)}
                 onColorChange={next => {
                   setColor(next)
                   setColorPickerTarget(null)
@@ -225,6 +227,7 @@ export function AssignmentCategoryManager({
                     autoSaveOnBlur
                     onNameChange={setName}
                     onToggleColors={() => toggleEditColors(category)}
+                    onCloseColors={() => setColorPickerTarget(null)}
                     onColorChange={setColor}
                     onCancel={resetEditor}
                     onSubmit={saveEdit}
@@ -295,6 +298,7 @@ function CategoryEditorRow({
   autoSaveOnBlur = false,
   onNameChange,
   onToggleColors,
+  onCloseColors,
   onColorChange,
   onCancel,
   onSubmit,
@@ -309,15 +313,19 @@ function CategoryEditorRow({
   autoSaveOnBlur?: boolean
   onNameChange: (name: string) => void
   onToggleColors: () => void
+  onCloseColors: () => void
   onColorChange: (color: AssignmentCategoryColor) => void
   onCancel: () => void
   onSubmit: () => void
 }) {
   const preset = groupPreset(color)
   const colorPanelId = `assignment-category-colors-${target}`
+  const editorRef = useRef<HTMLDivElement>(null)
+  useDismissOnOutsideClick(colorsOpen, editorRef, onCloseColors)
 
   return (
     <div
+      ref={editorRef}
       className="rounded-lg border bg-muted/20"
       onBlur={event => {
         if (!autoSaveOnBlur || pending || !name.trim()) return

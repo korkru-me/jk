@@ -1,5 +1,9 @@
 # แผนปิดงาน Safe Exam Browser หลัง Drawing Board
 
+## อนุมัติ release ordinary waiting/preview เท่านั้น — 12 ตุลาคม 2026
+
+เจ้าของอนุมัติให้นำหน้ารอสอบและ “ดูตัวอย่างนักเรียน” ของ narrowed candidate `c270c40` ขึ้น Production เพื่อดูด้วยตนเอง อำนาจนี้ไม่รวม native W7, SEB pilot, seed/final/enrollment, keys, activation หรือ Production migration ใหม่ รวม master `7e74dee` แล้วและรัน local regression ใหม่: 223 files / 2,981 tests, TypeScript/token lint/guarded TEST build ผ่าน เผยแพร่ผ่าน PR เข้า master/project `jk` ด้วย environment เดิม และต้องยืนยัน READY + exact merged source + canonical Production alias ก่อนรายงาน release สำเร็จ Production verification เป็น read-only ไม่สร้าง fixture/attempt/คะแนน; W7 ยัง HOLD จนได้รับคำขอใหม่โดยตรง ประวัติ Preview credential gate ด้านล่างไม่ใช่ข้ออนุมัติให้ย้าย secrets หรือเปลี่ยน environment
+
 ## คำขอเพิ่มเติม 11 ตุลาคม 2026 — ทำหน้ารอให้ครบก่อน W7
 
 เจ้าของขอพัก W7 และปรับ “ดูตัวอย่างนักเรียน” ของข้อสอบ Browser ให้เริ่มที่หน้ารอ/อ่านกติกาเหมือนทางเข้าสอบจริงแล้ว จึงแก้ใน narrowed candidate branch นี้ โดยใช้ shared waiting presentation ไม่สร้าง attempt จริงใน preview และไม่แตะ native seed/final/enrollment/keys/activation ตัวอย่างแบบฝึกหัดไม่เปลี่ยน ผลใหม่ 217 files / 2,913 tests, TypeScript/token lint/guarded TEST build และ local shared-view browser QA ผ่าน; hosted authenticated journey และ W7 ยังไม่ทดสอบ ไม่ Deploy/merge เว็บจริงในรอบนี้ ขั้นถัดไปให้เจ้าของตรวจหน้ารอและผ่าน permission gate ของ isolated Preview ก่อน hosted QA แล้วค่อยอนุมัติกลับ W7 ใหม่ ไม่ใช้ผล UI แทน native proof

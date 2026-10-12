@@ -12,13 +12,15 @@
  *   - the markup in question_text was searched raw, so a phrase straddling a
  *     tag was invisible while "span" and "class" were hits.
  */
-import { questionExcerpt } from '@/lib/question-display'
+import { DIFF_META, TYPE_LABEL, questionExcerpt } from '@/lib/question-display'
 import { escapeLike } from '@/lib/utils'
 
 export interface SearchableQuestion {
   title: string
   question_text: string
   difficulty: string
+  question_type?: string
+  subject?: string | null
   tags?: string[] | null
 }
 
@@ -57,11 +59,20 @@ export function searchTerms(search: string): string[] {
 }
 
 /**
- * Everything about a question a search may match: its title, the readable text
- * of its body (markup stripped — that is what the row shows), and its tags.
+ * Everything visible on a question card that search may match: its title, the
+ * readable body (markup stripped), difficulty, type, subject and tags.
  */
 function haystack(q: SearchableQuestion): string {
-  return normalize([q.title, questionExcerpt(q.question_text), ...(q.tags ?? [])].join(' '))
+  return normalize([
+    q.title,
+    questionExcerpt(q.question_text),
+    q.difficulty,
+    DIFF_META[q.difficulty]?.label,
+    q.question_type,
+    q.question_type ? TYPE_LABEL[q.question_type] : undefined,
+    q.subject,
+    ...(q.tags ?? []),
+  ].filter(Boolean).join(' '))
 }
 
 /**
@@ -96,12 +107,12 @@ export function matchesSearch(q: SearchableQuestion, search: string): boolean {
 
 /**
  * Why a broad search result was found, with the priority teachers see in the
- * bank: tag first, then title, then body content. A result belongs to exactly
- * one group even when the same word appears in more than one field.
+ * bank: tag first, then title, then body or visible metadata. A result belongs
+ * to exactly one group even when the same word appears in more than one field.
  *
  * For a multi-word search, all terms still have to match somewhere. Once that
  * is true, any tag hit wins; otherwise any title hit wins; the remainder was
- * found entirely through the readable question body.
+ * found through the readable body, difficulty, type or subject.
  */
 export function questionSearchGroup(
   q: SearchableQuestion,
@@ -256,7 +267,8 @@ export function questionSearchGroupSlices(
  *
  * A tag can only be matched by an exact array element (`ov`), so the words are
  * resolved against the tags that actually exist first — that is what
- * `tagUniverse` is for. Without it, tags simply do not take part.
+ * `tagUniverse` is for. Difficulty, question type and subject use their own
+ * columns so server and browser searches cover the same visible metadata.
  */
 export function questionSearchOrClauses(search: string, tagUniverse: string[] = []): string[] {
   return searchTerms(search).map(term => {
@@ -268,6 +280,15 @@ export function questionSearchOrClauses(search: string, tagUniverse: string[] = 
     // of them rides in the query string.
     const tags = tagsMatchingTerm(tagUniverse, term).slice(0, 100)
     if (tags.length > 0) parts.push(`tags.ov.{${tags.map(quoteForPostgrest).join(',')}}`)
+    const difficulties = Object.entries(DIFF_META)
+      .filter(([key, meta]) => normalize(key).includes(term) || normalize(meta.label).includes(term))
+      .map(([key]) => key)
+    if (difficulties.length > 0) parts.push(`difficulty.in.(${difficulties.join(',')})`)
+    const questionTypes = Object.entries(TYPE_LABEL)
+      .filter(([key, label]) => normalize(key).includes(term) || normalize(label).includes(term))
+      .map(([key]) => key)
+    if (questionTypes.length > 0) parts.push(`question_type.in.(${questionTypes.join(',')})`)
+    parts.push(`subject.ilike.${quoteForPostgrest(like)}`)
     return parts.join(',')
   })
 }

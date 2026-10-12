@@ -19,7 +19,7 @@ const ROOM = '00000000-0000-4000-8000-000000000001'
 const questions: AssignmentQuestionOption[] = Array.from({ length: 6 }, (_, i) => ({
   id: `00000000-0000-4000-8100-${String(i + 1).padStart(12, '0')}`,
   title: `โจทย์จำลองข้อ ${i + 1}`, question_text: `<p>คำถามจำลองข้อ ${i + 1}</p>`,
-  question_type: 'mcq', difficulty: 'easy', tags: [], sub_question_count: 1,
+  question_type: 'mcq', difficulty: 'easy', subject: 'ฟิสิกส์', tags: [], sub_question_count: 1,
   default_points: 1, has_random_values: false,
 }))
 
@@ -77,17 +77,17 @@ export function AssignmentPresetsLab() {
     }
     return {
       async load(kind) {
-        if (await fail()) return { error: '(จำลอง) โหลดรายการไม่สำเร็จ ค่าของงานยังอยู่' }
+        if (await fail()) return { error: '(จำลอง) ตรวจสอบรายการล่าสุดไม่สำเร็จ ค่าของงานยังอยู่' }
         return result(kind)
       },
       async save(input) {
-        if (await fail()) return { error: '(จำลอง) การเชื่อมต่อขัดข้อง กรุณาโหลดรายการก่อนลองซ้ำ' }
+        if (await fail()) return { error: '(จำลอง) การเชื่อมต่อขัดข้อง กรุณารอสักครู่แล้วลองซ้ำ' }
         const data = store.current[input.type]
         if (!assignmentPresetSettingsSchema.safeParse(input.settings).success) return { error: '(จำลอง) การตั้งค่าไม่ถูกต้อง' }
         if (data.presets.some(item => item.id !== input.id && item.name.toLocaleLowerCase() === input.name.trim().toLocaleLowerCase())) return { error: '(จำลอง) ชื่อชุดซ้ำ' }
         if (input.id) {
           const item = data.presets.find(preset => preset.id === input.id)
-          if (!item || item.revision !== input.expectedRevision) return { error: '(จำลอง) ข้อมูลถูกแก้ไขจากหน้าต่างอื่น กรุณาโหลดใหม่' }
+          if (!item || item.revision !== input.expectedRevision) return { error: '(จำลอง) ข้อมูลถูกแก้ไขจากหน้าต่างอื่น กรุณาลองอีกครั้ง' }
           Object.assign(item, { name: input.name.trim(), settings: structuredClone(input.settings), revision: item.revision + 1, updated_at: new Date().toISOString() })
         } else {
           if (data.presets.length >= 3) return { error: '(จำลอง) ครบสามชุดแล้ว' }
@@ -103,7 +103,7 @@ export function AssignmentPresetsLab() {
         if (await fail()) return { error: '(จำลอง) เปลี่ยนชื่อไม่สำเร็จ' }
         const data = store.current[input.type]
         const item = data.presets.find(preset => preset.id === input.id)
-        if (!item || item.revision !== input.expectedRevision) return { error: '(จำลอง) ข้อมูลเปลี่ยนแล้ว กรุณาโหลดใหม่' }
+        if (!item || item.revision !== input.expectedRevision) return { error: '(จำลอง) ข้อมูลเปลี่ยนแล้ว กรุณาลองอีกครั้ง' }
         if (data.presets.some(preset => preset.id !== item.id && preset.name.toLocaleLowerCase() === input.name.toLocaleLowerCase())) return { error: '(จำลอง) ชื่อชุดซ้ำ' }
         Object.assign(item, { name: input.name.trim(), revision: item.revision + 1, updated_at: new Date().toISOString() })
         return result(input.type)
@@ -112,7 +112,7 @@ export function AssignmentPresetsLab() {
         if (await fail()) return { error: '(จำลอง) ลบชุดไม่สำเร็จ' }
         const data = store.current[input.type]
         const item = data.presets.find(preset => preset.id === input.id)
-        if (!item || item.revision !== input.expectedRevision) return { error: '(จำลอง) ข้อมูลเปลี่ยนแล้ว กรุณาโหลดใหม่' }
+        if (!item || item.revision !== input.expectedRevision) return { error: '(จำลอง) ข้อมูลเปลี่ยนแล้ว กรุณาลองอีกครั้ง' }
         data.presets = data.presets.filter(preset => preset.id !== input.id)
         if (data.defaultPresetId === input.id) data.defaultPresetId = null
         return result(input.type)
@@ -120,7 +120,7 @@ export function AssignmentPresetsLab() {
       async setDefault(input) {
         if (await fail()) return { error: '(จำลอง) ตั้งค่าเริ่มต้นไม่สำเร็จ' }
         const data = store.current[input.type]
-        if (input.id && !data.presets.some(preset => preset.id === input.id && preset.revision === input.expectedRevision)) return { error: '(จำลอง) ข้อมูลเปลี่ยนแล้ว กรุณาโหลดใหม่' }
+        if (input.id && !data.presets.some(preset => preset.id === input.id && preset.revision === input.expectedRevision)) return { error: '(จำลอง) ข้อมูลเปลี่ยนแล้ว กรุณาลองอีกครั้ง' }
         data.defaultPresetId = input.id
         return result(input.type)
       },
@@ -128,7 +128,6 @@ export function AssignmentPresetsLab() {
   }, [])
 
   const assignmentActions = useMemo<NonNullable<ComponentProps<typeof CreateAssignmentForm>['actions']>>(() => ({
-    async createQuestionSet() { return { error: '(จำลอง) ไม่บันทึกแฟ้มในฐานข้อมูล' } },
     async createAssignment(input) {
       setCaptured(JSON.stringify(input, null, 2))
       return { error: '(จำลอง) รับข้อมูลแล้ว ไม่มีการมอบหมายหรือบันทึกฐานข้อมูล' }

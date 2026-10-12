@@ -18,16 +18,27 @@ const SCENARIOS: GroupsLabScenario[] = ['default', 'many', 'empty']
  * `?scenario=` none = 32 students in four groups; `many` = 143 students and
  * six groups (the size of a real room that looked cramped); `empty` = no
  * groups yet. `?fail=1` makes every save fail, to watch the screen roll back.
+ * `?view=overview` isolates the classroom overview for responsive checks.
  * Production receives a 404.
  */
 export default async function ClassroomGroupsLabPage({
   searchParams,
 }: {
-  searchParams: Promise<{ scenario?: string | string[]; fail?: string | string[] }>
+  searchParams: Promise<{
+    scenario?: string | string[]
+    fail?: string | string[]
+    view?: string | string[]
+  }>
 }) {
   if (!isExamScreenLabEnabled(process.env)) notFound()
-  const { scenario, fail } = await searchParams
+  const { scenario, fail, view } = await searchParams
   const requested = Array.isArray(scenario) ? scenario[0] : scenario
   const picked = SCENARIOS.find(s => s === requested) ?? 'default'
-  return <ClassroomGroupsLabClient scenario={picked} fail={(Array.isArray(fail) ? fail[0] : fail) === '1'} />
+  return (
+    <ClassroomGroupsLabClient
+      scenario={picked}
+      fail={(Array.isArray(fail) ? fail[0] : fail) === '1'}
+      overviewOnly={(Array.isArray(view) ? view[0] : view) === 'overview'}
+    />
+  )
 }

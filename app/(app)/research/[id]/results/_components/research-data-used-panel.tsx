@@ -13,25 +13,14 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/native-select'
-import { formatResearchScore, researchScoreSourceLabel } from '@/lib/education-research-scores'
-import type { EducationResearchScoreHistoryAction, EducationResearchSourceType } from '@/lib/types'
+import { formatResearchScore } from '@/lib/education-research-scores'
 import { cn } from '@/lib/utils'
 import { HelpBubble } from './research-help-bubble'
+import { ResearchHistoryDetails, type ResearchDataHistoryItem } from './research-history-details'
+
+export type { ResearchDataHistoryItem } from './research-history-details'
 
 export type ResearchDataFilter = 'all' | 'paired' | 'criterion' | 'incomplete' | 'excluded'
-
-export interface ResearchDataHistoryItem {
-  id: number
-  measurementLabel: 'ก่อนเรียน' | 'หลังเรียน'
-  action: EducationResearchScoreHistoryAction
-  oldScore: number | null
-  newScore: number | null
-  oldSource: EducationResearchSourceType | null
-  newSource: EducationResearchSourceType | null
-  reason: string | null
-  actorName: string | null
-  changedAt: string
-}
 
 export interface ResearchDataUsedRow {
   participantId: string
@@ -115,7 +104,7 @@ export function ResearchDataUsedPanel({
                   <td className="px-3 py-3 text-right font-semibold text-foreground">{formatResearchScore(row.posttest)}</td>
                   <td className="px-3 py-3"><UseStatus included={row.includedPaired} /></td>
                   <td className="px-3 py-3"><CriterionStatus included={row.includedCriterion} passed={row.passedCriterion} /></td>
-                  <td className="px-3 py-3"><p className="text-xs text-muted-foreground">{row.exclusionReason ?? 'ข้อมูลครบตามกติกา'}</p><HistoryDetails items={row.history} /></td>
+                  <td className="px-3 py-3"><p className="text-xs text-muted-foreground">{row.exclusionReason ?? 'ข้อมูลครบตามกติกา'}</p><ResearchHistoryDetails items={row.history} /></td>
                 </tr>
               ))}
               {rows.length === 0 && <tr><td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">ไม่พบข้อมูลที่ตรงกับการค้นหาและตัวกรอง</td></tr>}
@@ -150,27 +139,6 @@ function CriterionStatus({ included, passed }: { included: boolean; passed: bool
   if (!included) return <UseStatus included={false} />
   if (passed === null) return <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-xs font-medium text-muted-foreground"><CircleMinus className="size-3.5" aria-hidden="true" />ใช้ · ยังไม่ประเมิน</span>
   return <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium', passed ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning')}>{passed ? <CheckCircle2 className="size-3.5" aria-hidden="true" /> : <AlertTriangle className="size-3.5" aria-hidden="true" />}ใช้ · {passed ? 'ผ่าน' : 'ไม่ผ่าน'}</span>
-}
-
-function HistoryDetails({ items }: { items: ResearchDataHistoryItem[] }) {
-  return (
-    <details className="relative mt-2">
-      <summary className="cursor-pointer text-xs font-medium text-primary hover:underline">ดูประวัติ ({items.length})</summary>
-      <Card padding="sm" elevation="lg" className="absolute right-0 z-20 mt-1 w-80 max-w-[80vw] space-y-2">
-        {items.length === 0 ? <p className="text-xs text-muted-foreground">ยังไม่มีประวัติการเปลี่ยนแปลง</p> : items.slice(0, 20).map(item => <div key={item.id} className="border-b border-border pb-2 text-xs last:border-0 last:pb-0"><p className="font-medium text-foreground">{item.measurementLabel} · {historyActionLabel(item.action, item.oldScore, item.newScore)}</p><p className="mt-0.5 text-muted-foreground">{sourceLabel(item.oldSource)} → {sourceLabel(item.newSource)}</p><p className="mt-0.5 text-muted-foreground">{item.actorName ?? 'ระบบ'} · {formatThaiDate(item.changedAt)}</p>{item.reason && <p className="mt-0.5 text-muted-foreground">เหตุผล: {item.reason}</p>}</div>)}
-      </Card>
-    </details>
-  )
-}
-
-function historyActionLabel(action: EducationResearchScoreHistoryAction, oldScore: number | null, newScore: number | null): string {
-  if (action === 'insert') return `เพิ่มคะแนน ${formatResearchScore(newScore)}`
-  if (action === 'delete') return `ลบคะแนน ${formatResearchScore(oldScore)}`
-  return `${formatResearchScore(oldScore)} → ${formatResearchScore(newScore)}`
-}
-
-function sourceLabel(source: EducationResearchSourceType | null): string {
-  return source ? researchScoreSourceLabel(source) : 'ไม่มีข้อมูล'
 }
 
 function resultsHref(query: string, filter: ResearchDataFilter, page: number): string {

@@ -21,11 +21,13 @@ const CLASSROOM_ID = '00000000-0000-4000-8000-000000000099'
 
 export function SidebarNavigationLabShell({ children }: { children: ReactNode }) {
   const searchParams = useSearchParams()
+  const previewNavigationOnly = searchParams.get('preview') === '1'
   return (
     <ShellClient
       user={{ id: CLASSROOM_ID, email: 'sidebar@example.invalid', full_name: 'ครูจำลอง', role: searchParams.get('role') === 'student' ? 'student' : 'teacher' }}
       initialUnreadCount={0}
       notificationsEnabled={false}
+      previewNavigationOnly={previewNavigationOnly}
     >
       <p className="mb-4 text-xs text-muted-foreground">ห้องทดลองแถบห้องเรียน · ข้อมูลจำลอง · ไม่อ่านหรือบันทึก Supabase</p>
       {children}
@@ -40,6 +42,7 @@ function LabSidebar({ ready = false, onClose }: { ready?: boolean; onClose?: () 
       classroom={{ id: CLASSROOM_ID, name: ready ? 'แถบหน้ามอบหมายงานพร้อมแล้ว' : 'ฟิสิกส์ ห้องจำลอง', description: '', classroom_type: 'subject' }}
       switchableClassrooms={[{ id: 'other', name: 'ห้องจำลองอื่น', description: '' }]}
       backHref={SOURCE}
+      overviewHref={`${SOURCE}?view=overview`}
       navigationItems={classroomNavigationFor('subject', true)}
       activeItem={activeItem}
       studentCount={63}
@@ -53,6 +56,8 @@ function LabSidebar({ ready = false, onClose }: { ready?: boolean; onClose?: () 
 
 export function SidebarNavigationLabSource() {
   const [mode, setMode] = useState<'classroom' | 'assignment' | 'global' | 'teaching'>('classroom')
+  const searchParams = useSearchParams()
+  const previewNavigationOnly = searchParams.get('preview') === '1'
   const render = useCallback((onClose?: () => void) => mode === 'global' ? null : mode === 'classroom' ? <LabSidebar onClose={onClose} /> : mode === 'teaching' ? <LabTeachingSidebar onClose={onClose} /> : (
     <AssignmentContextNavigation
       assignment={{ id: CLASSROOM_ID, classroom_id: CLASSROOM_ID, title: 'ข้อสอบจำลอง', type: 'exam', mode: 'online', status: 'draft', question_ids: ['one'], random_question_count: null, completion_rule: 'fixed', streak_target: null, classrooms: { name: 'ฟิสิกส์ ห้องจำลอง' } }}
@@ -79,6 +84,12 @@ export function SidebarNavigationLabSource() {
     <div className="space-y-4">
       <h1 className="text-xl font-bold">ทดสอบคงแถบห้องเรียนระหว่างโหลด</h1>
       <div className="flex flex-wrap gap-2">
+        <Button
+          variant="outline"
+          render={<Link href={previewNavigationOnly ? SOURCE : `${SOURCE}?preview=1`} />}
+        >
+          {previewNavigationOnly ? 'ออกจากเมนูตัวอย่างนักเรียน' : 'ดูเมนูตัวอย่างนักเรียนจำลอง'}
+        </Button>
         <Button variant="outline" onClick={() => setMode('global')}>ดูเมนูหลักจำลอง</Button>
         <Button variant="outline" onClick={() => setMode('classroom')}>ดูเมนูห้องเรียนจำลอง</Button>
         <Button variant="outline" onClick={() => setMode('assignment')}>ดูเมนูงานจำลอง</Button>

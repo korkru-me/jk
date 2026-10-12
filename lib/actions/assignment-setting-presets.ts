@@ -19,7 +19,7 @@ const saveSchema = z.object({
   expectedRevision: z.number().int().min(1).max(2147483646).optional(),
   name: assignmentPresetNameSchema, settings: assignmentPresetSettingsSchema,
 }).strict().refine(input => (!!input.id) === (input.expectedRevision !== undefined), {
-  message: 'กรุณาโหลดชุดการตั้งค่าใหม่ก่อนบันทึก',
+  message: 'ข้อมูลอ้างอิงของชุดไม่ครบถ้วน กรุณาลองอีกครั้ง',
 })
 const LOAD_ERROR = 'ยังโหลดชุดการตั้งค่าไม่ได้ กรุณาลองใหม่ งานที่กำลังกรอกยังอยู่เหมือนเดิม'
 
@@ -90,11 +90,11 @@ async function mutate(input: {
     const responseValid = input.action === 'clear_default'
       ? data === null
       : z.string().uuid().safeParse(data).success && (!input.id || data === input.id)
-    if (!responseValid) return { error: 'ผลการบันทึกยังไม่ยืนยัน กรุณาโหลดรายการใหม่ก่อนลองซ้ำ' }
+    if (!responseValid) return { error: 'ผลการบันทึกยังไม่ยืนยัน ระบบกำลังตรวจสอบข้อมูลล่าสุด กรุณารอสักครู่แล้วลองอีกครั้ง' }
     const refreshed = await loadForSession(session, input.type)
-    if ('error' in refreshed) return { error: 'บันทึกคำสั่งแล้ว แต่โหลดรายการใหม่ไม่สำเร็จ กรุณากดโหลดใหม่ก่อนลองบันทึกซ้ำ' }
+    if ('error' in refreshed) return { error: 'บันทึกคำสั่งแล้ว แต่ยังยืนยันรายการล่าสุดไม่ได้ กรุณารอสักครู่แล้วลองอีกครั้ง' }
     return refreshed
-  } catch { return { error: 'ติดต่อระบบไม่ได้ ผลการบันทึกยังไม่ยืนยัน กรุณาโหลดรายการใหม่ก่อนลองซ้ำ' } }
+  } catch { return { error: 'ติดต่อระบบไม่ได้ ผลการบันทึกยังไม่ยืนยัน กรุณารอสักครู่แล้วลองอีกครั้ง' } }
 }
 
 export async function saveAssignmentSettingPreset(input: SaveAssignmentSettingPresetInput): Promise<AssignmentPresetActionResult> {
@@ -111,7 +111,7 @@ export async function renameAssignmentSettingPreset(input: z.infer<typeof identi
 
 export async function deleteAssignmentSettingPreset(input: z.infer<typeof identitySchema>): Promise<AssignmentPresetActionResult> {
   const parsed = identitySchema.safeParse(input)
-  if (!parsed.success) return { error: 'กรุณาโหลดชุดการตั้งค่าใหม่ก่อนลบ' }
+  if (!parsed.success) return { error: 'ข้อมูลอ้างอิงของชุดไม่ถูกต้อง กรุณาลองอีกครั้ง' }
   return mutate({ ...parsed.data, action: 'delete' })
 }
 
@@ -123,6 +123,6 @@ export async function setDefaultAssignmentSettingPreset(input: {
     expectedRevision: z.number().int().min(1).max(2147483646).optional(),
   }).strict().refine(value => value.id === null || value.expectedRevision !== undefined)
   const parsed = schema.safeParse(input)
-  if (!parsed.success) return { error: 'กรุณาโหลดชุดการตั้งค่าใหม่ก่อนตั้งค่าเริ่มต้น' }
+  if (!parsed.success) return { error: 'ข้อมูลอ้างอิงของชุดไม่ถูกต้อง กรุณาลองอีกครั้ง' }
   return mutate({ ...parsed.data, action: parsed.data.id === null ? 'clear_default' : 'default' })
 }

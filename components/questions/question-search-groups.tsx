@@ -28,9 +28,9 @@ export const SEARCH_GROUP_META: Record<QuestionSearchGroup, { label: string; hea
     description: 'คำค้นตรงกับชื่อโจทย์',
   },
   content: {
-    label: 'เนื้อหาโจทย์',
-    heading: 'พบจากเนื้อหาโจทย์',
-    description: 'คำค้นตรงกับข้อความภายในโจทย์',
+    label: 'เนื้อหาและข้อมูลกำกับ',
+    heading: 'พบจากเนื้อหาหรือข้อมูลกำกับ',
+    description: 'คำค้นตรงกับข้อความ ระดับความยาก ประเภทโจทย์ หรือวิชา',
   },
 }
 
@@ -75,7 +75,7 @@ export function SearchGroupSelector({ value, counts, onChange, label }: {
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
       <p className="text-xs text-muted-foreground">
-        เรียงผลจากแท็ก → ชื่อโจทย์ → เนื้อหาโจทย์ และแสดงแต่ละข้อเพียงกลุ่มเดียว
+        เรียงผลจากแท็ก → ชื่อโจทย์ → เนื้อหาและข้อมูลกำกับ และแสดงแต่ละข้อเพียงกลุ่มเดียว
       </p>
       <div className="flex flex-wrap items-center gap-1" role="group" aria-label={label}>
         <span className="mr-1 text-xs font-medium text-muted-foreground">แสดง:</span>

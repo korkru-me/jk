@@ -1663,7 +1663,14 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
       </div>
 
       {/* RIGHT: Nav panel */}
-      <div className={`hidden min-h-0 shrink-0 flex-col gap-3 lg:flex ${focusMode ? 'w-60' : 'w-56'}`}>
+      <div
+        data-exam-desktop-navigation
+        className={`hidden min-h-0 shrink-0 flex-col gap-3 lg:flex ${
+          focusMode
+            ? 'h-full w-60'
+            : 'sticky top-3 h-[calc(100dvh-4rem)] w-56 self-start'
+        }`}
+      >
 
         {/* Timer */}
         {secondsLeft !== null && (

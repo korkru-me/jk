@@ -6,7 +6,10 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { getMyOrgId } from '@/lib/actions/org'
 import type { Assignment } from '@/lib/types'
-import { parseDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
+import {
+  ensureRandomClassroomCoverPattern,
+  parseDescription,
+} from '@/app/(app)/classrooms/_components/classroom-meta'
 import { isClassroomCoverUrl } from '@/lib/classroom-cover'
 
 function generateClassCode(): string {
@@ -39,6 +42,7 @@ export async function createClassroom(data: { name: string; description: string;
 
   const checkedDescription = validateClassroomDescription(data.description, user.id)
   if ('error' in checkedDescription) return checkedDescription
+  const description = ensureRandomClassroomCoverPattern(checkedDescription.description)
 
   const orgId = await getMyOrgId()
   if (!orgId) return { error: 'ไม่พบข้อมูลสถาบัน กรุณาติดต่อผู้ดูแล' }
@@ -57,7 +61,7 @@ export async function createClassroom(data: { name: string; description: string;
     org_id: orgId,
     teacher_id: user.id,
     name: data.name,
-    description: checkedDescription.description || null,
+    description: description || null,
     class_code: classCode,
     status: 'active',
     classroom_type: data.classroomType ?? 'subject',
@@ -148,6 +152,7 @@ export async function duplicateClassroom(
   const description = overrides ? overrides.description.trim() : source.description
   const checkedDescription = validateClassroomDescription(description ?? '', user.id)
   if ('error' in checkedDescription) return checkedDescription
+  const descriptionWithCover = ensureRandomClassroomCoverPattern(checkedDescription.description)
 
   let classCode = generateClassCode()
   for (let i = 0; i < 5; i++) {
@@ -174,7 +179,7 @@ export async function duplicateClassroom(
       org_id: source.org_id,
       teacher_id: user.id,
       name,
-      description: checkedDescription.description || null,
+      description: descriptionWithCover || null,
       class_code: classCode,
       status: 'active',
       classroom_type: source.classroom_type,
@@ -241,7 +246,44 @@ export async function duplicateClassroom(
   return { success: true, id: copy.id, copiedAssignments: createdAssignmentIds.length }
 }
 
-// ── Update (rename / edit the description shown on the classroom header) ───
+// ── Recent dashboard order ──
+
+export async function recordClassroomRecentView(classroomId: string) {
+  const user = await getAuthUser()
+  if (!user || !classroomId) return { success: false }
+
+  // This action is invoked after the authorized classroom page has mounted,
+  // but it performs its own ownership check because server actions remain
+  // callable endpoints. Co-teacher/student visits must not reorder an owner's
+  // personal dashboard.
+  const admin = createAdminClient()
+  const { data: classroom } = await admin
+    .from('classrooms')
+    .select('id')
+    .eq('id', classroomId)
+    .eq('teacher_id', user.id)
+    .eq('status', 'active')
+    .maybeSingle()
+
+  if (!classroom) return { success: false }
+
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('classroom_recent_views')
+    .upsert(
+      { user_id: user.id, classroom_id: classroomId, viewed_at: new Date().toISOString() },
+      { onConflict: 'user_id,classroom_id' },
+    )
+
+  // A deployment whose schema migration is still pending should keep the
+  // classroom usable and fall back to the dashboard's existing created order.
+  if (error) return { success: false }
+
+  revalidatePath('/dashboard')
+  return { success: true }
+}
+
+// ── Update (rename / edit the description shown on the classroom header) ──
 
 export async function updateClassroom(id: string, data: { name: string; description: string }) {
   const user = await getAuthUser()

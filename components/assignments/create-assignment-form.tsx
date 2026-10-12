@@ -1,12 +1,19 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { toast } from 'sonner'
+import {
+  DndContext, MouseSensor, TouchSensor, closestCenter,
+  useSensor, useSensors, type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext, useSortable, verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { createAssignment } from '@/lib/actions/assignments'
-import { createQuestionSet } from '@/lib/actions/question-sets'
 import { assignmentCopyTitle, assignmentCreationTitle } from '@/lib/assignment-creation'
 import {
   assignmentPresetDefaults, type AssignmentPresetBootstrap, type AssignmentPresetSettings,
@@ -28,16 +35,19 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import {
-  Check, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, Eye, CircleHelp,
+  Check, ChevronRight, ChevronLeft, ChevronDown, Eye,
   X, Save, FileText,
 } from 'lucide-react'
 import {
-  filterSectionsToQuestions, moveQuestionOrder, moveQuestionOrderToIndex, parseSections,
+  filterSectionsToQuestions, moveQuestionOrderToIndex, parseSections,
   type QuestionSetSection,
 } from '@/lib/question-set-sections'
 import type {
@@ -65,7 +75,10 @@ import { QuestionPreviewDialog } from '@/components/assignments/question-preview
 import { QuestionListPreviewDialog } from '@/components/assignments/question-list-preview-dialog'
 import type { getQuestionPreviewDetails } from '@/lib/actions/question-previews'
 import { toggleQuestionSetSelection } from '@/lib/question-set-selection'
-import { QuestionSetImport } from '@/components/assignments/question-set-import'
+import {
+  QuestionSetImport,
+  type QuestionSetImportChoice,
+} from '@/components/assignments/question-set-import'
 import { ClassroomPicker } from '@/components/assignments/classroom-picker'
 import { AssignmentReviewSummary } from '@/components/assignments/assignment-review-summary'
 import {
@@ -91,10 +104,7 @@ import {
   INSTANT_CHECK_SETTING_LABEL,
 } from '@/components/assignments/instant-check-setting-label'
 import { AssignmentSettingHoverLabel } from '@/components/assignments/assignment-setting-hover-label'
-import {
-  RESULT_VISIBILITY_OPTIONS,
-  ResultVisibilityOptionHoverCard,
-} from '@/components/assignments/result-visibility-options'
+import { RESULT_VISIBILITY_OPTIONS } from '@/components/assignments/result-visibility-options'
 
 const QuestionPicker = dynamic(
   () => import('@/components/assignments/question-picker').then(mod => mod.QuestionPicker),
@@ -103,7 +113,7 @@ const QuestionPicker = dynamic(
 
 const STEPS = ['รายละเอียด โจทย์ และคะแนน', 'ตั้งค่า', 'กำหนดการสอบ']
 
-// สรุปก่อนสร้าง used to read the two original values only, so a งาน set to
+// The final review used to read the two original values only, so a งาน set to
 // แสดงคะแนนแต่ไม่แสดงเฉลย or ไม่แสดงผลลัพธ์ was summarised as
 // "หลังพ้นกำหนดส่ง" — the wrong promise, on the last screen before creating.
 const SHOW_RESULTS_SUMMARY: Record<ShowResultsMode, string> = {
@@ -180,7 +190,6 @@ interface Props {
   presetActions?: AssignmentPresetActions
   /** Local QA can capture submissions without writing synthetic data. */
   actions?: {
-    createQuestionSet: typeof createQuestionSet
     createAssignment: typeof createAssignment
     getQuestionPreviewDetails?: typeof getQuestionPreviewDetails
   }
@@ -201,6 +210,11 @@ export function CreateAssignmentForm({
   actions,
 }: Props) {
   const router = useRouter()
+  const questionOrderDndId = useId()
+  const questionOrderSensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
+  )
   const assignmentType = preselectedAssignmentType
   const assignmentNoun = assignmentType === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'
   const completionSectionLabel = `เงื่อนไขการทำ${assignmentNoun}เสร็จ`
@@ -241,11 +255,6 @@ export function CreateAssignmentForm({
   // every เติมคำตอบตัวเลข answer carries a photo, and a งาน that starts out
   // able to block students is not a safe default.
   const [requireWorkImage, setRequireWorkImage] = useState(copySource?.require_work_image ?? initialSettings.require_work_image)
-  // When not starting from an existing set, offer to save the picked
-  // questions back into the library as a new reusable set.
-  const [saveAsSet, setSaveAsSet] = useState(false)
-  const [questionSetTitle, setQuestionSetTitle] = useState('')
-
   // Step 1 (continued) — filter out any question_ids that no longer resolve to a real
   // question (e.g. deleted since the set was saved). Otherwise a dangling id
   // sails through into selectedIds, gets silently dropped later by
@@ -262,6 +271,30 @@ export function CreateAssignmentForm({
   const [showSections, setShowSections] = useState(copySource?.show_sections ?? initialSettings.show_question_sections)
   const [search, setSearch] = useState('')
   const [diffFilter, setDiffFilter] = useState('all')
+  const questionPickerRef = useRef<HTMLDivElement>(null)
+  const [questionPickerOpen, setQuestionPickerOpen] = useState(false)
+
+  useEffect(() => {
+    if (!questionPickerOpen) return
+
+    function closeQuestionPickerOnOutsideClick(event: MouseEvent) {
+      const container = questionPickerRef.current
+      const target = event.target
+      if (!container || !(target instanceof Node)) return
+      // The trigger can be replaced while Base UI updates its open state.
+      // The original event path still proves that the click began inside.
+      if (container.contains(target) || event.composedPath().includes(container)) return
+      // The preview dialog is rendered in a portal, outside questionPickerRef,
+      // but interacting with it must not silently close the picker behind it.
+      if (target instanceof Element && target.closest('[role="dialog"]')) return
+      setQuestionPickerOpen(false)
+    }
+
+    // Using click preserves the target through pointerup when this tall panel
+    // collapses, so the teacher can switch to the แฟ้ม picker in one click.
+    document.addEventListener('click', closeQuestionPickerOnOutsideClick)
+    return () => document.removeEventListener('click', closeQuestionPickerOnOutsideClick)
+  }, [questionPickerOpen])
   // How much of the คลัง above each student actually receives. Empty = all of
   // it, which is what every งาน did before this setting existed. It lives here
   // rather than in ตั้งค่า because "ให้เด็กทำกี่ข้อ" is the thought that comes
@@ -281,10 +314,15 @@ export function CreateAssignmentForm({
       Object.entries(copySource?.question_points ?? {}).map(([id, points]) => [id, String(points)]),
     ),
   )
+  const [questionPointsPreset, setQuestionPointsPreset] = useState<'one' | 'parts' | null>(null)
   // Which row's มุมมองนักเรียน is open, as an index into selectedIds so the
   // dialog's ข้อถัดไป walks the teacher's own order. null = closed.
   const [previewIndex, setPreviewIndex] = useState<number | null>(null)
-  const [listPreview, setListPreview] = useState<{ ids: string[]; title: string } | null>(null)
+  const [listPreview, setListPreview] = useState<{
+    ids: string[]
+    title: string
+    reorderable?: boolean
+  } | null>(null)
   // Independent of the per-question points above — rescales what's
   // *reported* only (never the underlying structure), and can be changed
   // any time later from the edit page too, even after students finish.
@@ -330,6 +368,7 @@ export function CreateAssignmentForm({
   const [calculatorEnabled, setCalculatorEnabled] = useState(copySource?.calculator_enabled ?? initialSettings.calculator_enabled)
   const [scratchpadEnabled, setScratchpadEnabled] = useState(copySource?.scratchpad_enabled ?? initialSettings.scratchpad_enabled)
   const [accessCode, setAccessCode] = useState(copySource?.access_code ?? '')
+  const [accessCodeEnabled, setAccessCodeEnabled] = useState(Boolean(copySource?.access_code?.trim()))
   const [proctoringEnabled, setProctoringEnabled] = useState(copySource?.proctoring_enabled ?? initialSettings.proctoring_enabled)
   const [fullscreenRequired, setFullscreenRequired] = useState(copySource?.fullscreen_required ?? initialSettings.fullscreen_required)
   const [blockClipboard, setBlockClipboard] = useState(copySource?.block_clipboard ?? initialSettings.block_clipboard)
@@ -447,7 +486,124 @@ export function CreateAssignmentForm({
       color: band.color,
     })),
   )
+  // A reload or closed tab is the one exit path where the app cannot show its
+  // own dialog. Track only values that can become part of the assignment: UI
+  // state such as the current step, an open disclosure, search, and previews
+  // must not turn a pristine form into an "unsaved" one.
+  const defaultPointsById = useMemo(
+    () => new Map(questions.map(question => [question.id, question.default_points])),
+    [questions],
+  )
+  const draftFingerprint = useMemo(
+    () => JSON.stringify({
+      title,
+      description,
+      classroomIds: [...classroomIds].sort(),
+      groupTargets: [...classroomIds]
+        .sort()
+        .map(classroomId => [classroomId, groupTargets[classroomId] === null
+          ? null
+          : [...(groupTargets[classroomId] ?? [])].sort()]),
+      requireWorkImage,
+      selectedIds,
+      sections: filterSectionsToQuestions(sections, selectedIds),
+      showSections,
+      randomQuestionCount,
+      questionPoints: selectedIds.map(id => [
+        id,
+        questionPointDrafts[id] ?? String(defaultPointsById.get(id) ?? 1),
+      ]),
+      displayMaxScore,
+      duration,
+      shuffleQ,
+      shuffleA,
+      sharedRandomValues,
+      showResults,
+      showSolutions,
+      maxAttempts,
+      scoreStrategy,
+      retryScope,
+      questionsPerPage,
+      instantCheck,
+      instantCheckAnswerKey,
+      calculatorEnabled,
+      scratchpadEnabled,
+      accessCode,
+      accessCodeEnabled,
+      proctoringEnabled,
+      fullscreenRequired,
+      blockClipboard,
+      examWatermarkEnabled,
+      secureBrowserMode,
+      androidExamMode,
+      sebQuitPassword,
+      sebQuitPasswordConfirmation,
+      completionRule,
+      streakTarget,
+      streakCapEnabled,
+      streakCap,
+      streakRecycle,
+      passingEnabled,
+      passingType,
+      passingValue,
+      startAt,
+      dueAt,
+      endAt,
+      lateBands,
+    }),
+    [
+      title, description, classroomIds, groupTargets, requireWorkImage,
+      selectedIds, sections, showSections, randomQuestionCount, questionPointDrafts,
+      defaultPointsById, displayMaxScore, duration, shuffleQ, shuffleA,
+      sharedRandomValues, showResults, showSolutions, maxAttempts, scoreStrategy,
+      retryScope, questionsPerPage, instantCheck, instantCheckAnswerKey,
+      calculatorEnabled, scratchpadEnabled, accessCode, accessCodeEnabled,
+      proctoringEnabled, fullscreenRequired, blockClipboard, examWatermarkEnabled,
+      secureBrowserMode, androidExamMode, sebQuitPassword, sebQuitPasswordConfirmation,
+      completionRule, streakTarget, streakCapEnabled, streakCap, streakRecycle,
+      passingEnabled, passingType, passingValue, startAt, dueAt, endAt, lateBands,
+    ],
+  )
+  const initialDraftFingerprintRef = useRef(draftFingerprint)
+  const hasUnsavedAssignmentChanges = draftFingerprint !== initialDraftFingerprintRef.current
+
+  useEffect(() => {
+    if (!hasUnsavedAssignmentChanges) return
+
+    function warnBeforeLeaving(event: BeforeUnloadEvent) {
+      event.preventDefault()
+      // Browsers deliberately replace this value with their own localized
+      // confirmation text. Assigning it is still required by older engines.
+      event.returnValue = ''
+    }
+
+    window.addEventListener('beforeunload', warnBeforeLeaving)
+    return () => window.removeEventListener('beforeunload', warnBeforeLeaving)
+  }, [hasUnsavedAssignmentChanges])
+
+  const scheduleRef = useRef<HTMLDivElement>(null)
+  const additionalClassroomsRef = useRef<HTMLDivElement>(null)
   const [scheduleOpen, setScheduleOpen] = useState(Boolean(startAt || dueAt || endAt))
+
+  useEffect(() => {
+    if (!scheduleOpen) return
+
+    function closeScheduleOnOutsideClick(event: MouseEvent) {
+      const container = scheduleRef.current
+      const target = event.target
+      if (!container || !(target instanceof Node)) return
+      // A selected value can move or replace a nested control before this
+      // document listener runs. The original event path still proves that the
+      // click began inside the schedule card in that case.
+      if (container.contains(target) || event.composedPath().includes(container)) return
+      setScheduleOpen(false)
+    }
+
+    // Waiting for click keeps the outside target in place through pointerup,
+    // so one click can both close this panel and activate the next control.
+    document.addEventListener('click', closeScheduleOnOutsideClick)
+    return () => document.removeEventListener('click', closeScheduleOnOutsideClick)
+  }, [scheduleOpen])
 
   // Every โจทย์ this teacher can actually assign. Kept as a set because both
   // the แฟ้ม shortcut and importSet ask "is this id real?" once per ข้อ in a
@@ -455,6 +611,7 @@ export function CreateAssignmentForm({
   const bankIds = useMemo(() => new Set(questions.map(q => q.id)), [questions])
 
   function toggleQ(id: string) {
+    setQuestionPointsPreset(null)
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
   }
 
@@ -463,51 +620,71 @@ export function CreateAssignmentForm({
   // will see (unless สลับลำดับข้อแบบสุ่ม is turned on in ตั้งค่า). `sections`
   // is deliberately left alone: it still carries แฟ้มย่อย for questions that
   // are currently unticked, and is trimmed to the real selection at submit.
-  function moveQuestion(id: string, delta: number) {
-    setSelectedIds(prev => moveQuestionOrder(prev, id, delta))
-  }
-
   function moveQuestionTo(id: string, position: number) {
     setSelectedIds(prev => moveQuestionOrderToIndex(prev, id, position - 1))
   }
 
+  function reorderQuestions(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    setSelectedIds(prev => {
+      const nextIndex = prev.indexOf(String(over.id))
+      if (nextIndex < 0) return prev
+      return moveQuestionOrderToIndex(prev, String(active.id), nextIndex)
+    })
+  }
+
   // Same effect as unticking the ข้อ back in เลือกโจทย์, so a duplicate spotted
   // here doesn't cost a trip backwards. `sections` is left alone for the same
-  // reason as in moveQuestion: it keeps this question's แฟ้มย่อย, so re-ticking
-  // it later puts it back under the same one. The last remaining ข้อ can't go —
+  // reason as in the reorder handlers: it keeps this question's แฟ้มย่อย, so
+  // re-ticking it later puts it back under the same one. The last remaining ข้อ can't go —
   // the server refuses a งาน with no โจทย์, and one built from a แฟ้ม would
   // quietly get the whole แฟ้ม back instead.
   function removeQuestion(id: string) {
+    setQuestionPointsPreset(null)
     setSelectedIds(prev => prev.filter(i => i !== id))
   }
 
-  function importSet(set: AssignmentQuestionSetOption) {
-    const validIds = [...new Set(set.question_ids)].filter(id => bankIds.has(id))
-    const missingCount = new Set(set.question_ids).size - validIds.length
+  function importSet(choice: QuestionSetImportChoice) {
+    const validIds = [...new Set(choice.questionIds)].filter(id => bankIds.has(id))
+    const validIdSet = new Set(validIds)
+    const missingCount = new Set(choice.questionIds).size - validIds.length
     const removing = validIds.length > 0 && validIds.every(id => selectedIds.includes(id))
-    setSelectedIds(prev => toggleQuestionSetSelection(prev, set.question_ids, bankIds))
+    setQuestionPointsPreset(null)
+    setSelectedIds(prev => toggleQuestionSetSelection(prev, choice.questionIds, bankIds))
     if (removing) {
       // As with unticking one question, retain section/point drafts for re-selection.
-      toast.success(`เอา ${validIds.length} ข้อจากแฟ้ม "${set.title}" ออกจากรายการที่เลือกแล้ว`)
+      toast.success(`เอา ${validIds.length} ข้อจาก${choice.toastLabel} ออกจากรายการที่เลือกแล้ว`)
       return
     }
     // What the click actually changed. Re-importing a แฟ้ม the teacher already
     // pulled in used to claim it added all 22 ข้อ again.
     const addedCount = validIds.filter(id => !selectedIds.includes(id)).length
-    // Sections follow their questions in. Ids already claimed by an earlier
-    // แฟ้ม stay where they are, so two แฟ้ม can be merged without a question
-    // showing up under two แฟ้มย่อย.
+    // Sections follow their questions in. Re-importing the same แฟ้ม or one
+    // แฟ้มย่อย merges by section id instead of appending duplicate headings.
+    // A question may intentionally belong to several แฟ้มย่อย, so membership
+    // is not stripped merely because another section already carries it.
     setSections(prev => {
-      const claimed = new Set(prev.flatMap(sec => sec.question_ids))
-      const incoming = parseSections(set.sections)
-        .map(sec => ({ ...sec, question_ids: sec.question_ids.filter(id => validIds.includes(id) && !claimed.has(id)) }))
+      const incoming = choice.sections
+        .map(sec => ({ ...sec, question_ids: sec.question_ids.filter(id => validIdSet.has(id)) }))
         .filter(sec => sec.question_ids.length > 0)
-      return [...prev, ...incoming]
+      const incomingById = new Map(incoming.map(section => [section.id, section]))
+      const merged = prev.map(section => {
+        const addition = incomingById.get(section.id)
+        if (!addition) return section
+        incomingById.delete(section.id)
+        return {
+          ...section,
+          question_ids: [...new Set([...section.question_ids, ...addition.question_ids])],
+        }
+      })
+      return [...merged, ...incomingById.values()]
     })
     if (missingCount > 0) {
-      toast.success(`เพิ่ม ${addedCount} ข้อจากแฟ้ม "${set.title}" (ข้าม ${missingCount} ข้อที่ถูกลบไปแล้ว)`)
+      toast.success(`เพิ่ม ${addedCount} ข้อจาก${choice.toastLabel} (ข้าม ${missingCount} ข้อที่ถูกลบไปแล้ว)`)
     } else {
-      toast.success(`เพิ่ม ${addedCount} ข้อจากแฟ้ม "${set.title}"`)
+      toast.success(`เพิ่ม ${addedCount} ข้อจาก${choice.toastLabel}`)
     }
   }
 
@@ -563,17 +740,26 @@ export function CreateAssignmentForm({
   // the ดูตัวอย่าง dialog must page through exactly what is shown.
   const previewIds = previewQuestions.map(q => q.id)
   // What a question is worth until the teacher types over it.
-  const defaultPointsById = new Map(questions.map(q => [q.id, q.default_points]))
   const pointsDraft = (id: string) => questionPointDrafts[id] ?? String(defaultPointsById.get(id) ?? 1)
+
+  function setAllQuestionPoints(
+    preset: 'one' | 'parts',
+    pointsFor: (question: AssignmentQuestionOption) => number,
+  ) {
+    setQuestionPointDrafts(prev => ({
+      ...prev,
+      ...Object.fromEntries(previewQuestions.map(question => [
+        question.id,
+        String(pointsFor(question)),
+      ])),
+    }))
+    setQuestionPointsPreset(preset)
+  }
 
   const pointsSum = Math.round(
     previewQuestions.reduce((sum, q) => sum + (Number.parseFloat(pointsDraft(q.id)) || 0), 0) * 100
   ) / 100
 
-  // Two students drawing different โจทย์ out of a คลัง whose ข้อ are worth
-  // different amounts end up graded out of different totals. คะแนนเต็มที่
-  // แสดงผล is the existing fix, so the warning offers it rather than only
-  // naming the problem.
   // ── เงื่อนไขจบงาน ────────────────────────────────────────────────────────
   // The same resolver createAssignment uses, asked with the same inputs, so a
   // streak the form shows as ready is a streak the server will accept — and a
@@ -621,19 +807,59 @@ export function CreateAssignmentForm({
     }
   }
 
-  const pointValues = previewQuestions.map(q => Number.parseFloat(pointsDraft(q.id)) || 0)
-  const drawnPointsVary = randomDrawOn && new Set(pointValues).size > 1
-  const displayMaxSet = displayMaxScore.trim() !== '' && Number(displayMaxScore) > 0
+  const parsedManualDisplayMax = Number.parseFloat(displayMaxScore)
+  const manualDisplayMax = displayMaxScore.trim() !== ''
+    && Number.isFinite(parsedManualDisplayMax)
+    && parsedManualDisplayMax > 0
+      ? parsedManualDisplayMax
+      : null
+  const displayMaxInvalid = displayMaxScore.trim() !== '' && manualDisplayMax === null
+  const accessCodeInvalid = accessCodeEnabled && accessCode.trim().length === 0
+  const automaticDisplayMax = randomDrawOn && !randomDrawInvalid ? questionsPerAttempt : null
+  const showQuestionDelivery = selectedIds.length > 0
+  const displayMaxScoreField = (
+    <Field data-invalid={displayMaxInvalid} className="gap-1.5">
+      <FieldLabel htmlFor="display-max-score">คะแนนเต็มที่แสดงผล</FieldLabel>
+      <div className="flex items-center gap-2">
+        <Input
+          id="display-max-score"
+          type="number"
+          min={0.1}
+          step="any"
+          value={displayMaxScore}
+          aria-describedby="display-max-score-description"
+          aria-invalid={displayMaxInvalid}
+          onChange={event => setDisplayMaxScore(event.target.value)}
+          placeholder={automaticDisplayMax !== null
+            ? `อัตโนมัติ (${automaticDisplayMax})`
+            : `ไม่ปรับ (${pointsSum})`}
+          className="w-32 sm:w-36"
+        />
+        <span className="text-sm text-muted-foreground">คะแนน</span>
+      </div>
+      <FieldDescription id="display-max-score-description" className="text-xs">
+        {automaticDisplayMax !== null
+          ? `เว้นว่างเพื่อใช้ ${automaticDisplayMax} คะแนนตามจำนวนข้อที่สุ่ม หรือกรอกค่าเพื่อปรับสเกลคะแนนรวม`
+          : `เว้นว่างเพื่อใช้คะแนนจริงรวม ${pointsSum} คะแนน หรือกรอกค่าที่ต้องการให้แสดง`}
+      </FieldDescription>
+      {displayMaxInvalid && (
+        <FieldError className="text-xs">
+          กรอกคะแนนเต็มที่มากกว่า 0 หรือเว้นว่างเพื่อใช้ค่าอัตโนมัติ
+        </FieldError>
+      )}
+    </Field>
+  )
 
   function canNext() {
     if (step === 0) {
       return title.trim().length > 0 && classroomIds.length > 0 && classrooms.length > 0
         && groupTargetsComplete(groupTargets, preselectedClassroomId ? [preselectedClassroomId] : classroomIds)
-        && selectedIds.length > 0 && (!saveAsSet || questionSetTitle.trim().length > 0)
+        && selectedIds.length > 0
         && !(streakOn && (!streakAvailable || streakBlocked))
-        && !randomDrawInvalid
+        && !randomDrawInvalid && !displayMaxInvalid
     }
     if (step === 1) {
+      if (accessCodeInvalid) return false
       if (assignmentType === 'exam' && secureBrowserMode === 'seb_required') {
         return getSebQuitPasswordClientError(sebQuitPassword, sebQuitPasswordConfirmation) === null
       }
@@ -683,13 +909,18 @@ export function CreateAssignmentForm({
       setStep(0)
       return
     }
-    if (completionChoice === 'threshold' && (passingValue.trim() === '' || !Number.isFinite(Number(passingValue)) || Number(passingValue) < 0 || (passingType === 'percent' && Number(passingValue) > 100))) {
-      toast.error('กรุณากรอกเกณฑ์ผ่านให้ถูกต้อง')
+    if (displayMaxInvalid) {
+      toast.error('คะแนนเต็มที่แสดงผลต้องมากกว่า 0 หรือเว้นว่างเพื่อใช้ค่าอัตโนมัติ')
       setStep(0)
       return
     }
-    if (!preselectedSet && saveAsSet && !questionSetTitle.trim()) {
-      toast.error('กรุณากรอกชื่อแฟ้มโจทย์')
+    if (accessCodeInvalid) {
+      toast.error('โปรดตรวจสอบข้อมูลที่จำเป็นให้ครบถ้วน')
+      setStep(1)
+      return
+    }
+    if (completionChoice === 'threshold' && (passingValue.trim() === '' || !Number.isFinite(Number(passingValue)) || Number(passingValue) < 0 || (passingType === 'percent' && Number(passingValue) > 100))) {
+      toast.error('กรุณากรอกเกณฑ์ผ่านให้ถูกต้อง')
       setStep(0)
       return
     }
@@ -699,35 +930,6 @@ export function CreateAssignmentForm({
       return
     }
     startTransition(async () => {
-      let setId = preselectedSet?.id
-
-      if (!preselectedSet && saveAsSet) {
-        const setRes = await (actions?.createQuestionSet ?? createQuestionSet)({
-          title: questionSetTitle.trim(),
-          description: description.trim(),
-          question_ids: selectedIds,
-          visibility: 'private',
-        })
-        if ('error' in setRes) {
-          toast.error(`บันทึกแฟ้มโจทย์ลงคลังไม่สำเร็จ: ${setRes.error} (จะมอบหมายต่อโดยไม่บันทึกลงคลัง)`)
-        } else {
-          setId = setRes.id
-        }
-      }
-
-      // Every question gets an explicit point value — its own structural value
-      // unless the teacher edited it, and 1 for invalid input.
-      const questionPoints = Object.fromEntries(
-        selectedIds.map(id => {
-          const parsed = Number.parseFloat(pointsDraft(id))
-          return [id, Number.isFinite(parsed) && parsed > 0 ? parsed : 1] as const
-        })
-      )
-
-      const parsedDisplayMax = Number.parseFloat(displayMaxScore)
-      const displayMax = displayMaxScore.trim() !== '' && Number.isFinite(parsedDisplayMax) && parsedDisplayMax > 0
-        ? parsedDisplayMax
-        : null
       const parsedRandomCount = Number(randomQuestionCount)
       const selectedRandomCount = canDrawRandomSubset
         && randomQuestionCount.trim() !== ''
@@ -736,6 +938,21 @@ export function CreateAssignmentForm({
         && parsedRandomCount < selectedIds.length
           ? parsedRandomCount
           : null
+      // A random draw scores the number of correct questions, so every
+      // question is explicitly worth 1 point. Keep the teacher's drafts in
+      // local state so switching back to all questions before submit restores
+      // them, but never send those weights for a random assignment.
+      const questionPoints = Object.fromEntries(
+        selectedIds.map(id => {
+          if (selectedRandomCount !== null) return [id, 1] as const
+          const parsed = Number.parseFloat(pointsDraft(id))
+          return [id, Number.isFinite(parsed) && parsed > 0 ? parsed : 1] as const
+        })
+      )
+
+      // The raw maximum is already the number of questions drawn. An explicit
+      // teacher value still rescales that total for the gradebook.
+      const displayMax = manualDisplayMax ?? selectedRandomCount
 
       const res = await (actions?.createAssignment ?? createAssignment)({
         copy_source_assignment_id: copySource?.id,
@@ -748,7 +965,7 @@ export function CreateAssignmentForm({
         show_sections: showSections,
         question_points: questionPoints,
         display_max_score: displayMax,
-        set_id: setId,
+        set_id: preselectedSet?.id,
         start_at: thaiLocalDateTimeToIso(effectiveStartAt),
         due_at: thaiLocalDateTimeToIso(dueAt),
         late_bands: lateBands.map(band => ({
@@ -778,7 +995,7 @@ export function CreateAssignmentForm({
         questions_per_page: Number(questionsPerPage) || 1,
         instant_check: instantCheck,
         instant_check_answer_key: instantCheckAnswerKey,
-        access_code: accessCode.trim() || null,
+        access_code: accessCodeEnabled ? accessCode.trim() || null : null,
         completion_rule: completionRule,
         streak_target: completionRule === 'streak' ? Number(streakTarget) : null,
         streak_question_cap: completionRule === 'streak' ? streakCapValue : null,
@@ -947,153 +1164,152 @@ export function CreateAssignmentForm({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-sm font-semibold text-foreground">โจทย์ คะแนน และเวลา</h2>
               <span className="shrink-0 text-sm font-semibold text-primary">
-                {previewQuestions.length} ข้อ · รวม {pointsSum} คะแนน
+                {previewQuestions.length} ข้อ · {randomDrawOn ? 'ข้อละ 1 คะแนน' : `รวม ${pointsSum} คะแนน`}
               </span>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-foreground">เลือกโจทย์</h3>
-              {selectedIds.length > 0 && (
-                <Button type="button" variant="outline" size="sm" onClick={() => setListPreview({ ids: previewIds, title: 'ตัวอย่างโจทย์ที่เลือก' })}>
-                  <Eye data-icon="inline-start" />
-                  ดูตัวอย่างโจทย์ที่เลือก
-                </Button>
-              )}
-            </div>
+            <h3 className="text-sm font-semibold text-foreground">
+              เลือกโจทย์ <span aria-hidden="true" className="text-destructive">*</span>
+              <span className="sr-only"> จำเป็น</span>
+            </h3>
 
             <QuestionSetImport
               sets={questionSets}
               bankIds={bankIds}
               selectedIds={selectedIds}
               onToggle={importSet}
-              onPreview={set => setListPreview({ ids: set.question_ids.filter(id => bankIds.has(id)), title: `โจทย์ในแฟ้ม ${set.title}` })}
+              onPreview={choice => setListPreview({
+                ids: choice.questionIds.filter(id => bankIds.has(id)),
+                title: `โจทย์ใน${choice.toastLabel}`,
+              })}
             />
 
-            <Collapsible>
-              <CollapsibleTrigger
-                className={cn(
-                  buttonVariants({ variant: 'outline' }),
-                  'group h-auto w-full justify-start gap-2 rounded-xl px-3 py-2.5 text-left',
-                )}
-              >
-                <span className="text-foreground">เลือกโจทย์รายข้อ</span>
-                <span className="text-xs font-normal text-muted-foreground">{questions.length} ข้อในคลัง</span>
-                <ChevronDown className="ml-auto text-muted-foreground transition-transform group-data-panel-open:rotate-180" />
-              </CollapsibleTrigger>
-              <CollapsibleContent className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 ease-out data-ending-style:h-0 data-starting-style:h-0">
-                <div className="pt-4">
-                  <QuestionPicker
-                    questions={questions}
-                    selectedIds={selectedIds}
-                    onToggle={toggleQ}
-                    search={search}
-                    onSearchChange={setSearch}
-                    diffFilter={diffFilter}
-                    onDiffFilterChange={setDiffFilter}
-                    showHeader={false}
-                    showSelectedFooter={false}
-                    surface="plain"
-                  />
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
+            <div ref={questionPickerRef}>
+              <Collapsible open={questionPickerOpen} onOpenChange={setQuestionPickerOpen}>
+                <CollapsibleTrigger
+                  className={cn(
+                    buttonVariants({ variant: 'outline' }),
+                    'group h-auto w-full justify-start gap-2 rounded-xl px-3 py-2.5 text-left',
+                  )}
+                >
+                  <span className="text-foreground">เลือกโจทย์รายข้อ</span>
+                  <span className="text-xs font-normal text-foreground">{questions.length} ข้อในคลัง</span>
+                  <ChevronDown className="ml-auto text-muted-foreground transition-transform group-data-panel-open:rotate-180" />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 ease-out data-ending-style:h-0 data-starting-style:h-0">
+                  <div className="pt-4">
+                    <QuestionPicker
+                      questions={questions}
+                      selectedIds={selectedIds}
+                      onToggle={toggleQ}
+                      search={search}
+                      onSearchChange={setSearch}
+                      diffFilter={diffFilter}
+                      onDiffFilterChange={setDiffFilter}
+                      showHeader={false}
+                      showSelectedFooter={false}
+                      surface="plain"
+                      loadPreviewQuestions={actions?.getQuestionPreviewDetails}
+                    />
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            </div>
             <Separator />
-            <h3 className="text-sm font-semibold text-foreground">คะแนนแต่ละข้อ</h3>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-foreground">คะแนนแต่ละข้อ</h3>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={previewIds.length === 0}
+                onClick={() => setListPreview({
+                  ids: previewIds,
+                  title: 'ตัวอย่างโจทย์ทั้งหมดตามลำดับ',
+                  reorderable: true,
+                })}
+              >
+                <Eye data-icon="inline-start" />
+                ดูโจทย์ทั้งหมด
+              </Button>
+            </div>
             <p data-assignment-description className="text-xs text-muted-foreground">
               ค่าเริ่มต้นคิดตามจำนวนข้อย่อยในโจทย์ — ข้อย่อย 1 ข้อ = 1 คะแนน
               แก้ไขคะแนนข้อไหนก็ได้ ระบบจะรวมคะแนนทั้งหมดให้อัตโนมัติ
-              สลับลำดับข้อได้ที่นี่ — ย้ายทีละขั้นด้วยลูกศร หรือพิมพ์เลขข้อที่ต้องการลงในช่องซ้ายมือแล้วกด Enter
+              สลับลำดับข้อได้ที่นี่ — กดค้างที่หมายเลขหรือชื่อโจทย์แล้วลาก
+              หรือพิมพ์เลขข้อที่ต้องการลงในช่องซ้ายมือแล้วกด Enter
               กดรูปตาเพื่อดูตัวอย่างข้อนั้นแบบที่นักเรียนเห็น
               และถ้าเจอข้อซ้ำหรือข้อที่ไม่เอาแล้ว กดกากบาทท้ายแถวเอาออกได้เลย ไม่ต้องเลื่อนกลับไปเลือกโจทย์
             </p>
 
-            <div className="space-y-1.5 max-h-[420px] overflow-y-auto pr-1">
-              {previewQuestions.map((q, i) => (
-                <div key={q.id} className="flex flex-wrap items-center gap-2 p-2.5 rounded-xl border border-border sm:flex-nowrap">
-                  <div className="flex min-w-0 flex-1 basis-full items-center gap-2 sm:basis-auto">
-                    <OrderNumberInput
+            <div role="group" aria-label="ปรับคะแนนทุกข้อ" className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant={!randomDrawOn && questionPointsPreset === 'one' ? 'default' : 'outline'}
+                size="sm"
+                aria-pressed={!randomDrawOn && questionPointsPreset === 'one'}
+                disabled={previewQuestions.length === 0 || randomDrawOn}
+                onClick={() => setAllQuestionPoints('one', () => 1)}
+              >
+                {!randomDrawOn && questionPointsPreset === 'one' && <Check data-icon="inline-start" />}
+                ทุกข้อ 1 คะแนน
+              </Button>
+              <Button
+                type="button"
+                variant={!randomDrawOn && questionPointsPreset === 'parts' ? 'default' : 'outline'}
+                size="sm"
+                aria-pressed={!randomDrawOn && questionPointsPreset === 'parts'}
+                disabled={previewQuestions.length === 0 || randomDrawOn}
+                onClick={() => setAllQuestionPoints('parts', question => question.default_points)}
+              >
+                {!randomDrawOn && questionPointsPreset === 'parts' && <Check data-icon="inline-start" />}
+                คะแนนตามข้อย่อย
+              </Button>
+              <span role="status" aria-live="polite" className="sr-only">
+                {questionPointsPreset === 'one'
+                  ? `ตั้งคะแนนทั้งหมด ${previewQuestions.length} ข้อเป็นข้อละ 1 คะแนนแล้ว`
+                  : questionPointsPreset === 'parts'
+                    ? `ตั้งคะแนนทั้งหมด ${previewQuestions.length} ข้อตามข้อย่อยแล้ว`
+                    : ''}
+              </span>
+            </div>
+            {randomDrawOn && (
+              <p className="text-xs text-muted-foreground">
+                เมื่อเลือกสุ่มโจทย์ ระบบจะกำหนดให้ทุกข้อมีค่า 1 คะแนนโดยอัตโนมัติ
+                ค่าคะแนนรายข้อที่ตั้งไว้จะไม่นำมาใช้ในโหมดนี้
+              </p>
+            )}
+
+            <DndContext
+              id={`assignment-question-order-${questionOrderDndId}`}
+              sensors={questionOrderSensors}
+              collisionDetection={closestCenter}
+              onDragEnd={reorderQuestions}
+            >
+              <SortableContext items={previewIds} strategy={verticalListSortingStrategy}>
+                <div className="flex max-h-[420px] flex-col gap-1.5 overflow-y-auto pr-1">
+                  {previewQuestions.map((q, i) => (
+                    <SortableQuestionScoreRow
+                      key={q.id}
+                      question={q}
                       position={i + 1}
                       total={previewQuestions.length}
+                      points={randomDrawOn ? '1' : pointsDraft(q.id)}
+                      pointsLockedToOne={randomDrawOn}
                       onMove={to => moveQuestionTo(q.id, to)}
+                      onPreview={() => setPreviewIndex(i)}
+                      onPointsChange={value => {
+                        setQuestionPointsPreset(null)
+                        setQuestionPointDrafts(d => ({ ...d, [q.id]: value }))
+                      }}
+                      onRemove={() => removeQuestion(q.id)}
                     />
-                    <div className="flex flex-col shrink-0">
-                      <IconButton
-                        label="ย้ายขึ้น"
-                        size="2xs"
-                        disabled={i === 0}
-                        onClick={() => moveQuestion(q.id, -1)}
-                      >
-                        <ChevronUp className="w-3.5 h-3.5" />
-                      </IconButton>
-                      <IconButton
-                        label="ย้ายลง"
-                        size="2xs"
-                        disabled={i === previewQuestions.length - 1}
-                        onClick={() => moveQuestion(q.id, 1)}
-                      >
-                        <ChevronDown className="w-3.5 h-3.5" />
-                      </IconButton>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{q.title}</p>
-                      <p className="text-xs text-muted-foreground truncate">{questionExcerpt(q.question_text)}</p>
-                    </div>
-                  </div>
-                  {q.sub_question_count > 1 && (
-                    <span className="text-xs text-muted-foreground shrink-0">
-                      {q.sub_question_count} {subQuestionUnit(q.question_type)}
-                    </span>
-                  )}
-                  <IconButton
-                    label={`ดูตัวอย่างข้อ ${i + 1}`}
-                    size="2xs"
-                    className="shrink-0"
-                    onClick={() => setPreviewIndex(i)}
-                  >
-                    <Eye className="w-3.5 h-3.5" />
-                  </IconButton>
-                  <Input
-                    type="number"
-                    min={0}
-                    step="any"
-                    value={pointsDraft(q.id)}
-                    aria-label={`คะแนนข้อ ${i + 1}`}
-                    onChange={e => setQuestionPointDrafts(d => ({ ...d, [q.id]: e.target.value }))}
-                    className="w-16 text-center shrink-0 sm:w-20"
-                  />
-                  <span className="text-xs text-muted-foreground shrink-0">คะแนน</span>
-                  <IconButton
-                    label="เอาข้อนี้ออก"
-                    size="2xs"
-                    className="shrink-0 hover:text-destructive"
-                    disabled={previewQuestions.length <= 1}
-                    onClick={() => removeQuestion(q.id)}
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </IconButton>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </SortableContext>
+            </DndContext>
             <Separator />
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="flex min-w-0 flex-col gap-1.5">
-                <Label htmlFor="display-max-score">คะแนนเต็มที่แสดงผล</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    id="display-max-score"
-                    type="number"
-                    min={0}
-                    step="any"
-                    value={displayMaxScore}
-                    aria-label="คะแนนเต็มที่แสดงผล"
-                    onChange={e => setDisplayMaxScore(e.target.value)}
-                    placeholder={`ไม่ปรับ (เท่ากับ ${pointsSum})`}
-                    className="max-w-[160px]"
-                  />
-                  <span className="text-sm text-muted-foreground">คะแนน</span>
-                </div>
-              </div>
-
+            <div className="grid gap-3 sm:grid-cols-2">
               {streakOn && (
                 <p data-assignment-description className="text-xs text-muted-foreground rounded-lg bg-muted px-3 py-2">
                   {completionSectionLabel}ตั้งไว้เป็น “ทำถูกติดต่อกัน {streakTarget} ข้อ” — หน้าทำโจทย์จึงแสดงทีละ 1 ข้อ
@@ -1131,35 +1347,10 @@ export function CreateAssignmentForm({
               </div>
             </div>
 
-            {!preselectedSet && (
-              <>
-                <label className="flex min-h-10 cursor-pointer items-center justify-between gap-3 rounded-xl border border-border px-3 py-2">
-                  <p className="min-w-0 text-sm font-medium text-foreground">บันทึกโจทย์ที่เลือกไว้ในแฟ้มเพื่อใช้ซ้ำ</p>
-                  <input
-                    type="checkbox"
-                    checked={saveAsSet}
-                    onChange={event => setSaveAsSet(event.target.checked)}
-                    className="size-4 shrink-0 accent-primary"
-                  />
-                </label>
-                {saveAsSet && (
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="question-set-title">ชื่อแฟ้มโจทย์ <span className="text-destructive">*</span></Label>
-                    <Input
-                      id="question-set-title"
-                      value={questionSetTitle}
-                      onChange={event => setQuestionSetTitle(event.target.value)}
-                      placeholder="เช่น แฟ้มโจทย์เรื่องแรงและการเคลื่อนที่"
-                      required
-                    />
-                  </div>
-                )}
-              </>
-            )}
           </Card>
 
-          {(canDrawRandomSubset || randomQuestionCount.trim() !== '') && (
-            <Card padding="md" className="space-y-3">
+          {showQuestionDelivery && (
+            <Card padding="md" className="flex flex-col gap-3">
               <div>
                 <h2 className="text-sm font-semibold text-foreground">ชุดโจทย์ที่นักเรียนได้รับ</h2>
                 <p data-assignment-description className="text-xs text-muted-foreground">
@@ -1182,7 +1373,7 @@ export function CreateAssignmentForm({
                 >
                   <p className="font-medium text-sm text-foreground">ให้ทำทุกข้อ</p>
                   <p data-assignment-description className={cn('mt-0.5 text-xs', !randomDrawOn ? 'text-foreground' : 'text-muted-foreground')}>
-                    ทุกคนได้โจทย์ชุดเดียวกัน
+                    นักเรียนทุกคนได้รับโจทย์ที่เลือกไว้ทั้งหมด
                   </p>
                 </button>
                 <button
@@ -1196,56 +1387,56 @@ export function CreateAssignmentForm({
                 >
                   <p className="font-medium text-sm text-foreground">สุ่มจากโจทย์ที่เลือกข้างต้น</p>
                   <p data-assignment-description className={cn('mt-0.5 text-xs', randomDrawOn ? 'text-foreground' : 'text-muted-foreground')}>
-                    แต่ละคน แต่ละรอบ ได้คนละชุด
+                    นักเรียนแต่ละคนและแต่ละรอบอาจได้รับชุดโจทย์ต่างกัน
                   </p>
                 </button>
               </div>
 
+              <Separator />
+
               {randomDrawOn && (
-                <div className="space-y-3 rounded-xl border border-border p-4">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Label htmlFor="random-question-count" className="text-sm text-muted-foreground">
-                      ให้นักเรียนทำ
-                    </Label>
-                    <Input
-                      id="random-question-count"
-                      type="number"
-                      min={1}
-                      max={maxRandomDraw}
-                      value={randomQuestionCount}
-                      onChange={event => {
-                        const nextValue = event.target.value
-                        setRandomQuestionCount(nextValue)
-                        if (nextValue.trim() === '' && completionRule === 'streak') {
-                          setCompletionRule('fixed')
-                          setPassingEnabled(false)
-                        }
-                      }}
-                      className="max-w-[110px]"
-                    />
-                    <span className="text-sm text-muted-foreground">
-                      ข้อ จากคลัง {selectedIds.length} ข้อ
-                    </span>
-                  </div>
-                  <p data-assignment-description className="text-xs text-muted-foreground">
-                    ชุดที่สุ่มได้จะถูกตรึงไว้ตลอดรอบนั้น — ปิดหน้าจอแล้วกลับมาทำต่อได้ชุดเดิม ส่วนรอบใหม่สุ่มชุดใหม่
-                  </p>
-                  {drawnPointsVary && !displayMaxSet && (
-                    <div className="flex items-start justify-between gap-3 rounded-lg bg-warning/10 px-3 py-2">
-                      <p className="text-xs text-foreground">
-                        คะแนนแต่ละข้อในคลังไม่เท่ากัน คนที่จับได้ข้อคะแนนสูงจะได้เปรียบ —
-                        ตั้ง “คะแนนเต็มที่แสดงผล” ให้ทุกคนเทียบกันได้
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => setDisplayMaxScore(String(questionsPerAttempt))}
-                        className="text-xs font-medium text-foreground underline shrink-0"
-                      >
-                        ตั้งเป็น {questionsPerAttempt}
-                      </button>
+                <FieldGroup className="grid gap-3 sm:grid-cols-2">
+                  <Field className="gap-1.5">
+                    <FieldLabel htmlFor="random-question-count">ให้นักเรียนทำ</FieldLabel>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Input
+                        id="random-question-count"
+                        type="number"
+                        min={1}
+                        max={maxRandomDraw}
+                        value={randomQuestionCount}
+                        onChange={event => {
+                          const nextValue = event.target.value
+                          setRandomQuestionCount(nextValue)
+                          if (nextValue.trim() === '' && completionRule === 'streak') {
+                            setCompletionRule('fixed')
+                            setPassingEnabled(false)
+                          }
+                        }}
+                        className="w-20"
+                      />
+                      <span className="text-sm text-muted-foreground">
+                        ข้อ จากคลัง {selectedIds.length} ข้อ
+                      </span>
                     </div>
-                  )}
-                </div>
+                    <p className="text-xs text-muted-foreground">
+                      ทุกข้อมีค่า 1 คะแนน และคิดคะแนนตามจำนวนข้อที่ตอบถูก
+                    </p>
+                  </Field>
+                  {displayMaxScoreField}
+                </FieldGroup>
+              )}
+
+              {!randomDrawOn && (
+                <FieldGroup className="max-w-md">
+                  {displayMaxScoreField}
+                </FieldGroup>
+              )}
+
+              {randomDrawOn && (
+                <p data-assignment-description className="text-xs text-muted-foreground">
+                  ชุดที่สุ่มได้จะถูกตรึงไว้ตลอดรอบนั้น — ปิดหน้าจอแล้วกลับมาทำต่อได้ชุดเดิม ส่วนรอบใหม่สุ่มชุดใหม่
+                </p>
               )}
             </Card>
           )}
@@ -1481,6 +1672,32 @@ export function CreateAssignmentForm({
                   </div>
                 ) : null) as React.ReactNode,
               }] : []),
+              {
+                label: 'กำหนดรหัสผ่านเข้าทำ',
+                desc: 'กำหนดให้นักเรียนกรอกรหัสผ่านที่ครูตั้งไว้ก่อนเริ่มทำแบบฝึกหัดหรือข้อสอบ',
+                descriptionOnHover: true,
+                value: accessCodeEnabled,
+                set: setAccessCodeEnabled,
+                footer: (accessCodeEnabled ? (
+                  <div className="pl-3">
+                    <Field data-invalid={accessCodeInvalid} className="gap-1.5">
+                      <FieldLabel htmlFor="create-access-code">รหัสผ่านเข้าทำ</FieldLabel>
+                      <Input
+                        id="create-access-code"
+                        value={accessCode}
+                        onChange={event => setAccessCode(event.target.value)}
+                        placeholder="กรอกรหัสผ่านที่นักเรียนต้องใช้"
+                        aria-invalid={accessCodeInvalid}
+                        aria-describedby="create-access-code-description"
+                        className="max-w-sm"
+                      />
+                      <FieldDescription id="create-access-code-description" className="text-xs">
+                        นักเรียนต้องกรอกรหัสนี้ให้ถูกต้องก่อนเริ่มทำงาน
+                      </FieldDescription>
+                    </Field>
+                  </div>
+                ) : null) as React.ReactNode,
+              },
               {
                 label: 'เครื่องคิดเลขวิทยาศาสตร์',
                 desc: 'เปิดให้นักเรียนใช้เครื่องคิดเลขวิทยาศาสตร์ภายในเว็บไซต์ระหว่างทำแบบฝึกหัดหรือข้อสอบ',
@@ -1761,7 +1978,7 @@ export function CreateAssignmentForm({
       {/* ── Step 3: กำหนดการสอบ ─────────────────────────────────────── */}
       {step === 2 && (
         <div className="space-y-3">
-          <Card padding="md">
+          <Card ref={scheduleRef} padding="md">
             <Collapsible open={scheduleOpen} onOpenChange={setScheduleOpen}>
               <CollapsibleTrigger className="group flex w-full items-center justify-between gap-3 text-left">
                 <span className="flex min-w-0 flex-col gap-1">
@@ -1798,26 +2015,14 @@ export function CreateAssignmentForm({
             </Collapsible>
           </Card>
 
-          <Card padding="md">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="code">รหัสผ่านเข้าทำ (ถ้ามี)</Label>
-              <Input
-                id="code"
-                value={accessCode}
-                onChange={e => setAccessCode(e.target.value)}
-                placeholder="ไม่บังคับ — เว้นว่างถ้าไม่ต้องใช้รหัส"
-                className="max-w-[200px]"
-              />
-            </div>
-          </Card>
-
           {preselectedClassroomId && (
-            <Card padding="md" className="flex flex-col gap-3">
+            <Card ref={additionalClassroomsRef} padding="md" className="flex flex-col gap-3">
               <ClassroomPicker
                 classrooms={classrooms}
                 selectedIds={classroomIds}
                 onToggle={toggleClassroom}
                 primaryClassroomId={preselectedClassroomId}
+                outsideClickBoundaryRef={additionalClassroomsRef}
               />
               {classroomIds.some(id => id !== preselectedClassroomId) && (
                 <div className="flex flex-col gap-1.5">
@@ -1837,41 +2042,40 @@ export function CreateAssignmentForm({
             </Card>
           )}
 
-          <Card padding="md" className="flex flex-col gap-2.5">
-            <h2 className="text-sm font-semibold text-foreground">แสดงผลลัพธ์</h2>
-            <ToggleGroup
-              value={[showResults]}
-              onValueChange={values => {
-                const next = values.at(-1)
-                if (next === 'immediate' || next === 'score_only' || next === 'after_due' || next === 'never') {
-                  setShowResults(next)
-                }
-              }}
-              aria-label="เลือกการแสดงผลลัพธ์"
-              variant="outline"
-              orientation="vertical"
-              spacing={2}
-              className="w-full items-stretch"
-            >
-              {RESULT_VISIBILITY_OPTIONS.map(option => (
-                <ResultVisibilityOptionHoverCard
-                  key={option.key}
-                  description={option.description}
-                  trigger={<ToggleGroupItem
-                    value={option.key}
-                    className="min-h-10 w-full min-w-0 justify-start whitespace-normal rounded-lg border border-border px-3 py-2 aria-pressed:bg-primary/10 aria-pressed:text-foreground data-[state=on]:bg-primary/10 data-[state=on]:text-foreground"
-                  >
-                    <span className="flex w-full items-center gap-3">
-                      <span className="flex min-w-0 flex-1 items-center gap-1.5 text-left">
-                        <span className="text-sm font-medium text-foreground">{option.label}</span>
-                        <CircleHelp aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
-                      </span>
-                      {showResults === option.key && <Check className="mt-0.5 shrink-0 text-primary" aria-hidden="true" />}
-                    </span>
-                  </ToggleGroupItem>}
-                />
-              ))}
-            </ToggleGroup>
+          <Card padding="md">
+            <Field className="gap-1.5">
+              <FieldLabel htmlFor="show-results">แสดงผลลัพธ์</FieldLabel>
+              <Select
+                value={showResults}
+                onValueChange={value => {
+                  if (value && RESULT_VISIBILITY_OPTIONS.some(option => option.key === value)) {
+                    setShowResults(value as ShowResultsMode)
+                  }
+                }}
+              >
+                <SelectTrigger
+                  id="show-results"
+                  aria-label="เลือกเวลาแสดงผลลัพธ์"
+                  className="w-full sm:max-w-md"
+                >
+                  <SelectValue>
+                    {RESULT_VISIBILITY_OPTIONS.find(option => option.key === showResults)?.label}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent align="start" alignItemWithTrigger={false}>
+                  <SelectGroup>
+                    {RESULT_VISIBILITY_OPTIONS.map(option => (
+                      <SelectItem key={option.key} value={option.key}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              <FieldDescription className="text-xs leading-5">
+                {RESULT_VISIBILITY_OPTIONS.find(option => option.key === showResults)?.description}
+              </FieldDescription>
+            </Field>
           </Card>
 
           <AssignmentReviewSummary
@@ -1894,9 +2098,11 @@ export function CreateAssignmentForm({
               },
               {
                 label: 'คะแนนเต็ม',
-                value: displayMaxScore.trim() && Number(displayMaxScore) > 0
-                  ? `${displayMaxScore} คะแนน (จริง ${pointsSum})`
-                  : `${pointsSum} คะแนน`,
+                value: manualDisplayMax !== null
+                  ? `${manualDisplayMax} คะแนน (กำหนดเอง${randomDrawOn ? '' : ` · คะแนนจริง ${pointsSum}`})`
+                  : automaticDisplayMax !== null
+                    ? `${automaticDisplayMax} คะแนน (ตามจำนวนข้อที่สุ่ม)`
+                    : `${pointsSum} คะแนน`,
               },
               ...(duration ? [{ label: 'เวลา', value: `${duration} นาที` }] : []),
               ...(dueAt ? [{ label: 'ส่งตรงเวลา', value: new Date(thaiLocalDateTimeToIso(dueAt) ?? dueAt).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) }] : []),
@@ -1923,7 +2129,10 @@ export function CreateAssignmentForm({
               ...(perPageValue > 1
                 ? [{ label: 'ข้อต่อหน้า', value: `${perPageValue} ข้อ` }]
                 : []),
-              ...(accessCode.trim() ? [{ label: 'รหัสผ่าน', value: accessCode.trim() }] : []),
+              {
+                label: 'รหัสผ่านเข้าทำ',
+                value: accessCodeEnabled && accessCode.trim() ? accessCode.trim() : 'ไม่ได้กำหนด',
+              },
               ...(assignmentType === 'exam' && proctoringEnabled
                 ? [{ label: 'คุมสอบสด', value: fullscreenRequired ? 'เปิด · บังคับเต็มจอ' : 'เปิด' }]
                 : []),
@@ -1948,15 +2157,15 @@ export function CreateAssignmentForm({
               { label: 'เฉลยวิธีทำ', value: showSolutions ? 'ให้ดูเมื่อทำเสร็จ' : 'ไม่ให้ดู' },
             ]}
           />
-          <AssignmentSettingPresetsSave />
         </div>
       )}
 
       <QuestionListPreviewDialog
-        ids={listPreview?.ids ?? []}
+        ids={listPreview?.reorderable ? previewIds : (listPreview?.ids ?? [])}
         title={listPreview?.title}
         open={listPreview !== null}
         onOpenChange={open => { if (!open) setListPreview(null) }}
+        onMoveQuestion={listPreview?.reorderable ? moveQuestionTo : undefined}
         loadQuestions={actions?.getQuestionPreviewDetails}
       />
       <QuestionPreviewDialog
@@ -1989,6 +2198,7 @@ export function CreateAssignmentForm({
           </Button>
         ) : (
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <AssignmentSettingPresetsSave />
             <Button
               type="button"
               variant="outline"
@@ -2075,5 +2285,100 @@ export function CreateAssignmentForm({
       )}
     </div>
     </AssignmentSettingPresetsProvider>
+  )
+}
+
+interface SortableQuestionScoreRowProps {
+  question: AssignmentQuestionOption
+  position: number
+  total: number
+  points: string
+  pointsLockedToOne: boolean
+  onMove: (position: number) => void
+  onPreview: () => void
+  onPointsChange: (value: string) => void
+  onRemove: () => void
+}
+
+function SortableQuestionScoreRow({
+  question,
+  position,
+  total,
+  points,
+  pointsLockedToOne,
+  onMove,
+  onPreview,
+  onPointsChange,
+  onRemove,
+}: SortableQuestionScoreRowProps) {
+  const {
+    listeners,
+    setActivatorNodeRef,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: question.id })
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={cn(
+        'flex flex-wrap items-center gap-2 rounded-xl border border-border p-2.5 sm:flex-nowrap',
+        isDragging && 'z-10 border-primary/40 bg-card opacity-80 shadow-lg ring-2 ring-primary/20',
+      )}
+    >
+      <div
+        ref={setActivatorNodeRef}
+        {...listeners}
+        title="กดค้างแล้วลากเพื่อสลับลำดับ"
+        className="flex min-w-0 flex-1 basis-full cursor-grab touch-manipulation items-center gap-2 active:cursor-grabbing sm:basis-auto"
+      >
+        <OrderNumberInput
+          position={position}
+          total={total}
+          onMove={onMove}
+        />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-foreground">{question.title}</p>
+          <p className="truncate text-xs text-muted-foreground">{questionExcerpt(question.question_text)}</p>
+        </div>
+      </div>
+      {question.sub_question_count > 1 && (
+        <span className="shrink-0 text-xs text-muted-foreground">
+          {question.sub_question_count} {subQuestionUnit(question.question_type)}
+        </span>
+      )}
+      <IconButton
+        label={`ดูตัวอย่างข้อ ${position}`}
+        size="2xs"
+        className="shrink-0"
+        onClick={onPreview}
+      >
+        <Eye className="h-3.5 w-3.5" />
+      </IconButton>
+      <Input
+        type="number"
+        min={0}
+        step="any"
+        value={points}
+        aria-label={`คะแนนข้อ ${position}`}
+        disabled={pointsLockedToOne}
+        title={pointsLockedToOne ? 'โหมดสุ่มกำหนดให้ทุกข้อมีค่า 1 คะแนน' : undefined}
+        onChange={event => onPointsChange(event.target.value)}
+        className="w-16 shrink-0 text-center sm:w-20"
+      />
+      <span className="shrink-0 text-xs text-muted-foreground">คะแนน</span>
+      <IconButton
+        label="เอาข้อนี้ออก"
+        size="2xs"
+        className="shrink-0 hover:text-destructive"
+        disabled={total <= 1}
+        onClick={onRemove}
+      >
+        <X className="h-3.5 w-3.5" />
+      </IconButton>
+    </div>
   )
 }

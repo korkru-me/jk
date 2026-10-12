@@ -26,6 +26,7 @@ import {
   resolveClassroomNavigationKey,
 } from '@/lib/classroom-navigation'
 import { backHrefFromSearchParams } from '@/lib/back-link'
+import { ClassroomRecentViewTracker } from './_components/classroom-recent-view-tracker'
 
 export default async function ClassroomDetailPage({
   params,
@@ -572,33 +573,36 @@ export default async function ClassroomDetailPage({
   const backHref = backHrefFromSearchParams(sp, '/classrooms')
 
   return (
-    <ClassroomDetailClient
-      classroom={c}
-      switchableClassrooms={switchableClassrooms}
-      students={students}
-      assignmentCount={assignmentCount ?? 0}
-      isOwner={isOwner}
-      canManage={canManage}
-      coTeachers={coTeachers}
-      invites={invites}
-      classroomAssignments={classroomAssignments}
-      assignmentCategories={assignmentCategories}
-      classroomSubmissions={classroomSubmissions}
-      classroomExtensions={classroomExtensions}
-      homeroomAssignments={homeroomAssignments}
-      homeroomSubmissions={homeroomSubmissions}
-      studentNotes={studentNotes}
-      studentProfiles={studentProfiles}
-      ownerName={ownerProfile?.full_name ?? 'ครูหลัก'}
-      posts={posts}
-      pendingReviewByAssignment={pendingReviewByAssignment}
-      seenByPost={seenByPost}
-      crossPostTargets={crossPostTargets}
-      groups={groups}
-      groupMembers={groupMembers}
-      initialNavigationItem={initialNavigationItem}
-      initialPeopleView={initialPeopleView}
-      backHref={backHref}
-    />
+    <>
+      {isOwner && <ClassroomRecentViewTracker classroomId={id} />}
+      <ClassroomDetailClient
+        classroom={c}
+        switchableClassrooms={switchableClassrooms}
+        students={students}
+        assignmentCount={assignmentCount ?? 0}
+        isOwner={isOwner}
+        canManage={canManage}
+        coTeachers={coTeachers}
+        invites={invites}
+        classroomAssignments={classroomAssignments}
+        assignmentCategories={assignmentCategories}
+        classroomSubmissions={classroomSubmissions}
+        classroomExtensions={classroomExtensions}
+        homeroomAssignments={homeroomAssignments}
+        homeroomSubmissions={homeroomSubmissions}
+        studentNotes={studentNotes}
+        studentProfiles={studentProfiles}
+        ownerName={ownerProfile?.full_name ?? 'ครูหลัก'}
+        posts={posts}
+        pendingReviewByAssignment={pendingReviewByAssignment}
+        seenByPost={seenByPost}
+        crossPostTargets={crossPostTargets}
+        groups={groups}
+        groupMembers={groupMembers}
+        initialNavigationItem={initialNavigationItem}
+        initialPeopleView={initialPeopleView}
+        backHref={backHref}
+      />
+    </>
   )
 }

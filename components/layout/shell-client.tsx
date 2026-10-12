@@ -16,12 +16,15 @@ export function ShellClient({
   initialUnreadCount,
   children,
   notificationsEnabled = true,
+  previewNavigationOnly,
 }: {
   user: ShellUser
   initialUnreadCount: number
   children: React.ReactNode
   /** Local shell fixtures disable polling; authenticated app shells keep it. */
   notificationsEnabled?: boolean
+  /** Local shell fixtures can exercise the assignment-preview navigation. */
+  previewNavigationOnly?: boolean
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -96,7 +99,7 @@ export function ShellClient({
         <div className="flex min-h-0 flex-1 overflow-hidden">
           {sidebarOpen && (
             <div
-              className="fixed inset-0 top-16 z-20 bg-overlay md:hidden"
+              className="fixed inset-0 top-12 z-20 bg-overlay md:hidden"
               onClick={() => setSidebarOpen(false)}
             />
           )}
@@ -106,6 +109,7 @@ export function ShellClient({
             isOpen={sidebarOpen}
             onClose={() => setSidebarOpen(false)}
             collapsed={sidebarCollapsed}
+            previewNavigationOnly={previewNavigationOnly}
           />
           <div className="flex-1 flex flex-col overflow-hidden min-w-0">
             <main className="flex-1 overflow-y-auto overscroll-contain bg-muted/30 p-6 md:[&>.assignment-create-stage]:max-w-[calc(100%+(var(--spacing)*6)-var(--notification-anchor-right-inset))] md:[&>.classroom-create-stage]:max-w-[calc(100%+(var(--spacing)*6)-var(--notification-anchor-right-inset))]">
