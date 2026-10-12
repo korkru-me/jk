@@ -43,7 +43,10 @@ export function SidebarButton({ label, children, endAdornment, className, ...pro
       {...props}
       aria-label={label}
       title={compact ? label : undefined}
-      className={cn('w-full justify-start transition-colors', className, compact && 'md:justify-center md:px-0')}
+      className={cn(
+        'w-full justify-start pl-3.5 pr-2.5 transition-colors has-data-[icon=inline-start]:pl-3.5 [&_svg:not([class*="size-"])]:size-4',
+        className,
+      )}
     >
       {children}
       <SidebarLabel>{label}</SidebarLabel>

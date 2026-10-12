@@ -60,7 +60,7 @@ export function AssignmentCreationMenu({
             type="button"
             variant={variant}
             size={size}
-            className={cn('transition-colors', className, compactOnDesktop && 'md:justify-center md:px-0')}
+            className={cn('pl-3.5 pr-2.5 transition-colors has-data-[icon=inline-start]:pl-3.5 [&_svg:not([class*="size-"])]:size-4', className)}
             aria-label={label}
             title={compactOnDesktop ? label : undefined}
             aria-current={active ? 'page' : undefined}

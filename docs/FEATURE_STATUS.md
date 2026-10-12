@@ -1,5 +1,10 @@
 # Feature status
 
+### ตำแหน่งไอคอน Sidebar ตรงกันทุกสถานะ — 12 ตุลาคม 2026
+
+- **UI-116** — แถวเมนูระดับบนใน Sidebar หลักและ contextual sidebar ใช้แกนแนวนอนเดียวกับปุ่ม hamburger ทั้ง drawer มือถือ, panel เต็ม, icon rail และ hover preview บน desktop จึงไม่กระโดดซ้าย–ขวาเมื่อซ่อนหรือแสดงเมนู; รายการลูกยังเยื้องเมื่อมี label เพื่อคงลำดับชั้น แต่กลับสู่แกนหลักเมื่ออยู่ใน icon rail
+- local Chrome fixture ที่ใช้ Shell/Topbar จริงยืนยัน mobile 390px ว่ากึ่งกลาง hamburger อยู่ที่ 41px และไอคอนเมนูอยู่ที่ 41–42px โดยไม่มี horizontal overflow; desktop ยืนยันทั้ง expanded, collapsed และ hover preview ว่าไอคอนอยู่ที่ 41–42px ชุดเดิม · unit tests 227 files / 3,062 cases, TypeScript, design-token lint และ production build ผ่าน การแก้ไขเป็น display-only ไม่เปลี่ยน route, registry, permission หรือ persisted collapsed state
+
 ### ห้องรอกะทัดรัดและกรอบตรงแนวกระดิ่ง — 12 ตุลาคม 2026
 
 - **UI-115** — หน้าตั้งค่าข้อสอบ/แบบฝึกหัดและหน้ารอทั้งนักเรียนจริงกับตัวอย่างครูใช้แนวขอบขวาเดียวกับกึ่งกลางกระดิ่งบน Topbar และเริ่มจากขอบเนื้อหาข้างเมนูบน desktop; mobile ยังคงเต็มพื้นที่ภายใน padding เดิม โดยไม่ใช้ความกว้างคงที่ที่ตรงเฉพาะหน้าจอเดียว

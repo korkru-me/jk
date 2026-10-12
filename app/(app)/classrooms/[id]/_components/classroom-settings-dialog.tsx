@@ -139,14 +139,13 @@ export function ClassroomSettingsDialog({
             title={compact ? 'ตั้งค่าห้องเรียน' : undefined}
             className={cn(
               placement === 'sidebar'
-                ? 'w-full justify-start transition-colors'
+                ? 'w-full justify-start pl-3.5 pr-2.5 transition-colors has-data-[icon=inline-start]:pl-3.5 [&_svg:not([class*="size-"])]:size-4'
                 : 'gap-1.5 bg-transparent',
               placement === 'banner' && (
                 onCover
                   ? 'border-current text-current hover:bg-current/10 hover:text-current'
                   : 'border-surface-inverse-border text-surface-inverse-foreground hover:bg-surface-inverse-foreground/10 hover:text-surface-inverse-foreground'
               ),
-              compact && 'md:justify-center md:px-0',
             )}
           />
         }
