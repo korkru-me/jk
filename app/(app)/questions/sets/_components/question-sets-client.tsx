@@ -345,7 +345,10 @@ function SetCard({
         className="absolute inset-0 z-10 rounded-[inherit] outline-none"
       />
 
-      <div className="relative overflow-hidden border-b border-primary/10 bg-primary/5 p-3">
+      <div className={cn(
+        'relative overflow-hidden bg-primary/5 p-3',
+        isOwner && 'border-b border-primary/10',
+      )}>
         <Layers
           aria-hidden="true"
           className="pointer-events-none absolute -right-2 -bottom-5 size-20 text-primary/5 transition-transform group-hover:-translate-y-1 group-hover:rotate-3"
@@ -373,48 +376,8 @@ function SetCard({
         </div>
       </div>
 
-      <div className="relative flex flex-1 items-center gap-2 p-3">
-        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <div className="flex min-w-0 items-center gap-2">
-            <p className="min-w-0 flex-1 truncate text-sm leading-snug text-muted-foreground">
-              {set.description
-                || (isOwner ? 'เปิดแฟ้มเพื่อเพิ่มรายละเอียดและจัดลำดับโจทย์' : 'เปิดดูโจทย์ในแฟ้มที่ทีมแชร์ไว้')}
-            </p>
-
-            {sections.length > 0 && (
-              <div className="flex max-w-[52%] shrink-0 items-center gap-1 overflow-hidden">
-                {sections.slice(0, 1).map(section => (
-                  <Badge key={section.id} variant="secondary" className="min-w-0 max-w-24 truncate">
-                    {section.title || 'ไม่ได้ตั้งชื่อ'}
-                  </Badge>
-                ))}
-                {sections.length > 1 && (
-                  <Badge variant="outline">+{sections.length - 1}</Badge>
-                )}
-              </div>
-            )}
-          </div>
-
-          {(set.organizations?.name || set.shared_org_names?.length || (!isOwner && set.users?.full_name)) && (
-            <div className="flex flex-wrap items-center gap-1">
-              {set.organizations?.name && (
-                <Badge variant="outline">
-                  {set.organizations.name}
-                </Badge>
-              )}
-              {set.shared_org_names?.map((name) => (
-                <Badge key={name} variant="secondary">
-                  + {name}
-                </Badge>
-              ))}
-              {!isOwner && set.users?.full_name && (
-                <span className="text-xs text-muted-foreground">โดย {set.users.full_name}</span>
-              )}
-            </div>
-          )}
-        </div>
-
-        {isOwner && (
+      {isOwner && (
+        <div className="relative flex items-center justify-end px-3 py-2">
           <div className="relative z-20 flex shrink-0 items-center gap-1">
             <IconButton
               label={`ดาวน์โหลดแฟ้มโจทย์ ${set.title} เป็นไฟล์`}
@@ -435,8 +398,8 @@ function SetCard({
               <Trash2 />
             </IconButton>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       <ConfirmDialog
         open={confirmingDelete}
