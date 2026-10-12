@@ -1,5 +1,13 @@
 # แผนปิดงาน Safe Exam Browser หลัง Drawing Board
 
+## ผล release ordinary waiting/preview — 12 ตุลาคม 2026 / W7 ยังพัก
+
+เจ้าของอนุมัติให้นำเฉพาะหน้ารอสอบและ “ดูตัวอย่างนักเรียน” ขึ้นเว็บจริง PR `https://github.com/korkru-me/jk/pull/42` merge เข้า master ที่ `f1df7493021d63721de94008b02ce7984c39c8a0` แล้ว ต้นไม้โค้ดตรงกับ candidate ที่รวม master ล่าสุดและ push แล้ว `3aea0ab004c5af34e48458de08a0f8484a72b62d` ผลใหม่ 223 files / 2,981 tests, TypeScript/token lint/guarded TEST-only webpack build และ local Chrome waiting/preview presentation ผ่าน (0 starts ก่อนปุ่ม, 1 simulated start หลังปุ่ม, 320px ไม่ล้น, axe 0 violations, Next errors/compilation ว่าง) ไม่ใช่ authenticated hosted/native W7 proof
+
+Production project `jk` deployment `dpl_ujGwDrniZP4stFwLTQy9FgR6AZdC` READY และ source ตรง master ข้างต้น ทั้ง `korkru.com` และ `www.korkru.com` ชี้ deployment นี้ ยืนยันหลัง deploy แบบ read-only: root redirect ไป www ตามเดิม, `/login` 200 ไม่มีป้าย Staging, waiting screen lab 404 และ anonymous preview ของ UUID สังเคราะห์ redirect `/login` 307 ไม่อ่านข้อมูลนักเรียน ไม่สร้าง/เริ่ม/ส่ง attempt หรือเปลี่ยนคะแนน ไม่มี migration ใหม่หรือ DB mutation จาก PR นี้ ไม่เปลี่ยน environment/secret/native activation และไม่ย้าย Staging alias Preview check ของ branch หยุดเพราะ environment guard เดิม (`KORKRU_DEPLOYMENT_ENV` ไม่พร้อม) จึงไม่นับเป็น hosted UAT และไม่ bypass/ย้ายคีย์เพื่อแก้ check; Production build สำเร็จด้วย environment เดิม
+
+**W7 HOLD:** native pilot branch นี้ยังไม่ได้รวม UI source ของ Production ไม่มี seed/final/CK/BEK/enrollment/manifest evidence เปลี่ยนจาก release นี้ ให้เจ้าของตรวจ ordinary waiting/preview บนเว็บจริงก่อน เมื่ออนุมัติกลับ W7 ต้อง preflight และล็อก native candidate/source/deployment ใหม่ ไม่ใช้ผล Production UI หรือคีย์ของไฟล์เก่ามาปิด native gates ประวัติ 11 ตุลาคมด้านล่างเป็นสถานะก่อน release นี้
+
 ## คำขอล่าสุด 11 ตุลาคม 2026 — พัก W7 และทำหน้ารอสอบก่อน
 
 เจ้าของยืนยัน **ยังไม่ทำ W7** และขอให้ “ดูตัวอย่างนักเรียน” ของข้อสอบที่ไม่ใช้ SEB เริ่มที่หน้ารอ/อ่านกติกาก่อน แก้เสร็จและ push ใน narrowed branch `codex/exam-waiting-production` ที่ `c270c40` โดยไม่รวม source นี้เข้ามาใน native pilot branch ปัจจุบัน เส้นทาง preview ตรวจ teacher authorization ก่อน waiting และ answer reads เปิด ExamClient จำลองเฉพาะหลังปุ่มเริ่ม ไม่สร้าง attempt/คำตอบ/คะแนนจริง ใช้ shared waiting presentation ของ candidate ซึ่งเพิ่มกติกาและเวลาเดิมเมื่อ resume แบบฝึกหัดคงเดิม
