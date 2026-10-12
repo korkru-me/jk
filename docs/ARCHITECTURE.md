@@ -44,6 +44,8 @@ App shell มี contextual sidebar registry ฝั่ง client ที่ผู
 
 เมื่อ icon rail ถูกย่อบน desktop (8 ต.ค. 2026) การ hover จะขยายเฉพาะ panel ด้านในเป็น `w-64` แบบ overlay เหนือ main content โดย outer flex slot ยัง `w-20` จึงไม่ขยับ layout; เมื่อ pointer ออกจากแถบ panel จะกลับเป็น icon rail ทันที ส่วน hamburger ยังคงเปลี่ยน persisted collapsed state และขยาย outer slot เป็น `w-64` แบบปักหมุดตามเดิม · preview นี้ใช้ display context เดิม จึงเปิด label/action ของ contextual sidebar ครบโดยไม่แก้ registry, route, permission หรือ mobile drawer
 
+ตำแหน่งไอคอนเมนู (12 ต.ค. 2026): แถวเมนูระดับบนของ Sidebar หลักและ contextual sidebar ใช้ left padding ชุดเดียวกันและบังคับไอคอนเป็นขนาดเดียวกัน เพื่อให้กึ่งกลางไอคอนตรงกับ hamburger และไม่ย้ายแกน X เมื่อสลับ panel เต็ม, icon rail, hover preview หรือ drawer มือถือ · รายการลูกเพิ่มระยะเยื้องเฉพาะเมื่อแสดง label; การเปลี่ยนนี้เป็น presentation-only ไม่แตะ route, registry, persisted collapsed state หรือ permission
+
 เมื่อเลือกนำงานเดิมมาใช้/แบบฝึกหัด/ข้อสอบจากห้อง `Link.onNavigate` จะเก็บ renderer ของห้องที่ลงทะเบียนไว้แล้วเป็น pending entry เฉพาะห้องเดียวกันและ URL ปลายทางเดียวกัน (pathname + query ที่เรียงชื่อ key) เพื่อคงแถบห้องเรียนระหว่าง Next.js loading boundary ทั้งก่อนและหลัง registrar หน้าเดิมถูกถอดออก · หน้าใหม่ลงทะเบียนใน layout effect ก่อน paint แล้วล้าง pending; ถ้าหน้าใหม่ไม่มีบริบทที่ผ่านตรวจ ใช้ `ClearPendingSidebar` คืนเมนูตาม route · การออกไปเส้นทางอื่นหรือ query คนละห้องไม่ใช้ renderer นี้ และการเปิดแท็บใหม่ไม่สร้าง pending ในแท็บเดิม · renderer ที่คงไว้ใช้ข้อมูลเดิมที่ส่งถึง browser แล้วเท่านั้น ไม่ fetch ข้อมูลหรือเพิ่มสิทธิ์; การนำทางจากแถบเก่าระหว่างโหลดต้องเข้าหน้าห้องผ่าน router ไม่แก้แท็บของ component ที่เลิกใช้งานแล้ว
 
 ## Runtime boundaries

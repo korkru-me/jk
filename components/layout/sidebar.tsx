@@ -136,11 +136,10 @@ function NavGroupItem({ group, pathname, onNavigate, compactOnDesktop = false }:
         aria-controls={panelId}
         title={compactOnDesktop ? group.label : undefined}
         className={cn(
-          'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+          'flex w-full items-center gap-3 rounded-lg py-2.5 pl-3.5 pr-3 text-sm font-medium transition-colors',
           hasActiveChild
             ? 'bg-primary/10 text-primary'
             : 'text-foreground/70 hover:bg-muted hover:text-foreground',
-          compactOnDesktop && 'md:justify-center md:px-2'
         )}
       >
         <NavItemIcon icon={group.icon} />
@@ -179,11 +178,10 @@ function NavGroupItem({ group, pathname, onNavigate, compactOnDesktop = false }:
                 onClick={onNavigate}
                 title={compactOnDesktop ? child.label : undefined}
                 className={cn(
-                  'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                  'flex items-center gap-2.5 rounded-lg py-2 pl-3.5 pr-3 text-sm font-medium transition-colors',
                   isNavActive(pathname, child.href)
                     ? 'bg-primary/10 text-primary'
                     : 'text-foreground/70 hover:bg-muted hover:text-foreground',
-                  compactOnDesktop && 'md:justify-center md:px-2'
                 )}
               >
                 <NavItemIcon icon={child.icon} />
@@ -214,13 +212,13 @@ function ClassroomSectionNavigation({ pathname, onNavigate }: {
         href="/dashboard"
         onClick={onNavigate}
         title={compact ? 'เมนูหลัก' : undefined}
-        className={cn('flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground', compact && 'md:justify-center md:px-0')}
+        className="flex items-center gap-2 rounded-lg py-2 pl-3.5 pr-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
       >
         <ChevronLeft aria-hidden="true" className="size-4" />
         <SidebarLabel>เมนูหลัก</SidebarLabel>
       </Link>
 
-      <div className={cn('flex items-start gap-3 px-2 py-1', compact && 'md:justify-center md:px-0')} title="ห้องเรียน">
+      <div className="flex items-start gap-3 px-2 py-1" title="ห้องเรียน">
         <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
           <School aria-hidden="true" className="size-5" />
         </div>
@@ -246,11 +244,10 @@ function ClassroomSectionNavigation({ pathname, onNavigate }: {
               aria-current={selected ? 'page' : undefined}
               title={compact ? label : undefined}
               className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                'flex items-center gap-3 rounded-lg py-2.5 pl-3.5 pr-3 text-sm font-medium transition-colors',
                 selected
                   ? 'bg-primary/10 text-primary'
                   : 'text-foreground/70 hover:bg-muted hover:text-foreground',
-                compact && 'md:justify-center md:px-0',
               )}
             >
               <Icon aria-hidden="true" className="size-4" />
@@ -380,11 +377,10 @@ export function Sidebar({
                     title={compactOnDesktop ? entry.label : undefined}
                     aria-current={isNavActive(pathname, entry.href) ? 'page' : undefined}
                     className={cn(
-                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                      'flex items-center gap-3 rounded-lg py-2.5 pl-3.5 pr-3 text-sm font-medium transition-colors',
                       isNavActive(pathname, entry.href)
                         ? 'bg-primary/10 text-primary'
                         : 'text-foreground/70 hover:bg-muted hover:text-foreground',
-                      compactOnDesktop && 'md:justify-center md:px-2',
                     )}
                   >
                     <NavItemIcon icon={entry.icon} />
@@ -397,12 +393,12 @@ export function Sidebar({
 
         {/* Admin link */}
         {role === 'admin' && !previewNavigationOnly && !usesClassroomSidebar && !contextualContent && (
-          <div className={cn('px-3 pb-2', compactOnDesktop && 'md:px-2')}>
+          <div className="px-3 pb-2">
             <Link
               href="/admin"
               onClick={onClose}
               title={compactOnDesktop ? 'Admin Panel' : undefined}
-              className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors bg-warning/10 text-warning hover:bg-warning/20 border border-warning/20', compactOnDesktop && 'md:justify-center md:px-2')}
+              className="flex items-center gap-3 rounded-lg border border-warning/20 bg-warning/10 py-2.5 pl-3.5 pr-3 text-sm font-medium text-warning transition-colors hover:bg-warning/20"
             >
               <NavItemIcon icon={ShieldCheck} />
               <SidebarLabel>Admin Panel</SidebarLabel>
@@ -411,8 +407,8 @@ export function Sidebar({
         )}
 
         {/* User info */}
-        <div className={cn('shrink-0 border-t p-4', compactOnDesktop && 'md:px-2')} title={fullName}>
-          <div className={cn('flex items-center gap-3', compactOnDesktop && 'md:justify-center')}>
+        <div className="shrink-0 border-t p-4" title={fullName}>
+          <div className="flex items-center gap-3">
             <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
               {fullName.charAt(0)}
             </div>
