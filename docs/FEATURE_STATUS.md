@@ -1,5 +1,13 @@
 # Feature status
 
+### หน้ารอเข้าห้องทำแบบฝึกหัด — 12 ตุลาคม 2026 / W7 ยังพัก
+
+- ใช้ `ExamWaitingRoom` ชุดเดียวกับข้อสอบทั้งนักเรียนจริงและ “ดูตัวอย่างนักเรียน” เปลี่ยนชื่อ/ปุ่ม/กติกาเป็นแบบฝึกหัด แสดงเวลา จำนวนข้อ เวลาปิดรับ คำชี้แจง จำนวนครั้งทั้งหมดหรือเกณฑ์ผ่าน/streak วิธีเลือกคะแนน ตรวจรายข้อ ทำซ้ำเฉพาะข้อที่ไม่ได้เต็ม และภาพวิธีทำตามการตั้งค่าจริง ไม่มีการเปิดโจทย์หรือจับเวลาตัวอย่างก่อนกดปุ่ม
+- `readSubmissionEntry` ของทั้ง exam/exercise ส่งเฉพาะ metadata หลัง Auth/roster/native gates; GET/prefetch ไม่สร้าง/grade/draw รอบ ปุ่มใช้ `startAssignmentFromWaiting` ซึ่งตรวจสิทธิ์/กำหนดการ/รหัส/receipt ใหม่และใช้ core เดิม `startExamFromWaiting` เป็น compatibility wrapper Resume ใช้รอบและเวลาเดิม Expired POST ยืนยันผลรอบเดิมเท่านั้น ไม่เปิด successor ในคำขอเดียวกัน ลบ legacy GET first-draw fallback จาก take route แล้ว
+- Teacher preview ตรวจ session + `canManageAssignment` ก่อน metadata/answer-bearing reads และต้องกดนำทาง `?preview=exercise` สำหรับแบบฝึกหัด (`?preview=exam` สำหรับข้อสอบ); scalar query เป็น presentation hint เท่านั้น โหมดตัวอย่างไม่สร้าง submission/บันทึกคะแนนจริง และไม่ตรวจรหัสจริง
+- ตรวจ full suite 225 files / 3,053 tests (focused waiting/details/navigation 6 files / 126 cases) ด้วย mocked Auth/DB/native boundaries พร้อม Chrome shared UI lab: idle 0 simulated requests, explicit start 1 receipt, preview code-required disabled จนกรอกค่า, untimed resume ใช้รอบเดิมไม่อ้างเวลาเดิน, 320px ไม่มี horizontal overflow/ปุ่มถูกตัด, desktop preview และ axe 0 violations/0 incomplete/28 passes Next MCP compilation/runtime ไม่มี errors; ไม่ใช่ hosted authenticated Auth-to-DB หรือ native W7 proof TypeScript/token lint และ guarded TEST-only webpack build ผ่าน
+- ไม่แก้ grading/threshold adjustment/quotas/retry snapshots/instant-check authority/RLS/schema/native SEB files/keys/activation flags ไม่มี migration ใหม่; ordinary header/answers ยังคง separate inserts ไม่อ้าง atomic guarantee หรือ native W7 proof เพิ่ม Branch `codex/exercise-waiting-room` ยังไม่เผยแพร่ Production ระหว่างรอคำตอบเจ้าของว่าจะ deploy หรือดูตัวอย่างก่อน
+
 ### อนุมัติเผยแพร่หน้ารอสอบและตัวอย่างนักเรียนขึ้นเว็บจริง — 12 ตุลาคม 2026
 
 - เจ้าของอนุมัติ merge/deploy เฉพาะ ordinary exam waiting และ teacher preview จาก `c270c40` โดยยังพัก W7; รวม `master` ล่าสุด `7e74dee` แล้วรักษาการนำทาง/หน้าตาและ return types ของฟอร์มห้องเรียนล่าสุด ไม่มีการเปลี่ยน SEB native release, ไฟล์, คีย์, activation flags, alias Staging, สูตรคะแนน หรือ database schema จาก master รอบนี้

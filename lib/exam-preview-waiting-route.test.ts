@@ -42,8 +42,9 @@ beforeEach(() => {
 })
 afterEach(() => vi.unstubAllGlobals())
 
-describe('teacher exam preview enters through a question-free waiting room (mocked reads)', () => {
-  it.each([undefined, 'true', 'take', ['exam']])('default/invalid hint %j never loads or serializes questions', async hint => {
+describe.each(['exam', 'exercise'])('teacher %s preview enters through a question-free waiting room (mocked reads)', type => {
+  beforeEach(() => m.assignment.mockResolvedValue({ data: { ...assignment, type } }))
+  it.each([undefined, 'true', 'take', ['exam'], ['exercise']])('default/invalid hint %j never loads or serializes questions', async hint => {
     const element = await page(hint) as ReactElement<{ summary: unknown }>
     expect(element.type).toBe(m.waiting)
     expect(JSON.stringify(element.props)).not.toContain('PRIVATE-CODE')
@@ -52,14 +53,14 @@ describe('teacher exam preview enters through a question-free waiting room (mock
     expect(m.questions).not.toHaveBeenCalled(); expect(m.build).not.toHaveBeenCalled(); expect(m.admin).not.toHaveBeenCalled()
   })
   it('only explicit preview navigation builds the teacher-only simulated exam', async () => {
-    const element = await page('exam') as ReactElement<{ children: ReactElement<{ previewMode: boolean; submissionId: string }> }>
+    const element = await page(type) as ReactElement<{ children: ReactElement<{ previewMode: boolean; submissionId: string }> }>
     expect(m.access).toHaveBeenCalledExactlyOnceWith(id, 'teacher')
     expect(m.questions).toHaveBeenCalledOnce(); expect(m.build).toHaveBeenCalledOnce()
     expect(element.props.children.type).toBe(m.exam)
     expect(element.props.children.props.previewMode).toBe(true)
     expect(element.props.children.props.submissionId).toBe(`preview-${id}`)
   })
-  it.each([undefined, 'exam'])('denies students/unrelated teachers before waiting or answer-bearing reads (%j)', async hint => {
+  it.each([undefined, 'exam', 'exercise'])('denies students/unrelated teachers before waiting or answer-bearing reads (%j)', async hint => {
     m.access.mockResolvedValue(false)
     await expect(page(hint)).rejects.toThrow('not-found')
     expect(m.admin).not.toHaveBeenCalled(); expect(m.questions).not.toHaveBeenCalled(); expect(m.build).not.toHaveBeenCalled()
@@ -69,15 +70,15 @@ describe('teacher exam preview enters through a question-free waiting room (mock
     await expect(page('exam')).rejects.toThrow('redirect:/login')
     expect(m.assignment).not.toHaveBeenCalled(); expect(m.questions).not.toHaveBeenCalled()
   })
-  it('keeps exercise preview opening directly as before', async () => {
-    m.assignment.mockResolvedValue({ data: { ...assignment, type: 'exercise' } })
-    const element = await page() as ReactElement<{ children: ReactElement }>
-    expect(element.props.children.type).toBe(m.exam)
+  it('a different work-type hint does not skip the waiting room', async () => {
+    const element = await page(type === 'exam' ? 'exercise' : 'exam') as ReactElement
+    expect(element.type).toBe(m.waiting)
+    expect(m.questions).not.toHaveBeenCalled(); expect(m.build).not.toHaveBeenCalled()
   })
   it('empty exams show a disabled waiting summary without loading question data', async () => {
-    m.assignment.mockResolvedValue({ data: { ...assignment, question_ids: [] } })
+    m.assignment.mockResolvedValue({ data: { ...assignment, type, question_ids: [] } })
     const element = await page() as ReactElement<{ summary: { blockedReason: string } }>
-    expect(element.type).toBe(m.waiting); expect(element.props.summary.blockedReason).toBe('ชุดข้อสอบนี้ยังไม่มีโจทย์')
+    expect(element.type).toBe(m.waiting); expect(element.props.summary.blockedReason).toBe(`ชุด${type === 'exercise' ? 'แบบฝึกหัด' : 'ข้อสอบ'}นี้ยังไม่มีโจทย์`)
     expect(m.questions).not.toHaveBeenCalled(); expect(m.admin).not.toHaveBeenCalled()
   })
   it('SEB/streak metadata remain a teacher preview, with only the code-required boolean', async () => {

@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { startExamFromWaiting } from '@/lib/actions/submissions'
+import { startAssignmentFromWaiting } from '@/lib/actions/submissions'
 import { ExamWaitingRoom } from '@/components/exam/exam-waiting-room'
 import type { ExamWaitingSummary } from '@/lib/exam-waiting-room'
 
@@ -13,7 +13,7 @@ export function ExamWaitingClient({ assignmentId, summary, sebChallenge }: {
 }) {
   const router = useRouter()
   return <ExamWaitingFlow summary={summary}
-    requestStart={code => startExamFromWaiting(assignmentId, summary.previousSubmissionId,
+    requestStart={code => startAssignmentFromWaiting(assignmentId, summary.previousSubmissionId,
       summary.activeSubmissionId ? 'resume' : summary.expired ? 'recover' : 'start', code, sebChallenge)}
     onEntered={result => {
       if (result.alreadySubmitted) {
@@ -49,13 +49,13 @@ export function ExamWaitingFlow({ summary, requestStart, onEntered, onReload }: 
       try {
         const result = await requestStart(code.trim() || undefined)
         if (result.error || !result.submissionId) {
-          setError(result.error ?? 'สถานะเข้าสอบเปลี่ยนแล้ว กรุณาโหลดหน้ารอสอบใหม่')
+          setError(result.error ?? 'สถานะงานเปลี่ยนแล้ว กรุณาโหลดหน้ารอใหม่')
           return
         }
         onEntered({ submissionId: result.submissionId, alreadySubmitted: result.alreadySubmitted === true })
       } catch {
         // No automatic replay: a lost response may have started the timer.
-        setError('ยังยืนยันสถานะรอบสอบไม่ได้ กรุณาโหลดหน้ารอสอบใหม่ ระบบจะใช้รอบเดิมหากเริ่มแล้ว')
+        setError('ยังยืนยันสถานะรอบทำงานไม่ได้ กรุณาโหลดหน้ารอใหม่ ระบบจะใช้รอบเดิมหากเริ่มแล้ว')
       } finally {
         starting.current = false
       }
