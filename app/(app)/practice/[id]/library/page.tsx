@@ -5,6 +5,7 @@ import { getAuthUser } from '@/lib/auth/server'
 import { isPracticeLibraryEnabled } from '@/lib/practice-question'
 import { loadPracticeLibrarySearch } from '@/lib/practice-question-access.server'
 import { buildPracticeSearchHref, parsePracticeSearchParams } from '@/lib/practice-search'
+import { hasPracticeAccessSession } from '@/lib/practice-access-session.server'
 
 export const metadata = { title: 'คลังฝึกด้วยตนเอง — KorKru' }
 
@@ -30,6 +31,8 @@ export default async function StudentPracticeLibraryQuestionsPage({
     }
     notFound()
   }
+  if (result.library.requiresAccessCode
+    && !await hasPracticeAccessSession(user.id, id)) redirect(`/practice/${id}`)
   if (result.canonicalPage !== state.page) {
     redirect(buildPracticeSearchHref(id, state, { page: result.canonicalPage }))
   }

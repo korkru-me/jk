@@ -9,6 +9,10 @@ const library = {
   title: 'สอวน. ค่าย 1 · ไฟฟ้า',
   description: '<p><strong>เลือกฝึกตามหัวข้อที่ต้องการ</strong><img src=x onerror=alert(1)></p>',
   revealAnswerKey: false,
+  requiresAccessCode: false,
+  calculatorEnabled: false,
+  scratchpadEnabled: true,
+  shuffleOptions: true,
 }
 
 describe('practice waiting room', () => {
@@ -37,5 +41,21 @@ describe('practice waiting room', () => {
     expect(html).toContain('<strong>เลือกฝึกตามหัวข้อที่ต้องการ</strong>')
     expect(html).not.toContain('src="x"')
     expect(html).not.toContain('onerror')
+  })
+
+  it('requires the configured access code before showing the library link', () => {
+    const html = renderToStaticMarkup(createElement(PracticeWaitingRoom, {
+      library: { ...library, requiresAccessCode: true },
+      questionCount: 1,
+      enterHref: '/practice/library-1/library',
+      locked: true,
+      unlockAction: () => {},
+      accessError: 'invalid',
+    }))
+
+    expect(html).toContain('name="accessCode"')
+    expect(html).toContain('required=""')
+    expect(html).toContain('รหัสผ่านไม่ถูกต้อง')
+    expect(html).not.toContain('href="/practice/library-1/library"')
   })
 })

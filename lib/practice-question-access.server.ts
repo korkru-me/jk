@@ -19,6 +19,7 @@ import {
   type PracticeSearchState,
 } from '@/lib/practice-search'
 import type { Question, QuestionType } from '@/lib/types'
+import { createHash, timingSafeEqual } from 'node:crypto'
 
 /** Keep planned table/RPC literals in one module while the migration is gated. */
 export const PRACTICE_STORAGE = Object.freeze({
@@ -36,6 +37,10 @@ export interface StudentPracticeLibrary {
   title: string
   description: string | null
   revealAnswerKey: boolean
+  requiresAccessCode: boolean
+  calculatorEnabled: boolean
+  scratchpadEnabled: boolean
+  shuffleOptions: boolean
 }
 
 export interface PracticeQuestionListItem {
@@ -87,6 +92,10 @@ type LibraryRow = {
   description: string | null
   status: string
   reveal_answer_key: boolean
+  access_code: string | null
+  calculator_enabled: boolean
+  scratchpad_enabled: boolean
+  shuffle_options: boolean
 }
 
 type StudentLibraryAccess = {
@@ -118,7 +127,7 @@ async function readStudentLibraryAccess(
 ): Promise<StudentLibraryAccess> {
   const { data, error } = await admin
     .from(PRACTICE_STORAGE.libraries)
-    .select('id, org_id, classroom_id, title, description, status, reveal_answer_key')
+    .select('id, org_id, classroom_id, title, description, status, reveal_answer_key, access_code, calculator_enabled, scratchpad_enabled, shuffle_options')
     .eq('id', libraryId)
     .maybeSingle()
   if (error) return { status: 'unavailable' }
@@ -168,8 +177,41 @@ async function readStudentLibraryAccess(
       title: row.title,
       description: row.description,
       revealAnswerKey: row.reveal_answer_key === true,
+      requiresAccessCode: Boolean(row.access_code),
+      calculatorEnabled: row.calculator_enabled === true,
+      scratchpadEnabled: row.scratchpad_enabled === true,
+      shuffleOptions: row.shuffle_options === true,
     }),
   }
+}
+
+export async function verifyPracticeLibraryAccessCode(
+  actorId: string,
+  libraryId: string,
+  suppliedCode: string,
+): Promise<'accepted' | 'rejected' | 'unavailable'> {
+  if (!isPracticeLibraryEnabled(process.env)
+    || !isUuid(actorId)
+    || !isUuid(libraryId)
+    || typeof suppliedCode !== 'string'
+    || suppliedCode.length > 100) return 'rejected'
+  const admin = createPracticeAdmin()
+  if (!admin) return 'unavailable'
+  const access = await readStudentLibraryAccess(admin, actorId, libraryId)
+  if (access.status === 'unavailable') return 'unavailable'
+  if (access.status !== 'ready') return 'rejected'
+  const { data, error } = await admin
+    .from(PRACTICE_STORAGE.libraries)
+    .select('access_code')
+    .eq('id', libraryId)
+    .maybeSingle()
+  if (error || !data) return 'unavailable'
+  const expectedCode = typeof data.access_code === 'string' ? data.access_code.trim() : ''
+  if (!expectedCode) return 'accepted'
+  const normalize = (value: string) => createHash('sha256')
+    .update(value.trim().toLocaleUpperCase('th-TH'))
+    .digest()
+  return timingSafeEqual(normalize(suppliedCode), normalize(expectedCode)) ? 'accepted' : 'rejected'
 }
 
 export async function loadPracticeLibraryWaiting(
@@ -307,6 +349,10 @@ export async function loadPracticeQuestionForStudent(
       || typeof row.library_title !== 'string'
       || (row.library_description !== null && typeof row.library_description !== 'string')
       || typeof row.reveal_answer_key !== 'boolean'
+      || typeof row.requires_access_code !== 'boolean'
+      || typeof row.calculator_enabled !== 'boolean'
+      || typeof row.scratchpad_enabled !== 'boolean'
+      || typeof row.shuffle_options !== 'boolean'
       || row.question_id !== questionId
       || !Number.isSafeInteger(row.position)
       || (row.position as number) < 0
@@ -354,6 +400,10 @@ export async function loadPracticeQuestionForStudent(
         title: row.library_title,
         description: row.library_description,
         revealAnswerKey: row.reveal_answer_key,
+        requiresAccessCode: row.requires_access_code,
+        calculatorEnabled: row.calculator_enabled,
+        scratchpadEnabled: row.scratchpad_enabled,
+        shuffleOptions: row.shuffle_options,
       }),
       question,
       position: row.position as number,

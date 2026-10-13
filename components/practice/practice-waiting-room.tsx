@@ -1,11 +1,13 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { BookOpenCheck, ListChecks, LogIn, Search, ShieldCheck } from 'lucide-react'
+import { BookOpenCheck, KeyRound, ListChecks, LogIn, Search, ShieldCheck } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { RichText } from '@/components/ui/rich-text'
 import { Separator } from '@/components/ui/separator'
+import { Input } from '@/components/ui/input'
+import { Field, FieldError, FieldLabel } from '@/components/ui/field'
 import type { StudentPracticeLibrary } from '@/lib/practice-question-access.server'
 
 interface PracticeWaitingRoomProps {
@@ -13,6 +15,9 @@ interface PracticeWaitingRoomProps {
   questionCount: number
   enterHref: string
   returnHref?: string
+  locked?: boolean
+  accessError?: 'invalid' | 'unavailable' | null
+  unlockAction?: (formData: FormData) => void | Promise<void>
 }
 
 export function PracticeWaitingRoom({
@@ -20,6 +25,9 @@ export function PracticeWaitingRoom({
   questionCount,
   enterHref,
   returnHref = '/practice',
+  locked = false,
+  accessError = null,
+  unlockAction,
 }: PracticeWaitingRoomProps) {
   return (
     <Card padding="lg" className="relative isolate mx-auto flex w-full max-w-5xl flex-col gap-4 overflow-hidden">
@@ -93,10 +101,40 @@ export function PracticeWaitingRoom({
       </section>
 
       <footer className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-        <Button className="h-auto min-h-11 whitespace-normal py-2" render={<Link href={enterHref} />}>
-          <LogIn data-icon="inline-start" aria-hidden="true" />
-          เข้าคลังฝึก
-        </Button>
+        {locked && unlockAction ? (
+          <form action={unlockAction} className="flex w-full flex-col gap-3 sm:max-w-md">
+            <Field data-invalid={Boolean(accessError)}>
+              <FieldLabel htmlFor="practice-access-code">รหัสผ่านเข้าคลังฝึก</FieldLabel>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Input
+                  id="practice-access-code"
+                  name="accessCode"
+                  type="password"
+                  autoComplete="off"
+                  required
+                  maxLength={100}
+                  className="min-h-11"
+                />
+                <Button type="submit" className="min-h-11 shrink-0">
+                  <KeyRound data-icon="inline-start" aria-hidden="true" />
+                  ตรวจรหัสและเข้าคลัง
+                </Button>
+              </div>
+              <FieldError>
+                {accessError === 'invalid'
+                  ? 'รหัสผ่านไม่ถูกต้อง กรุณาลองอีกครั้ง'
+                  : accessError === 'unavailable'
+                    ? 'ยังตรวจรหัสผ่านไม่ได้ กรุณาลองใหม่'
+                    : null}
+              </FieldError>
+            </Field>
+          </form>
+        ) : (
+          <Button className="h-auto min-h-11 whitespace-normal py-2" render={<Link href={enterHref} />}>
+            <LogIn data-icon="inline-start" aria-hidden="true" />
+            เข้าคลังฝึก
+          </Button>
+        )}
         <Link
           href={returnHref}
           className={buttonVariants({ variant: 'outline', className: 'h-auto min-h-11 whitespace-normal py-2' })}

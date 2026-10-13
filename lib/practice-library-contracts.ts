@@ -24,6 +24,11 @@ export const PRACTICE_LIBRARY_COLUMNS = [
   'description',
   'status',
   'reveal_answer_key',
+  'access_code',
+  'calculator_enabled',
+  'scratchpad_enabled',
+  'shuffle_questions',
+  'shuffle_options',
   'published_at',
   'closed_at',
   'created_at',
@@ -39,6 +44,11 @@ export type PracticeLibraryRow = Readonly<{
   description: string | null
   status: PracticeLibraryStatus
   reveal_answer_key: boolean
+  access_code: string | null
+  calculator_enabled: boolean
+  scratchpad_enabled: boolean
+  shuffle_questions: boolean
+  shuffle_options: boolean
   published_at: string | null
   closed_at: string | null
   created_at: string

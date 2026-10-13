@@ -74,7 +74,11 @@ export default async function PracticeLibraryLabPage({ searchParams }: {
   if (!isExamScreenLabEnabled(process.env)) notFound()
   const { view } = await searchParams
 
-  if (view === 'waiting') {
+  if (view === 'waiting' || view === 'waiting-locked') {
+    async function previewUnlock() {
+      'use server'
+    }
+    const locked = view === 'waiting-locked'
     return (
       <main className="mx-auto w-full max-w-6xl p-4 sm:p-6">
         <p className="mb-4 text-xs text-muted-foreground">
@@ -87,10 +91,16 @@ export default async function PracticeLibraryLabPage({ searchParams }: {
             title: 'สอวน. ค่าย 1 · ไฟฟ้าและกลศาสตร์',
             description: '<p>เลือกหัวข้อที่อยากฝึก แล้วลองทำซ้ำได้ตามต้องการ</p>',
             revealAnswerKey: false,
+            requiresAccessCode: locked,
+            calculatorEnabled: false,
+            scratchpadEnabled: true,
+            shuffleOptions: true,
           }}
           questionCount={128}
           enterHref="/exam-screen-lab/practice-library?view=waiting"
           returnHref="/exam-screen-lab/practice-library"
+          locked={locked}
+          unlockAction={locked ? previewUnlock : undefined}
         />
       </main>
     )

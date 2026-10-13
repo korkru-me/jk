@@ -29,6 +29,11 @@ export interface PracticeLibraryEditorValue {
   classroomIds: string[]
   questionIds: string[]
   revealAnswerKey: boolean
+  accessCode: string | null
+  calculatorEnabled: boolean
+  scratchpadEnabled: boolean
+  shuffleQuestions: boolean
+  shuffleOptions: boolean
 }
 
 export type PracticeLibraryActionResult =
@@ -73,6 +78,15 @@ const practiceLibraryFields = {
     .max(2_000, 'คำชี้แจงต้องไม่เกิน 2,000 ตัวอักษร'),
   questionIds: questionIdsSchema,
   revealAnswerKey: z.boolean(),
+  accessCode: z.string()
+    .trim()
+    .min(1, 'กรุณากรอกรหัสผ่าน')
+    .max(100, 'รหัสผ่านต้องไม่เกิน 100 ตัวอักษร')
+    .nullable(),
+  calculatorEnabled: z.boolean(),
+  scratchpadEnabled: z.boolean(),
+  shuffleQuestions: z.boolean(),
+  shuffleOptions: z.boolean(),
 }
 
 /**

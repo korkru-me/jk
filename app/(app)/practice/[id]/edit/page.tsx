@@ -86,6 +86,11 @@ export default async function EditPracticeLibraryPage({
         questionIds: membership.ids,
         status: loaded.library.status,
         revealAnswerKey: loaded.library.reveal_answer_key,
+        accessCode: loaded.library.access_code,
+        calculatorEnabled: loaded.library.calculator_enabled,
+        scratchpadEnabled: loaded.library.scratchpad_enabled,
+        shuffleQuestions: loaded.library.shuffle_questions,
+        shuffleOptions: loaded.library.shuffle_options,
       }}
     />
   )

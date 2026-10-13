@@ -104,6 +104,11 @@ async function createLibraryRows(input: {
   title: string
   description: string
   revealAnswerKey: boolean
+  accessCode: string | null
+  calculatorEnabled: boolean
+  scratchpadEnabled: boolean
+  shuffleQuestions: boolean
+  shuffleOptions: boolean
   questionIds: string[]
   publish: boolean
 }): Promise<PracticeLibraryActionResult> {
@@ -113,6 +118,11 @@ async function createLibraryRows(input: {
     p_title: input.title,
     p_description: input.description || null,
     p_reveal_answer_key: input.revealAnswerKey,
+    p_access_code: input.accessCode,
+    p_calculator_enabled: input.calculatorEnabled,
+    p_scratchpad_enabled: input.scratchpadEnabled,
+    p_shuffle_questions: input.shuffleQuestions,
+    p_shuffle_options: input.shuffleOptions,
     p_question_ids: input.questionIds,
     p_publish: input.publish,
   })
@@ -167,6 +177,11 @@ export async function createPracticeLibrary(
     title: parsed.data.title,
     description: sanitizeRichTextForStorage(parsed.data.description.trim()),
     revealAnswerKey: parsed.data.revealAnswerKey,
+    accessCode: parsed.data.accessCode,
+    calculatorEnabled: parsed.data.calculatorEnabled,
+    scratchpadEnabled: parsed.data.scratchpadEnabled,
+    shuffleQuestions: parsed.data.shuffleQuestions,
+    shuffleOptions: parsed.data.shuffleOptions,
     questionIds: parsed.data.questionIds,
     publish: parsed.data.intent === 'publish',
   })
@@ -212,6 +227,11 @@ export async function updatePracticeLibrary(
       p_title: parsed.data.title,
       p_description: description || null,
       p_reveal_answer_key: parsed.data.revealAnswerKey,
+      p_access_code: parsed.data.accessCode,
+      p_calculator_enabled: parsed.data.calculatorEnabled,
+      p_scratchpad_enabled: parsed.data.scratchpadEnabled,
+      p_shuffle_questions: parsed.data.shuffleQuestions,
+      p_shuffle_options: parsed.data.shuffleOptions,
       p_question_ids: parsed.data.questionIds,
     })
     const savedCount = typeof result.data === 'number' ? result.data : Number(result.data)
@@ -226,6 +246,11 @@ export async function updatePracticeLibrary(
         title: parsed.data.title,
         description: description || null,
         reveal_answer_key: parsed.data.revealAnswerKey,
+        access_code: parsed.data.accessCode,
+        calculator_enabled: parsed.data.calculatorEnabled,
+        scratchpad_enabled: parsed.data.scratchpadEnabled,
+        shuffle_questions: parsed.data.shuffleQuestions,
+        shuffle_options: parsed.data.shuffleOptions,
       })
       .eq('id', loaded.library.id)
       .select('id')

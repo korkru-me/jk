@@ -8,11 +8,12 @@ import {
   ChevronLeft,
   ChevronDown,
   ChevronRight,
-  ChevronUp,
   CircleAlert,
+  Eye,
   Save,
   Send,
   Trash2,
+  X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { BankQuestion } from '@/lib/question-bank'
@@ -25,7 +26,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { IconButton } from '@/components/ui/icon-button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { AssignmentAnnouncementEditor } from '@/components/assignments/assignment-announcement-editor'
@@ -39,6 +41,7 @@ import {
 } from '@/components/assignments/question-set-import'
 import type { AssignmentQuestionSetOption } from '@/components/assignments/create-assignment-form'
 import { toggleQuestionSetSelection } from '@/lib/question-set-selection'
+import { questionExcerpt } from '@/lib/question-display'
 import { cn } from '@/lib/utils'
 import {
   closePracticeLibrary,
@@ -65,6 +68,11 @@ interface InitialPracticeLibrary {
   questionIds: string[]
   status: PracticeLibraryStatus
   revealAnswerKey: boolean
+  accessCode: string | null
+  calculatorEnabled: boolean
+  scratchpadEnabled: boolean
+  shuffleQuestions: boolean
+  shuffleOptions: boolean
 }
 
 interface PracticeLibraryFormProps {
@@ -119,6 +127,12 @@ export function PracticeLibraryForm({
   })
   const [selectedIds, setSelectedIds] = useState<string[]>(initialLibrary?.questionIds ?? [])
   const [revealAnswerKey, setRevealAnswerKey] = useState(initialLibrary?.revealAnswerKey ?? false)
+  const [accessCodeEnabled, setAccessCodeEnabled] = useState(Boolean(initialLibrary?.accessCode))
+  const [accessCode, setAccessCode] = useState(initialLibrary?.accessCode ?? '')
+  const [calculatorEnabled, setCalculatorEnabled] = useState(initialLibrary?.calculatorEnabled ?? false)
+  const [scratchpadEnabled, setScratchpadEnabled] = useState(initialLibrary?.scratchpadEnabled ?? true)
+  const [shuffleQuestions, setShuffleQuestions] = useState(initialLibrary?.shuffleQuestions ?? false)
+  const [shuffleOptions, setShuffleOptions] = useState(initialLibrary?.shuffleOptions ?? true)
   const [search, setSearch] = useState('')
   const [difficulty, setDifficulty] = useState('all')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
@@ -128,6 +142,12 @@ export function PracticeLibraryForm({
     classroomIds: initialLibrary ? [initialLibrary.classroomId] : classroomIds,
     selectedIds: initialLibrary?.questionIds ?? [],
     revealAnswerKey: initialLibrary?.revealAnswerKey ?? false,
+    accessCodeEnabled: Boolean(initialLibrary?.accessCode),
+    accessCode: initialLibrary?.accessCode ?? '',
+    calculatorEnabled: initialLibrary?.calculatorEnabled ?? false,
+    scratchpadEnabled: initialLibrary?.scratchpadEnabled ?? true,
+    shuffleQuestions: initialLibrary?.shuffleQuestions ?? false,
+    shuffleOptions: initialLibrary?.shuffleOptions ?? true,
   }))
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [step, setStep] = useState(0)
@@ -144,6 +164,12 @@ export function PracticeLibraryForm({
     classroomIds,
     selectedIds,
     revealAnswerKey,
+    accessCodeEnabled,
+    accessCode,
+    calculatorEnabled,
+    scratchpadEnabled,
+    shuffleQuestions,
+    shuffleOptions,
   })
   const isDirty = currentSnapshot !== savedSnapshot
   const membershipFrozen = initialLibrary?.status !== undefined && initialLibrary.status !== 'draft'
@@ -248,17 +274,6 @@ export function PracticeLibraryForm({
     setSelectedIds(current => current.filter(id => !blocked.has(id)))
   }
 
-  function moveQuestion(index: number, direction: -1 | 1) {
-    if (membershipFrozen) return
-    setSelectedIds(current => {
-      const target = index + direction
-      if (target < 0 || target >= current.length) return current
-      const next = [...current]
-      ;[next[index], next[target]] = [next[target], next[index]]
-      return next
-    })
-  }
-
   function runSave(intent: 'draft' | 'publish' = 'draft') {
     setFieldErrors({})
     startTransition(async () => {
@@ -269,6 +284,11 @@ export function PracticeLibraryForm({
             description,
             questionIds: selectedIds,
             revealAnswerKey,
+            accessCode: accessCodeEnabled ? accessCode : null,
+            calculatorEnabled,
+            scratchpadEnabled,
+            shuffleQuestions,
+            shuffleOptions,
           })
         : await createPracticeLibrary({
             title,
@@ -276,6 +296,11 @@ export function PracticeLibraryForm({
             classroomIds,
             questionIds: selectedIds,
             revealAnswerKey,
+            accessCode: accessCodeEnabled ? accessCode : null,
+            calculatorEnabled,
+            scratchpadEnabled,
+            shuffleQuestions,
+            shuffleOptions,
             intent,
           })
 
@@ -440,7 +465,10 @@ export function PracticeLibraryForm({
               className={cn(contextualPrimaryClassroomId && 'md:col-span-2')}
               data-invalid={Boolean(fieldErrors.title)}
             >
-              <FieldLabel htmlFor="practice-title">ชื่อคลังฝึก</FieldLabel>
+              <FieldLabel htmlFor="practice-title">
+                ชื่อคลังฝึก <span aria-hidden="true" className="text-destructive">*</span>
+                <span className="sr-only"> จำเป็น</span>
+              </FieldLabel>
               <Input
                 id="practice-title"
                 className="min-h-11"
@@ -533,31 +561,7 @@ export function PracticeLibraryForm({
               )}
             </div>
           )}
-          {membershipFrozen ? (
-            <div className="max-h-80 overflow-y-auto rounded-lg border border-border" role="list">
-              {selectedIds.map((id, index) => {
-                const question = questionById.get(id)
-                return (
-                  <div
-                    key={id}
-                    role="listitem"
-                    className="flex min-h-11 items-center gap-3 border-b border-border px-3 py-2 last:border-b-0"
-                  >
-                    <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{index + 1}</span>
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium" title={question?.title}>
-                      {question?.title ?? 'โจทย์ที่ไม่สามารถแสดงรายละเอียดได้'}
-                    </span>
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {question?.question_type ?? 'ไม่พร้อมใช้'}
-                    </span>
-                  </div>
-                )
-              })}
-              {selectedIds.length === 0 && (
-                <p className="px-3 py-6 text-center text-sm text-muted-foreground">ไม่พบโจทย์ในคลังนี้</p>
-              )}
-            </div>
-          ) : (
+          {!membershipFrozen && (
             <div className="flex flex-col gap-3">
               <h3 className="text-sm font-semibold text-foreground">
                 เลือกโจทย์ <span aria-hidden="true" className="text-destructive">*</span>
@@ -612,61 +616,71 @@ export function PracticeLibraryForm({
               </div>
             </div>
           )}
-          {!membershipFrozen && selectedIds.length > 1 && (
-            <Collapsible>
-              <div className="flex min-h-10 flex-wrap items-center justify-between gap-2 border-y border-border py-1.5">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">ลำดับโจทย์</p>
-                  <p className="text-xs text-muted-foreground">นักเรียนเห็นเลขข้อตามลำดับนี้</p>
-                </div>
-                <CollapsibleTrigger
-                  render={<Button type="button" size="sm" variant="outline" className="min-h-11" />}
+          <Separator />
+          <div className="flex min-h-11 flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">โจทย์ที่เลือก</h3>
+              <p className="text-xs text-muted-foreground">
+                แสดงครบทุกข้อโดยไม่มีคะแนน และนักเรียนเลือกฝึกข้อใดก่อนก็ได้
+              </p>
+            </div>
+            {selectedIds.length > 0 && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="min-h-11"
+                onClick={() => setListPreview({ ids: selectedIds, title: 'โจทย์ทั้งหมดในคลังฝึก' })}
+              >
+                <Eye data-icon="inline-start" />
+                ดูโจทย์ทั้งหมด
+              </Button>
+            )}
+          </div>
+          <div className="max-h-[28rem] overflow-y-auto rounded-xl border border-border" role="list">
+            {selectedIds.map((id, index) => {
+              const question = questionById.get(id)
+              const title = question?.title ?? 'โจทย์ที่ไม่สามารถแสดงรายละเอียดได้'
+              return (
+                <div
+                  key={id}
+                  role="listitem"
+                  className="flex min-h-16 items-center gap-3 border-b border-border px-3 py-2 last:border-b-0"
                 >
-                  จัดลำดับ
-                </CollapsibleTrigger>
-              </div>
-              <CollapsibleContent className="max-h-72 overflow-y-auto py-1">
-                {selectedIds.map((id, index) => {
-                  const question = questionById.get(id)
-                  return (
-                    <div
-                      key={id}
-                      className="flex min-h-11 items-center gap-2 border-b border-border px-1 py-1 last:border-b-0"
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-full border border-border text-sm font-semibold tabular-nums">
+                    {index + 1}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-foreground" title={title}>{title}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {question ? questionExcerpt(question.question_text) || question.question_type : 'ไม่พร้อมใช้'}
+                    </p>
+                  </div>
+                  <IconButton
+                    type="button"
+                    label={`ดูตัวอย่าง ${title}`}
+                    size="sm"
+                    onClick={() => setListPreview({ ids: [id], title: `ตัวอย่างข้อ ${index + 1}` })}
+                  >
+                    <Eye />
+                  </IconButton>
+                  {!membershipFrozen && (
+                    <IconButton
+                      type="button"
+                      label={`เอา ${title} ออกจากคลังฝึก`}
+                      size="sm"
+                      onClick={() => toggleQuestion(id)}
                     >
-                      <span className="w-7 shrink-0 text-center text-xs tabular-nums text-muted-foreground">
-                        {index + 1}
-                      </span>
-                      <span className="min-w-0 flex-1 truncate text-sm" title={question?.title}>
-                        {question?.title ?? 'โจทย์ที่ไม่สามารถแสดงรายละเอียดได้'}
-                      </span>
-                      <Button
-                        type="button"
-                        size="icon-sm"
-                        variant="ghost"
-                        className="size-11"
-                        aria-label={`เลื่อน ${question?.title ?? `ข้อ ${index + 1}`} ขึ้น`}
-                        disabled={index === 0}
-                        onClick={() => moveQuestion(index, -1)}
-                      >
-                        <ChevronUp />
-                      </Button>
-                      <Button
-                        type="button"
-                        size="icon-sm"
-                        variant="ghost"
-                        className="size-11"
-                        aria-label={`เลื่อน ${question?.title ?? `ข้อ ${index + 1}`} ลง`}
-                        disabled={index === selectedIds.length - 1}
-                        onClick={() => moveQuestion(index, 1)}
-                      >
-                        <ChevronDown />
-                      </Button>
-                    </div>
-                  )
-                })}
-              </CollapsibleContent>
-            </Collapsible>
-          )}
+                      <X />
+                    </IconButton>
+                  )}
+                </div>
+              )
+            })}
+            {selectedIds.length === 0 && (
+              <p className="px-3 py-8 text-center text-sm text-muted-foreground">ยังไม่ได้เลือกโจทย์</p>
+            )}
+          </div>
           <FieldError>{fieldErrors.questionIds?.[0]}</FieldError>
           {initialLibrary && selectedIds.length > 0 && (
             <PracticeBulkTagEditor
@@ -709,6 +723,54 @@ export function PracticeLibraryForm({
               checked={revealAnswerKey}
               onCheckedChange={setRevealAnswerKey}
             />
+            <AssignmentSettingToggle
+              label="กำหนดรหัสผ่านเข้าทำ"
+              description="ให้นักเรียนกรอกรหัสผ่านที่ครูตั้งไว้ก่อนเข้าคลังฝึก"
+              checked={accessCodeEnabled}
+              onCheckedChange={checked => {
+                setAccessCodeEnabled(checked)
+                if (!checked) setAccessCode('')
+              }}
+              footer={accessCodeEnabled ? (
+                <Field data-invalid={Boolean(fieldErrors.accessCode)} className="pl-3">
+                  <FieldLabel htmlFor="practice-access-code">รหัสผ่าน</FieldLabel>
+                  <Input
+                    id="practice-access-code"
+                    value={accessCode}
+                    onChange={event => setAccessCode(event.target.value)}
+                    maxLength={100}
+                    autoComplete="off"
+                    required
+                  />
+                  <FieldDescription>นักเรียนต้องกรอกรหัสนี้ในหน้ารอก่อนเห็นรายการโจทย์</FieldDescription>
+                  <FieldError>{fieldErrors.accessCode?.[0]}</FieldError>
+                </Field>
+              ) : undefined}
+            />
+            <AssignmentSettingToggle
+              label="เครื่องคิดเลขวิทยาศาสตร์"
+              description="เปิดให้นักเรียนใช้เครื่องคิดเลขวิทยาศาสตร์ระหว่างฝึกทำโจทย์"
+              checked={calculatorEnabled}
+              onCheckedChange={setCalculatorEnabled}
+            />
+            <AssignmentSettingToggle
+              label="กระดาษทด"
+              description="เปิดกระดาษทดที่เก็บเฉพาะในเครื่อง ไม่ใช้แนบส่งวิธีทำ"
+              checked={scratchpadEnabled}
+              onCheckedChange={setScratchpadEnabled}
+            />
+            <AssignmentSettingToggle
+              label="สับลำดับข้อ"
+              description="นักเรียนทุกคนเห็นโจทย์ชุดเดียวกัน แต่ระบบสับลำดับข้อให้แต่ละคนแตกต่างกัน"
+              checked={shuffleQuestions}
+              onCheckedChange={setShuffleQuestions}
+            />
+            <AssignmentSettingToggle
+              label="สลับลำดับตัวเลือก"
+              description="สลับลำดับตัวเลือกของโจทย์ปรนัยให้นักเรียนแต่ละคนแตกต่างกัน"
+              checked={shuffleOptions}
+              onCheckedChange={setShuffleOptions}
+            />
             {!initialLibrary
               && contextualPrimaryClassroomId
               && classrooms.some(classroom => classroom.id !== contextualPrimaryClassroomId) && (
@@ -743,6 +805,11 @@ export function PracticeLibraryForm({
                 { label: 'โจทย์', value: `${selectedIds.length.toLocaleString('th-TH')} ข้อ` },
                 { label: 'การตรวจคำตอบ', value: 'ตรวจได้ทีละข้อ' },
                 { label: 'เฉลยคำตอบ', value: revealAnswerKey ? 'แสดงหลังตรวจ' : 'ไม่แสดง' },
+                { label: 'รหัสผ่านเข้าทำ', value: accessCodeEnabled ? 'กำหนดแล้ว' : 'ไม่ได้กำหนด' },
+                { label: 'เครื่องคิดเลขวิทยาศาสตร์', value: calculatorEnabled ? 'เปิด' : 'ปิด' },
+                { label: 'กระดาษทด', value: scratchpadEnabled ? 'เปิด' : 'ปิด' },
+                { label: 'ลำดับโจทย์', value: shuffleQuestions ? 'สับต่างกันในแต่ละคน' : 'ตามลำดับที่เลือก' },
+                { label: 'ลำดับตัวเลือก', value: shuffleOptions ? 'สลับ' : 'ตามโจทย์ต้นฉบับ' },
               ].map(item => (
                 <div key={item.label} className="flex min-h-11 items-center justify-between gap-4 border-b border-border py-2 last:border-b-0">
                   <span className="text-sm text-muted-foreground">{item.label}</span>

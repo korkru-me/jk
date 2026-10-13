@@ -87,6 +87,8 @@ export interface ScratchpadProps {
   artifact: StudentWorkArtifactView | null
   loadAttachedNonce: number
   previewMode: boolean
+  /** Practice mode keeps the paper local-only and must not offer work submission. */
+  attachmentEnabled?: boolean
   fingerInputMode: FingerInputMode
   onFingerInputModeChange: (mode: FingerInputMode) => void
   onAttachmentSaved: (artifact: StudentWorkArtifactView) => void
@@ -130,6 +132,7 @@ export default function Scratchpad({
   artifact,
   loadAttachedNonce,
   previewMode,
+  attachmentEnabled = true,
   fingerInputMode,
   onFingerInputModeChange,
   onAttachmentSaved,
@@ -866,7 +869,7 @@ export default function Scratchpad({
               {statusText(status, persistenceEnabled)}
             </span>
           </div>
-          {(artifact?.sceneUrl || (previewMode && artifact?.sourceType === 'scratchpad')) && (
+          {attachmentEnabled && (artifact?.sceneUrl || (previewMode && artifact?.sourceType === 'scratchpad')) && (
             <Button
               type="button"
               variant="outline"
@@ -882,23 +885,25 @@ export default function Scratchpad({
               <span className="hidden lg:inline">ฉบับที่แนบ</span>
             </Button>
           )}
-          <Button
-            type="button"
-            size="xs"
-            className="min-h-10 pointer-coarse:min-h-11"
-            onClick={() => void attachAsWork()}
-            disabled={attaching || loadingAttached || Boolean(readOnlyMessage)}
-          >
-            {attaching
-              ? <Loader2 className="animate-spin" data-icon="inline-start" />
-              : <Paperclip data-icon="inline-start" />}
-            {attaching ? 'กำลังแนบ...' : artifact ? 'อัปเดตวิธีทำ' : 'แนบวิธีทำ'}
-          </Button>
+          {attachmentEnabled && (
+            <Button
+              type="button"
+              size="xs"
+              className="min-h-10 pointer-coarse:min-h-11"
+              onClick={() => void attachAsWork()}
+              disabled={attaching || loadingAttached || Boolean(readOnlyMessage)}
+            >
+              {attaching
+                ? <Loader2 className="animate-spin" data-icon="inline-start" />
+                : <Paperclip data-icon="inline-start" />}
+              {attaching ? 'กำลังแนบ...' : artifact ? 'อัปเดตวิธีทำ' : 'แนบวิธีทำ'}
+            </Button>
+          )}
           <Button ref={closeButtonRef} type="button" variant="ghost" size="icon-sm" className="size-10 pointer-coarse:size-11" onClick={onClose} aria-label="ปิดกระดาษทด">
             <X />
           </Button>
         </div>
-        {attachmentLabel && (
+        {attachmentEnabled && attachmentLabel && (
           <div className="mt-1.5 flex items-center justify-end" aria-live="polite">
             <Badge
               variant={attachmentNeedsAttention ? 'destructive' : attachmentState === 'attached_current' ? 'secondary' : 'outline'}

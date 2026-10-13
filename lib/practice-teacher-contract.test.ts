@@ -14,6 +14,13 @@ import {
 const libraryId = '43d807c2-f678-4c9d-a6e4-f28884e9cb0b'
 const classroomId = '1868c537-4632-4855-89cb-f1617f02ea65'
 const questionId = '24475b32-21d9-4143-8fbd-b5ac1fdc8195'
+const settings = {
+  accessCode: null,
+  calculatorEnabled: false,
+  scratchpadEnabled: true,
+  shuffleQuestions: false,
+  shuffleOptions: true,
+}
 
 describe('practice teacher mutation validation', () => {
   it('normalizes the teacher-editable fields only', () => {
@@ -23,6 +30,7 @@ describe('practice teacher mutation validation', () => {
       classroomIds: [classroomId],
       questionIds: [questionId],
       revealAnswerKey: false,
+      ...settings,
       intent: 'draft',
     })).toEqual({
       title: 'สอวน. ฟิสิกส์',
@@ -30,6 +38,7 @@ describe('practice teacher mutation validation', () => {
       classroomIds: [classroomId],
       questionIds: [questionId],
       revealAnswerKey: false,
+      ...settings,
       intent: 'draft',
     })
   })
@@ -43,6 +52,7 @@ describe('practice teacher mutation validation', () => {
         classroomIds: [classroomId],
         questionIds: [],
         revealAnswerKey: false,
+        ...settings,
         intent: 'draft',
         [forbidden]: forbidden === 'isCorrect' ? true : '10',
       }).success).toBe(false)
@@ -56,6 +66,7 @@ describe('practice teacher mutation validation', () => {
       classroomIds: [classroomId],
       questionIds: [questionId, questionId],
       revealAnswerKey: false,
+      ...settings,
       intent: 'draft',
     }).success).toBe(false)
   })
@@ -67,6 +78,7 @@ describe('practice teacher mutation validation', () => {
       description: '',
       questionIds: [questionId],
       revealAnswerKey: false,
+      ...settings,
     }
     expect(updatePracticeLibrarySchema.safeParse(base).success).toBe(true)
     expect(updatePracticeLibrarySchema.safeParse({ ...base, classroomId }).success).toBe(false)
@@ -80,6 +92,7 @@ describe('practice teacher mutation validation', () => {
       description: '',
       questionIds: [questionId],
       revealAnswerKey: false,
+      ...settings,
       intent: 'draft' as const,
     }
     expect(createPracticeLibrarySchema.safeParse({ ...base, classroomIds: [] }).success).toBe(false)

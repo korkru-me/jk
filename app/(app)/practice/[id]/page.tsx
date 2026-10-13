@@ -5,18 +5,22 @@ import { getAuthUser } from '@/lib/auth/server'
 import { isPracticeLibraryEnabled } from '@/lib/practice-question'
 import { loadPracticeLibraryWaiting } from '@/lib/practice-question-access.server'
 import { buildPracticeSearchHref, parsePracticeSearchParams } from '@/lib/practice-search'
+import { hasPracticeAccessSession } from '@/lib/practice-access-session.server'
+import { unlockPracticeLibrary } from '../_access-actions'
 
 export const metadata = { title: 'คลังฝึกด้วยตนเอง — KorKru' }
 
 export default async function StudentPracticeLibraryWaitingPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
   if (!isPracticeLibraryEnabled(process.env)) notFound()
   const user = await getAuthUser()
   if (!user) redirect('/login')
-  const { id } = await params
+  const [{ id }, rawSearch] = await Promise.all([params, searchParams])
   const result = await loadPracticeLibraryWaiting(user.id, id)
 
   if (result.status !== 'ready') {
@@ -25,11 +29,20 @@ export default async function StudentPracticeLibraryWaitingPage({
     }
     notFound()
   }
+  const unlocked = !result.library.requiresAccessCode
+    || await hasPracticeAccessSession(user.id, id)
+  const rawAccessError = Array.isArray(rawSearch.access) ? rawSearch.access[0] : rawSearch.access
+  const accessError = rawAccessError === 'invalid' || rawAccessError === 'unavailable'
+    ? rawAccessError
+    : null
   return (
     <PracticeWaitingRoom
       library={result.library}
       questionCount={result.questionCount}
       enterHref={buildPracticeSearchHref(id, parsePracticeSearchParams({}))}
+      locked={!unlocked}
+      accessError={accessError}
+      unlockAction={unlockPracticeLibrary.bind(null, id)}
     />
   )
 }
