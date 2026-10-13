@@ -12,9 +12,9 @@
 - Migration version + checksum:
   - `20261012155740_self_practice_library.sql` — `ddb723b0cdf87e42d47417d5a55cc6c7a52f46326b6527aca1ad20d40692ae11`
   - `20261013045149_self_practice_atomic_rpcs.sql` — `faebef616f7060dcbbcd38d910c39b7f6b72fecce4bb6ad2fd0682bf8652fa85`
-- ยืนยันว่าตั้ง `PRACTICE_VARIANT_SECRET` ฝั่ง server ความยาวอย่างน้อย 32 ตัวอักษร: [x] (Vercel Secret, Preview branch `staging` เท่านั้น)
+- ยืนยันว่าตั้ง `PRACTICE_VARIANT_SECRET` ฝั่ง server ความยาวอย่างน้อย 32 ตัวอักษร: [x] (แยก Vercel Secret ระหว่าง Preview branch `staging` และ Production)
 - ผู้ทดสอบ / วันที่: Codex automated + authenticated browser UAT / 13 ตุลาคม 2026
-- ผลรวม: Technical Staging UAT, final build และ full-suite ผ่าน; เจ้าของผลิตภัณฑ์พักการปล่อย Production เมื่อ 13 ตุลาคม 2026 เพื่อปรับแก้และตรวจบน local ให้สมบูรณ์ก่อนอนุมัติรอบสุดท้าย
+- ผลรวม: Technical Staging UAT, final build และ full-suite ผ่าน; เจ้าของผลิตภัณฑ์อนุมัติ Production release เมื่อ 13 ตุลาคม 2026 หลังเปิดดูหน้าสร้างบน local ที่ใช้ข้อมูลจริง
 
 ### Automated + hosted Staging evidence (13 ตุลาคม 2026)
 
@@ -26,10 +26,18 @@
 - Responsive candidate ล่าสุดที่ 320, 390, 768 และ 1280px ไม่มี global horizontal overflow; filter มือถือสูงประมาณ 221px, รายการ 1,000 ข้อในหน้าแก้ไขใช้ internal scroll และตาราง progress มือถือเลื่อนแนวนอนเฉพาะภายในกรอบ
 - axe บน candidate ล่าสุดผ่าน `0 violations / 0 incomplete`; Next 16 `get_compilation_issues` และ `get_errors` ไม่พบปัญหา และ practice routes ครบ
 - หลัง ARIA patch ล่าสุด TypeScript และ design-token lint ผ่าน, full Vitest ผ่าน 238 files / 3,193 tests และ final `next build --webpack` ผ่านโดยสร้าง static pages 68/68 พร้อม practice routes ครบ
-- Vercel ตั้ง `PRACTICE_LIBRARY_ENABLED=true` และ `PRACTICE_VARIANT_SECRET` เฉพาะ Preview branch `staging`; Production ไม่ได้แก้และ feature flag ยังคงปิด
+- Vercel ตั้ง `PRACTICE_LIBRARY_ENABLED=true` และ `PRACTICE_VARIANT_SECRET` แยกทั้ง Preview branch `staging` และ Production; ค่า Production มีผลกับ deployment ใหม่เท่านั้น
 - หลังจบ UAT cleanup ผ่าน: ลบบัญชี QA สังเคราะห์ 8 บัญชีและโจทย์ 1,000 ข้อ, ลบ manifest สำเร็จ และไม่พบ cleanup failure
 
-หลักฐาน responsive เป็น browser emulation ไม่ใช่ physical-device UAT และ owner sign-off สำหรับ Production รอบสุดท้ายยังคงรอหลังการปรับแก้บน local
+หลักฐาน responsive เป็น browser emulation ไม่ใช่ physical-device UAT; เจ้าของผลิตภัณฑ์รับทราบข้อจำกัดนี้และอนุมัติ Production release แล้ว
+
+### Production rollout (13 ตุลาคม 2026)
+
+- Production Supabase project ref `libsutfinswqkruihwdx` ตรงกับ `.env.local` และ linked project ก่อน apply
+- เนื่องจาก repository มี SEB/Staging-only migrations เก่า 12 ตัวที่ตั้งใจไม่ลง Production จึงใช้ isolated release view ซึ่ง dry-run แสดงเฉพาะ `20261011025759_classroom_recent_views.sql`, `20261012155740_self_practice_library.sql` และ `20261013045149_self_practice_atomic_rpcs.sql`; ไม่ใช้ `--include-all`, seed หรือ migration repair
+- apply สามไฟล์สำเร็จตามลำดับ; post-apply migration ledger ตรงสำหรับ release view, dry-run รายงาน up-to-date และ `supabase db lint --linked --level error` ผ่านโดยไม่มีผลลัพธ์
+- ตั้ง Production-only `PRACTICE_VARIANT_SECRET` ใหม่และ `PRACTICE_LIBRARY_ENABLED=true` สำหรับ deployment ใหม่ โดยไม่ reuse secret ของ Staging
+- ไม่สร้างผู้ใช้ โจทย์ คลังฝึก หรือ attempt สำหรับ QA บน Production; การตรวจหลัง deploy จำกัดเป็น read-only smoke และการใช้งานจริงของเจ้าของผลิตภัณฑ์
 
 ใช้เฉพาะ Staging ที่ผ่าน isolation guard และข้อมูล QA สังเคราะห์ ห้ามใช้ข้อมูลนักเรียนจริงหรือ Production เพื่อทดสอบ mutation
 
@@ -91,9 +99,9 @@
 
 ## Owner sign-off
 
-- [ ] ยืนยันว่าคำว่า “ไม่มีคะแนน” ตรงกับเจตนาผลิตภัณฑ์หลังการปรับแก้บน local
-- [ ] ยืนยันว่าครูเห็นเพียงข้อที่เคยตอบและจำนวนครั้ง ไม่เห็นคำตอบหรือความถูกต้อง
-- [ ] ยืนยันว่า view-only co-teacher ไม่ควรเห็น roster progress
-- [ ] อนุมัติให้เปิด Production flag แบบจำกัด
+- [x] ยืนยันว่าคำว่า “ไม่มีคะแนน” ตรงกับเจตนาผลิตภัณฑ์หลังการเปิดดูบน local
+- [x] ยืนยันว่าครูเห็นเพียงข้อที่เคยตอบและจำนวนครั้ง ไม่เห็นคำตอบหรือความถูกต้อง
+- [x] ยืนยันว่า view-only co-teacher ไม่ควรเห็น roster progress
+- [x] อนุมัติให้เปิด Production flag แบบจำกัด
 
-ผู้อนุมัติ / วันที่ / หมายเหตุ: พักการอนุมัติเมื่อ 13 ตุลาคม 2026 เพื่อปรับแก้บน local ก่อนปล่อย Production รอบเดียว
+ผู้อนุมัติ / วันที่ / หมายเหตุ: เจ้าของผลิตภัณฑ์ / 13 ตุลาคม 2026 / อนุมัติให้ดันขึ้นเว็บจริงเพื่อเริ่มทดลองใช้งานส่วนนี้ โดยห้ามสร้างข้อมูล QA สังเคราะห์บน Production

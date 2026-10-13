@@ -1,6 +1,6 @@
 # Feature status
 
-### คลังฝึกไม่มีคะแนน — Phase 1–7 Staging UAT candidate หลัง feature flag (13 ตุลาคม 2026)
+### คลังฝึกไม่มีคะแนน — Phase 1–7 พร้อมปล่อย Production หลัง Staging UAT (13 ตุลาคม 2026)
 
 - `คลังฝึก` เป็นโดเมนแยกจาก assignment/submission โดยโครงสร้าง ใช้คลังโจทย์ แท็ก ตัวแสดงโจทย์ และ evaluator ที่ปลอดภัยร่วมกันเท่านั้น; ไม่มี `AssignmentType` ค่าใหม่ ไม่มี submission/score และไม่มีทาง export progress เป็นคะแนน
 - เส้นทางครูอยู่ที่ `/practice`, `/practice/new`, `/practice/[id]/edit` และหน้าความคืบหน้าที่ `/practice/[id]/progress`; เส้นทางนักเรียนใช้ `/practice/[id]` กับหน้าทำโจทย์รายข้อ ครูเห็นเพียงข้อที่เคยตอบและจำนวนครั้ง ส่วนผลตรวจถูกส่งกลับให้นักเรียนใน request ของตน
@@ -14,7 +14,7 @@
 - Isolated Supabase Staging ผ่าน gate ด้วย 8 บทบาทและ 1,000 โจทย์: search + exact tag **AND** พบ 500 ข้อ, RPC เดียวคืน 24 แถว, JSON row payload 5,824 bytes และ caller latency 112.24 ms; migration ledger/dry-run/database lint ผ่าน และ anonymous access ถูกปฏิเสธ
 - Canonical hosted browser UAT ผ่าน role matrix: owner กับ co-teacher `admin/manage` จัดการและดู progress ได้, `view` เห็น metadata แต่ edit/progress ได้ 404, นักเรียนในห้องเห็น published library และรักษา filter/back state, นักเรียนนอกห้องกับครูต่าง organization เข้าไม่ได้; ครูเห็นเพียงข้อที่เคยตอบ แท็ก และจำนวนครั้ง โดย HTML/RSC ไม่เปิด answer/correctness/solution/score
 - Candidate ล่าสุดหลัง `34256db` ผ่าน TypeScript, design-token lint, full Vitest 238 files / 3,193 tests, final Next 16 webpack build (68/68 static pages และ practice routes ครบ) และ runtime diagnostics หลัง ARIA patch
-- Vercel เปิด `PRACTICE_LIBRARY_ENABLED` และตั้ง variant secret เฉพาะ Preview branch `staging`; Production ไม่ได้แก้และ flag ยังคงปิด สถานะ deploy/หลักฐานละเอียดอยู่ใน `docs/SELF_PRACTICE_UAT.md`; physical-device UAT และ owner sign-off ยังเป็น Production release gate
+- เจ้าของผลิตภัณฑ์อนุมัติ Production release หลังเปิดดูหน้าสร้างบน local ที่อ่านข้อมูลจริง; Production Supabase apply เฉพาะ `20261011025759_classroom_recent_views.sql` และ practice migrations สองไฟล์ผ่าน isolated release view โดยกัน SEB/Staging-only migrations 12 ตัวออก จากนั้น dry-run รายงาน up-to-date และ database lint ระดับ error ผ่าน · Vercel Production มี secret แยกและ `PRACTICE_LIBRARY_ENABLED=true` สำหรับ deployment ใหม่; ไม่สร้างข้อมูล QA หรือทดสอบ mutation บน Production รายละเอียดอยู่ใน `docs/SELF_PRACTICE_UAT.md`
 - Final Staging merge `30492cd` ขึ้นสถานะ Ready และตรวจ route/authorization ซ้ำสำเร็จ; cleanup ลบบัญชี QA สังเคราะห์ 8 บัญชีกับโจทย์ 1,000 ข้อออกจาก Staging ครบโดยไม่มี failure
 
 ### ตำแหน่งไอคอน Sidebar ตรงกันทุกสถานะ — 12 ตุลาคม 2026
