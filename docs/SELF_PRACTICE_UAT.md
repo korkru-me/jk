@@ -6,30 +6,29 @@
 
 ## หลักฐานรอบทดสอบ
 
-- Environment / URL: Local candidate `http://localhost:3001`; hosted UAT ต้องใช้ `https://staging.korkru.com` เท่านั้น
-- Branch / commit: `codex/self-practice-library` implementation `4a979ee` + scale evidence `70fbef6`; migration delivery `codex/self-practice-staging-delivery` @ `d71e21b`
+- Environment / URL: Hosted UAT `https://staging.korkru.com`; Supabase Staging แยกจาก Production
+- Branch / commit: `codex/self-practice-library` @ `34256db`; authenticated hosted UAT บน Staging merge `a09b86e` และตรวจ responsive/accessibility ของ mobile polish + ARIA semantics บน candidate ล่าสุดแบบ local runtime
 - Supabase project ref (ไม่ใส่ secret): `dyuxkrzeveknqgtuzpbh` (Staging)
 - Migration version + checksum:
   - `20261012155740_self_practice_library.sql` — `ddb723b0cdf87e42d47417d5a55cc6c7a52f46326b6527aca1ad20d40692ae11`
   - `20261013045149_self_practice_atomic_rpcs.sql` — `faebef616f7060dcbbcd38d910c39b7f6b72fecce4bb6ad2fd0682bf8652fa85`
-- ยืนยันว่าตั้ง `PRACTICE_VARIANT_SECRET` ฝั่ง server ความยาวอย่างน้อย 32 ตัวอักษร: [ ]
-- ผู้ทดสอบ / วันที่:
-- ผลรวม: `ผ่าน` / `ไม่ผ่าน` / `ถูกบล็อก`
+- ยืนยันว่าตั้ง `PRACTICE_VARIANT_SECRET` ฝั่ง server ความยาวอย่างน้อย 32 ตัวอักษร: [x] (Vercel Secret, Preview branch `staging` เท่านั้น)
+- ผู้ทดสอบ / วันที่: Codex automated + authenticated browser UAT / 13 ตุลาคม 2026
+- ผลรวม: Technical Staging UAT, final build และ full-suite ผ่าน; รอ owner sign-off ก่อนเปิด Production
 
-### Automated candidate evidence (13 ตุลาคม 2026)
+### Automated + hosted Staging evidence (13 ตุลาคม 2026)
 
-- TypeScript: `npx tsc --noEmit` ผ่าน
-- Vitest: 238 files / 3,193 tests ผ่าน รวม SQL/RLS/RPC contract บน PGlite 32 เคส
-- Design-token lint: ผ่าน; palette 105 (baseline 149), hand-rolled cards 0, buttons 259 (baseline 302)
-- Production build: `next build --webpack` ผ่าน และสร้าง practice routes ครบ
-- Next 16 runtime: `get_compilation_issues` ไม่พบ issue; `get_errors` ไม่พบ config/session error หลังเปิด route ใหม่
-- Browser local: เปิด `/practice` โดยไม่มี session แล้ว redirect ไป `/login`; console รอบใหม่สะอาด และ viewport 320 px มี `scrollWidth = innerWidth = 320`
-- Staging migration: apply จาก committed delivery `d71e21b` เฉพาะ `20261012155740` + `20261013045149` สำเร็จ; post-apply ledger ตรง local/remote, dry-run คืน `upToDate: true` และ `db lint --linked --level error` ไม่พบผลลัพธ์
-- Staging anonymous negative smoke: direct `SELECT` ของทั้งสามตารางและ service-only search RPC ถูกปฏิเสธด้วย PostgreSQL `42501`
-- Staging readiness guard: 6 checks ผ่าน แต่ขาด `SUPABASE_SERVICE_ROLE_KEY` ของ Staging จึงไม่สร้าง synthetic accounts/fixtures และไม่อ้าง authenticated UAT ว่าผ่าน
-- Local scale evidence: PGlite fixture 1,000 โจทย์ มี progress สังเคราะห์ของนักเรียน 2 คน; ค้นข้อความ + แท็ก AND พบ 500 ข้อและคืน 24 แถวผ่าน RPC เดียว, payload แถวผลลัพธ์ 5,440 bytes, เวลาที่ caller วัด 37.03 ms และ `EXPLAIN ANALYZE` เป็น `Function Scan` 24 actual rows / 33.197 ms (ค่าจากเครื่อง local รอบนี้ ไม่ใช่ hosted latency หรือ RSC bytes)
+- Staging isolation guard ยืนยัน project ref `dyuxkrzeveknqgtuzpbh`; migration ledger ตรง local/remote, dry-run up-to-date, `db lint --linked --level error` ผ่าน และ anonymous `SELECT`/service-only RPC ถูกปฏิเสธด้วย PostgreSQL `42501`
+- Fixture สังเคราะห์ 8 บทบาทและคลัง 1,000 โจทย์ผ่าน gate ครบ: search + exact tag **AND** พบ 500 ข้อ, หน้าแรกคืน 24 แถวผ่าน DB RPC เดียว, JSON row payload 5,824 bytes และ caller latency 112.24 ms (ไม่อ้างว่าเป็น RSC bytes หรือ Production latency)
+- Canonical browser role matrix ผ่าน: owner และ co-teacher `admin/manage` จัดการ/ดู progress ได้; co-teacher `view` เห็น metadata แต่ไม่มีปุ่มจัดการและเปิด edit/progress ตรงได้ 404; นักเรียนในห้องเห็นเฉพาะ published library; นักเรียนนอกห้องไม่เห็นรายการและ direct URL ได้ 404; ครูต่าง organization ถูกปฏิเสธจาก gate
+- นักเรียนกรอง `สอวน. ค่าย 1` + `ไฟฟ้า` ได้ 500 ผลลัพธ์/21 หน้า, URL เก็บ tag ซ้ำและกลับจากหน้าทำโจทย์แล้วยังคง filter; การตรวจคำตอบแสดง “ตรวจแล้ว · ไม่คิดคะแนน” และเพิ่ม attempt แบบ idempotent โดย payload ไม่เปิด answer key/solution/score
+- หน้าครูแสดงนักเรียน 2 คน จำนวนข้อที่เคยตอบและจำนวนครั้งเท่านั้น; detail มีเพียงโจทย์ แท็ก และจำนวนครั้ง และการตรวจ HTML/RSC ไม่พบ answer, correctness, formula, tolerance, solution, score, points หรือ verdict
+- Responsive candidate ล่าสุดที่ 320, 390, 768 และ 1280px ไม่มี global horizontal overflow; filter มือถือสูงประมาณ 221px, รายการ 1,000 ข้อในหน้าแก้ไขใช้ internal scroll และตาราง progress มือถือเลื่อนแนวนอนเฉพาะภายในกรอบ
+- axe บน candidate ล่าสุดผ่าน `0 violations / 0 incomplete`; Next 16 `get_compilation_issues` และ `get_errors` ไม่พบปัญหา และ practice routes ครบ
+- หลัง ARIA patch ล่าสุด TypeScript และ design-token lint ผ่าน, full Vitest ผ่าน 238 files / 3,193 tests และ final `next build --webpack` ผ่านโดยสร้าง static pages 68/68 พร้อม practice routes ครบ
+- Vercel ตั้ง `PRACTICE_LIBRARY_ENABLED=true` และ `PRACTICE_VARIANT_SECRET` เฉพาะ Preview branch `staging`; Production ไม่ได้แก้และ feature flag ยังคงปิด
 
-หลักฐานชุดนี้ยังไม่แทน authenticated multi-role browser UAT, hosted 1,000-question/RSC measurement, physical-device UAT หรือ owner sign-off; รายการเหล่านั้นยังคงเป็น release gate ของ Production
+หลักฐาน responsive เป็น browser emulation ไม่ใช่ physical-device UAT และ owner sign-off ยังเป็น release gate ของ Production
 
 ใช้เฉพาะ Staging ที่ผ่าน isolation guard และข้อมูล QA สังเคราะห์ ห้ามใช้ข้อมูลนักเรียนจริงหรือ Production เพื่อทดสอบ mutation
 

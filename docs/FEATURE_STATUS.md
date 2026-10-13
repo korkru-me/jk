@@ -1,6 +1,6 @@
 # Feature status
 
-### คลังฝึกไม่มีคะแนน — Phase 1–7 implementation candidate หลัง feature flag (13 ตุลาคม 2026)
+### คลังฝึกไม่มีคะแนน — Phase 1–7 Staging UAT candidate หลัง feature flag (13 ตุลาคม 2026)
 
 - `คลังฝึก` เป็นโดเมนแยกจาก assignment/submission โดยโครงสร้าง ใช้คลังโจทย์ แท็ก ตัวแสดงโจทย์ และ evaluator ที่ปลอดภัยร่วมกันเท่านั้น; ไม่มี `AssignmentType` ค่าใหม่ ไม่มี submission/score และไม่มีทาง export progress เป็นคะแนน
 - เส้นทางครูอยู่ที่ `/practice`, `/practice/new`, `/practice/[id]/edit` และหน้าความคืบหน้าที่ `/practice/[id]/progress`; เส้นทางนักเรียนใช้ `/practice/[id]` กับหน้าทำโจทย์รายข้อ ครูเห็นเพียงข้อที่เคยตอบและจำนวนครั้ง ส่วนผลตรวจถูกส่งกลับให้นักเรียนใน request ของตน
@@ -9,11 +9,12 @@
 - รายการนักเรียนค้น/รวมจำนวนด้วย RPC เดียวต่อหน้า (24 ข้อ), progress รายคนแบ่งหน้า 50 ข้อ และ mutation draft/duplicate/bulk tag เป็น transaction เดียว; co-teacher `admin/manage` รักษา owner-private membership เดิมได้โดยไม่เปิดสิทธิ์อ่านหรือแนบโจทย์ส่วนตัวอื่น
 - variant receipt ไม่เปิด seed หรือ raw question revision ใน browser; nonce ถูกผูก actor/library/question/revision ด้วย HMAC ฝั่ง server และการตรวจคำตอบตัวเลขส่งโหมด DEG/RAD ชั่วคราวเข้า evaluator โดยไม่เพิ่มข้อมูลถาวร
 - สิทธิ์จัดการและดู progress ให้เฉพาะเจ้าของห้องกับครูร่วม `admin/manage`; ครูร่วม `view` อ่านได้เฉพาะ metadata คลังฝึกและ **ห้ามเห็น roster progress** นักเรียนอ่านได้เฉพาะคลังที่เผยแพร่ในห้องที่ตนยังเป็นสมาชิกและเห็น progress ของตนเองเท่านั้น
-- UI ใช้ compact list/table ไม่ใช้การ์ดสูงต่อโจทย์: toolbar ราว 96px, แถวโจทย์ 64–72px, แถว progress 44–48px และป้าย “ไม่มีคะแนน” อยู่ทุกทางเข้าที่อาจสับสนกับแบบฝึกหัด
+- UI ใช้ compact list/table ไม่ใช้การ์ดสูงต่อโจทย์: filter มือถือสูงประมาณ 221px, รายการ 1,000 ข้อในหน้าแก้ไขเลื่อนภายในกรอบ และป้าย “ไม่มีคะแนน” อยู่ทุกทางเข้าที่อาจสับสนกับแบบฝึกหัด; browser emulation ที่ 320/390/768/1280px ไม่มี global horizontal overflow และ axe ผ่าน `0 violations / 0 incomplete`
 - navigation และทางเข้าสร้างถูกซ่อนด้วย server-only `PRACTICE_LIBRARY_ENABLED=true`; flag เป็น presentation/rollout gate ไม่ใช่ authorization และค่าเริ่มต้นปิด ข้อมูลการตรวจ Phase 7 กับ owner sign-off ต้องบันทึกใน `docs/SELF_PRACTICE_UAT.md` ก่อนเปิด Production
-- Candidate ผ่าน TypeScript, design-token lint, full Vitest 238 files / 3,193 tests, SQL/RLS/RPC contract บน PGlite 32 เคส, webpack production build และ Next 16 runtime diagnostics; local unauthenticated route guard redirect `/practice` ไป `/login` และ viewport 320 px ไม่ล้นแนวนอน โดย local scale fixture 1,000 ข้อค้นผ่าน RPC เดียว คืน 24/500 แถวใน 37.03 ms และมี payload 5,440 bytes ส่วน authenticated multi-role/hosted RSC/physical-device/owner sign-off ยังเป็น Production release gate
-- Staging รับ migration `20261012155740` + `20261013045149` จาก committed delivery `d71e21b` แล้ว; post-apply ledger ตรง, dry-run up-to-date, database lint ผ่าน และ anon ถูกปฏิเสธจากทั้งสามตารางกับ service-only RPC แต่ readiness guard ยังขาด Staging service-role key จึงไม่สร้าง synthetic fixture และยังไม่ผ่าน authenticated multi-role UAT
-- สถานะ deploy ต้องอ่านจากหลักฐาน UAT ล่าสุด ไม่อนุมานจากการมี route ใน repository; Production flag ยังต้องปิดจนกว่า authenticated multi-role UAT, hosted 1,000-question/RSC performance evidence และ owner sign-off จะครบ
+- Isolated Supabase Staging ผ่าน gate ด้วย 8 บทบาทและ 1,000 โจทย์: search + exact tag **AND** พบ 500 ข้อ, RPC เดียวคืน 24 แถว, JSON row payload 5,824 bytes และ caller latency 112.24 ms; migration ledger/dry-run/database lint ผ่าน และ anonymous access ถูกปฏิเสธ
+- Canonical hosted browser UAT ผ่าน role matrix: owner กับ co-teacher `admin/manage` จัดการและดู progress ได้, `view` เห็น metadata แต่ edit/progress ได้ 404, นักเรียนในห้องเห็น published library และรักษา filter/back state, นักเรียนนอกห้องกับครูต่าง organization เข้าไม่ได้; ครูเห็นเพียงข้อที่เคยตอบ แท็ก และจำนวนครั้ง โดย HTML/RSC ไม่เปิด answer/correctness/solution/score
+- Candidate ล่าสุดหลัง `34256db` ผ่าน TypeScript, design-token lint, full Vitest 238 files / 3,193 tests, final Next 16 webpack build (68/68 static pages และ practice routes ครบ) และ runtime diagnostics หลัง ARIA patch
+- Vercel เปิด `PRACTICE_LIBRARY_ENABLED` และตั้ง variant secret เฉพาะ Preview branch `staging`; Production ไม่ได้แก้และ flag ยังคงปิด สถานะ deploy/หลักฐานละเอียดอยู่ใน `docs/SELF_PRACTICE_UAT.md`; physical-device UAT และ owner sign-off ยังเป็น Production release gate
 
 ### ตำแหน่งไอคอน Sidebar ตรงกันทุกสถานะ — 12 ตุลาคม 2026
 
