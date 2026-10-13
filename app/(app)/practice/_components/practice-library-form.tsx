@@ -60,6 +60,14 @@ import { PracticeBulkTagEditor } from './practice-bulk-tag-editor'
 
 const CREATE_STEPS = ['รายละเอียดและโจทย์', 'ตั้งค่า', 'ตรวจสอบและสร้าง']
 
+const NEW_PRACTICE_LIBRARY_DEFAULTS = {
+  revealAnswerKey: true,
+  calculatorEnabled: true,
+  scratchpadEnabled: true,
+  shuffleQuestions: true,
+  shuffleOptions: true,
+} as const
+
 interface InitialPracticeLibrary {
   id: string
   title: string
@@ -126,13 +134,23 @@ export function PracticeLibraryForm({
     return classrooms[0] ? [classrooms[0].id] : []
   })
   const [selectedIds, setSelectedIds] = useState<string[]>(initialLibrary?.questionIds ?? [])
-  const [revealAnswerKey, setRevealAnswerKey] = useState(initialLibrary?.revealAnswerKey ?? false)
+  const [revealAnswerKey, setRevealAnswerKey] = useState(
+    initialLibrary?.revealAnswerKey ?? NEW_PRACTICE_LIBRARY_DEFAULTS.revealAnswerKey,
+  )
   const [accessCodeEnabled, setAccessCodeEnabled] = useState(Boolean(initialLibrary?.accessCode))
   const [accessCode, setAccessCode] = useState(initialLibrary?.accessCode ?? '')
-  const [calculatorEnabled, setCalculatorEnabled] = useState(initialLibrary?.calculatorEnabled ?? false)
-  const [scratchpadEnabled, setScratchpadEnabled] = useState(initialLibrary?.scratchpadEnabled ?? true)
-  const [shuffleQuestions, setShuffleQuestions] = useState(initialLibrary?.shuffleQuestions ?? false)
-  const [shuffleOptions, setShuffleOptions] = useState(initialLibrary?.shuffleOptions ?? true)
+  const [calculatorEnabled, setCalculatorEnabled] = useState(
+    initialLibrary?.calculatorEnabled ?? NEW_PRACTICE_LIBRARY_DEFAULTS.calculatorEnabled,
+  )
+  const [scratchpadEnabled, setScratchpadEnabled] = useState(
+    initialLibrary?.scratchpadEnabled ?? NEW_PRACTICE_LIBRARY_DEFAULTS.scratchpadEnabled,
+  )
+  const [shuffleQuestions, setShuffleQuestions] = useState(
+    initialLibrary?.shuffleQuestions ?? NEW_PRACTICE_LIBRARY_DEFAULTS.shuffleQuestions,
+  )
+  const [shuffleOptions, setShuffleOptions] = useState(
+    initialLibrary?.shuffleOptions ?? NEW_PRACTICE_LIBRARY_DEFAULTS.shuffleOptions,
+  )
   const [search, setSearch] = useState('')
   const [difficulty, setDifficulty] = useState('all')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
@@ -141,13 +159,18 @@ export function PracticeLibraryForm({
     description: initialLibrary?.description ?? '',
     classroomIds: initialLibrary ? [initialLibrary.classroomId] : classroomIds,
     selectedIds: initialLibrary?.questionIds ?? [],
-    revealAnswerKey: initialLibrary?.revealAnswerKey ?? false,
+    revealAnswerKey: initialLibrary?.revealAnswerKey
+      ?? NEW_PRACTICE_LIBRARY_DEFAULTS.revealAnswerKey,
     accessCodeEnabled: Boolean(initialLibrary?.accessCode),
     accessCode: initialLibrary?.accessCode ?? '',
-    calculatorEnabled: initialLibrary?.calculatorEnabled ?? false,
-    scratchpadEnabled: initialLibrary?.scratchpadEnabled ?? true,
-    shuffleQuestions: initialLibrary?.shuffleQuestions ?? false,
-    shuffleOptions: initialLibrary?.shuffleOptions ?? true,
+    calculatorEnabled: initialLibrary?.calculatorEnabled
+      ?? NEW_PRACTICE_LIBRARY_DEFAULTS.calculatorEnabled,
+    scratchpadEnabled: initialLibrary?.scratchpadEnabled
+      ?? NEW_PRACTICE_LIBRARY_DEFAULTS.scratchpadEnabled,
+    shuffleQuestions: initialLibrary?.shuffleQuestions
+      ?? NEW_PRACTICE_LIBRARY_DEFAULTS.shuffleQuestions,
+    shuffleOptions: initialLibrary?.shuffleOptions
+      ?? NEW_PRACTICE_LIBRARY_DEFAULTS.shuffleOptions,
   }))
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [step, setStep] = useState(0)
