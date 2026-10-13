@@ -5,6 +5,7 @@ import { isPracticeLibraryEnabled } from '@/lib/practice-question'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { PracticeLibraryForm } from '../../_components/practice-library-form'
+import type { AssignmentQuestionSetOption } from '@/components/assignments/create-assignment-form'
 import {
   authenticatePracticeTeacher,
   loadPracticeEditorQuestions,
@@ -49,12 +50,19 @@ export default async function EditPracticeLibraryPage({
     )
   }
 
-  const bank = await loadPracticeEditorQuestions(
-    supabase,
-    actor.userId,
-    loaded.library.id,
-    membership.ids,
-  )
+  const [bank, { data: questionSets }] = await Promise.all([
+    loadPracticeEditorQuestions(
+      supabase,
+      actor.userId,
+      loaded.library.id,
+      membership.ids,
+    ),
+    supabase
+      .from('question_sets')
+      .select('id, title, description, question_ids, sections')
+      .eq('created_by', actor.userId)
+      .order('created_at', { ascending: false }),
+  ])
 
   return (
     <PracticeLibraryForm
@@ -64,6 +72,7 @@ export default async function EditPracticeLibraryPage({
         name: loaded.classroom.name,
       }]}
       questions={bank.questions}
+      questionSets={(questionSets ?? []) as AssignmentQuestionSetOption[]}
       missingQuestionIds={bank.missingIds}
       unsupportedQuestionIds={bank.unsupportedIds}
       loadingWarning={bank.error}

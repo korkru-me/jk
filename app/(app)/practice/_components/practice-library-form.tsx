@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Archive,
@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { BankQuestion } from '@/lib/question-bank'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { ConfirmDialog, useConfirm } from '@/components/ui/confirm-dialog'
@@ -31,7 +31,15 @@ import { NativeSelect } from '@/components/ui/native-select'
 import { Separator } from '@/components/ui/separator'
 import { AssignmentAnnouncementEditor } from '@/components/assignments/assignment-announcement-editor'
 import { AssignmentSettingToggle } from '@/components/assignments/assignment-setting-toggle'
+import { QuestionListPreviewDialog } from '@/components/assignments/question-list-preview-dialog'
 import { QuestionPicker } from '@/components/assignments/question-picker'
+import {
+  QuestionSetImport,
+  type QuestionSetImportChoice,
+} from '@/components/assignments/question-set-import'
+import type { AssignmentQuestionSetOption } from '@/components/assignments/create-assignment-form'
+import { toggleQuestionSetSelection } from '@/lib/question-set-selection'
+import { cn } from '@/lib/utils'
 import {
   closePracticeLibrary,
   createPracticeLibrary,
@@ -62,6 +70,7 @@ interface InitialPracticeLibrary {
 interface PracticeLibraryFormProps {
   classrooms: PracticeClassroomOption[]
   questions: BankQuestion[]
+  questionSets?: AssignmentQuestionSetOption[]
   initialClassroomId?: string
   initialLibrary?: InitialPracticeLibrary
   missingQuestionIds?: string[]
@@ -79,6 +88,7 @@ function statusBadgeVariant(status: PracticeLibraryStatus) {
 export function PracticeLibraryForm({
   classrooms,
   questions,
+  questionSets = [],
   initialClassroomId,
   initialLibrary,
   missingQuestionIds = [],
@@ -119,6 +129,12 @@ export function PracticeLibraryForm({
   }))
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [step, setStep] = useState(0)
+  const [questionPickerOpen, setQuestionPickerOpen] = useState(false)
+  const questionPickerRef = useRef<HTMLDivElement>(null)
+  const [listPreview, setListPreview] = useState<{
+    ids: string[]
+    title: string
+  } | null>(null)
 
   const currentSnapshot = JSON.stringify({
     title,
@@ -143,6 +159,7 @@ export function PracticeLibraryForm({
     () => new Map(questions.map(question => [question.id, question])),
     [questions],
   )
+  const bankIds = useMemo(() => new Set(questions.map(question => question.id)), [questions])
   const selectedMissingIds = missingQuestionIds.filter(id => selectedIds.includes(id))
   const selectedUnsupportedIds = unsupportedQuestionIds.filter(id => selectedIds.includes(id))
   const blockedQuestionIds = [...new Set([...selectedMissingIds, ...selectedUnsupportedIds])]
@@ -164,11 +181,48 @@ export function PracticeLibraryForm({
     return () => window.removeEventListener('beforeunload', warnBeforeLeaving)
   }, [isDirty])
 
+  useEffect(() => {
+    if (!questionPickerOpen) return
+
+    function closeQuestionPickerOnOutsideClick(event: MouseEvent) {
+      const container = questionPickerRef.current
+      const target = event.target
+      if (!container || !(target instanceof Node)) return
+      if (container.contains(target) || event.composedPath().includes(container)) return
+      if (target instanceof Element && target.closest('[role="dialog"]')) return
+      setQuestionPickerOpen(false)
+    }
+
+    document.addEventListener('click', closeQuestionPickerOnOutsideClick)
+    return () => document.removeEventListener('click', closeQuestionPickerOnOutsideClick)
+  }, [questionPickerOpen])
+
   function toggleQuestion(id: string) {
     if (membershipFrozen) return
     setSelectedIds(current => (
       current.includes(id) ? current.filter(questionId => questionId !== id) : [...current, id]
     ))
+  }
+
+  function importQuestionSet(choice: QuestionSetImportChoice) {
+    if (membershipFrozen) return
+    const usableIds = [...new Set(choice.questionIds)].filter(id => bankIds.has(id))
+    const removing = usableIds.length > 0 && usableIds.every(id => selectedIds.includes(id))
+    const changedCount = removing
+      ? usableIds.length
+      : usableIds.filter(id => !selectedIds.includes(id)).length
+    const missingCount = new Set(choice.questionIds).size - usableIds.length
+
+    setSelectedIds(current => toggleQuestionSetSelection(current, choice.questionIds, bankIds))
+    if (removing) {
+      toast.success(`เอา ${changedCount} ข้อจาก${choice.toastLabel} ออกจากคลังฝึกแล้ว`)
+      return
+    }
+    toast.success(
+      missingCount > 0
+        ? `เพิ่ม ${changedCount} ข้อจาก${choice.toastLabel} (ข้าม ${missingCount} ข้อที่ถูกลบไปแล้ว)`
+        : `เพิ่ม ${changedCount} ข้อจาก${choice.toastLabel}`,
+    )
   }
 
   function removeBlockedQuestions() {
@@ -416,10 +470,8 @@ export function PracticeLibraryForm({
         <Card padding="md">
         <section aria-labelledby="practice-questions-heading" className="flex min-w-0 flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <h2 id="practice-questions-heading" className="text-sm font-semibold text-foreground">โจทย์ในคลังฝึก</h2>
-              <Badge variant="secondary">{selectedIds.length} ข้อ</Badge>
-            </div>
+            <h2 id="practice-questions-heading" className="text-sm font-semibold text-foreground">โจทย์</h2>
+            <span className="text-sm font-semibold text-primary">{selectedIds.length} ข้อ</span>
             {membershipFrozen && (
               <span className="text-xs text-muted-foreground">รายการโจทย์ถูกตรึงหลังเผยแพร่ครั้งแรก</span>
             )}
@@ -477,21 +529,59 @@ export function PracticeLibraryForm({
               )}
             </div>
           ) : (
-            <QuestionPicker
-              questions={questions}
-              selectedIds={selectedIds}
-              baselineIds={initialLibrary?.questionIds ?? []}
-              onToggle={toggleQuestion}
-              search={search}
-              onSearchChange={setSearch}
-              diffFilter={difficulty}
-              onDiffFilterChange={setDifficulty}
-              showHeader={false}
-              showSelectedFooter={false}
-              surface="plain"
-              collectionNoun="คลังฝึก"
-              loadPreviewQuestions={previewLibraryId ? loadPracticePreview : undefined}
-            />
+            <div className="flex flex-col gap-3">
+              <h3 className="text-sm font-semibold text-foreground">
+                เลือกโจทย์ <span aria-hidden="true" className="text-destructive">*</span>
+                <span className="sr-only"> จำเป็น</span>
+              </h3>
+
+              <QuestionSetImport
+                sets={questionSets}
+                bankIds={bankIds}
+                selectedIds={selectedIds}
+                onToggle={importQuestionSet}
+                onPreview={choice => setListPreview({
+                  ids: choice.questionIds.filter(id => bankIds.has(id)),
+                  title: `โจทย์ใน${choice.toastLabel}`,
+                })}
+              />
+
+              <div ref={questionPickerRef}>
+                <Collapsible open={questionPickerOpen} onOpenChange={setQuestionPickerOpen}>
+                  <CollapsibleTrigger
+                    className={cn(
+                      buttonVariants({ variant: 'outline' }),
+                      'group h-auto w-full justify-start gap-2 rounded-xl px-3 py-2.5 text-left',
+                    )}
+                  >
+                    <span className="text-foreground">เลือกโจทย์รายข้อ</span>
+                    <span className="text-xs font-normal text-foreground">
+                      {questions.length.toLocaleString('th-TH')} ข้อในคลัง
+                    </span>
+                    <ChevronDown className="ml-auto text-muted-foreground transition-transform group-data-panel-open:rotate-180" />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 ease-out data-ending-style:h-0 data-starting-style:h-0">
+                    <div className="pt-4">
+                      <QuestionPicker
+                        questions={questions}
+                        selectedIds={selectedIds}
+                        baselineIds={initialLibrary?.questionIds ?? []}
+                        onToggle={toggleQuestion}
+                        search={search}
+                        onSearchChange={setSearch}
+                        diffFilter={difficulty}
+                        onDiffFilterChange={setDifficulty}
+                        showHeader={false}
+                        showSelectedFooter={false}
+                        surface="plain"
+                        collectionNoun="คลังฝึก"
+                        loadPreviewQuestions={previewLibraryId ? loadPracticePreview : undefined}
+                      />
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              </div>
+            </div>
           )}
           {!membershipFrozen && selectedIds.length > 1 && (
             <Collapsible>
@@ -680,6 +770,14 @@ export function PracticeLibraryForm({
           </div>
         </footer>
       </form>
+
+      <QuestionListPreviewDialog
+        ids={listPreview?.ids ?? []}
+        title={listPreview?.title}
+        open={listPreview !== null}
+        onOpenChange={open => { if (!open) setListPreview(null) }}
+        loadQuestions={previewLibraryId ? loadPracticePreview : undefined}
+      />
 
       {confirmDialog}
       {initialLibrary?.status === 'draft' && (

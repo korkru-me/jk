@@ -3,6 +3,7 @@ import { PracticeLibraryForm } from '@/app/(app)/practice/_components/practice-l
 import { PracticeWaitingRoom } from '@/components/practice/practice-waiting-room'
 import { isExamScreenLabEnabled } from '@/lib/exam-screen-lab-access'
 import type { BankQuestion } from '@/lib/question-bank'
+import type { AssignmentQuestionSetOption } from '@/components/assignments/create-assignment-form'
 
 export const metadata = { title: 'ทดลองคลังฝึก — KorKru' }
 export const dynamic = 'force-dynamic'
@@ -46,6 +47,27 @@ const questions: BankQuestion[] = [
   },
 ]
 
+const questionSets: AssignmentQuestionSetOption[] = [
+  {
+    id: '00000000-0000-4000-8400-000000000001',
+    title: 'สอวน. ฟิสิกส์ ค่าย 1–2',
+    description: 'โจทย์กลศาสตร์ ไฟฟ้า และของไหลสำหรับฝึกคัดเลือก',
+    question_ids: questions.map(question => question.id),
+    sections: [
+      {
+        id: 'mechanics',
+        title: 'กลศาสตร์',
+        question_ids: [questions[0].id, questions[2].id],
+      },
+      {
+        id: 'electricity',
+        title: 'ไฟฟ้า',
+        question_ids: [questions[1].id],
+      },
+    ],
+  },
+]
+
 export default async function PracticeLibraryLabPage({ searchParams }: {
   searchParams: Promise<{ view?: string }>
 }) {
@@ -86,6 +108,7 @@ export default async function PracticeLibraryLabPage({ searchParams }: {
           name: 'ฟิสิกส์ ม.4/1',
         }]}
         questions={questions}
+        questionSets={questionSets}
         initialClassroomId="00000000-0000-4000-8300-000000000002"
       />
     </main>
