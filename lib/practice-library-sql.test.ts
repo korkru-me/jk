@@ -10,6 +10,10 @@ const rpcMigration = readFileSync(
   new URL('../supabase/migrations/20261013045149_self_practice_atomic_rpcs.sql', import.meta.url),
   'utf8',
 )
+const multiClassroomMigration = readFileSync(
+  new URL('../supabase/migrations/20261013124500_practice_multi_classroom_creation.sql', import.meta.url),
+  'utf8',
+)
 
 const ORG_A = '10000000-0000-4000-8000-000000000001'
 const ORG_B = '10000000-0000-4000-8000-000000000002'
@@ -25,6 +29,7 @@ const STUDENT_ZERO = '20000000-0000-4000-8000-000000000009'
 const ROOM_A = '30000000-0000-4000-8000-000000000001'
 const ROOM_B = '30000000-0000-4000-8000-000000000002'
 const ROOM_DELETE = '30000000-0000-4000-8000-000000000003'
+const ROOM_A_SECOND = '30000000-0000-4000-8000-000000000004'
 const QUESTION_A1 = '40000000-0000-4000-8000-000000000001'
 const QUESTION_A2 = '40000000-0000-4000-8000-000000000002'
 const QUESTION_B = '40000000-0000-4000-8000-000000000003'
@@ -210,7 +215,8 @@ beforeAll(async () => {
       ('${STUDENT_ZERO}', 'student', 'active', 'นักเรียนยังไม่ตอบ');
     INSERT INTO public.classrooms VALUES
       ('${ROOM_A}', '${ORG_A}', '${OWNER_A}', 'active', 'subject'),
-      ('${ROOM_B}', '${ORG_B}', '${OWNER_B}', 'active', 'subject');
+      ('${ROOM_B}', '${ORG_B}', '${OWNER_B}', 'active', 'subject'),
+      ('${ROOM_A_SECOND}', '${ORG_A}', '${OWNER_A}', 'active', 'subject');
     INSERT INTO public.classroom_co_teachers VALUES
       ('${ROOM_A}', '${CO_MANAGE}', 'manage'),
       ('${ROOM_A}', '${CO_VIEW}', 'view'),
@@ -251,6 +257,7 @@ beforeAll(async () => {
   `)
   await db.exec(migration)
   await db.exec(rpcMigration)
+  await db.exec(multiClassroomMigration)
   await as(user(OWNER_A), async tx => {
     await tx.query(
       `INSERT INTO public.practice_libraries
@@ -613,6 +620,8 @@ describe('self-practice RPC privilege and execution contracts', () => {
           'public.bulk_update_practice_question_tags(uuid,uuid[],text,text)'::regprocedure),
         ('create_practice_library',
           'public.create_practice_library(uuid,uuid,text,text,boolean,uuid[],boolean)'::regprocedure),
+        ('create_practice_libraries_for_classrooms',
+          'public.create_practice_libraries_for_classrooms(uuid,uuid[],text,text,boolean,uuid[],boolean)'::regprocedure),
         ('duplicate_practice_library',
           'public.duplicate_practice_library(uuid)'::regprocedure),
         ('get_practice_library_questions_for_manager',
@@ -638,6 +647,15 @@ describe('self-practice RPC privilege and execution contracts', () => {
       {
         name: 'bulk_update_practice_question_tags',
         prosecdef: true,
+        provolatile: 'v',
+        proconfig: ['search_path=""'],
+        anon_can: false,
+        authenticated_can: true,
+        service_can: false,
+      },
+      {
+        name: 'create_practice_libraries_for_classrooms',
+        prosecdef: false,
         provolatile: 'v',
         proconfig: ['search_path=""'],
         anon_can: false,
@@ -1272,6 +1290,87 @@ describe('self-practice RPC privilege and execution contracts', () => {
 })
 
 describe('self-practice atomic authenticated mutations', () => {
+  it('creates equivalent classroom-scoped libraries for every selected room atomically', async () => {
+    await as(user(OWNER_A), async tx => {
+      const primaryId = (await tx.query<{ id: string }>(`
+        SELECT public.create_practice_libraries_for_classrooms(
+          $1, ARRAY[$2, $3]::uuid[], '  คลังหลายห้อง  ', '  ฝึกชุดเดียวกัน  ', true,
+          ARRAY[$4, $5]::uuid[], true
+        ) AS id
+      `, [ORG_A, ROOM_A, ROOM_A_SECOND, QUESTION_A2, QUESTION_A1])).rows[0].id
+      const libraries = (await tx.query<{
+        id: string
+        classroom_id: string
+        description: string
+        status: string
+        reveal_answer_key: boolean
+      }>(`
+        SELECT id, classroom_id, description, status, reveal_answer_key
+        FROM public.practice_libraries
+        WHERE title = 'คลังหลายห้อง'
+        ORDER BY CASE classroom_id WHEN $1 THEN 0 ELSE 1 END
+      `, [ROOM_A])).rows
+
+      expect(libraries).toHaveLength(2)
+      expect(libraries[0]).toMatchObject({
+        id: primaryId,
+        classroom_id: ROOM_A,
+        description: 'ฝึกชุดเดียวกัน',
+        status: 'published',
+        reveal_answer_key: true,
+      })
+      expect(libraries[1]).toMatchObject({
+        classroom_id: ROOM_A_SECOND,
+        description: 'ฝึกชุดเดียวกัน',
+        status: 'published',
+        reveal_answer_key: true,
+      })
+
+      const memberships = (await tx.query<{
+        classroom_id: string
+        question_id: string
+        position: number
+      }>(`
+        SELECT library.classroom_id, membership.question_id, membership.position
+        FROM public.practice_libraries library
+        JOIN public.practice_library_questions membership ON membership.library_id = library.id
+        WHERE library.title = 'คลังหลายห้อง'
+        ORDER BY library.classroom_id, membership.position
+      `)).rows
+      expect(memberships).toEqual([
+        { classroom_id: ROOM_A, question_id: QUESTION_A2, position: 0 },
+        { classroom_id: ROOM_A, question_id: QUESTION_A1, position: 1 },
+        { classroom_id: ROOM_A_SECOND, question_id: QUESTION_A2, position: 0 },
+        { classroom_id: ROOM_A_SECOND, question_id: QUESTION_A1, position: 1 },
+      ])
+    })
+  })
+
+  it('rejects duplicate or unauthorized room targets without leaving partial libraries', async () => {
+    await as(user(OWNER_A), async tx => {
+      const attempts = [
+        { rooms: [ROOM_A, ROOM_A], code: '22023' },
+        { rooms: [ROOM_A, ROOM_B], code: '42501' },
+      ]
+
+      for (const [index, attempt] of attempts.entries()) {
+        await tx.exec(`SAVEPOINT invalid_rooms_${index}`)
+        await expect(tx.query(`
+          SELECT public.create_practice_libraries_for_classrooms(
+            $1, $2::uuid[], 'ต้องไม่เหลือหลายห้อง', NULL, false,
+            ARRAY[$3]::uuid[], false
+          )
+        `, [ORG_A, attempt.rooms, QUESTION_A1])).rejects.toMatchObject({ code: attempt.code })
+        await tx.exec(`ROLLBACK TO SAVEPOINT invalid_rooms_${index}`)
+      }
+
+      expect((await tx.query<{ count: number }>(`
+        SELECT count(*)::int AS count
+        FROM public.practice_libraries WHERE title = 'ต้องไม่เหลือหลายห้อง'
+      `)).rows[0].count).toBe(0)
+    })
+  })
+
   it('creates and publishes a library with ordered memberships in one RPC', async () => {
     await as(user(OWNER_A), async tx => {
       const id = (await tx.query<{ id: string }>(`

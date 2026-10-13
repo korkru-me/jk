@@ -70,6 +70,7 @@ export default async function EditPracticeLibraryPage({
         id: loaded.classroom.id,
         orgId: loaded.classroom.org_id,
         name: loaded.classroom.name,
+        description: loaded.classroom.description,
       }]}
       questions={bank.questions}
       questionSets={(questionSets ?? []) as AssignmentQuestionSetOption[]}

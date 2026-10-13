@@ -23,6 +23,9 @@ interface Props {
   classrooms: AssignmentClassroomOption[]
   selectedIds: string[]
   onToggle: (id: string) => void
+  /** Noun used in the contextual helper copy. Assignment keeps the default;
+   *  other classroom-scoped work can reuse the same interaction accurately. */
+  itemNoun?: string
   /** The room the teacher came from. It stays selected while other rooms are
    *  tucked behind an explicit "assign elsewhere too" disclosure. */
   primaryClassroomId?: string
@@ -54,6 +57,7 @@ export function ClassroomPicker({
   classrooms,
   selectedIds,
   onToggle,
+  itemNoun = 'งาน',
   primaryClassroomId,
   outsideClickBoundaryRef,
 }: Props) {
@@ -174,7 +178,7 @@ export function ClassroomPicker({
               <span data-assignment-description className="text-xs font-normal text-muted-foreground">
                 {selectedRows.length > 0
                   ? `เลือกเพิ่มแล้ว ${selectedRows.length} ห้องเรียน`
-                  : 'หากไม่เลือกเพิ่ม งานจะอยู่ในห้องนี้เท่านั้น'}
+                  : `หากไม่เลือกเพิ่ม ${itemNoun}จะอยู่ในห้องนี้เท่านั้น`}
               </span>
             </span>
             <ChevronDown className="size-4 shrink-0 transition-transform group-data-panel-open:rotate-180" aria-hidden="true" />

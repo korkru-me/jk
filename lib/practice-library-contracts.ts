@@ -85,6 +85,7 @@ export const GET_PRACTICE_STUDENT_QUESTION_PROGRESS_RPC = 'get_practice_student_
 export const BULK_UPDATE_PRACTICE_QUESTION_TAGS_RPC = 'bulk_update_practice_question_tags' as const
 export const REPLACE_DRAFT_PRACTICE_LIBRARY_QUESTIONS_RPC = 'replace_draft_practice_library_questions' as const
 export const CREATE_PRACTICE_LIBRARY_RPC = 'create_practice_library' as const
+export const CREATE_PRACTICE_LIBRARIES_FOR_CLASSROOMS_RPC = 'create_practice_libraries_for_classrooms' as const
 export const UPDATE_PRACTICE_LIBRARY_DRAFT_RPC = 'update_practice_library_draft' as const
 export const DUPLICATE_PRACTICE_LIBRARY_RPC = 'duplicate_practice_library' as const
 

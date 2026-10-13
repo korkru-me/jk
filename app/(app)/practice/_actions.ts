@@ -12,7 +12,7 @@ import {
 import {
   canManagePracticeLibrary,
   BULK_UPDATE_PRACTICE_QUESTION_TAGS_RPC,
-  CREATE_PRACTICE_LIBRARY_RPC,
+  CREATE_PRACTICE_LIBRARIES_FOR_CLASSROOMS_RPC,
   DUPLICATE_PRACTICE_LIBRARY_RPC,
   UPDATE_PRACTICE_LIBRARY_DRAFT_RPC,
   isUuid,
@@ -97,19 +97,19 @@ async function validatePracticeQuestions(
   return null
 }
 
-async function createLibraryRow(input: {
+async function createLibraryRows(input: {
   supabase: SupabaseServerClient
   orgId: string
-  classroomId: string
+  classroomIds: string[]
   title: string
   description: string
   revealAnswerKey: boolean
   questionIds: string[]
   publish: boolean
 }): Promise<PracticeLibraryActionResult> {
-  const result = await input.supabase.rpc(CREATE_PRACTICE_LIBRARY_RPC, {
+  const result = await input.supabase.rpc(CREATE_PRACTICE_LIBRARIES_FOR_CLASSROOMS_RPC, {
     p_org_id: input.orgId,
-    p_classroom_id: input.classroomId,
+    p_classroom_ids: input.classroomIds,
     p_title: input.title,
     p_description: input.description || null,
     p_reveal_answer_key: input.revealAnswerKey,
@@ -138,25 +138,32 @@ export async function createPracticeLibrary(
 
   const context = await actionContext()
   if (!context.ok) return context.result
-  const classroom = await loadPracticeClassroomAccess(
-    context.supabase,
-    context.userId,
-    parsed.data.classroomId,
-  )
-  if (!classroom || !canManagePracticeLibrary(classroom.access)) return failure(FORBIDDEN)
-  if (!isEligiblePracticeClassroom({
+  const classrooms = await Promise.all(parsed.data.classroomIds.map(classroomId => (
+    loadPracticeClassroomAccess(context.supabase, context.userId, classroomId)
+  )))
+  if (classrooms.some(classroom => !classroom || !canManagePracticeLibrary(classroom.access))) {
+    return failure(FORBIDDEN, { classroomIds: ['มีห้องเรียนที่คุณไม่มีสิทธิ์จัดการ'] })
+  }
+  const managedClassrooms = classrooms.filter((classroom): classroom is NonNullable<typeof classroom> => Boolean(classroom))
+  if (managedClassrooms.some(classroom => !isEligiblePracticeClassroom({
     status: classroom.status,
     classroomType: classroom.classroom_type,
-  })) {
+  }))) {
     return failure('สร้างคลังฝึกได้เฉพาะในห้องเรียนรายวิชาที่เปิดใช้งาน')
+  }
+  const orgId = managedClassrooms[0]?.org_id
+  if (!orgId || managedClassrooms.some(classroom => classroom.org_id !== orgId)) {
+    return failure('เลือกห้องเรียนจากองค์กรเดียวกันเท่านั้น', {
+      classroomIds: ['ห้องเรียนทั้งหมดต้องอยู่ในองค์กรเดียวกัน'],
+    })
   }
   const questionError = await validatePracticeQuestions(context.supabase, parsed.data.questionIds)
   if (questionError) return failure(questionError, { questionIds: [questionError] })
 
-  return createLibraryRow({
+  return createLibraryRows({
     supabase: context.supabase,
-    orgId: classroom.org_id,
-    classroomId: classroom.id,
+    orgId,
+    classroomIds: managedClassrooms.map(classroom => classroom.id),
     title: parsed.data.title,
     description: sanitizeRichTextForStorage(parsed.data.description.trim()),
     revealAnswerKey: parsed.data.revealAnswerKey,

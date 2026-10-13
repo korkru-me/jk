@@ -27,10 +27,10 @@ import {
 } from '@/components/ui/collapsible'
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { NativeSelect } from '@/components/ui/native-select'
 import { Separator } from '@/components/ui/separator'
 import { AssignmentAnnouncementEditor } from '@/components/assignments/assignment-announcement-editor'
 import { AssignmentSettingToggle } from '@/components/assignments/assignment-setting-toggle'
+import { ClassroomPicker } from '@/components/assignments/classroom-picker'
 import { QuestionListPreviewDialog } from '@/components/assignments/question-list-preview-dialog'
 import { QuestionPicker } from '@/components/assignments/question-picker'
 import {
@@ -108,13 +108,15 @@ export function PracticeLibraryForm({
   const [isPending, startTransition] = useTransition()
   const [title, setTitle] = useState(initialLibrary?.title ?? '')
   const [description, setDescription] = useState(initialLibrary?.description ?? '')
-  const [classroomId, setClassroomId] = useState(
-    initialLibrary?.classroomId
-      ?? (classrooms.some(classroom => classroom.id === initialClassroomId)
-        ? initialClassroomId
-        : classrooms[0]?.id)
-      ?? '',
-  )
+  const contextualPrimaryClassroomId = !initialLibrary
+    && classrooms.some(classroom => classroom.id === initialClassroomId)
+    ? initialClassroomId
+    : undefined
+  const [classroomIds, setClassroomIds] = useState<string[]>(() => {
+    if (initialLibrary) return [initialLibrary.classroomId]
+    if (contextualPrimaryClassroomId) return [contextualPrimaryClassroomId]
+    return classrooms[0] ? [classrooms[0].id] : []
+  })
   const [selectedIds, setSelectedIds] = useState<string[]>(initialLibrary?.questionIds ?? [])
   const [revealAnswerKey, setRevealAnswerKey] = useState(initialLibrary?.revealAnswerKey ?? false)
   const [search, setSearch] = useState('')
@@ -123,7 +125,7 @@ export function PracticeLibraryForm({
   const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify({
     title: initialLibrary?.title ?? '',
     description: initialLibrary?.description ?? '',
-    classroomId: initialLibrary?.classroomId ?? classroomId,
+    classroomIds: initialLibrary ? [initialLibrary.classroomId] : classroomIds,
     selectedIds: initialLibrary?.questionIds ?? [],
     revealAnswerKey: initialLibrary?.revealAnswerKey ?? false,
   }))
@@ -139,7 +141,7 @@ export function PracticeLibraryForm({
   const currentSnapshot = JSON.stringify({
     title,
     description,
-    classroomId,
+    classroomIds,
     selectedIds,
     revealAnswerKey,
   })
@@ -165,9 +167,15 @@ export function PracticeLibraryForm({
   const blockedQuestionIds = [...new Set([...selectedMissingIds, ...selectedUnsupportedIds])]
   const hasDraftQuestionBlock = !membershipFrozen
     && (blockedQuestionIds.length > 0 || Boolean(loadingWarning))
-  const selectedClassroom = classrooms.find(classroom => classroom.id === classroomId)
+  const selectedClassrooms = classroomIds.flatMap(id => {
+    const classroom = classrooms.find(candidate => candidate.id === id)
+    return classroom ? [classroom] : []
+  })
+  const classroomSummary = selectedClassrooms.length <= 1
+    ? (selectedClassrooms[0]?.name ?? '—')
+    : `${selectedClassrooms[0]?.name ?? ''} และอีก ${selectedClassrooms.length - 1} ห้อง`
   const canAdvanceDetails = title.trim().length > 0
-    && Boolean(classroomId)
+    && classroomIds.length > 0
     && selectedIds.length > 0
     && !hasDraftQuestionBlock
 
@@ -201,6 +209,15 @@ export function PracticeLibraryForm({
     if (membershipFrozen) return
     setSelectedIds(current => (
       current.includes(id) ? current.filter(questionId => questionId !== id) : [...current, id]
+    ))
+  }
+
+  function toggleClassroom(id: string) {
+    if (initialLibrary || id === contextualPrimaryClassroomId) return
+    setClassroomIds(current => (
+      current.includes(id)
+        ? current.filter(classroomId => classroomId !== id)
+        : [...current, id]
     ))
   }
 
@@ -256,7 +273,7 @@ export function PracticeLibraryForm({
         : await createPracticeLibrary({
             title,
             description,
-            classroomId,
+            classroomIds,
             questionIds: selectedIds,
             revealAnswerKey,
             intent,
@@ -419,7 +436,10 @@ export function PracticeLibraryForm({
             {isDirty && <span className="text-xs text-muted-foreground" role="status">มีการแก้ไขที่ยังไม่ได้บันทึก</span>}
           </div>
           <FieldGroup className="grid gap-3 md:grid-cols-2">
-            <Field data-invalid={Boolean(fieldErrors.title)}>
+            <Field
+              className={cn(contextualPrimaryClassroomId && 'md:col-span-2')}
+              data-invalid={Boolean(fieldErrors.title)}
+            >
               <FieldLabel htmlFor="practice-title">ชื่อคลังฝึก</FieldLabel>
               <Input
                 id="practice-title"
@@ -433,24 +453,33 @@ export function PracticeLibraryForm({
               />
               <FieldError>{fieldErrors.title?.[0]}</FieldError>
             </Field>
-            <Field data-invalid={Boolean(fieldErrors.classroomId)}>
-              <FieldLabel htmlFor="practice-classroom">ห้องเรียน</FieldLabel>
-              <NativeSelect
-                id="practice-classroom"
-                className="min-h-11"
-                value={classroomId}
-                onChange={event => setClassroomId(event.target.value)}
-                disabled={Boolean(initialLibrary)}
-                required
-                aria-invalid={Boolean(fieldErrors.classroomId)}
-              >
-                {classrooms.length === 0 && <option value="">ไม่มีห้องเรียนที่จัดการได้</option>}
-                {classrooms.map(classroom => (
-                  <option key={classroom.id} value={classroom.id}>{classroom.name}</option>
-                ))}
-              </NativeSelect>
-              <FieldError>{fieldErrors.classroomId?.[0]}</FieldError>
-            </Field>
+            {initialLibrary && (
+              <Field>
+                <FieldLabel htmlFor="practice-classroom">ห้องเรียน</FieldLabel>
+                <Input
+                  id="practice-classroom"
+                  value={selectedClassrooms[0]?.name ?? ''}
+                  disabled
+                  readOnly
+                />
+              </Field>
+            )}
+            {!initialLibrary && !contextualPrimaryClassroomId && (
+              <Field data-invalid={Boolean(fieldErrors.classroomIds)}>
+                <FieldLabel>
+                  ห้องเรียน <span aria-hidden="true" className="text-destructive">*</span>
+                  {classroomIds.length > 1 && (
+                    <span className="font-normal text-muted-foreground"> ({classroomIds.length} ห้อง)</span>
+                  )}
+                </FieldLabel>
+                <ClassroomPicker
+                  classrooms={classrooms}
+                  selectedIds={classroomIds}
+                  onToggle={toggleClassroom}
+                />
+                <FieldError>{fieldErrors.classroomIds?.[0]}</FieldError>
+              </Field>
+            )}
             <Field className="md:col-span-2" data-invalid={Boolean(fieldErrors.description)}>
               <FieldLabel>ชี้แจงรายละเอียดเพิ่มเติม</FieldLabel>
               <p className="text-xs text-muted-foreground">
@@ -680,6 +709,26 @@ export function PracticeLibraryForm({
               checked={revealAnswerKey}
               onCheckedChange={setRevealAnswerKey}
             />
+            {!initialLibrary
+              && contextualPrimaryClassroomId
+              && classrooms.some(classroom => classroom.id !== contextualPrimaryClassroomId) && (
+              <>
+                <Separator />
+                <ClassroomPicker
+                  classrooms={classrooms}
+                  selectedIds={classroomIds}
+                  onToggle={toggleClassroom}
+                  primaryClassroomId={contextualPrimaryClassroomId}
+                  itemNoun="คลังฝึก"
+                />
+                <FieldError>{fieldErrors.classroomIds?.[0]}</FieldError>
+                {classroomIds.length > 1 && (
+                  <p className="text-xs text-muted-foreground">
+                    แต่ละห้องจะมีคลังฝึกและความคืบหน้าของนักเรียนแยกจากกัน
+                  </p>
+                )}
+              </>
+            )}
           </Card>
         )}
 
@@ -689,7 +738,7 @@ export function PracticeLibraryForm({
             <div className="rounded-xl border border-border px-3">
               {[
                 { label: 'ชื่อ', value: title.trim() },
-                { label: 'ห้องเรียน', value: selectedClassroom?.name ?? '—' },
+                { label: 'ห้องเรียน', value: classroomSummary },
                 { label: 'ประเภท', value: 'คลังฝึก · ไม่มีคะแนน' },
                 { label: 'โจทย์', value: `${selectedIds.length.toLocaleString('th-TH')} ข้อ` },
                 { label: 'การตรวจคำตอบ', value: 'ตรวจได้ทีละข้อ' },
@@ -749,7 +798,7 @@ export function PracticeLibraryForm({
                   className="min-h-11"
                   type="submit"
                   variant={initialLibrary ? 'default' : 'outline'}
-                  disabled={isPending || !isDirty || !title.trim() || !classroomId || hasDraftQuestionBlock}
+                  disabled={isPending || !isDirty || !title.trim() || classroomIds.length === 0 || hasDraftQuestionBlock}
                 >
                   <Save data-icon="inline-start" />
                   {isPending ? 'กำลังบันทึก...' : initialLibrary ? 'บันทึก' : 'บันทึกร่าง'}

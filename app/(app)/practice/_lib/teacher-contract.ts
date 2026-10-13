@@ -20,12 +20,13 @@ export interface PracticeClassroomOption {
   id: string
   orgId: string
   name: string
+  description: string | null
 }
 
 export interface PracticeLibraryEditorValue {
   title: string
   description: string
-  classroomId: string
+  classroomIds: string[]
   questionIds: string[]
   revealAnswerKey: boolean
 }
@@ -43,6 +44,19 @@ const questionIdsSchema = z
       context.addIssue({
         code: 'custom',
         message: 'รายการโจทย์มีข้อซ้ำ',
+      })
+    }
+  })
+
+const classroomIdsSchema = z
+  .array(uuidSchema)
+  .min(1, 'เลือกห้องเรียนอย่างน้อย 1 ห้อง')
+  .max(50, 'เลือกห้องเรียนได้ไม่เกิน 50 ห้อง')
+  .superRefine((ids, context) => {
+    if (new Set(ids).size !== ids.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'รายการห้องเรียนมีห้องซ้ำ',
       })
     }
   })
@@ -68,7 +82,7 @@ const practiceLibraryFields = {
  */
 export const createPracticeLibrarySchema = z.object({
   ...practiceLibraryFields,
-  classroomId: uuidSchema,
+  classroomIds: classroomIdsSchema,
   intent: z.enum(['draft', 'publish']),
 }).strict()
 

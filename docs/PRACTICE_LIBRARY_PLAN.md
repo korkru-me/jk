@@ -165,7 +165,7 @@ Acceptance gate:
 
 งานหลัก:
 
-- เพิ่ม `practice_libraries` สำหรับคลังฝึกหนึ่งห้องใน MVP, `practice_library_questions` สำหรับสมาชิกโจทย์ตามลำดับ และ `practice_answer_attempts` สำหรับ accepted-check event โดยไม่ผูกกับตารางคะแนน
+- เพิ่ม `practice_libraries` โดยหนึ่งแถวคงผูกหนึ่งห้อง, `practice_library_questions` สำหรับสมาชิกโจทย์ตามลำดับ และ `practice_answer_attempts` สำหรับ accepted-check event โดยไม่ผูกกับตารางคะแนน; หน้าสร้างเลือกหลายห้องได้เหมือน assignment แต่ atomic RPC จะสร้างคลังที่ตั้งค่าเหมือนกันแยกหนึ่งชุดต่อห้อง เพื่อไม่รวม roster/progress ข้ามห้อง
 - `practice_answer_attempts` เก็บเฉพาะ `library_id`, `student_id`, `question_id`, `checked_at`, `idempotency_key`; บังคับ unique อย่างน้อยที่ `(library_id, student_id, idempotency_key)` แล้ว derive จำนวนครั้งด้วย `count(*)` แทนการมี aggregate counter เป็น source of truth ชุดที่สอง
 - `checked_at` มาจากฐานข้อมูล ไม่รับเวลาจาก browser และ RPC สำหรับ append event เรียกได้จาก server boundary เท่านั้น; browser ห้าม insert/update/delete event โดยตรง
 - Server Action ต้องตรวจ auth, รูปทรงและความไม่ว่างของคำตอบก่อนเรียก RPC; RPC ตรวจ published status, roster, library membership และ actor ซ้ำอีกชั้น โดยไม่รับหรือเก็บ payload คำตอบ
@@ -199,7 +199,7 @@ route หลักของเฟสนี้คือ `/practice`, `/practice/n
 งานหลัก:
 
 - เพิ่มตัวเลือก “คลังฝึก” ในทางเข้าสร้างงานภายในห้องเรียน แต่พาไป route/domain เฉพาะ และไม่เพิ่มทางเข้าใน sidebar หลัก
-- ทำหน้าตั้งค่าแบบ compact: ชื่อ, คำชี้แจง, ห้องเป้าหมาย, สถานะ และรายการโจทย์
+- ทำหน้าตั้งค่าแบบ compact: ชื่อ, คำชี้แจง, ห้องเป้าหมาย, สถานะ และรายการโจทย์; เมื่อมาจากห้องเรียนให้ตรึงห้องหลักและใช้ disclosure เลือกห้องเพิ่มเติมแบบเดียวกับ assignment ส่วนทางเข้ากลางเลือกหลายห้องในข้อมูลพื้นฐาน
 - ใช้ selector ของคลังโจทย์เดิมโดยกรองเฉพาะชนิดที่รองรับและโหลด preview ตามคำขอ
 - รองรับเลือก/เอาออกหลายข้อ จัดลำดับเมื่อจำเป็น และเตือนก่อนทิ้ง draft ที่ยังไม่บันทึก
 - เพิ่ม flow bulk tag ตามภาพอ้างอิง โดยเขียนแท็กกลับที่โจทย์ต้นทาง ไม่สร้างแท็กสำเนาเฉพาะคลัง
