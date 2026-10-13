@@ -77,10 +77,17 @@ export function PracticeLibraryView({
         </div>
       </header>
 
-      <Card padding="md" className="flex flex-col gap-3">
-        <form method="get" className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(12rem,0.55fr)_auto]">
+      <Card
+        edge="none"
+        padding="none"
+        className="flex flex-col gap-2 bg-transparent sm:rounded-2xl sm:border sm:border-border sm:bg-card sm:p-4"
+      >
+        <form
+          method="get"
+          className="grid grid-cols-[minmax(0,1fr)_44px] gap-2 md:grid-cols-[minmax(0,1fr)_minmax(12rem,0.55fr)_auto]"
+        >
           {state.tags.map(tag => <input key={tag} type="hidden" name="tag" value={tag} />)}
-          <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground">
+          <label className="col-span-2 flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground md:col-span-1">
             ค้นหาชื่อหรือเนื้อหาโจทย์
             <Input
               name="q"
@@ -100,9 +107,13 @@ export function PracticeLibraryView({
               disabled={tagLimitReached}
             />
           </label>
-          <Button type="submit" className="min-h-[44px] self-end">
+          <Button
+            type="submit"
+            size="icon"
+            className="size-11 self-end md:w-auto md:px-4"
+          >
             <Search data-icon="inline-start" aria-hidden="true" />
-            ค้นหา
+            <span className="sr-only md:not-sr-only">ค้นหา</span>
           </Button>
         </form>
 

@@ -55,37 +55,72 @@ const admin = createClient(
   { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } },
 )
 let clean = true
+const failures = []
 
-if ((await admin.from('classrooms').delete().eq('id', manifest.classroomId)).error) clean = false
+function fail(step, error = null) {
+  clean = false
+  failures.push({
+    step,
+    ...(error ? { code: error.code ?? 'request_failed' } : {}),
+  })
+}
+
+const removedClassroom = await admin.from('classrooms').delete().eq('id', manifest.classroomId)
+if (removedClassroom.error) fail('classroom-delete', removedClassroom.error)
 for (let start = 0; start < manifest.questionIds.length; start += 100) {
   const removed = await admin.from('questions').delete()
     .in('id', manifest.questionIds.slice(start, start + 100))
-  if (removed.error) clean = false
+  if (removed.error) fail('question-delete', removed.error)
 }
 for (const account of manifest.accounts.toReversed()) {
   if (!account.membershipVerified || !Array.isArray(account.orgIds)) {
-    clean = false
+    fail('account-manifest-guard')
     continue
   }
   for (const orgId of account.orgIds) {
+    const organization = await admin.from('organizations').select('id').eq('id', orgId)
+    if (organization.error) {
+      fail('organization-read', organization.error)
+      continue
+    }
+    if (organization.data.length === 0) continue
     const members = await admin.from('organization_members')
       .select('user_id, org_role').eq('org_id', orgId)
     if (members.error || members.data.length !== 1
       || members.data[0].user_id !== account.id
       || members.data[0].org_role !== 'owner') {
-      clean = false
+      fail('organization-membership-guard', members.error)
       continue
     }
-    if ((await admin.from('organizations').delete().eq('id', orgId)).error) clean = false
+    const removedOrganization = await admin.from('organizations').delete().eq('id', orgId)
+    if (removedOrganization.error) fail('organization-delete', removedOrganization.error)
   }
-  if ((await admin.auth.admin.deleteUser(account.id)).error) clean = false
+  const existingUser = await admin.auth.admin.getUserById(account.id)
+  if (!existingUser.error && existingUser.data.user) {
+    const removedUser = await admin.auth.admin.deleteUser(account.id)
+    if (removedUser.error) fail('auth-user-delete', removedUser.error)
+  } else if (existingUser.error?.code !== 'user_not_found') {
+    fail('auth-user-read', existingUser.error)
+  }
+}
+const remainingClassroom = await admin.from('classrooms')
+  .select('id').eq('id', manifest.classroomId)
+if (remainingClassroom.error || remainingClassroom.data.length !== 0) {
+  fail('classroom-verification', remainingClassroom.error)
 }
 const remainingLibrary = await admin.from('practice_libraries')
   .select('id').eq('id', manifest.libraryId)
-if (remainingLibrary.error || remainingLibrary.data.length !== 0) clean = false
-const remainingQuestions = await admin.from('questions')
-  .select('id', { count: 'exact', head: true }).in('id', manifest.questionIds)
-if (remainingQuestions.error || remainingQuestions.count !== 0) clean = false
+if (remainingLibrary.error || remainingLibrary.data.length !== 0) {
+  fail('library-verification', remainingLibrary.error)
+}
+for (let start = 0; start < manifest.questionIds.length; start += 100) {
+  const remainingQuestions = await admin.from('questions')
+    .select('id', { count: 'exact', head: true })
+    .in('id', manifest.questionIds.slice(start, start + 100))
+  if (remainingQuestions.error || remainingQuestions.count !== 0) {
+    fail('question-verification', remainingQuestions.error)
+  }
+}
 
 if (clean) unlinkSync(manifestPath)
 console.log(JSON.stringify({
@@ -93,5 +128,6 @@ console.log(JSON.stringify({
   syntheticAccounts: manifest.accounts.length,
   syntheticQuestions: manifest.questionIds.length,
   manifestRemoved: clean,
+  failures,
 }))
 process.exitCode = clean ? 0 : 1
