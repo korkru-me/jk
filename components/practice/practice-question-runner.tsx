@@ -262,7 +262,7 @@ export function PracticeQuestionRunner({
           <p className="truncate text-xs text-muted-foreground">{libraryTitle}</p>
           <div className="flex min-w-0 items-center gap-2">
             <h1 className="min-w-0 flex-1 truncate text-lg font-semibold text-foreground">{question.questions.title}</h1>
-            <Badge variant="secondary" aria-label="แบบฝึกเอง ไม่มีคะแนน">
+            <Badge role="status" variant="secondary" aria-label="แบบฝึกเอง ไม่มีคะแนน">
               <span className="sm:hidden">ไม่มีคะแนน</span>
               <span className="hidden sm:inline">ฝึกเอง · ไม่มีคะแนน</span>
             </Badge>

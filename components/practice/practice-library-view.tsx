@@ -65,7 +65,7 @@ export function PracticeLibraryView({
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-2">
             <h1 className="min-w-0 flex-1 truncate text-xl font-semibold text-foreground">{library.title}</h1>
-            <Badge variant="secondary" aria-label="แบบฝึกเอง ไม่มีคะแนน">
+            <Badge role="status" variant="secondary" aria-label="แบบฝึกเอง ไม่มีคะแนน">
               <BookOpenCheck data-icon="inline-start" aria-hidden="true" />
               <span className="sm:hidden">ไม่มีคะแนน</span>
               <span className="hidden sm:inline">ฝึกเอง · ไม่มีคะแนน</span>
@@ -126,6 +126,7 @@ export function PracticeLibraryView({
 
         {state.tags.length > 0 && (
           <div
+            role="group"
             className="flex min-w-0 items-center gap-1.5 overflow-x-auto pb-1"
             aria-label="แท็กที่ต้องมีทั้งหมด เลื่อนไปด้านข้างเพื่อดูเพิ่มเติม"
           >
