@@ -6,7 +6,6 @@ import { usePathname, useSearchParams } from 'next/navigation'
 import {
   ChevronDown,
   ChevronLeft,
-  BookOpenCheck,
   ClipboardCheck,
   ClipboardList,
   FilePlus2,
@@ -32,7 +31,6 @@ import { Separator } from '@/components/ui/separator'
 import { sidebarSearchKey, useSidebarContext } from './sidebar-context'
 import { SidebarDisplayProvider, SidebarLabel, SidebarSectionLabel, useSidebarCompact } from './sidebar-display'
 import type { UserRole } from '@/lib/types'
-import { useAppFeatureFlags } from './app-feature-flags'
 
 interface NavItem {
   href: string
@@ -55,7 +53,7 @@ function isGroup(entry: NavEntry): entry is NavGroup {
 
 const homeNav: NavItem = { href: '/dashboard', label: 'หน้าหลัก', icon: House }
 
-function teacherNavigation(practiceLibrary: boolean): NavEntry[] {
+function teacherNavigation(): NavEntry[] {
   return [
     homeNav,
     {
@@ -67,9 +65,6 @@ function teacherNavigation(practiceLibrary: boolean): NavEntry[] {
         { href: '/questions/sets', label: 'คลังโจทย์', icon: LibraryBig },
       ],
     },
-    ...(practiceLibrary
-      ? [{ href: '/practice', label: 'คลังฝึก · ไม่มีคะแนน', icon: BookOpenCheck } satisfies NavItem]
-      : []),
     { href: '/classrooms', label: 'ห้องเรียน', icon: School },
     {
       label: 'วิจัยการศึกษา',
@@ -83,13 +78,10 @@ function teacherNavigation(practiceLibrary: boolean): NavEntry[] {
   ]
 }
 
-function studentNavigation(practiceLibrary: boolean): NavEntry[] {
+function studentNavigation(): NavEntry[] {
   return [
     homeNav,
     { href: '/classrooms', label: 'ห้องเรียนของฉัน', icon: School },
-    ...(practiceLibrary
-      ? [{ href: '/practice', label: 'คลังฝึก · ไม่มีคะแนน', icon: BookOpenCheck } satisfies NavItem]
-      : []),
     { href: '/my-submissions', label: 'สรุปงานของฉัน', icon: ClipboardList },
     { href: '/settings/profile', label: 'ข้อมูลส่วนตัว', icon: UserRound },
   ]
@@ -293,14 +285,13 @@ export function Sidebar({
   const [desktopPreviewOpen, setDesktopPreviewOpen] = useState(false)
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const { practiceLibrary } = useAppFeatureFlags()
   const search = sidebarSearchKey(searchParams.toString())
   const previewNavigationOnly = previewNavigationOnlyOverride ?? isAssignmentStudentPreviewPath(pathname)
   const navItems = previewNavigationOnly
     ? [homeNav]
     : role === 'teacher' || role === 'admin'
-      ? teacherNavigation(practiceLibrary)
-      : studentNavigation(practiceLibrary)
+      ? teacherNavigation()
+      : studentNavigation()
   const { contextualSidebar, pendingSidebar, clearPendingSidebar } = useSidebarContext()
   const usesTeacherNavigation = role === 'teacher' || role === 'admin'
   const usesClassroomSidebar = !previewNavigationOnly
