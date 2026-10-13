@@ -15,6 +15,7 @@
 - Canonical hosted browser UAT ผ่าน role matrix: owner กับ co-teacher `admin/manage` จัดการและดู progress ได้, `view` เห็น metadata แต่ edit/progress ได้ 404, นักเรียนในห้องเห็น published library และรักษา filter/back state, นักเรียนนอกห้องกับครูต่าง organization เข้าไม่ได้; ครูเห็นเพียงข้อที่เคยตอบ แท็ก และจำนวนครั้ง โดย HTML/RSC ไม่เปิด answer/correctness/solution/score
 - Candidate ล่าสุดหลัง `34256db` ผ่าน TypeScript, design-token lint, full Vitest 238 files / 3,193 tests, final Next 16 webpack build (68/68 static pages และ practice routes ครบ) และ runtime diagnostics หลัง ARIA patch
 - Vercel เปิด `PRACTICE_LIBRARY_ENABLED` และตั้ง variant secret เฉพาะ Preview branch `staging`; Production ไม่ได้แก้และ flag ยังคงปิด สถานะ deploy/หลักฐานละเอียดอยู่ใน `docs/SELF_PRACTICE_UAT.md`; physical-device UAT และ owner sign-off ยังเป็น Production release gate
+- Final Staging merge `30492cd` ขึ้นสถานะ Ready และตรวจ route/authorization ซ้ำสำเร็จ; cleanup ลบบัญชี QA สังเคราะห์ 8 บัญชีกับโจทย์ 1,000 ข้อออกจาก Staging ครบโดยไม่มี failure
 
 ### ตำแหน่งไอคอน Sidebar ตรงกันทุกสถานะ — 12 ตุลาคม 2026
 

@@ -7,7 +7,7 @@
 ## หลักฐานรอบทดสอบ
 
 - Environment / URL: Hosted UAT `https://staging.korkru.com`; Supabase Staging แยกจาก Production
-- Branch / commit: `codex/self-practice-library` @ `34256db`; authenticated hosted UAT บน Staging merge `a09b86e` และตรวจ responsive/accessibility ของ mobile polish + ARIA semantics บน candidate ล่าสุดแบบ local runtime
+- Branch / commit: `codex/self-practice-library` code @ `34256db` + evidence @ `4bf6ca8`; final Staging merge `30492cd` ขึ้นสถานะ Ready และตรวจ route/authorization ซ้ำบน `staging.korkru.com`
 - Supabase project ref (ไม่ใส่ secret): `dyuxkrzeveknqgtuzpbh` (Staging)
 - Migration version + checksum:
   - `20261012155740_self_practice_library.sql` — `ddb723b0cdf87e42d47417d5a55cc6c7a52f46326b6527aca1ad20d40692ae11`
@@ -27,6 +27,7 @@
 - axe บน candidate ล่าสุดผ่าน `0 violations / 0 incomplete`; Next 16 `get_compilation_issues` และ `get_errors` ไม่พบปัญหา และ practice routes ครบ
 - หลัง ARIA patch ล่าสุด TypeScript และ design-token lint ผ่าน, full Vitest ผ่าน 238 files / 3,193 tests และ final `next build --webpack` ผ่านโดยสร้าง static pages 68/68 พร้อม practice routes ครบ
 - Vercel ตั้ง `PRACTICE_LIBRARY_ENABLED=true` และ `PRACTICE_VARIANT_SECRET` เฉพาะ Preview branch `staging`; Production ไม่ได้แก้และ feature flag ยังคงปิด
+- หลังจบ UAT cleanup ผ่าน: ลบบัญชี QA สังเคราะห์ 8 บัญชีและโจทย์ 1,000 ข้อ, ลบ manifest สำเร็จ และไม่พบ cleanup failure
 
 หลักฐาน responsive เป็น browser emulation ไม่ใช่ physical-device UAT และ owner sign-off ยังเป็น release gate ของ Production
 
