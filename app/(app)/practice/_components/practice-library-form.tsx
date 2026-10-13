@@ -157,6 +157,7 @@ export function PracticeLibraryForm({
     ids: string[]
     title: string
   } | null>(null)
+  const allowNavigationRef = useRef(false)
 
   const currentSnapshot = JSON.stringify({
     title,
@@ -205,15 +206,76 @@ export function PracticeLibraryForm({
     && selectedIds.length > 0
     && !hasDraftQuestionBlock
 
+  const confirmDiscardChanges = useCallback(async () => {
+    if (!isDirty) return true
+    return confirm({
+      title: 'ออกโดยไม่บันทึก?',
+      description: 'ข้อมูลคลังฝึกที่ยังไม่ได้บันทึกจะหายไป',
+      confirmLabel: 'ออกโดยไม่บันทึก',
+      cancelLabel: 'กลับไปแก้ไข',
+      variant: 'destructive',
+    })
+  }, [confirm, isDirty])
+
   useEffect(() => {
     if (!isDirty) return
     const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
+      if (allowNavigationRef.current) return
       event.preventDefault()
-      event.returnValue = true
+      event.returnValue = ''
     }
     window.addEventListener('beforeunload', warnBeforeLeaving)
     return () => window.removeEventListener('beforeunload', warnBeforeLeaving)
   }, [isDirty])
+
+  useEffect(() => {
+    if (!isDirty) return
+
+    function guardLinkNavigation(event: MouseEvent) {
+      if (
+        allowNavigationRef.current
+        || event.defaultPrevented
+        || event.button !== 0
+        || event.metaKey
+        || event.ctrlKey
+        || event.shiftKey
+        || event.altKey
+      ) return
+      const target = event.target
+      const anchor = target instanceof Element
+        ? target.closest<HTMLAnchorElement>('a[href]')
+        : null
+      if (
+        !anchor
+        || anchor.hasAttribute('download')
+        || (anchor.target && anchor.target.toLowerCase() !== '_self')
+      ) return
+
+      const destination = new URL(anchor.href, window.location.href)
+      const current = new URL(window.location.href)
+      if (!['http:', 'https:'].includes(destination.protocol)) return
+      if (
+        destination.origin === current.origin
+        && destination.pathname === current.pathname
+        && destination.search === current.search
+      ) return
+
+      event.preventDefault()
+      event.stopPropagation()
+      void confirmDiscardChanges().then(shouldLeave => {
+        if (!shouldLeave || !anchor.isConnected) return
+        // Replaying the original link lets Next.js and the app shell run their
+        // normal navigation/close callbacks. The bypass lasts only for that
+        // replay, and also prevents a second native prompt for full reloads.
+        allowNavigationRef.current = true
+        anchor.click()
+        window.setTimeout(() => { allowNavigationRef.current = false }, 0)
+      })
+    }
+
+    document.addEventListener('click', guardLinkNavigation, true)
+    return () => document.removeEventListener('click', guardLinkNavigation, true)
+  }, [confirmDiscardChanges, isDirty])
 
   useEffect(() => {
     if (!questionPickerOpen) return
@@ -337,16 +399,7 @@ export function PracticeLibraryForm({
   }
 
   async function leaveForm() {
-    if (isDirty) {
-      const shouldLeave = await confirm({
-        title: 'ออกโดยไม่บันทึก?',
-        description: 'ชื่อ คำชี้แจง หรือรายการโจทย์ที่ยังไม่ได้บันทึกจะหายไป',
-        confirmLabel: 'ออกโดยไม่บันทึก',
-        cancelLabel: 'กลับไปแก้ไข',
-        variant: 'destructive',
-      })
-      if (!shouldLeave) return
-    }
+    if (!await confirmDiscardChanges()) return
     router.push('/practice')
   }
 
@@ -423,7 +476,7 @@ export function PracticeLibraryForm({
                     ? 'bg-primary text-primary-foreground'
                     : index === step
                       ? 'bg-primary text-primary-foreground ring-4 ring-primary/20'
-                      : 'bg-muted text-muted-foreground'
+                      : 'bg-muted text-foreground'
                 }`}>
                   {index < step ? <Check className="size-4" aria-hidden="true" /> : index + 1}
                 </div>
@@ -637,7 +690,10 @@ export function PracticeLibraryForm({
               </Button>
             )}
           </div>
-          <div className="max-h-[28rem] overflow-y-auto rounded-xl border border-border" role="list">
+          <div
+            className="max-h-[28rem] overflow-y-auto rounded-xl border border-border"
+            role={selectedIds.length > 0 ? 'list' : undefined}
+          >
             {selectedIds.map((id, index) => {
               const question = questionById.get(id)
               const title = question?.title ?? 'โจทย์ที่ไม่สามารถแสดงรายละเอียดได้'
@@ -851,9 +907,15 @@ export function PracticeLibraryForm({
           <div className="flex flex-1 flex-wrap items-center justify-end gap-2 sm:flex-none">
             {!initialLibrary && step < CREATE_STEPS.length - 1 ? (
               <Button
+                key={`practice-next-${step}`}
                 type="button"
                 className="min-h-11"
-                onClick={() => setStep(current => current + 1)}
+                onClick={event => {
+                  // Prevent the native default action before this DOM node can
+                  // become the submit button rendered by the review step.
+                  event.preventDefault()
+                  setStep(current => current + 1)
+                }}
                 disabled={isPending || (step === 0 && !canAdvanceDetails)}
               >
                 ถัดไป
@@ -862,6 +924,7 @@ export function PracticeLibraryForm({
             ) : (
               <>
                 <Button
+                  key="practice-save-draft"
                   className="min-h-11"
                   type="submit"
                   variant={initialLibrary ? 'default' : 'outline'}
