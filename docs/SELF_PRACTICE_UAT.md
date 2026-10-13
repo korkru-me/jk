@@ -14,11 +14,11 @@
   - `20261013045149_self_practice_atomic_rpcs.sql` — `faebef616f7060dcbbcd38d910c39b7f6b72fecce4bb6ad2fd0682bf8652fa85`
 - ยืนยันว่าตั้ง `PRACTICE_VARIANT_SECRET` ฝั่ง server ความยาวอย่างน้อย 32 ตัวอักษร: [x] (Vercel Secret, Preview branch `staging` เท่านั้น)
 - ผู้ทดสอบ / วันที่: Codex automated + authenticated browser UAT / 13 ตุลาคม 2026
-- ผลรวม: Technical Staging UAT, final build และ full-suite ผ่าน; รอ owner sign-off ก่อนเปิด Production
+- ผลรวม: Technical Staging UAT, final build และ full-suite ผ่าน; เจ้าของผลิตภัณฑ์พักการปล่อย Production เมื่อ 13 ตุลาคม 2026 เพื่อปรับแก้และตรวจบน local ให้สมบูรณ์ก่อนอนุมัติรอบสุดท้าย
 
 ### Automated + hosted Staging evidence (13 ตุลาคม 2026)
 
-- Staging isolation guard ยืนยัน project ref `dyuxkrzeveknqgtuzpbh`; migration ledger ตรง local/remote, dry-run up-to-date, `db lint --linked --level error` ผ่าน และ anonymous `SELECT`/service-only RPC ถูกปฏิเสธด้วย PostgreSQL `42501`
+- Staging isolation guard ยืนยัน project ref `dyuxkrzeveknqgtuzpbh`; dry-run ของ release candidate และ `db lint --linked --level error` ผ่าน และ anonymous `SELECT`/service-only RPC ถูกปฏิเสธด้วย PostgreSQL `42501` · audit ก่อน Production เมื่อ 13 ตุลาคมพบว่า worktree ที่ link กลับ Staging มี remote-only `20261009142610_atomic_seb_exam_start` จึงไม่อ้างว่า ledger ของ feature worktree ตรงทุก version
 - Fixture สังเคราะห์ 8 บทบาทและคลัง 1,000 โจทย์ผ่าน gate ครบ: search + exact tag **AND** พบ 500 ข้อ, หน้าแรกคืน 24 แถวผ่าน DB RPC เดียว, JSON row payload 5,824 bytes และ caller latency 112.24 ms (ไม่อ้างว่าเป็น RSC bytes หรือ Production latency)
 - Canonical browser role matrix ผ่าน: owner และ co-teacher `admin/manage` จัดการ/ดู progress ได้; co-teacher `view` เห็น metadata แต่ไม่มีปุ่มจัดการและเปิด edit/progress ตรงได้ 404; นักเรียนในห้องเห็นเฉพาะ published library; นักเรียนนอกห้องไม่เห็นรายการและ direct URL ได้ 404; ครูต่าง organization ถูกปฏิเสธจาก gate
 - นักเรียนกรอง `สอวน. ค่าย 1` + `ไฟฟ้า` ได้ 500 ผลลัพธ์/21 หน้า, URL เก็บ tag ซ้ำและกลับจากหน้าทำโจทย์แล้วยังคง filter; การตรวจคำตอบแสดง “ตรวจแล้ว · ไม่คิดคะแนน” และเพิ่ม attempt แบบ idempotent โดย payload ไม่เปิด answer key/solution/score
@@ -29,7 +29,7 @@
 - Vercel ตั้ง `PRACTICE_LIBRARY_ENABLED=true` และ `PRACTICE_VARIANT_SECRET` เฉพาะ Preview branch `staging`; Production ไม่ได้แก้และ feature flag ยังคงปิด
 - หลังจบ UAT cleanup ผ่าน: ลบบัญชี QA สังเคราะห์ 8 บัญชีและโจทย์ 1,000 ข้อ, ลบ manifest สำเร็จ และไม่พบ cleanup failure
 
-หลักฐาน responsive เป็น browser emulation ไม่ใช่ physical-device UAT และ owner sign-off ยังเป็น release gate ของ Production
+หลักฐาน responsive เป็น browser emulation ไม่ใช่ physical-device UAT และ owner sign-off สำหรับ Production รอบสุดท้ายยังคงรอหลังการปรับแก้บน local
 
 ใช้เฉพาะ Staging ที่ผ่าน isolation guard และข้อมูล QA สังเคราะห์ ห้ามใช้ข้อมูลนักเรียนจริงหรือ Production เพื่อทดสอบ mutation
 
@@ -91,9 +91,9 @@
 
 ## Owner sign-off
 
-- [ ] ยืนยันว่าคำว่า “ไม่มีคะแนน” ตรงกับเจตนาผลิตภัณฑ์
+- [ ] ยืนยันว่าคำว่า “ไม่มีคะแนน” ตรงกับเจตนาผลิตภัณฑ์หลังการปรับแก้บน local
 - [ ] ยืนยันว่าครูเห็นเพียงข้อที่เคยตอบและจำนวนครั้ง ไม่เห็นคำตอบหรือความถูกต้อง
 - [ ] ยืนยันว่า view-only co-teacher ไม่ควรเห็น roster progress
 - [ ] อนุมัติให้เปิด Production flag แบบจำกัด
 
-ผู้อนุมัติ / วันที่ / หมายเหตุ:
+ผู้อนุมัติ / วันที่ / หมายเหตุ: พักการอนุมัติเมื่อ 13 ตุลาคม 2026 เพื่อปรับแก้บน local ก่อนปล่อย Production รอบเดียว
