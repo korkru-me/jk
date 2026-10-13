@@ -180,6 +180,7 @@ export async function checkPracticeAnswer(input: unknown): Promise<PracticeAnswe
     }
 
     revalidatePath(`/practice/${parsed.data.libraryId}`)
+    revalidatePath(`/practice/${parsed.data.libraryId}/library`)
     return { ok: true, feedback }
   } catch {
     return { ok: false, error: GENERIC_ERROR, retryable: true }

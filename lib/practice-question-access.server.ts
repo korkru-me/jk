@@ -60,6 +60,14 @@ export type PracticeQuestionSearchAccess = PracticeQuestionSearchResult | {
   status: 'disabled' | 'not_found' | 'forbidden' | 'unavailable'
 }
 
+export type PracticeLibraryWaitingAccess = {
+  status: 'ready'
+  library: StudentPracticeLibrary
+  questionCount: number
+} | {
+  status: 'disabled' | 'not_found' | 'forbidden' | 'unavailable'
+}
+
 export type PracticeQuestionAccess = {
   status: 'ready'
   library: StudentPracticeLibrary
@@ -161,6 +169,29 @@ async function readStudentLibraryAccess(
       description: row.description,
       revealAnswerKey: row.reveal_answer_key === true,
     }),
+  }
+}
+
+export async function loadPracticeLibraryWaiting(
+  actorId: string,
+  libraryId: string,
+): Promise<PracticeLibraryWaitingAccess> {
+  if (!isPracticeLibraryEnabled(process.env)) return { status: 'disabled' }
+  if (!isUuid(actorId) || !isUuid(libraryId)) return { status: 'not_found' }
+  const admin = createPracticeAdmin()
+  if (!admin) return { status: 'unavailable' }
+  const access = await readStudentLibraryAccess(admin, actorId, libraryId)
+  if (access.status !== 'ready') return access
+
+  const { count, error } = await admin
+    .from(PRACTICE_STORAGE.libraryQuestions)
+    .select('question_id', { count: 'exact', head: true })
+    .eq('library_id', libraryId)
+  if (error || count === null) return { status: 'unavailable' }
+  return {
+    status: 'ready',
+    library: access.library,
+    questionCount: count,
   }
 }
 

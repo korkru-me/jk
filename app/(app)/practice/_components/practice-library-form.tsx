@@ -4,7 +4,10 @@ import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Archive,
+  Check,
+  ChevronLeft,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   CircleAlert,
   Save,
@@ -15,6 +18,7 @@ import { toast } from 'sonner'
 import type { BankQuestion } from '@/lib/question-bank'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Card } from '@/components/ui/card'
 import { ConfirmDialog, useConfirm } from '@/components/ui/confirm-dialog'
 import {
   Collapsible,
@@ -25,7 +29,8 @@ import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field
 import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/native-select'
 import { Separator } from '@/components/ui/separator'
-import { Textarea } from '@/components/ui/textarea'
+import { AssignmentAnnouncementEditor } from '@/components/assignments/assignment-announcement-editor'
+import { AssignmentSettingToggle } from '@/components/assignments/assignment-setting-toggle'
 import { QuestionPicker } from '@/components/assignments/question-picker'
 import {
   closePracticeLibrary,
@@ -41,6 +46,8 @@ import {
   type PracticeLibraryStatus,
 } from '../_lib/teacher-contract'
 import { PracticeBulkTagEditor } from './practice-bulk-tag-editor'
+
+const CREATE_STEPS = ['รายละเอียดและโจทย์', 'ตั้งค่า', 'ตรวจสอบและสร้าง']
 
 interface InitialPracticeLibrary {
   id: string
@@ -111,6 +118,7 @@ export function PracticeLibraryForm({
     revealAnswerKey: initialLibrary?.revealAnswerKey ?? false,
   }))
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [step, setStep] = useState(0)
 
   const currentSnapshot = JSON.stringify({
     title,
@@ -140,6 +148,11 @@ export function PracticeLibraryForm({
   const blockedQuestionIds = [...new Set([...selectedMissingIds, ...selectedUnsupportedIds])]
   const hasDraftQuestionBlock = !membershipFrozen
     && (blockedQuestionIds.length > 0 || Boolean(loadingWarning))
+  const selectedClassroom = classrooms.find(classroom => classroom.id === classroomId)
+  const canAdvanceDetails = title.trim().length > 0
+    && Boolean(classroomId)
+    && selectedIds.length > 0
+    && !hasDraftQuestionBlock
 
   useEffect(() => {
     if (!isDirty) return
@@ -304,13 +317,48 @@ export function PracticeLibraryForm({
         )}
       </header>
 
+      {!initialLibrary && (
+        <nav className="flex items-start" aria-label="ขั้นตอนการสร้างคลังฝึก">
+          {CREATE_STEPS.map((label, index) => (
+            <div key={label} className="flex flex-1 items-start last:flex-none">
+              <div className="flex flex-col items-center">
+                <div className={`flex size-8 items-center justify-center rounded-full text-sm font-bold transition-all ${
+                  index < step
+                    ? 'bg-primary text-primary-foreground'
+                    : index === step
+                      ? 'bg-primary text-primary-foreground ring-4 ring-primary/20'
+                      : 'bg-muted text-muted-foreground'
+                }`}>
+                  {index < step ? <Check className="size-4" aria-hidden="true" /> : index + 1}
+                </div>
+                <p className={`mt-1 max-w-24 text-center text-xs sm:max-w-none sm:whitespace-nowrap ${
+                  index === step ? 'font-medium text-primary' : 'text-muted-foreground'
+                }`}>
+                  {label}
+                </p>
+              </div>
+              {index < CREATE_STEPS.length - 1 && (
+                <div className={`mx-2 mt-4 h-0.5 flex-1 transition-all ${index < step ? 'bg-primary' : 'bg-muted'}`} />
+              )}
+            </div>
+          ))}
+        </nav>
+      )}
+
       <form
         className="flex flex-col gap-4"
         onSubmit={event => {
           event.preventDefault()
+          if (!initialLibrary && step < CREATE_STEPS.length - 1) {
+            if (step !== 0 || canAdvanceDetails) setStep(current => current + 1)
+            return
+          }
           runSave('draft')
         }}
       >
+        {(!initialLibrary ? step === 0 : true) && (
+          <div className="flex flex-col gap-3">
+        <Card padding="md">
         <section aria-labelledby="practice-basic-heading" className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 id="practice-basic-heading" className="text-sm font-semibold text-foreground">ข้อมูลพื้นฐาน</h2>
@@ -350,35 +398,22 @@ export function PracticeLibraryForm({
               <FieldError>{fieldErrors.classroomId?.[0]}</FieldError>
             </Field>
             <Field className="md:col-span-2" data-invalid={Boolean(fieldErrors.description)}>
-              <FieldLabel htmlFor="practice-description">คำชี้แจง</FieldLabel>
-              <Textarea
-                id="practice-description"
+              <FieldLabel>ชี้แจงรายละเอียดเพิ่มเติม</FieldLabel>
+              <p className="text-xs text-muted-foreground">
+                นักเรียนจะเห็นข้อความและรูปนี้ในหน้ารอก่อนเข้าคลังฝึก
+              </p>
+              <AssignmentAnnouncementEditor
                 value={description}
-                onChange={event => setDescription(event.target.value)}
-                rows={2}
-                maxLength={2_000}
-                placeholder="บอกนักเรียนว่าคลังนี้เหมาะกับการฝึกแนวใด"
-                aria-invalid={Boolean(fieldErrors.description)}
+                onChange={setDescription}
+                rows={3}
               />
               <FieldError>{fieldErrors.description?.[0]}</FieldError>
             </Field>
-            <Field>
-              <FieldLabel htmlFor="practice-answer-key">ผลตรวจที่นักเรียนเห็น</FieldLabel>
-              <NativeSelect
-                id="practice-answer-key"
-                className="min-h-11"
-                value={revealAnswerKey ? 'answer_key' : 'feedback_only'}
-                onChange={event => setRevealAnswerKey(event.target.value === 'answer_key')}
-              >
-                <option value="feedback_only">บอกเพียงว่าตรงหรือยังไม่ตรง</option>
-                <option value="answer_key">เฉลยคำตอบหลังตรวจ</option>
-              </NativeSelect>
-            </Field>
           </FieldGroup>
         </section>
+        </Card>
 
-        <Separator />
-
+        <Card padding="md">
         <section aria-labelledby="practice-questions-heading" className="flex min-w-0 flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
@@ -529,12 +564,71 @@ export function PracticeLibraryForm({
             />
           )}
         </section>
+        </Card>
+          </div>
+        )}
 
-        <Separator />
+        {(!initialLibrary ? step === 1 : true) && (
+          <Card padding="md" className="flex flex-col gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">ตั้งค่าคลังฝึก</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                การฝึกชนิดนี้ไม่กำหนดคะแนน เวลา ชุดสุ่ม หรือเงื่อนไขจบ
+              </p>
+            </div>
+            <AssignmentSettingToggle
+              label="ให้นักเรียนกดตรวจคำตอบได้ทีละข้อ"
+              description="คลังฝึกใช้การตรวจรายข้อเสมอ เพื่อให้นักเรียนลองใหม่ได้ทันที"
+              checked
+              onCheckedChange={() => {}}
+              disabled
+              disabledMessage="เปิดไว้เสมอสำหรับคลังฝึก"
+            />
+            <AssignmentSettingToggle
+              label="แสดงเฉลยหลังจากกดตรวจคำตอบ"
+              description="หากปิด นักเรียนจะเห็นเพียงว่าคำตอบตรงหรือยังไม่ตรง"
+              checked={revealAnswerKey}
+              onCheckedChange={setRevealAnswerKey}
+            />
+          </Card>
+        )}
+
+        {!initialLibrary && step === 2 && (
+          <Card padding="md" className="flex flex-col gap-3">
+            <h2 className="text-sm font-semibold text-foreground">ตรวจสอบรายละเอียดก่อนสร้าง</h2>
+            <div className="rounded-xl border border-border px-3">
+              {[
+                { label: 'ชื่อ', value: title.trim() },
+                { label: 'ห้องเรียน', value: selectedClassroom?.name ?? '—' },
+                { label: 'ประเภท', value: 'คลังฝึก · ไม่มีคะแนน' },
+                { label: 'โจทย์', value: `${selectedIds.length.toLocaleString('th-TH')} ข้อ` },
+                { label: 'การตรวจคำตอบ', value: 'ตรวจได้ทีละข้อ' },
+                { label: 'เฉลยคำตอบ', value: revealAnswerKey ? 'แสดงหลังตรวจ' : 'ไม่แสดง' },
+              ].map(item => (
+                <div key={item.label} className="flex min-h-11 items-center justify-between gap-4 border-b border-border py-2 last:border-b-0">
+                  <span className="text-sm text-muted-foreground">{item.label}</span>
+                  <span className="text-right text-sm font-medium text-foreground">{item.value}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              นักเรียนจะเข้าหน้ารอก่อนเห็นรายการโจทย์ และครูดูได้เฉพาะข้อที่เคยตอบกับจำนวนครั้ง
+            </p>
+          </Card>
+        )}
 
         <footer className="flex min-h-11 flex-wrap items-center justify-between gap-2 pb-2">
           <div className="flex flex-wrap items-center gap-2">
-            <Button className="min-h-11" type="button" variant="outline" onClick={leaveForm} disabled={isPending}>ยกเลิก</Button>
+            <Button
+              className="min-h-11"
+              type="button"
+              variant="outline"
+              onClick={() => !initialLibrary && step > 0 ? setStep(current => current - 1) : leaveForm()}
+              disabled={isPending}
+            >
+              {!initialLibrary && step > 0 && <ChevronLeft data-icon="inline-start" aria-hidden="true" />}
+              {!initialLibrary && step > 0 ? 'ย้อนกลับ' : 'ยกเลิก'}
+            </Button>
             {initialLibrary?.status === 'draft' && (
               <Button
                 type="button"
@@ -549,20 +643,39 @@ export function PracticeLibraryForm({
             )}
           </div>
           <div className="flex flex-1 flex-wrap items-center justify-end gap-2 sm:flex-none">
-            <Button className="min-h-11" type="submit" variant={initialLibrary ? 'default' : 'outline'} disabled={isPending || !isDirty || !title.trim() || !classroomId || hasDraftQuestionBlock}>
-              <Save data-icon="inline-start" />
-              {isPending ? 'กำลังบันทึก...' : initialLibrary ? 'บันทึก' : 'บันทึกร่าง'}
-            </Button>
-            {!initialLibrary && (
+            {!initialLibrary && step < CREATE_STEPS.length - 1 ? (
               <Button
                 type="button"
                 className="min-h-11"
-                onClick={() => runSave('publish')}
-                disabled={isPending || !title.trim() || !classroomId || selectedIds.length === 0 || hasDraftQuestionBlock}
+                onClick={() => setStep(current => current + 1)}
+                disabled={isPending || (step === 0 && !canAdvanceDetails)}
               >
-                <Send data-icon="inline-start" />
-                สร้างและเผยแพร่
+                ถัดไป
+                <ChevronRight data-icon="inline-end" aria-hidden="true" />
               </Button>
+            ) : (
+              <>
+                <Button
+                  className="min-h-11"
+                  type="submit"
+                  variant={initialLibrary ? 'default' : 'outline'}
+                  disabled={isPending || !isDirty || !title.trim() || !classroomId || hasDraftQuestionBlock}
+                >
+                  <Save data-icon="inline-start" />
+                  {isPending ? 'กำลังบันทึก...' : initialLibrary ? 'บันทึก' : 'บันทึกร่าง'}
+                </Button>
+                {!initialLibrary && (
+                  <Button
+                    type="button"
+                    className="min-h-11"
+                    onClick={() => runSave('publish')}
+                    disabled={isPending || !canAdvanceDetails}
+                  >
+                    <Send data-icon="inline-start" />
+                    สร้างและเผยแพร่
+                  </Button>
+                )}
+              </>
             )}
           </div>
         </footer>

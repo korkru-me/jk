@@ -1,28 +1,23 @@
 import { notFound, redirect } from 'next/navigation'
 import { PracticeAccessState } from '@/components/practice/practice-access-state'
-import { PracticeLibraryView } from '@/components/practice/practice-library-view'
+import { PracticeWaitingRoom } from '@/components/practice/practice-waiting-room'
 import { getAuthUser } from '@/lib/auth/server'
 import { isPracticeLibraryEnabled } from '@/lib/practice-question'
-import { loadPracticeLibrarySearch } from '@/lib/practice-question-access.server'
+import { loadPracticeLibraryWaiting } from '@/lib/practice-question-access.server'
 import { buildPracticeSearchHref, parsePracticeSearchParams } from '@/lib/practice-search'
 
 export const metadata = { title: 'คลังฝึกด้วยตนเอง — KorKru' }
 
-type SearchParams = Record<string, string | string[] | undefined>
-
-export default async function StudentPracticeLibraryPage({
+export default async function StudentPracticeLibraryWaitingPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<SearchParams>
 }) {
   if (!isPracticeLibraryEnabled(process.env)) notFound()
   const user = await getAuthUser()
   if (!user) redirect('/login')
-  const [{ id }, rawSearch] = await Promise.all([params, searchParams])
-  const state = parsePracticeSearchParams(rawSearch)
-  const result = await loadPracticeLibrarySearch(user.id, id, state)
+  const { id } = await params
+  const result = await loadPracticeLibraryWaiting(user.id, id)
 
   if (result.status !== 'ready') {
     if (result.status === 'unavailable') {
@@ -30,17 +25,11 @@ export default async function StudentPracticeLibraryPage({
     }
     notFound()
   }
-  if (result.canonicalPage !== state.page) {
-    redirect(buildPracticeSearchHref(id, state, { page: result.canonicalPage }))
-  }
-
   return (
-    <PracticeLibraryView
+    <PracticeWaitingRoom
       library={result.library}
-      items={result.items}
-      total={result.total}
-      totalPages={result.totalPages}
-      state={state}
+      questionCount={result.questionCount}
+      enterHref={buildPracticeSearchHref(id, parsePracticeSearchParams({}))}
     />
   )
 }

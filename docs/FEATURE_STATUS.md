@@ -1,9 +1,17 @@
 # Feature status
 
+### Wizard สร้างคลังฝึกและหน้ารอก่อนเข้าคลัง — 13 ตุลาคม 2026
+
+- หน้าสร้าง `/practice/new` ใช้ wizard 3 ขั้นแบบเดียวกับหน้าสร้างแบบฝึกหัด: “รายละเอียดและโจทย์ → ตั้งค่า → ตรวจสอบและสร้าง” โดยตัดคะแนนรายข้อ เวลาทำ การจ่ายชุดโจทย์ และเงื่อนไขจบออกทั้งหมด; คำชี้แจงใช้ rich-text editor ร่วมกับ assignment แต่ย่อความสูงเฉพาะคลังฝึกเพื่อประหยัดพื้นที่แกน Y, sanitize ก่อนบันทึก/ก่อน render และ orphan sweep ตรวจ reference ใน `practice_libraries` ก่อนเสนอให้ลบรูป
+- ขั้นตั้งค่าปัจจุบันแสดงเฉพาะพฤติกรรมที่ schema รองรับจริง: ตรวจคำตอบรายข้อเปิดถาวร และเลือกได้ว่าจะเผยเฉลยหลังตรวจหรือไม่; ไม่แสดง “ชื่อแฟ้มย่อย” หรือ “แนบรูปแสดงวิธีทำ” และไม่สร้าง control ที่บันทึกไม่ได้
+- นักเรียนเข้า `/practice/[id]` เป็นหน้ารอก่อน แล้วกดเข้ารายการค้นหา/กรองที่ `/practice/[id]/library`; หน้ารอแสดงชื่อ คำชี้แจง จำนวนข้อ และกติกาว่าไม่มีรอบทำ เวลา ส่งงาน หรือคะแนน การเปิดหน้ารอไม่บันทึก event ใด ๆ
+- local lab `/exam-screen-lab/practice-library` ครอบคลุม wizard และ `?view=waiting`; TypeScript, design-token lint, full Vitest 240 files / 3,197 cases, production build, Next MCP compilation/runtime, axe desktop/mobile และ viewport 390px ไม่มี horizontal overflow ผ่าน ไม่มี migration และไม่ได้ deploy/push Production
+- การตั้งค่าเพิ่มเติมจาก assignment เช่น รหัสผ่าน เครื่องคิดเลข กระดาษทด สลับข้อ/ตัวเลือก ค่าตัวเลขร่วม และกำหนดเวลา ยังไม่ถูกเพิ่ม เพราะ `practice_libraries` ไม่มีคอลัมน์เหล่านี้ และ migration ledger ของ Production มีไฟล์ local-only เก่าค้างอยู่หลายรายการ จึงต้องแยกงาน reconcile/release schema ก่อน ห้ามทำเป็นสวิตช์ที่ไม่บันทึกจริง
+
 ### คลังฝึกไม่มีคะแนน — Phase 1–7 พร้อมปล่อย Production หลัง Staging UAT (13 ตุลาคม 2026)
 
 - `คลังฝึก` เป็นโดเมนแยกจาก assignment/submission โดยโครงสร้าง ใช้คลังโจทย์ แท็ก ตัวแสดงโจทย์ และ evaluator ที่ปลอดภัยร่วมกันเท่านั้น; ไม่มี `AssignmentType` ค่าใหม่ ไม่มี submission/score และไม่มีทาง export progress เป็นคะแนน
-- เส้นทางครูอยู่ที่ `/practice`, `/practice/new`, `/practice/[id]/edit` และหน้าความคืบหน้าที่ `/practice/[id]/progress`; เส้นทางนักเรียนใช้ `/practice/[id]` กับหน้าทำโจทย์รายข้อ ครูเห็นเพียงข้อที่เคยตอบและจำนวนครั้ง ส่วนผลตรวจถูกส่งกลับให้นักเรียนใน request ของตน
+- เส้นทางครูอยู่ที่ `/practice`, `/practice/new`, `/practice/[id]/edit` และหน้าความคืบหน้าที่ `/practice/[id]/progress`; เส้นทางนักเรียนใช้หน้ารอ `/practice/[id]`, รายการค้นหา `/practice/[id]/library` และหน้าทำโจทย์รายข้อ ครูเห็นเพียงข้อที่เคยตอบและจำนวนครั้ง ส่วนผลตรวจถูกส่งกลับให้นักเรียนใน request ของตน
 - โจทย์จับคู่ใน practice รองรับตัวเลือกที่มีเฉพาะรูปแล้ว โดยคำตอบชั่วคราวใช้ token จากเนื้อหาที่แสดงจริง ไม่ใช้ลำดับที่ครูสร้าง รูปแบบเก็บคำตอบจับคู่ของ assignment/exam ไม่เปลี่ยนและไม่มี migration เพิ่มจากจุดนี้
 - หลายแท็กใช้ exact **AND**, URL เก็บ search/filter/page, การกดตรวจที่มีคำตอบไม่ว่างหนึ่งครั้งสร้าง accepted-check event ได้ไม่เกินหนึ่งแถวด้วย UUID idempotency key และ DTO ครูปฏิเสธ answer, correctness, score, verdict, solution และเวลา activity
 - รายการนักเรียนค้น/รวมจำนวนด้วย RPC เดียวต่อหน้า (24 ข้อ), progress รายคนแบ่งหน้า 50 ข้อ และ mutation draft/duplicate/bulk tag เป็น transaction เดียว; co-teacher `admin/manage` รักษา owner-private membership เดิมได้โดยไม่เปิดสิทธิ์อ่านหรือแนบโจทย์ส่วนตัวอื่น

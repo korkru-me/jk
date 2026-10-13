@@ -225,7 +225,7 @@ Acceptance gate:
 
 เป้าหมายคือค้นหาจากโจทย์มากกว่าร้อยข้อได้เร็ว เข้าใจง่าย และไม่โหลดข้อมูลเกินจำเป็น
 
-route หลักของเฟสนี้คือ `/practice/[id]` และใช้ URL state `q`, `tag` ซ้ำได้หลายค่า และ `page` ที่ validate แล้ว; ค่าเริ่มต้นโหลด 24 ข้อต่อหน้า
+route หลักของเฟสนี้คือหน้ารอ `/practice/[id]` และรายการโจทย์ `/practice/[id]/library`; รายการใช้ URL state `q`, `tag` ซ้ำได้หลายค่า และ `page` ที่ validate แล้ว ค่าเริ่มต้นโหลด 24 ข้อต่อหน้า ส่วนหน้ารอไม่มี input คำตอบและไม่สร้าง event
 
 งานหลัก:
 
@@ -363,7 +363,7 @@ Acceptance gate:
 - Phase 1: contract “ไม่มีคะแนน”, exact multi-tag AND, accepted-check/idempotency และภาพอ้างอิงถูกตรึงแล้ว
 - Phase 2: schema/RLS/RPC contract กำหนดเป็น 3 ตารางแยกและ service-only accepted-check; สถานะ apply จริงต้องยืนยันจาก migration ledger ของ environment ไม่ใช่จากไฟล์ใน Git
 - Phase 3: ทางเข้าครู, list/create/edit/lifecycle และตัวเลือกโจทย์อยู่หลัง server-only `PRACTICE_LIBRARY_ENABLED`; ไม่เพิ่ม `AssignmentType`
-- Phase 4: student library ใช้ search + tag AND + pagination ใน URL และ list DTO ที่ไม่บรรทุกเฉลย
+- Phase 4: student library มีหน้ารอก่อนเข้า แล้วใช้ search + tag AND + pagination ใน URL ที่ `/practice/[id]/library` และ list DTO ที่ไม่บรรทุกเฉลย
 - Phase 5: หน้าทำโจทย์ใช้ server evaluator/feedback ส่วนตัวและ append event แบบ idempotent โดยไม่เขียน submission
 - Phase 6: overview/detail progress ใช้ DTO allowlist และปฏิเสธ view-only co-teacher; ไม่มีคะแนน ความถูกต้อง ranking หรือ activity timeline
 - Phase 7: automated/browser/database evidence, viewport QA, performance fixture และ owner sign-off บันทึกใน `docs/SELF_PRACTICE_UAT.md`; ถ้ารายการ release gate ใดยังไม่ผ่าน ให้คง flag ปิดใน Production แม้ code path จะ build ผ่าน

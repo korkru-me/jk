@@ -103,7 +103,7 @@ async function stillReferenced(
 
   // Classroom covers and waiting-room announcements deliberately reuse the
   // teacher-owned question-images bucket, but their URLs live outside the
-  // question columns understood by the legacy RPC. Scan both tables as a
+  // question columns understood by the legacy RPC. Scan the related tables as a
   // second, fail-closed source of truth before sweeping. Assignments are not
   // filtered by creator: a co-teacher may upload into an assignment they can
   // manage, just as copied questions can reference somebody else's file.
@@ -129,6 +129,21 @@ async function stillReferenced(
     for (let from = 0; ; from += pageSize) {
       const { data, error } = await admin
         .from('assignments')
+        .select('description')
+        .like('description', `%question-images/${ownerId}/%`)
+        .range(from, from + pageSize - 1)
+      if (error) throw new Error(error.message)
+      for (const row of data ?? []) {
+        for (const path of extractStoragePaths(row.description ?? '', bucket)) {
+          if (wanted.has(path)) referenced.add(path)
+        }
+      }
+      if ((data?.length ?? 0) < pageSize) break
+    }
+
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await admin
+        .from('practice_libraries')
         .select('description')
         .like('description', `%question-images/${ownerId}/%`)
         .range(from, from + pageSize - 1)

@@ -41,6 +41,7 @@ import {
   loadManagedPracticeQuestionRows,
   type ManagedPracticeQuestionRow,
 } from './_lib/teacher-data'
+import { sanitizeRichTextForStorage } from '@/lib/rich-text-sanitize'
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
 
@@ -157,7 +158,7 @@ export async function createPracticeLibrary(
     orgId: classroom.org_id,
     classroomId: classroom.id,
     title: parsed.data.title,
-    description: parsed.data.description,
+    description: sanitizeRichTextForStorage(parsed.data.description.trim()),
     revealAnswerKey: parsed.data.revealAnswerKey,
     questionIds: parsed.data.questionIds,
     publish: parsed.data.intent === 'publish',
@@ -179,6 +180,7 @@ export async function updatePracticeLibrary(
     parsed.data.libraryId,
   )
   if (!loaded?.canManage) return failure(FORBIDDEN)
+  const description = sanitizeRichTextForStorage(parsed.data.description.trim())
 
   const currentMembership = await loadPracticeLibraryQuestionIds(context.supabase, loaded.library.id)
   if (currentMembership.error) return failure(currentMembership.error)
@@ -201,7 +203,7 @@ export async function updatePracticeLibrary(
     const result = await context.supabase.rpc(UPDATE_PRACTICE_LIBRARY_DRAFT_RPC, {
       p_library_id: loaded.library.id,
       p_title: parsed.data.title,
-      p_description: parsed.data.description || null,
+      p_description: description || null,
       p_reveal_answer_key: parsed.data.revealAnswerKey,
       p_question_ids: parsed.data.questionIds,
     })
@@ -215,7 +217,7 @@ export async function updatePracticeLibrary(
       .from('practice_libraries')
       .update({
         title: parsed.data.title,
-        description: parsed.data.description || null,
+        description: description || null,
         reveal_answer_key: parsed.data.revealAnswerKey,
       })
       .eq('id', loaded.library.id)
@@ -226,6 +228,7 @@ export async function updatePracticeLibrary(
 
   revalidatePath('/practice')
   revalidatePath(`/practice/${loaded.library.id}`)
+  revalidatePath(`/practice/${loaded.library.id}/library`)
   revalidatePath(`/practice/${loaded.library.id}/edit`)
   return { ok: true, id: loaded.library.id }
 }
@@ -273,6 +276,7 @@ async function transitionPracticeLibrary(
 
   revalidatePath('/practice')
   revalidatePath(`/practice/${loaded.library.id}`)
+  revalidatePath(`/practice/${loaded.library.id}/library`)
   revalidatePath(`/practice/${loaded.library.id}/edit`)
   return { ok: true, id: loaded.library.id }
 }
@@ -411,6 +415,7 @@ export async function updatePracticeQuestionTags(
 
   revalidatePath('/questions')
   revalidatePath(`/practice/${loaded.library.id}`)
+  revalidatePath(`/practice/${loaded.library.id}/library`)
   revalidatePath(`/practice/${loaded.library.id}/edit`)
   return { ok: true, id: loaded.library.id }
 }
