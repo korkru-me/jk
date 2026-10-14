@@ -406,9 +406,12 @@ export function CreateAssignmentForm({
       : initialSettings.passing_type != null && initialSettings.passing_value != null,
   )
   const [passingType, setPassingType] = useState<'score' | 'percent'>(copySource?.passing_type ?? initialSettings.passing_type ?? 'percent')
+  // The value shown on the card must be a real draft, ready when selected.
+  // Keep explicit saved values, including zero; an emptied input stays invalid.
   const [passingValue, setPassingValue] = useState(
     (copySource ? copySource.passing_value : initialSettings.passing_value) != null
-      ? String(copySource ? copySource.passing_value : initialSettings.passing_value) : '',
+      ? String(copySource ? copySource.passing_value : initialSettings.passing_value)
+      : passingType === 'percent' ? '70' : '7',
   )
 
   // Capture requested settings, not the question-dependent effective payload.
@@ -467,7 +470,8 @@ export function CreateAssignmentForm({
     setStreakRecycle(settings.streak_recycle_pool)
     setPassingEnabled(presetCompletionRule !== 'streak' && settings.passing_type !== null && settings.passing_value !== null)
     setPassingType(settings.passing_type ?? 'percent')
-    setPassingValue(numberDraft(settings.passing_value))
+    setPassingValue(settings.passing_value != null
+      ? String(settings.passing_value) : settings.passing_type === 'score' ? '7' : '70')
     setRandomQuestionCount(numberDraft(settings.random_question_count))
     setDisplayMaxScore(numberDraft(settings.display_max_score))
     setShowSections(settings.show_question_sections)
@@ -1492,7 +1496,6 @@ export function CreateAssignmentForm({
                     value={passingValue}
                     onFocus={() => chooseCompletion('threshold')}
                     onChange={event => setPassingValue(event.target.value)}
-                    placeholder={passingType === 'percent' ? '70' : '7'}
                     aria-label="ค่าเกณฑ์ผ่าน"
                     className={completionRuleInputClassName}
                   />
