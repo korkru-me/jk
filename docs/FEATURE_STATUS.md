@@ -1714,3 +1714,11 @@ Physical iPad UAT ของ candidate `r7` ยืนยันแล้วว่�
 - `/exam-screen-lab/submission-result` ใช้คำตอบจำลอง รวมซ่อนคะแนน/สลับตัวเลือก/คำตอบเก่า/รอตรวจ ไม่มี attempt หรือข้อมูลบัญชีจริง รายละเอียดใน `STUDENT_SOLUTION_RESULTS.md`
 - ผู้ใช้ยืนยันให้ลบเฉพาะ Export as PDF ของหน้าวิเคราะห์งาน จึงลบเมนู/ฟังก์ชันพิมพ์/ไอคอนที่เกี่ยวข้อง หน้าวิเคราะห์และ CSV คงอยู่ การปรับตัวอ่าน PDF ที่แนบเป็นเฉลยพักเป็น draft นอก commit นี้ ส่วนเดิมยังเปิดไฟล์ในแท็บใหม่และไม่มีลายน้ำในตัวไฟล์
 - TypeScript, token lint, webpack build และ unit suite 254 ไฟล์ / 3,285 เคสผ่าน Browser 320/390/1280/1600px ไม่มี overflow ตรวจคำตอบ/ลายน้ำ/ล็อกเฉลย/optional overlay ปิดแล้วมีลายน้ำบังคับผ่าน Next MCP ไม่มี compile/runtime error ยังไม่ทดสอบ Auth submit/native SEB/อุปกรณ์สัมผัสจริง ไม่มี migration/push/deploy จากงานนี้
+
+
+### ปฏิทินรายวิชาและสถานะงาน — 14 ตุลาคม 2026 (local preview)
+
+- หน้าห้องรายวิชามีปฏิทินขวา sticky เฉพาะงานที่นักเรียนเห็นในวิชานั้น โฮมรูมใช้ projection ของพื้นที่เรียนรู้ของฉันสำหรับงานรวมทุกวิชาและ group reach ไม่ใช้ highest-score-only completion ของตัวรวมครูแล้ว
+- แถบซ้ายการ์ดตรงสีปฏิทิน: ส่งแล้วเขียว, เลยกำหนดแดง, ใกล้ส่งภายใน 48 ชั่วโมงเหลือง, ยังไม่ถึงกำหนด/ไม่มีกำหนดเป็น primary มี Tooltip/legend งานเสร็จมีติ๊ก/ป้ายและเงาเขียวอ่อน คง completion/retry/ซ่อนคะแนนเดิม
+- ย้ายงานเสร็จท้ายกลุ่มและกลุ่มเสร็จทั้งหมดท้ายรายการแบบ stable โดยตรวจทั้งกลุ่มก่อนตัวกรอง รายละเอียด source guards และผลตรวจใน STUDENT_CLASSROOM_CALENDAR.md
+- TypeScript, token lint, webpack build และ 3,299 unit tests ผ่าน Browser ใช้ข้อมูลจำลอง ตรวจสี/ordering/scope/sticky/จอ 320–1600px ไม่เขียนฐานข้อมูล ไม่มี migration/push/deploy ตามคำสั่งเจ้าของ ยังไม่ตรวจบัญชีนักเรียนจริงหรืออุปกรณ์จริง

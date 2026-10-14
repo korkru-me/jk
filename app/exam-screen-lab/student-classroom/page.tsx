@@ -9,6 +9,7 @@ import { isExamScreenLabEnabled } from '@/lib/exam-screen-lab-access'
 import { buildHomeroomClassmates } from '@/lib/student-homeroom-classmates'
 import type { Classroom, ClassroomPost } from '@/lib/types'
 import type { AssignmentCategory } from '@/lib/assignment-categories'
+import { classroomCalendarEvents } from '@/lib/student-classroom-work'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'ห้องเรียนนักเรียน · ตัวอย่าง — KorKru' }
@@ -21,6 +22,7 @@ const ROOM: Classroom = {
   description: composeDescription({ ...EMPTY_META, cover: 'orange', coverPattern: 'physics', iconKey: 'physics', gradeLevel: 'ม.4', academicTerm: '1/2569', capacityEnabled: true, maxCapacity: '30' }),
 }
 const CATEGORIES: AssignmentCategory[] = [
+  { id: 'cat-completed', classroom_id: ROOM.id, name: 'บทเรียนที่ส่งครบแล้ว', color: 'green', position: -1 },
   { id: 'cat-simple', classroom_id: ROOM.id, name: 'ฟิสิกส์ง่าย', color: 'purple', position: 0 },
   { id: 'cat-group', classroom_id: ROOM.id, name: 'กลุ่มที่ 1', color: 'mint', position: 1 },
 ]
@@ -31,10 +33,12 @@ const BASE: StudentAssignmentRow = {
   show_results: 'immediate', category_id: 'cat-simple', attempts_used: 0, has_in_progress: false, submission: null,
 }
 const ASSIGNMENTS: StudentAssignmentRow[] = [
+  { ...BASE, id: 'work-completed-group', title: 'งานในกลุ่มที่ส่งครบแล้ว', category_id: 'cat-completed', passing_type: null, attempts_used: 1, submission: { id: 'sub-completed-group', status: 'submitted', total_score: null, max_score: 10 } },
   BASE,
   { ...BASE, id: 'work-open', title: 'ทดสอบระบบตรวจกลับไปให้คะแนนเอง', question_ids: ['1','2','3','4','5'], end_at: null, duration_minutes: null, passing_type: null },
   { ...BASE, id: 'work-group', title: 'ทดสอบ 4', category_id: 'cat-group', end_at: null, duration_minutes: null },
   { ...BASE, id: 'work-exam', title: 'สอบกลางภาค · แรงและการเคลื่อนที่', type: 'exam', passing_type: null, end_at: '2026-10-17T16:00:00+07:00', max_attempts: 1 },
+  { ...BASE, id: 'work-soon', title: 'ใบงานใกล้กำหนดส่ง', passing_type: null, end_at: '2026-10-15T16:00:00+07:00' },
   { ...BASE, id: 'work-resume', title: 'แบบฝึกหัดที่กำลังทำต่อ', category_id: 'cat-group', end_at: '2026-10-14T16:00:00+07:00', has_in_progress: true, attempts_used: 2, submission: { id: 'sub-old', status: 'graded', total_score: 45, max_score: 100 } },
   { ...BASE, id: 'work-retry', title: 'ทบทวนบทเรียน · แก้เฉพาะข้อที่ยังไม่เต็ม', retry_scope: 'wrong_only', passing_type: null, max_attempts: 3, attempts_used: 1, end_at: null, submission: { id: 'sub-retry', status: 'graded', total_score: 8, max_score: 10 } },
   { ...BASE, id: 'work-result', title: 'ข้อสอบที่ส่งแล้ว', type: 'exam', max_attempts: 1, passing_type: null, attempts_used: 1, submission: { id: 'sub-result', status: 'graded', total_score: 18, max_score: 20 } },
@@ -69,18 +73,15 @@ export default async function StudentClassroomLabPage({ searchParams }: { search
     return <ShellClient user={USER} initialUnreadCount={0} notificationsEnabled={false}>
       <HomeroomStudentView classroom={classroom} teacherName="ครูที่ปรึกษาจำลอง" studentCount={scenario === 'homeroom-empty' ? 1 : classmates.length + 1}
         classmates={scenario === 'homeroom-empty' ? [] : classmates}
-        calendarEvents={scenario === 'homeroom-empty' ? [] : [{ id: 'lab-homeroom-work', title: 'ใบงานทบทวน', classroomName: 'ฟิสิกส์ 1', endAt: '2026-10-14T16:00:00+07:00', done: false, submissionId: null }]}
+        calendarEvents={scenario === 'homeroom-empty' ? [] : [...classroomCalendarEvents(ASSIGNMENTS, ROOM.name).map(event => ({ ...event, href: assignmentHrefs[event.id] })), { id: 'lab-other-subject', title: 'ใบงานคณิตศาสตร์จากอีกห้อง', classroomName: 'คณิตศาสตร์ 1', endAt: '2026-10-15T16:00:00+07:00', done: false, submissionId: null, href: '/exam-screen-lab/student-dashboard' }]}
         posts={scenario === 'homeroom-empty' ? [] : posts} trackSeen={false} initialNow={NOW}
         previewLabel="ตัวอย่างสำหรับตรวจหน้าตา · ห้องเรียน ประกาศ และเพื่อนร่วมชั้นจำลอง" backHref="/exam-screen-lab/student-dashboard#classrooms" />
     </ShellClient>
   }
   return (
     <ShellClient user={USER} initialUnreadCount={0} notificationsEnabled={false}>
-      <div className="flex min-w-0 flex-col gap-3" data-student-classroom-lab>
-        <p className="text-xs text-muted-foreground">ตัวอย่างสำหรับตรวจหน้าตา · ห้องเรียนและงานจำลอง</p>
         {selected && <Card id="preview-work" padding="md" className="flex scroll-mt-20 flex-col gap-2"><h2 className="font-semibold">{selected.title}</h2><p className="text-sm text-muted-foreground">เปิดการ์ดงานแล้ว · รายละเอียดจำลองสำหรับตรวจการกดทั้งกรอบ ไม่มีการเริ่มทำหรือส่งงานจริง</p><Link href="/exam-screen-lab/student-classroom" className="text-sm text-primary hover:underline">กลับรายการงาน</Link></Card>}
-        <StudentClassroomView classroom={classroom} teacherName="ครูผู้สอนจำลอง" studentCount={3} assignments={assignments} categories={scenario === 'empty' ? [] : CATEGORIES} posts={[]} trackSeen={false} backHref="/exam-screen-lab/student-dashboard#classrooms" assignmentHrefs={assignmentHrefs} initialNow={NOW} />
-      </div>
+        <StudentClassroomView classroom={classroom} teacherName="ครูผู้สอนจำลอง" studentCount={3} assignments={assignments} categories={scenario === 'empty' ? [] : CATEGORIES} posts={[]} trackSeen={false} backHref="/exam-screen-lab/student-dashboard#classrooms" assignmentHrefs={assignmentHrefs} initialNow={NOW} previewLabel="ตัวอย่างสำหรับตรวจหน้าตา · ห้องเรียนและงานจำลอง" />
     </ShellClient>
   )
 }

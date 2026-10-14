@@ -9,6 +9,8 @@ import { Card } from '@/components/ui/card'
 import { StudentClassroomHeader } from './student-classroom-header'
 import { ClassroomPracticeLibraries } from '@/components/practice/classroom-practice-libraries'
 import type { ClassroomPracticeLibrariesResult } from '@/lib/classroom-practice-libraries'
+import { AssignmentCalendar } from '@/app/(app)/dashboard/_components/assignment-calendar'
+import { classroomCalendarEvents } from '@/lib/student-classroom-work'
 
 export type { StudentAssignmentRow }
 
@@ -24,12 +26,15 @@ interface Props {
   assignmentHrefs?: Record<string, string>
   initialNow?: string
   practiceLibraries?: ClassroomPracticeLibrariesResult | null
+  previewLabel?: string
 }
 
-export function StudentClassroomView({ classroom, teacherName, studentCount, assignments, categories, posts, backHref = '/dashboard#classrooms', trackSeen = true, assignmentHrefs, initialNow, practiceLibraries }: Props) {
+export function StudentClassroomView({ classroom, teacherName, studentCount, assignments, categories, posts, backHref = '/dashboard#classrooms', trackSeen = true, assignmentHrefs, initialNow, practiceLibraries, previewLabel }: Props) {
+  const calendarEvents = classroomCalendarEvents(assignments, classroom.name).map(event => ({ ...event, href: assignmentHrefs?.[event.id] }))
 
   return (
-    <div className="flex min-w-0 max-w-5xl flex-col gap-4">
+    <div className="student-learning-stage @container/subject flex w-full min-w-0 flex-col gap-3 [--student-content-width:calc(100%-15rem)]" data-student-subject>
+      {previewLabel && <p className="text-xs text-muted-foreground">{previewLabel}</p>}
       <Link
         href={backHref}
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -37,6 +42,8 @@ export function StudentClassroomView({ classroom, teacherName, studentCount, ass
         <ChevronLeft className="size-4" /> ห้องเรียนของฉัน
       </Link>
 
+      <div className="grid items-start gap-4 @min-[46rem]/subject:grid-cols-[minmax(0,var(--student-content-width))_minmax(0,1fr)]" data-student-subject-grid>
+      <div className="flex min-w-0 flex-col gap-4" data-student-subject-content>
       <StudentClassroomHeader classroom={classroom} teacherName={teacherName} studentCount={studentCount} />
 
       {/* Stream — bounded like the teacher's board, so a term of announcements
@@ -69,6 +76,11 @@ export function StudentClassroomView({ classroom, teacherName, studentCount, ass
           <AssignmentList assignments={assignments} categories={categories} classroomDescription={classroom.description} assignmentHrefs={assignmentHrefs} initialNow={initialNow} />
         )}
       </section>
+      </div>
+      <aside aria-label={`ปฏิทินงาน ${classroom.name}`} className="min-w-0 self-start @min-[46rem]/subject:sticky @min-[46rem]/subject:top-0" data-sticky-subject-calendar>
+        <AssignmentCalendar events={calendarEvents} initialNow={initialNow} scopeLabel={classroom.name} />
+      </aside>
+      </div>
     </div>
   )
 }

@@ -16,7 +16,7 @@ import { completionAttemptLimit, findPassingCompletion } from '@/lib/assignment-
 import { fetchAllRows, fetchRowsInChunks } from '@/lib/supabase/fetch-all-rows'
 import { buildHomeroomClassmates, type HomeroomClassmateUser } from '@/lib/student-homeroom-classmates'
 import type { StudentNoteRow, StudentProfileRow } from './_components/homeroom-overview'
-import type { CalendarEvent } from '@/app/(app)/dashboard/_components/assignment-calendar'
+import { loadStudentLearningCalendar } from '@/lib/student-learning-calendar.server'
 import { linkReachesGroup, type ClassroomGroup } from '@/lib/classroom-groups'
 import type { AssignmentCategory } from '@/lib/assignment-categories'
 import {
@@ -79,7 +79,7 @@ export default async function ClassroomDetailPage({
         { count: studentCount },
         classmateResult,
         posts,
-        { assignments, submissions },
+        calendarEvents,
       ] = await Promise.all([
         admin.from('users').select('full_name').eq('id', c.teacher_id).single(),
         admin.from('classroom_students').select('id', { count: 'exact', head: true }).eq('classroom_id', id),
@@ -88,7 +88,7 @@ export default async function ClassroomDetailPage({
           .eq('classroom_id', id).neq('student_id', authUser.id).order('student_id').range(from, to)
           .returns<{ student_id: string; users: HomeroomClassmateUser }[]>()),
         getClassroomPosts(id),
-        getHomeroomAggregate(admin, id, [authUser!.id]),
+        loadStudentLearningCalendar(admin, authUser.id),
       ])
       if (classmateResult.error) throw new Error('โหลดรายชื่อเพื่อนร่วมห้องไม่สำเร็จ')
       // Membership was verified above. Read only numbers for this room's peers;
@@ -99,23 +99,6 @@ export default async function ClassroomDetailPage({
       )
       if (numbers.error) throw new Error('โหลดเลขที่เพื่อนร่วมห้องไม่สำเร็จ')
       const classmates = buildHomeroomClassmates(classmateResult.rows.map(row => row.users), numbers.rows, authUser.id)
-
-      const isDone = (status?: string) => status === 'submitted' || status === 'graded'
-      const bestByAssignment = new Map<string, typeof submissions[number]>()
-      for (const s of submissions) {
-        const prev = bestByAssignment.get(s.assignment_id)
-        if (!prev || (s.total_score ?? -1) > (prev.total_score ?? -1)) bestByAssignment.set(s.assignment_id, s)
-      }
-      const calendarEvents: CalendarEvent[] = assignments
-        .filter((a): a is typeof a & { end_at: string } => !!a.end_at)
-        .map(a => ({
-          id: a.id,
-          title: a.title,
-          classroomName: a.classroomName,
-          endAt: a.end_at,
-          done: isDone(bestByAssignment.get(a.id)?.status),
-          submissionId: bestByAssignment.get(a.id)?.id ?? null,
-        }))
 
       return (
         <HomeroomStudentView

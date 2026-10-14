@@ -340,3 +340,10 @@ npm run build
 - A fixed portal covers review/dialogs/revealed exercise feedback independently of optional exam watermark. Teacher review labels identity as the student's work and teacher-view context. Server time advances with performance elapsed time, including while a cached dialog is closed. This is visual attribution, not cryptographic evidence.
 - Only analytics PDF export is removed by user request; analytics and CSV remain. PDF attachment reader changes are a pending local draft, so external files have no physical watermark. See STUDENT_SOLUTION_RESULTS.md.
 - When integrating isolated attempt-expiry work (19f7ca5), retain its closed_at/timeout-receipt guards alongside the required watermark field and compact summary. This change does not integrate that work.
+
+
+## Student classroom calendar scope
+
+- Subject classrooms derive CalendarEvent rows from the already authorized StudentAssignmentRow list through classroomCalendarEvents. The existing isCompleted gate drives both cards and their calendar; no cross-subject query is added to this path. Both subject and homeroom use the learning-stage sticky layout.
+- Student homeroom replaces the teacher aggregate/highest-score reduction with loadStudentLearningCalendar after verified Auth and exact room membership. Owner-scoped paginated memberships/submissions plus published enrolled-room links and groupOf feed the same buildStudentLearningData projection as the dashboard. Only calendar DTOs are returned; teacher homeroom aggregation is unchanged.
+- studentWorkSeverity shares the 48-hour deadline scale between calendar dots and card stripes. orderStudentClassroomWork stably partitions completed rows and whole completed groups, deciding group completion from the unfiltered list. Visibility/retry/scoring rules remain unchanged. See STUDENT_CLASSROOM_CALENDAR.md.

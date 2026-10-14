@@ -63,7 +63,7 @@ export function HomeroomStudentView({
           </section>
         </div>
         <aside aria-label="ปฏิทินกำหนดส่งงาน" className="min-w-0 self-start @min-[46rem]/homeroom:sticky @min-[46rem]/homeroom:top-0" data-sticky-homeroom-calendar>
-          <AssignmentCalendar events={calendarEvents} initialNow={initialNow} />
+          <AssignmentCalendar events={calendarEvents} initialNow={initialNow} scopeLabel="งานรวมทุกวิชา" />
         </aside>
       </div>
     </div>
