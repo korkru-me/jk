@@ -1749,7 +1749,7 @@ describe('self-practice atomic authenticated mutations', () => {
           'KEEP', true, false, true, false, ARRAY[$3]::uuid[], false
         ) AS id
       `, [ORG_A, ROOM_A, QUESTION_A1])).rows[0].id
-    ))
+    ), true)
     await as(user(CO_MANAGE), async tx => {
       const result = await tx.query<{ count: number }>(`
         SELECT public.update_practice_library_draft(
@@ -1757,7 +1757,7 @@ describe('self-practice atomic authenticated mutations', () => {
         ) AS count
       `, [draft, QUESTION_A1])
       expect(result.rows[0].count).toBe(1)
-    })
+    }, true)
     await as(user(OWNER_A), async tx => {
       expect((await tx.query(`
         SELECT title, access_code, calculator_enabled, scratchpad_enabled,
@@ -1767,7 +1767,8 @@ describe('self-practice atomic authenticated mutations', () => {
         calculator_enabled: true, scratchpad_enabled: false,
         shuffle_questions: true, shuffle_options: false,
       })
-    })
+      await tx.query('DELETE FROM public.practice_libraries WHERE id=$1', [draft])
+    }, true)
   })
 
   it('denies the previous draft editor to view-only and foreign teachers', async () => {
@@ -1777,7 +1778,7 @@ describe('self-practice atomic authenticated mutations', () => {
           $1, $2, 'compatibility denied', NULL, false, ARRAY[$3]::uuid[], false
         ) AS id
       `, [ORG_A, ROOM_A, QUESTION_A1])).rows[0].id
-    ))
+    ), true)
     for (const actor of [CO_VIEW, OWNER_B]) {
       await expect(as(user(actor), tx => tx.query(`
         SELECT public.update_practice_library_draft(
@@ -1785,6 +1786,7 @@ describe('self-practice atomic authenticated mutations', () => {
         )
       `, [draft, QUESTION_A1]))).rejects.toMatchObject({ code: '42501' })
     }
+    await as(user(OWNER_A), tx => tx.query('DELETE FROM public.practice_libraries WHERE id=$1', [draft]), true)
   })
 
   it('normalizes and de-duplicates bulk tags, and rejects a mixed invalid set atomically', async () => {
