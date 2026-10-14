@@ -1,5 +1,12 @@
 # Feature status
 
+### โลโก้กวางสามเขา — 14 ตุลาคม 2026
+
+- เจ้าของเลือกภาพตัวอย่างที่เขาที่สามโค้งกางไปด้านซ้ายเหนือหู และอนุมัติปรับทุกจุดพร้อมเผยแพร่ Production
+- SVG ใหม่ trace จากภาพที่เลือก ใช้สีเดียวและคง theme token เดิม; header, landing/footer, หน้าบัญชี, watermark หน้ารอสอบ/แบบฝึกหัด, ลายปกห้องเรียน และไอคอน browser/Apple ใช้ geometry ใหม่ครบ พร้อม version URL กัน cache รูปเก่า
+- ตรวจ TypeScript, design-token lint, 50 tests ของ cover/waiting UI และ production webpack build ผ่าน; local Chrome ตรวจ header/หน้าบัญชี/หน้ารอ, mobile 390px ไม่ล้น และโลโก้โหมดมืดอ่านได้; Next MCP compilation/runtime ไม่พบ error และ React tree ใช้ BrandLogo/ClassroomCoverPattern เดิม · ไม่ทดสอบ Auth-to-DB หรือ mutation บน hosted site
+- เก็บภาพต้นฉบับและ legacy assets เดิมไว้สำหรับประวัติ ไม่แตะ schema, Auth, RLS, ข้อมูลนักเรียน หรือ migration
+
 ### คลังฝึกไม่มีคะแนน — Phase 1–7 พร้อมปล่อย Production หลัง Staging UAT (13 ตุลาคม 2026)
 
 - `คลังฝึก` เป็นโดเมนแยกจาก assignment/submission โดยโครงสร้าง ใช้คลังโจทย์ แท็ก ตัวแสดงโจทย์ และ evaluator ที่ปลอดภัยร่วมกันเท่านั้น; ไม่มี `AssignmentType` ค่าใหม่ ไม่มี submission/score และไม่มีทาง export progress เป็นคะแนน

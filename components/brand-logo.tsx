@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils'
+import { BRAND_MARK_ASPECT_RATIO, BRAND_MARK_URL } from '@/components/brand-mark-data'
 
 interface BrandLogoProps {
   layout?: 'horizontal' | 'stacked'
@@ -20,11 +21,12 @@ export function BrandLogo({ layout = 'horizontal', subtitle, compact = false, cl
       <span
         aria-hidden="true"
         style={{
-          WebkitMask: "url('/brand/deer-mark.svg') center / contain no-repeat",
-          mask: "url('/brand/deer-mark.svg') center / contain no-repeat",
+          WebkitMask: `url('${BRAND_MARK_URL}') center / contain no-repeat`,
+          mask: `url('${BRAND_MARK_URL}') center / contain no-repeat`,
+          aspectRatio: BRAND_MARK_ASPECT_RATIO,
         }}
         className={cn(
-          'block aspect-[580/1045] shrink-0 bg-brand-accent',
+          'block shrink-0 bg-brand-accent',
           stacked
             ? (compact ? 'h-8' : 'h-10')
             : (compact ? 'h-8' : 'h-11'),

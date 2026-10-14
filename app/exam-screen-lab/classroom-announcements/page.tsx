@@ -12,7 +12,7 @@ const posts: ClassroomPost[] = [
     classroom_id: 'lab-classroom',
     author_id: 'lab-author',
     body: 'ประกาศจำลอง — กดรูปเพื่อขยายโดยไม่ออกจากหน้านี้',
-    attachments: [{ url: '/logo.png', name: 'ภาพประกาศแนวตั้ง.png', mime: 'image/png', size: 0 }],
+    attachments: [{ url: '/brand/deer-mark.svg?v=3', name: 'ภาพประกาศแนวตั้ง.png', mime: 'image/png', size: 0 }],
     pinned: false,
     created_at: '2026-10-05T00:00:00Z',
     updated_at: '2026-10-05T00:00:00Z',
@@ -26,7 +26,7 @@ const posts: ClassroomPost[] = [
     author_id: 'lab-author',
     body: 'ประกาศจำลองหลายรูป — เปิดรูปที่เลือกและคืนโฟกัสเมื่อปิด',
     attachments: [
-      { url: '/logo.png', name: 'ภาพแนวตั้งในชุด.png', mime: 'image/png', size: 0 },
+      { url: '/brand/deer-mark.svg?v=3', name: 'ภาพแนวตั้งในชุด.png', mime: 'image/png', size: 0 },
       { url: '/samples/simple-circuit.svg', name: 'ภาพแนวนอนในชุด.svg', mime: 'image/svg+xml', size: 0 },
     ],
     pinned: false,
