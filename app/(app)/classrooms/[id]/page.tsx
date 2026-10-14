@@ -119,6 +119,7 @@ export default async function ClassroomDetailPage({
           complianceSubmitted={complianceSubmitted}
           complianceTotal={dueAssignments.length}
           posts={posts}
+          backHref={backHrefFromSearchParams(sp, '/dashboard#classrooms')}
         />
       )
     }
@@ -242,6 +243,7 @@ export default async function ClassroomDetailPage({
         assignments={assignments}
         categories={(assignmentCategoryRows ?? []) as AssignmentCategory[]}
         posts={posts}
+        backHref={backHrefFromSearchParams(sp, '/dashboard#classrooms')}
       />
     )
   }

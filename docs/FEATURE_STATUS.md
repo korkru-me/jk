@@ -10,6 +10,16 @@
 - Staging apply migration ครบและ integration gate ผ่าน 8 บทบาท / 1,000 โจทย์ / 2 ห้อง: ค่าตั้งค่าบันทึกตรงกัน, exact AND search/pagination, idempotency, progress isolation และ closed-library denial ผ่าน; cleanup PASS · Production dry-run มีเฉพาะสองไฟล์นี้ และ Staging database lint ระดับ error ผ่าน
 - เพื่อให้ติดตั้งฐานข้อมูลก่อนเผยแพร่ source โดยเว็บรุ่นเดิมยังบันทึกร่างได้ เพิ่ม migration `20261014043342_practice_draft_backward_compatibility.sql`: RPC signature เดิมอ่านค่าตั้งค่าที่บันทึกแล้วภายใต้สิทธิ์เดิมและ row lock ก่อนเรียกตัวบันทึกรุ่นใหม่ ไม่เดาค่า default หรือเปิดสิทธิ์เพิ่ม; unit/hosted gate ต้องตรวจผู้ช่วยสอน manage บันทึกได้โดยค่าตั้งค่าไม่หาย และ view/ครูต่างห้องยังถูกปฏิเสธ
 
+### ห้องเรียนนักเรียนใช้ธีมของครูและการ์ดงานแบบกดทั้งกรอบ — 14 ตุลาคม 2026
+
+- หัวห้องวิชาและโฮมรูมของนักเรียนใช้ `StudentClassroomHeader` ร่วมกัน อ่านสี ไอคอน และลายปกที่ครูบันทึกไว้ด้วย helper/pattern ชุดเดียวกับฝั่งครู มีชื่อห้อง คำอธิบาย ครูและจำนวนเพื่อนในกรอบกระชับ; ห้องเก่าที่ไม่เลือกสีใช้พื้นผิวกลาง ข้อมูลเดิมยังอ่านได้
+- ย้ายตัวกรองสถานะเป็น ToggleGroup แบบต่อเนื่องและประเภทงานเป็น Select ในแถบเดียว (ประมาณ 38px บน desktop และขึ้นสองแถวเมื่อพื้นที่แคบ) ตัวเลขประเภทนับภายในสถานะที่เลือก กรองสองเงื่อนไขร่วมกันได้ และใช้ primitive ที่รองรับคีย์บอร์ด/ปิดภายนอก/คืน focus; เอา Card สถิติซ้ำสองใบออกโดยจำนวนงานยังอยู่บนตัวกรอง
+- การ์ดงานใหม่ใช้ Card พร้อมแถบสีและไอคอนตามธีมห้องเรียน กรอบทั่วไปสูงประมาณ 104px บน desktop จัดสองคอลัมน์เมื่อ container กว้างพอ ไม่มีปุ่มเริ่มทำแยก ทั้งกรอบเป็น Link ที่มีชื่อ action และ focus ring; กลุ่มงานใช้หัวข้อ Folder ขนาดเล็ก และประกาศที่ว่างแสดงเพียงแถวสั้น
+- `studentAssignmentCardState` คงทางเข้า waiting/take สำหรับเริ่ม ทำต่อ และลองใหม่ตาม attempt/completion rule เดิม รวม wrong-only retry และ mastery flag; งานที่หมดสิทธิ์ลองใหม่เปิด submission เพื่อดูผล/สถานะ คะแนนและข้อความผ่าน/ไม่ผ่านแสดงตาม `canStudentViewScore` รวม after_due ส่วนคะแนนที่ไม่เปิดเผยไม่ปรากฏบนการ์ด ไม่เปลี่ยน grading, query ข้อมูลนักเรียน หรือ RLS
+- ลิงก์ย้อนกลับของนักเรียนอ่าน `back` ที่ผ่าน helper ตรวจ internal path เดิม และใช้ `/dashboard#classrooms` เป็นค่าเริ่มต้น local fixture ใหม่ `/exam-screen-lab/student-classroom` มีห้องวิชา/โฮมรูม/ห้องเก่า/ว่าง งานเริ่มใหม่/ทำต่อ/ลองใหม่/คะแนนซ่อน/หลังปิดสอบ/จบ streak และลิงก์รายละเอียดจำลอง ไม่อ่านฐานข้อมูลหรือเขียน seen/start/submit
+- TypeScript, design-token lint, unit suite 242 ไฟล์ / 3,219 เคส และ webpack production build ผ่าน; ตรวจ 320/390/768/1280px โหมดสว่าง/มืด การกรองร่วมกัน การคลิกพื้นที่ว่างและกด Enter เปิดกรอบงาน การปิด Select ภายนอก/Escape/คืน focus; axe 0 violations (มี contrast incomplete ของข้อความสั้นบางจุดจึงตรวจภาพร่วมด้วย) Next MCP compilation/runtime และ browser console ไม่มี error
+- บันทึก commit เฉพาะในเครื่องตามคำสั่งเจ้าของ ยังไม่ push/deploy ไม่มี migration; ทดสอบการเปิดงานด้วย fixture ไม่เริ่มหรือส่งข้อสอบจริง บั๊ก query ประกาศของหน้ารวมแก้แยกใน commit ก่อนหน้านี้และยืนยันด้วย Staging Data API แบบ 0 rows
+
 ### แก้หน้ารวมนักเรียนโหลดไม่สำเร็จ — 14 ตุลาคม 2026
 
 - หน้า `/dashboard` ล้มระหว่างโหลดประกาศ เพราะ `users(full_name)` มีทั้งความสัมพันธ์ผู้เขียนประกาศและผู้อ่านผ่าน `post_reads` ทำให้ PostgREST ตอบ `PGRST201`; ระบุ `users!classroom_posts_author_id_fkey(full_name)` เช่นเดียวกับ stream ของห้องเรียน โดยคง RLS และการจำกัดห้องจาก memberships เดิม
