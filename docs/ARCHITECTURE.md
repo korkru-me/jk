@@ -308,3 +308,10 @@ npm run build
 - Subject and homeroom student views share `StudentClassroomHeader`, using the teacher's saved cover preset, icon and pattern metadata. The student return link uses the existing validated `back` helper and falls back to the classroom anchor on the combined learning home.
 - `AssignmentList` keeps status/type/category filtering local. Its whole-card links use the pure `studentAssignmentCardState` projection to choose the existing take or submission route, preserve unfinished retries independently of the official attempt, enforce attempt/completion presentation rules, and gate displayed scores with the shared result-visibility helpers. The server's membership, group, scoring and submission queries stay unchanged.
 - The environment-gated `/exam-screen-lab/student-classroom` uses synthetic props and read-only fixture detail links; announcement seen tracking is disabled and no exam start/submit or database access is involved.
+
+## Student profile presentation
+
+- The authenticated settings layout still reads the verified user's role, then renders `SettingsShell`; only students omit the duplicate settings navigation. The student stage shares the shell's measured notification anchor on large screens and uses full width on small screens.
+- `AvatarCropEditor` decodes a local file or the current image in the browser, bounds its square crop through the pure `avatar-crop` helper, and returns a 512×512 PNG data URL to the existing page-local preview. Object URLs are released when drafts close or the component unmounts. No avatar URL is persisted; profile/password actions and data-access policies remain unchanged.
+- Section audience labels reflect the classroom server projection: homeroom advisors can see the student profile, while subject teachers receive only grade, section, student code and class number. School name stays in the advisor projection, and the interface explains that distinction. These labels do not grant access.
+- The environment-gated `/exam-screen-lab/student-profile` supplies synthetic identities/images and non-mutating form actions to the same shell/editor/form; it never queries student data or changes accounts.
