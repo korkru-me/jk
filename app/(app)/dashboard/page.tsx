@@ -154,7 +154,7 @@ export default async function DashboardPage({ searchParams }: {
   const [assignmentsRes, recentPostsRes, groupOf] = classroomIds.length > 0
     ? await Promise.all([
         admin.from('assignments')
-          .select('id, classroom_id, title, type, end_at, duration_minutes, passing_type, passing_value, score_strategy, display_max_score, show_results, assignment_classrooms!inner(classroom_id, group_ids)')
+          .select('id, classroom_id, title, type, created_at, end_at, duration_minutes, passing_type, passing_value, score_strategy, display_max_score, show_results, assignment_classrooms!inner(classroom_id, group_ids)')
           .in('assignment_classrooms.classroom_id', classroomIds)
           .eq('status', 'published')
           .order('end_at', { ascending: true, nullsFirst: false }),

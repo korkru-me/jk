@@ -96,13 +96,13 @@ export function AssignmentList({ assignments, categories, classroomDescription, 
             return (
               <section key={section.category?.id ?? 'uncategorized'} className="flex min-w-0 flex-col gap-2">
                 {categories.length > 0 && (
-                  <div className="flex min-w-0 items-center gap-1.5 px-1">
-                    <Folder className={cn('size-3.5 shrink-0', preset?.text ?? 'text-muted-foreground')} aria-hidden="true" />
-                    <h3 className="min-w-0 break-words text-xs font-semibold">{section.category?.name ?? 'งานอื่น ๆ'}</h3>
-                    <span className="shrink-0 text-xs text-muted-foreground">{section.assignments.length} งาน</span>
+                  <div className={cn('flex min-w-0 items-center gap-2 rounded-lg px-3 py-2', preset?.surface ?? 'bg-muted')}>
+                    <Folder className={cn('size-4 shrink-0', preset?.text ?? 'text-muted-foreground')} aria-hidden="true" />
+                    <h3 className={cn('min-w-0 break-words text-sm font-bold', preset?.text)}>{section.category?.name ?? 'งานอื่น ๆ'}</h3>
+                    <span className="ml-auto shrink-0 text-xs font-medium text-foreground/75">{section.assignments.length} งาน</span>
                   </div>
                 )}
-                <div className="grid grid-cols-1 gap-2 @min-[42rem]:grid-cols-2">
+                <div className="grid grid-cols-1 gap-2 @min-[30rem]:grid-cols-2 @min-[46rem]:grid-cols-3">
                   {section.assignments.map(a => <StudentAssignmentCard key={a.id} assignment={a} cover={cover} now={now} href={assignmentHrefs?.[a.id]} />)}
                 </div>
               </section>

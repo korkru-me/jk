@@ -58,6 +58,11 @@ export function StudentView({
         </Card>
       ) : (
         <div className="flex flex-col gap-4">
+          {embedded ? (
+            <div className="grid grid-cols-1 gap-3 @min-[26rem]:grid-cols-2 @min-[36rem]:grid-cols-3" data-student-classroom-grid>
+              {[...homeroomClassrooms, ...subjectClassrooms].map(renderClassroom)}
+            </div>
+          ) : <>
           {homeroomClassrooms.length > 0 && (
             <section className="flex flex-col gap-3" aria-labelledby="student-homerooms-heading">
               <GroupHeading id="student-homerooms-heading" className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -79,6 +84,7 @@ export function StudentView({
               </div>
             </section>
           )}
+          </>}
         </div>
       )}
     </div>

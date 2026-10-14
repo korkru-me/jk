@@ -7,6 +7,8 @@ import { ClassroomDetailClient } from './_components/classroom-detail-client'
 import { StudentClassroomView, type StudentAssignmentRow } from './_components/student-classroom-view'
 import { HomeroomStudentView } from './_components/homeroom-student-view'
 import { getClassroomPosts, getPostSeenByPost } from '@/lib/actions/classroom-posts'
+import { getClassroomAnnouncementAcknowledgementStatus } from '@/lib/actions/classroom-announcement-acknowledgements'
+import { isAnnouncementAcknowledgementEnabled } from '@/lib/classroom-announcement-acknowledgements'
 import { getHomeroomAggregate } from '@/lib/homeroom-data'
 import { selectOfficialAttempt, rescaleToDisplayMax } from '@/lib/scoring'
 import { isAttemptExpired } from '@/lib/grading'
@@ -564,7 +566,11 @@ export default async function ClassroomDetailPage({
 
   // Who has seen each announcement. Only the teaching side can read these rows
   // (post_reads_select), and only this side has any use for them.
-  const seenByPost = canManage ? await getPostSeenByPost(posts.map(p => p.id)) : {}
+  const acknowledgementsEnabled = isAnnouncementAcknowledgementEnabled(process.env)
+  const acknowledgementStatus = canManage && acknowledgementsEnabled ? await getClassroomAnnouncementAcknowledgementStatus(id) : {}
+  const displayPosts = canManage && acknowledgementsEnabled
+    ? posts.map(post => ({ ...post, acknowledgementStatus: acknowledgementStatus[post.id] ?? { round: 1, remindedAt: null, studentIds: [] } })) : posts
+  const seenByPost = canManage && !acknowledgementsEnabled ? await getPostSeenByPost(posts.map(p => p.id)) : {}
   const initialNavigationItem = resolveClassroomNavigationKey(
     sp.view,
     classroomNavigationFor(c.classroom_type, canManage),
@@ -595,7 +601,7 @@ export default async function ClassroomDetailPage({
         studentNotes={studentNotes}
         studentProfiles={studentProfiles}
         ownerName={ownerProfile?.full_name ?? 'ครูหลัก'}
-        posts={posts}
+        posts={displayPosts}
         pendingReviewByAssignment={pendingReviewByAssignment}
         seenByPost={seenByPost}
         crossPostTargets={crossPostTargets}

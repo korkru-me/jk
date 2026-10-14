@@ -4,6 +4,9 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { ShellClient, type ShellUser } from '@/components/layout/shell-client'
 import { getAuthUser } from '@/lib/auth/server'
 import { isPracticeLibraryEnabled } from '@/lib/practice-question'
+import { isAnnouncementAcknowledgementEnabled } from '@/lib/classroom-announcement-acknowledgements'
+import { getPendingClassroomAnnouncements } from '@/lib/actions/classroom-announcement-acknowledgements'
+import { StudentAnnouncementInbox } from '@/components/classrooms/student-announcement-inbox'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const practiceLibraryEnabled = isPracticeLibraryEnabled(process.env)
@@ -71,12 +74,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   if (profile.role !== 'admin' && !profile.survey_role) redirect('/complete-profile')
 
+  const announcementFeed = profile.role === 'student' && isAnnouncementAcknowledgementEnabled(process.env)
+    ? await getPendingClassroomAnnouncements() : { posts: [], error: undefined }
+
   return (
     <ShellClient
       user={profile as ShellUser}
       initialUnreadCount={initialUnreadCount}
       practiceLibraryEnabled={practiceLibraryEnabled}
     >
+      {profile.role === 'student' && <StudentAnnouncementInbox initialPosts={announcementFeed.posts} initialError={announcementFeed.error} />}
       {children}
     </ShellClient>
   )

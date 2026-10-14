@@ -1,5 +1,15 @@
 # Feature status
 
+### หน้ารวมเรียนกระชับและรับทราบประกาศ — 14 ตุลาคม 2026 (local source/preview)
+
+- กรอบห้องเรียน/สรุปงาน/ประกาศของนักเรียนใช้ขอบขวาที่ notification anchor ของ shell เมื่อมีพื้นที่สำหรับปฏิทิน ปฏิทินอยู่คอลัมน์ถัดไปและ sticky ใน main scroll; บนจอแคบใช้คอลัมน์เดียว ห้อง Homeroom อยู่ต้น grid ร่วมกับห้องวิชา แถวละ 3 Card เมื่อพื้นที่พอ ไม่แยกแถวว่างสำหรับ Homeroom เดี่ยว
+- สรุปงานอยู่ใน Card เดียวพร้อมจำนวนและ Select “ใกล้กำหนดส่งก่อน / มอบหมายล่าสุดก่อน” ไม่มีหัวข้อ “งานที่ต้องทำ” ซ้ำ รายการจำกัดความสูงและเลื่อนภายใน; ประวัติเมื่อขยายจำกัดความสูงเช่นกัน การ์ดงานกดได้ทั้งกรอบ ประกาศล่าสุดใช้สี/ไอคอนจาก ID ห้องจริง และหัวข้อทั้งสามใช้ text-xl เท่ากัน
+- งานในห้องเรียนวางได้ 3 คอลัมน์ตามความกว้าง container หัวหมวดใช้แถบสี ไอคอนและตัวหนา เพิ่ม created_at ใน projection เพื่อเรียงงานใหม่ โดยไม่แก้กติกาการส่ง/คะแนน/สิทธิ์กลุ่ม
+- เตรียม explicit receipt และรอบแจ้งเตือนด้วย migration `20261014053207_classroom_announcement_acknowledgements.sql` และ service-only SECURITY INVOKER RPC; ไม่ถือ legacy post_reads เป็นการกดรับทราบ Popup นักเรียนใช้ธีมห้อง แสดงผู้ประกาศ เวลา ปักหมุด การแก้ไข/แจ้งใหม่และไฟล์แนบ ครูใช้ “รับทราบแล้ว X/Y คน” กับไอคอน BellRing ในรอบที่เปิดฟีเจอร์ ครูแจ้งใหม่แล้ว count เริ่ม 0 แต่ receipt เก่ายังอยู่
+- **ยังไม่ apply หรือเปิดรับทราบถาวรในข้อมูลจริง**: migration audit พบ Production มี local-only เดิม 12 รายการ และ Staging มี remote-only `20261009142610` ต้องจัด baseline ก่อนตาม AGENTS.md; flag `CLASSROOM_ANNOUNCEMENT_ACKNOWLEDGEMENTS` ปิดโดยค่าเริ่มต้น เมื่อปิดคง legacy “เห็นแล้ว” และไม่เรียก RPC ใหม่ รายละเอียด rollout และข้อจำกัดอยู่ใน `docs/STUDENT_ANNOUNCEMENT_ACKNOWLEDGEMENTS.md`
+- TypeScript, token lint, webpack build และ unit suite 245 ไฟล์ / 3,237 เคสผ่าน รวม PGlite 7 เคสตรวจ SQL/permission/round และ sort 3 เคส Browser ตรวจ 320/390/1280/1600px, 3 Card ต่อแถว, แนวขอบ/ย่อเมนู, sticky calendar, ตัวเรียง/กรอบเลื่อน, light/dark, receipt สำเร็จ/ล้มเหลว/ไม่เด้งหลัง reload/แจ้งใหม่/พักคิวและ nested image; Next MCP runtime ไม่พบ error, axe ไม่มี violation (contrast/focus บางส่วน incomplete ตรวจภาพ/keyboard ร่วมด้วย) ไม่ทดสอบ hosted Staging/Auth จริงหรือ race บน connection แยก
+- fixtures `/exam-screen-lab/student-dashboard?scenario=busy`, `/exam-screen-lab/student-classroom` และ `/exam-screen-lab/announcement-acknowledgements` ใช้ข้อมูลสังเคราะห์เท่านั้น ตามคำสั่งเจ้าของ commit ในเครื่อง ไม่ push/deploy/เปลี่ยนฐานข้อมูลจริง
+
 ### หน้าข้อมูลส่วนตัวนักเรียนแบบกะทัดรัดและการจัดรูปตัวอย่าง — 14 ตุลาคม 2026
 
 - เอาเมนูตั้งค่าซ้ำออกเฉพาะนักเรียน ใช้ `SettingsShell` ร่วมกับ local fixture; บน desktop ขอบซ้ายเริ่มที่แนว padding ของเนื้อหาหลัก ไม่จัดกลางด้วย max-width เดิม และขอบขวาใช้แนว notification anchor เช่นหน้าสร้างงาน เมื่อย่อ/ขยาย sidebar จะคำนวณใหม่ ส่วนจอเล็กใช้ความกว้างเต็มและช่องฟอร์มปรับตามความกว้าง Card

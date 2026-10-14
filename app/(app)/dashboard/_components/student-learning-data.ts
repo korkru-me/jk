@@ -10,7 +10,7 @@ type WorkSettings = Pick<Assignment,
   'id' | 'classroom_id' | 'title' | 'type' | 'end_at' | 'duration_minutes' |
   'passing_type' | 'passing_value' | 'score_strategy' | 'display_max_score' | 'show_results'
 >
-export type LearningAssignment = WorkSettings & { assignment_classrooms: AssignmentLinkReach[] }
+export type LearningAssignment = WorkSettings & { created_at?: string; assignment_classrooms: AssignmentLinkReach[] }
 export type LearningSubmission = Pick<Submission,
   'id' | 'assignment_id' | 'total_score' | 'max_score' | 'score_adjustment' |
   'status' | 'attempt_number' | 'created_at'
@@ -22,6 +22,7 @@ export type StudentWorkItem = {
   classroom: Pick<StudentClassroom, 'id' | 'name' | 'description'> | null
   otherClassroomNames: string[]
   endAt: string | null
+  assignedAt: string | null
   durationMinutes: number | null
   inProgress: boolean
   hasPreviousAttempt: boolean
@@ -99,7 +100,7 @@ export function buildStudentLearningData({ classrooms, assignments, submissions,
     return {
       id: a.id, title: a.title, classroom: rooms[0] ?? null,
       otherClassroomNames: rooms.slice(1).map(c => c.name),
-      endAt: a.end_at, durationMinutes: a.duration_minutes,
+      endAt: a.end_at, assignedAt: a.created_at ?? null, durationMinutes: a.duration_minutes,
       inProgress: inProgressIds.has(a.id), hasPreviousAttempt: !!previous,
       previousScore: previous && canStudentViewScore(previous.assignments?.show_results, previous.assignments?.end_at, now)
         ? { total: previous.total_score, max: previous.max_score } : null,

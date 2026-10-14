@@ -28,6 +28,7 @@ import { useConfirm } from '@/components/ui/confirm-dialog'
 import { Card } from '@/components/ui/card'
 import { PostAttach } from '@/components/classrooms/post-attach'
 import { PostAttachments } from '@/components/classrooms/post-attachments'
+import { AnnouncementAcknowledgementPanel } from '@/components/classrooms/announcement-acknowledgement-panel'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
@@ -785,7 +786,9 @@ function PostCard({
           <PostAttachments attachments={attachments} />
           {canManage && (
             <div className="mt-2">
-              <SeenPanel students={students} seenBy={seenBy} />
+              {post.acknowledgementStatus
+                ? <AnnouncementAcknowledgementPanel postId={post.id} students={students} status={post.acknowledgementStatus} />
+                : <SeenPanel students={students} seenBy={seenBy} />}
             </div>
           )}
         </>

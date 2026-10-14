@@ -1,8 +1,12 @@
+'use client'
+
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { CheckCircle2, ChevronRight, Clock, History, ListChecks, ListTodo } from 'lucide-react'
+import { ArrowRight, CheckCircle2, ChevronRight, Clock, History, ListChecks, ArrowDownWideNarrow } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
-import { buttonVariants } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { sortStudentWork, type StudentWorkOrder } from '@/lib/student-work-sort'
 import { ClassroomIcon } from '@/components/classrooms/classroom-icon'
 import { coverOf, parseDescription } from '../../classrooms/_components/classroom-meta'
 import { formatThaiDate, formatThaiDateTime } from '@/lib/thai-time'
@@ -18,49 +22,78 @@ function dueInfo(endAt: string | null, now: number) {
 }
 
 export function StudentWorkSummary({ data, now = Date.now() }: { data: StudentLearningData; now?: number }) {
+  const [order, setOrder] = useState<StudentWorkOrder>('due')
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const historyRef = useRef<HTMLDetailsElement>(null)
+  useEffect(() => {
+    if (!historyOpen) return
+    const outside = (event: PointerEvent) => {
+      const details = historyRef.current
+      if (details && event.target instanceof Node && !details.contains(event.target) && !event.composedPath().includes(details)) details.open = false
+    }
+    const escape = (event: KeyboardEvent) => {
+      const details = historyRef.current
+      if (event.key !== 'Escape' || event.defaultPrevented || !details) return
+      const inside = details.contains(document.activeElement)
+      details.open = false
+      if (inside) details.querySelector('summary')?.focus()
+    }
+    document.addEventListener('pointerdown', outside)
+    document.addEventListener('keydown', escape)
+    return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape) }
+  }, [historyOpen])
+  const work = sortStudentWork(data.pendingWork, order)
   return (
-    <section id="work-summary" aria-labelledby="student-work-heading" className="flex min-w-0 scroll-mt-20 flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+    <section id="work-summary" aria-labelledby="student-work-heading" className="min-w-0 scroll-mt-20">
+      <Card className="overflow-hidden">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-3">
         <h2 id="student-work-heading" className="flex items-center gap-2 text-xl font-bold">
           <ListChecks className="size-5 text-primary" aria-hidden="true" /> สรุปงานของฉัน
         </h2>
-        <div className="flex flex-wrap items-center gap-2 text-xs" role="group" aria-label="สรุปจำนวนงาน">
+        <div className="flex flex-wrap items-center gap-1.5 text-xs" role="group" aria-label="สรุปจำนวนงาน">
           <Badge variant="statusWarning">ต้องทำ <strong>{data.pendingWork.length}</strong></Badge>
           <Badge variant="statusDestructive">ใกล้/เลยกำหนด <strong>{data.urgentCount}</strong></Badge>
           <Badge variant="statusSuccess">ส่งแล้ว <strong>{data.doneCount}</strong></Badge>
         </div>
-      </div>
-
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="flex items-center gap-1.5 text-sm font-semibold">
-          <ListTodo className="size-4 text-primary" aria-hidden="true" /> งานที่ต้องทำ
-        </h3>
-        <p className="text-xs text-muted-foreground">{data.pendingWork.length} รายการ · เรียงตามกำหนดส่ง</p>
+        <Select value={order} onValueChange={value => { if (value === 'due' || value === 'latest') setOrder(value) }}>
+          <SelectTrigger size="sm" aria-label="เรียงงาน" className="ml-auto min-w-[10rem]">
+            <ArrowDownWideNarrow className="size-3.5" aria-hidden="true" />
+            <SelectValue>{value => value === 'latest' ? 'มอบหมายล่าสุด' : 'ใกล้กำหนดส่ง'}</SelectValue>
+          </SelectTrigger>
+          <SelectContent align="end" alignItemWithTrigger={false}>
+            <SelectItem value="due">ใกล้กำหนดส่งก่อน</SelectItem>
+            <SelectItem value="latest">มอบหมายล่าสุดก่อน</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
       {data.pendingWork.length ? (
-        <ul className="flex flex-col gap-2">
-          {data.pendingWork.map(work => <li key={work.id}><WorkRow work={work} now={now} /></li>)}
-        </ul>
+        <div className="max-h-[min(28rem,60dvh)] overflow-y-auto overscroll-contain p-3 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+          tabIndex={0} role="region" aria-label="รายการงานที่ต้องส่ง" data-student-work-scroll>
+          <ul className="flex flex-col gap-2">
+            {work.map(item => <li key={item.id}><WorkRow work={item} now={now} /></li>)}
+          </ul>
+        </div>
       ) : (
-        <Card padding="md" className="flex items-center gap-3">
+        <div className="flex items-center gap-3 p-4">
           <CheckCircle2 className="size-6 text-success" aria-hidden="true" />
           <div>
             <p className="text-sm font-semibold">{data.history.length ? 'ทำงานครบแล้ว ไม่มีงานค้าง' : 'ยังไม่มีงานที่ต้องทำ'}</p>
             <p className="text-xs text-muted-foreground">งานที่ครูมอบหมายจะรวมอยู่ตรงนี้</p>
           </div>
-        </Card>
+        </div>
       )}
 
       {data.history.length > 0 && (
-        <Card className="overflow-hidden">
-          <details>
+        <div className="border-t">
+          <details ref={historyRef} onToggle={event => setHistoryOpen(event.currentTarget.open)}>
             <summary className="cursor-pointer px-4 py-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
               <span className="ml-1 inline-flex items-center gap-2">
                 <History className="size-4 text-primary" aria-hidden="true" /> ประวัติการสอบทั้งหมด
                 <span className="text-xs font-normal text-muted-foreground">{data.history.length} รายการ</span>
               </span>
             </summary>
-            <ul className="divide-y border-t">
+            <div className="max-h-72 overflow-y-auto overscroll-contain border-t" role="region" aria-label="รายการประวัติการสอบ" tabIndex={0}>
+            <ul className="divide-y">
               {data.history.map(entry => (
                 <li key={entry.id} className="flex items-center gap-3 px-4 py-2.5">
                   <div className="min-w-0 flex-1">
@@ -76,9 +109,11 @@ export function StudentWorkSummary({ data, now = Date.now() }: { data: StudentLe
                 </li>
               ))}
             </ul>
+            </div>
           </details>
-        </Card>
+        </div>
       )}
+      </Card>
     </section>
   )
 }
@@ -90,7 +125,9 @@ function WorkRow({ work, now }: { work: StudentWorkItem; now: number }) {
   const roomNames = [work.classroom?.name, ...work.otherClassroomNames].filter(Boolean).join(' · ')
 
   return (
-    <Card radius="md" className={cn('relative overflow-hidden', cover?.surface)} data-work-row data-classroom-id={work.classroom?.id}>
+    <Link href={`/assignments/${work.id}/take`} prefetch={false} aria-label={`${work.inProgress ? 'ทำต่อ' : work.hasPreviousAttempt ? 'ลองใหม่' : 'เริ่มทำ'}: ${work.title}`}
+      className="group block rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+    <Card radius="md" interactive className={cn('relative overflow-hidden', cover?.surface)} data-work-row data-classroom-id={work.classroom?.id} data-work-id={work.id}>
       <span aria-hidden="true" className={cn('absolute inset-y-0 left-0 w-1', cover?.solid ?? 'bg-muted-foreground')} />
       <div className="flex items-center gap-3 py-2.5 pl-4 pr-3">
         <div className={cn('hidden size-9 shrink-0 items-center justify-center rounded-lg sm:flex', cover ? `${cover.surface} ${cover.text}` : 'bg-muted text-foreground')}>
@@ -112,10 +149,9 @@ function WorkRow({ work, now }: { work: StudentWorkItem; now: number }) {
             {work.previousScore && <span className="text-foreground/75">คะแนนเดิม {work.previousScore.total ?? 'รอตรวจ'}/{work.previousScore.max}</span>}
           </div>
         </div>
-        <Link href={`/assignments/${work.id}/take`} className={cn(buttonVariants({ size: 'sm', variant: work.inProgress || work.hasPreviousAttempt ? 'outline' : 'default' }), 'shrink-0')}>
-          {work.inProgress ? 'ทำต่อ' : work.hasPreviousAttempt ? 'ลองใหม่' : 'เริ่มทำ'}
-        </Link>
+        <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden="true" />
       </div>
     </Card>
+    </Link>
   )
 }

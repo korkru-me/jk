@@ -1,5 +1,9 @@
 # Data model และ invariants
 
+## Pending: explicit classroom announcement receipts
+
+Migration `20261014053207_classroom_announcement_acknowledgements.sql` is prepared locally, not applied: `classroom_announcement_rounds` stores current round/reminded_at per post; `classroom_announcement_acknowledgements` stores the first explicit receipt per `(post_id, student_id, round_no)`. Both cascade from the existing post/user, enable RLS and permit service-only RPC access. Legacy `post_reads.seen_at` remains a separate sighting and is never backfilled as consent/acknowledgement. The server rollout flag stays off until migration parity and Staging verification pass.
+
 อัปเดตล่าสุด: 12 ตุลาคม 2026
 
 เอกสารนี้เป็นแผนที่เชิงแนวคิด ไม่ใช่ schema dump ก่อนแก้ฐานข้อมูลต้องอ่าน migration ที่เกี่ยวข้องและตรวจสถานะฐานข้อมูลจริง

@@ -51,10 +51,11 @@ export default async function StudentDashboardLabPage({ searchParams }: {
     })),
   ] : EVENTS
   const classrooms = scenario === 'empty' ? [] : scenario === 'busy' ? CLASSROOMS : CLASSROOMS.slice(0, 3)
-  const assignments: LearningAssignment[] = events.map(event => {
+  const assignments: LearningAssignment[] = events.map((event, index) => {
     const room = classrooms.find(c => c.name === event.classroomName) ?? CLASSROOMS[2]
     return {
       id: event.id, classroom_id: room.id, title: event.title, end_at: event.endAt,
+      created_at: `2026-10-${String(Math.max(1, 14 - index)).padStart(2, '0')}T09:00:00+07:00`,
       type: 'exercise', duration_minutes: event.id === 'calendar-physics' ? 30 : null,
       passing_type: 'percent', passing_value: 60, score_strategy: 'best', display_max_score: null,
       show_results: event.id === 'calendar-thai' ? 'never' : 'immediate',
@@ -78,13 +79,11 @@ export default async function StudentDashboardLabPage({ searchParams }: {
 
   return (
     <ShellClient user={USER} initialUnreadCount={0} notificationsEnabled={false}>
-      <div className="flex flex-col gap-3">
-        <p className="text-xs text-muted-foreground">ตัวอย่างสำหรับตรวจหน้าตา · ข้อมูลนักเรียนและงานจำลอง</p>
         <StudentDashboard user={USER} data={data} calendarNow={calendarNow} initialJoinCode={join} joinAction={previewJoinClassroom}
+          previewLabel="ตัวอย่างสำหรับตรวจหน้าตา · ข้อมูลนักเรียนและงานจำลอง"
           backHref="/exam-screen-lab/student-dashboard#classrooms"
-          recentPosts={scenario === 'empty' ? [] : [{ id: 'lab-post', classroom_id: 'lab-room-1', body: 'อย่าลืมทบทวนเรื่องแรงและการเคลื่อนที่ก่อนเรียนครั้งถัดไปนะครับ', created_at: calendarNow, users: { full_name: 'ครูจำลอง' }, classrooms: { name: 'ฟิสิกส์ ม.4' } }]}
+          recentPosts={scenario === 'empty' ? [] : CLASSROOMS.slice(0, 3).map(c => ({ id: `post-${c.id}`, classroom_id: c.id, body: 'อย่าลืมทบทวนเรื่องแรงและการเคลื่อนที่ก่อนเรียนครั้งถัดไปนะครับ', created_at: calendarNow, users: { full_name: 'ครูจำลอง' }, classrooms: { name: c.name } }))}
         />
-      </div>
     </ShellClient>
   )
 }

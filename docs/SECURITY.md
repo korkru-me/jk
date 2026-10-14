@@ -1,5 +1,9 @@
 # Security และ privacy guardrails
 
+## Pending classroom announcement acknowledgements
+
+The prepared acknowledgement migration uses service-only SECURITY INVOKER functions with `search_path = ''`; new tables enable RLS and revoke direct PUBLIC/anon/authenticated access. Server actions derive actor IDs from verified sessions and RPCs repeat student roster or owner/co-teacher admin/manage authorization against the exact post/classroom. The same post row lock serializes acknowledgement/resend; stale rounds fail, and no peer receipt identifiers enter student payloads. Automatic sighting data is not represented as explicit acknowledgement. This schema is not applied and its server flag defaults off; hosted Auth/Data API/cross-org and separate-connection race verification remain required after migration history is reconciled.
+
 อัปเดตล่าสุด: 7 ตุลาคม 2026
 
 KorKru จัดการข้อมูลนักเรียนและอาจเกี่ยวข้องกับผู้เยาว์ ความปลอดภัยและความเป็นส่วนตัวเป็นเงื่อนไขของความถูกต้อง ไม่ใช่งานเก็บรายละเอียดภายหลัง
