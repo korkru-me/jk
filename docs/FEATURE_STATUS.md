@@ -1,5 +1,14 @@
 # Feature status
 
+### คลังฝึกในสรุปงานนักเรียนและงานเสร็จอยู่ท้าย — 14 ตุลาคม 2026 (local only)
+
+- “พื้นที่เรียนรู้ของฉัน” รวมคลังฝึกที่เปิดในห้องวิชาของนักเรียนเข้า Card สรุปงานเดียวกับงานปกติ ใช้สี/ไอคอนประจำห้องเดิม และป้ายรูปหนังสือ “คลังฝึก” พร้อมจำนวนโจทย์และ “ฝึกได้เรื่อย ๆ · ไม่มีคะแนน”; คลิกไปหน้ารอ `/practice/[id]` เพื่อคง access-code flow เดิม มีจำนวนคลังแยกจากจำนวนงานค้าง/ใกล้ส่ง/ส่งแล้ว
+- ใช้ session-bound `loadStudentPracticeLibraries` เดิมหลังตรวจ Auth/role และหลัง feature flag, อ่าน active subject roster + published libraries ผ่าน RLS พร้อม allowlist metadata/จำนวนโจทย์/เวลาที่เปิดและสร้าง; ไม่อ่าน attempt/คำตอบ/คะแนน/รหัสเข้าคลัง. Projection กรอง active enrolled subject ซ้ำ แยก practiceWork ออกจาก assignments และกำหนด completed=false เสมอ ไม่เพิ่ม pendingCountMap, urgentCount, doneCount, history หรือ calendarEvents
+- ตัวเรียงตรึง completed tier ไว้ท้ายในทั้งสองตัวกรองและทั้งสองทิศทาง; มอบหมายล่าสุดใช้ publishedAt ของคลัง (fallback createdAt สำหรับข้อมูลเก่า) ส่วนใกล้กำหนดส่งวางรายการไม่มีกำหนดไว้หลังงานมีวันส่งภายในกลุ่มที่ยังไม่เสร็จ และเรียงรายการไม่มีกำหนดตามเวลามอบหมายใหม่ก่อน ไม่มีการสร้างวันส่งให้คลัง
+- ถ้าโหลดคลังไม่ได้ แสดง error เล็กใน Card และยังคงงานปกติ ตัวกรองยังใช้พื้นที่กด 44px และอยู่แถวเดียวกันที่ 320px; คลังฟิสิกส์ใช้พื้นสีเดียวกับงานฟิสิกส์และสูงประมาณ 71px เทียบงานปกติ 79px ที่ viewport เดียวกันใน fixture
+- TypeScript, token lint, 259 test files / 3,355 tests และ production webpack build ผ่าน; Browser synthetic QA ตรวจ due/latest ทั้ง asc/desc, งานเสร็จท้ายทุกกรณี, มีแต่คลัง/ส่งงานปกติครบแล้ว/โหลดคลังล้มเหลว, สีวิชาและเส้นทางเข้า และ 320px ไม่ล้น. Next MCP ไม่มี compilation/runtime errors. ไม่ทดสอบ Auth-to-DB persistence/hosted Staging ในรอบนี้ตามขอบเขต local only; ไม่มี migration ใหม่, database mutation, push หรือ deploy
+
+
 ### กฎพื้นที่แกน Y และคลังฝึกฉบับกระชับ — 14 ตุลาคม 2026 (local only)
 
 - เจ้าของกำหนดเป็นกฎถาวรว่าทุกงาน UI ต้องประหยัดพื้นที่แกน Y โดยยังสวยงาม อ่านง่าย และใช้งานสะดวก บันทึกใน `AGENTS.md`, `.cursor/rules/vertical-space.mdc` แบบ alwaysApply และอ้างอิงจาก product-ui rule; ให้ตรวจความสูงจริงก่อน/หลัง และคงพื้นที่กด 44px

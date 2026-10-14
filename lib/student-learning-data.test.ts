@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildStudentLearningData, type LearningAssignment, type LearningSubmission } from '@/app/(app)/dashboard/_components/student-learning-data'
 import type { StudentClassroom } from '@/app/(app)/classrooms/_components/student-view'
+import { studentPracticeLibraryListItem } from '@/app/(app)/practice/_lib/student-landing-contract'
 
 const now = Date.parse('2026-10-14T10:00:00+07:00')
 const classrooms: StudentClassroom[] = [
@@ -77,8 +78,59 @@ describe('combined student learning data', () => {
     expect(data.pendingWork.at(-1)?.id).toBe('0')
     expect(data.urgentCount).toBe(15)
     expect(buildStudentLearningData({ classrooms: [], assignments: [], submissions: [], now })).toEqual({
-      classrooms: [], pendingCountMap: {}, pendingWork: [], completedWork: [], urgentCount: 0, doneCount: 0, calendarEvents: [], history: [],
+      classrooms: [], pendingCountMap: {}, pendingWork: [], completedWork: [], practiceWork: [], practiceError: null, urgentCount: 0, doneCount: 0, calendarEvents: [], history: [],
     })
+  })
+})
+
+describe('practice libraries in the learning summary', () => {
+  const library = studentPracticeLibraryListItem({ id: 'library', title: 'คลังฝึกฟิสิกส์', classroomId: 'blue',
+    classroomName: 'ชื่อเก่า', questionCount: 143, publishedAt: '2026-10-14T09:00:00+07:00', createdAt: '2026-10-01T09:00:00+07:00' })
+  it('keeps optional practice separate from task counts, grades, deadline urgency and calendar events', () => {
+    const a = assignment()
+    const base = build([a], [attempt(a, 9)])
+    const data = buildStudentLearningData({ classrooms, assignments: [a], submissions: [attempt(a, 9)],
+      practiceLibraries: [library], now })
+    expect(data.practiceWork[0]).toMatchObject({ kind: 'practice', completed: false, endAt: null,
+      assignedAt: library.publishedAt, questionCount: 143, classroom: classrooms[0] && { id: 'blue', name: classrooms[0].name, description: classrooms[0].description } })
+    for (const key of ['pendingWork', 'completedWork', 'pendingCountMap', 'urgentCount', 'doneCount', 'calendarEvents', 'history'] as const) {
+      expect(data[key]).toEqual(base[key])
+    }
+    expect(data.practiceWork[0]).not.toHaveProperty('previousScore')
+    expect(data.practiceWork[0]).not.toHaveProperty('submissionId')
+  })
+  it('deduplicates libraries and rejects rooms outside the roster, archived rooms and homerooms', () => {
+    const rooms = [...classrooms,
+      { ...classrooms[0], id: 'archived', status: 'archived' as const },
+      { ...classrooms[0], id: 'homeroom', classroom_type: 'homeroom' as const },
+    ]
+    const data = buildStudentLearningData({ classrooms: rooms, assignments: [], submissions: [], now,
+      practiceLibraries: [library, library, ...['outside', 'archived', 'homeroom'].map(classroomId => ({ ...library, id: classroomId, classroomId }))] })
+    expect(data.practiceWork.map(work => work.id)).toEqual(['library'])
+  })
+  it('uses creation time when an older published library has no publish time, and works with only libraries', () => {
+    const data = buildStudentLearningData({ classrooms, assignments: [], submissions: [], now,
+      practiceLibraries: [{ ...library, publishedAt: null }] })
+    expect(data.practiceWork[0].assignedAt).toBe(library.createdAt)
+    expect(data.pendingWork).toEqual([])
+    expect(data.completedWork).toEqual([])
+    expect(data.doneCount).toBe(0)
+    expect(data.calendarEvents).toEqual([])
+  })
+  it('does not infer completion or accept answer/score data from practice metadata', () => {
+    const unexpected = { ...library, completed: true, score: 10, answer: 'private', attemptCount: 143 }
+    const data = buildStudentLearningData({ classrooms, assignments: [], submissions: [], now, practiceLibraries: [unexpected] })
+    expect(data.practiceWork[0].completed).toBe(false)
+    expect(data.practiceWork[0]).not.toHaveProperty('score')
+    expect(data.practiceWork[0]).not.toHaveProperty('answer')
+    expect(data.practiceWork[0]).not.toHaveProperty('attemptCount')
+  })
+  it('retains normal work when practice loading fails', () => {
+    const data = buildStudentLearningData({ classrooms, assignments: [assignment()], submissions: [], now,
+      practiceError: 'โหลดคลังฝึกไม่สำเร็จ' })
+    expect(data.pendingWork).toHaveLength(1)
+    expect(data.practiceWork).toEqual([])
+    expect(data.practiceError).toBe('โหลดคลังฝึกไม่สำเร็จ')
   })
 })
 

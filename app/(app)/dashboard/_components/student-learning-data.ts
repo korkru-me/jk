@@ -5,6 +5,7 @@ import { rescaleToDisplayMax, selectOfficialAttempt } from '@/lib/scoring'
 import { canStudentReviewAnswers, canStudentViewScore } from '@/lib/result-visibility'
 import type { StudentClassroom } from '../../classrooms/_components/student-view'
 import type { CalendarEvent } from './assignment-calendar'
+import type { StudentPracticeLibraryListItem } from '../../practice/_lib/student-landing-contract'
 
 type WorkSettings = Pick<Assignment,
   'id' | 'classroom_id' | 'title' | 'type' | 'end_at' | 'duration_minutes' |
@@ -38,11 +39,25 @@ export type StudentWorkHistory = {
   score: { total: number | null; max: number } | null
   reviewLabel: string
 }
+export type StudentPracticeWorkItem = {
+  kind: 'practice'
+  id: string
+  title: string
+  classroom: Pick<StudentClassroom, 'id' | 'name' | 'description'>
+  otherClassroomNames: string[]
+  endAt: null
+  assignedAt: string | null
+  completed: false
+  questionCount: number
+}
+export type StudentSummaryItem = ({ kind: 'assignment' } & StudentWorkItem) | StudentPracticeWorkItem
 export type StudentLearningData = {
   classrooms: StudentClassroom[]
   pendingCountMap: Record<string, number>
   pendingWork: StudentWorkItem[]
   completedWork: StudentWorkItem[]
+  practiceWork: StudentPracticeWorkItem[]
+  practiceError: string | null
   urgentCount: number
   doneCount: number
   history: StudentWorkHistory[]
@@ -52,10 +67,12 @@ export type StudentLearningData = {
 /** Server-side projection: one completion rule for cards, summary and calendar.
  * Input rows must already be scoped to the authenticated student's memberships
  * and own submissions. Hidden scores are removed before rendering any props. */
-export function buildStudentLearningData({ classrooms, assignments, submissions, groupOf = new Map(), now = Date.now() }: {
+export function buildStudentLearningData({ classrooms, assignments, submissions, practiceLibraries = [], practiceError = null, groupOf = new Map(), now = Date.now() }: {
   classrooms: StudentClassroom[]
   assignments: LearningAssignment[]
   submissions: LearningSubmission[]
+  practiceLibraries?: StudentPracticeLibraryListItem[]
+  practiceError?: string | null
   groupOf?: ReadonlyMap<string, string>
   now?: number
 }): StudentLearningData {
@@ -112,9 +129,19 @@ export function buildStudentLearningData({ classrooms, assignments, submissions,
 
   const pendingWork = work.filter(item => !item.completed)
   const completedWork = work.filter(item => item.completed)
+  const practiceWork: StudentPracticeWorkItem[] = [...new Map(practiceLibraries.map(library => [library.id, library])).values()].flatMap(library => {
+    const classroom = classroomById.get(library.classroomId)
+    if (!classroom || classroom.status !== 'active' || classroom.classroom_type !== 'subject') return []
+    return [{
+      kind: 'practice', id: library.id, title: library.title,
+      classroom: { id: classroom.id, name: classroom.name, description: classroom.description },
+      otherClassroomNames: [], endAt: null, assignedAt: library.publishedAt ?? library.createdAt,
+      completed: false, questionCount: library.questionCount,
+    }]
+  })
 
   return {
-    classrooms: classrooms.filter(c => c.status === 'active'), pendingCountMap, pendingWork, completedWork,
+    classrooms: classrooms.filter(c => c.status === 'active'), pendingCountMap, pendingWork, completedWork, practiceWork, practiceError,
     urgentCount: pendingWork.filter(a => a.endAt && Date.parse(a.endAt) - now <= 3 * 86400000).length,
     doneCount: doneIds.size,
     calendarEvents: visibleAssignments.filter(a => a.end_at).map(a => ({

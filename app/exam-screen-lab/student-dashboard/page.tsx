@@ -6,6 +6,7 @@ import { buildStudentLearningData, type LearningAssignment, type LearningSubmiss
 import type { StudentClassroom } from '@/app/(app)/classrooms/_components/student-view'
 import { ShellClient } from '@/components/layout/shell-client'
 import { isExamScreenLabEnabled } from '@/lib/exam-screen-lab-access'
+import { studentPracticeLibraryListItem } from '@/app/(app)/practice/_lib/student-landing-contract'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'พื้นที่เรียนรู้ของฉัน · ตัวอย่าง — KorKru' }
@@ -65,6 +66,7 @@ export default async function StudentDashboardLabPage({ searchParams }: {
   if (scenario !== 'empty' && scenario !== 'leap') assignments.push({
     ...assignments[1], id: 'work-without-deadline', title: 'ทบทวนบทเรียน · ไม่มีกำหนดส่ง', end_at: null,
   })
+  if (scenario === 'practice-only') assignments.length = 0
   const submissions: LearningSubmission[] = assignments.flatMap(a => {
     if (scenario !== 'completed' && !['calendar-done', 'calendar-thai', 'calendar-physics'].includes(a.id)) return []
     const room = CLASSROOMS.find(c => c.id === a.classroom_id)!
@@ -75,7 +77,20 @@ export default async function StudentDashboardLabPage({ searchParams }: {
       created_at: '2026-10-13T16:00:00+07:00',
     }]
   })
-  const data = buildStudentLearningData({ classrooms, assignments, submissions, now: Date.parse(calendarNow) })
+  const practiceLibraries = scenario === 'empty' || scenario === 'practice-error' ? [] : [
+    studentPracticeLibraryListItem({
+      id: '91000000-0000-4000-8000-000000000001', title: 'แรงและการเคลื่อนที่ · ฝึกฟิสิกส์',
+      classroomId: CLASSROOMS[2].id, classroomName: CLASSROOMS[2].name, questionCount: 143,
+      publishedAt: '2026-10-14T09:00:00+07:00', createdAt: '2026-10-01T09:00:00+07:00',
+    }),
+    studentPracticeLibraryListItem({
+      id: '91000000-0000-4000-8000-000000000002', title: 'สมการและกราฟ · ฝึกคณิตศาสตร์',
+      classroomId: CLASSROOMS[1].id, classroomName: CLASSROOMS[1].name, questionCount: 48,
+      publishedAt: '2026-10-12T09:00:00+07:00', createdAt: '2026-10-10T09:00:00+07:00',
+    }),
+  ]
+  const data = buildStudentLearningData({ classrooms, assignments, submissions, practiceLibraries,
+    practiceError: scenario === 'practice-error' ? 'โหลดคลังฝึกไม่สำเร็จ' : null, now: Date.parse(calendarNow) })
 
   return (
     <ShellClient user={USER} initialUnreadCount={0} notificationsEnabled={false}>

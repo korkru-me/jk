@@ -24,3 +24,27 @@ it('reverses dated items while leaving unknown deadlines at the bottom', () => {
   expect(sortStudentWork(items, 'due', 'desc').map(w => w.id)).toEqual(['latest', 'soon', 'overdue', 'no-date'])
   expect(sortStudentWork(items, 'latest', 'asc').map(w => w.id)).toEqual(['overdue', 'soon', 'latest', 'no-date'])
 })
+
+it.each([['due', 'asc'], ['due', 'desc'], ['latest', 'asc'], ['latest', 'desc']] as const)(
+  'keeps completed tasks last for %s/%s while reusable libraries stay among active work', (order, direction) => {
+    const rows = [
+      { id: 'done-old', completed: true, endAt: '2026-01-01', assignedAt: '2026-01-01' },
+      { id: 'pending', completed: false, endAt: '2026-10-15', assignedAt: '2026-10-12' },
+      { id: 'practice', completed: false, endAt: null, assignedAt: '2026-10-14' },
+      { id: 'done-new', completed: true, endAt: '2027-01-01', assignedAt: '2027-01-01' },
+    ]
+    const result = sortStudentWork(rows, order, direction)
+    expect(result.slice(0, 2).map(work => work.id).sort()).toEqual(['pending', 'practice'])
+    expect(result.slice(2).every(work => work.completed)).toBe(true)
+    expect(rows[0].id).toBe('done-old')
+  },
+)
+it('orders undated items by their publication time in either deadline direction', () => {
+  const rows = [
+    { id: 'new', endAt: null, assignedAt: '2026-10-14' },
+    { id: 'old', endAt: null, assignedAt: '2026-10-01' },
+    { id: 'unknown', endAt: null, assignedAt: null },
+  ]
+  expect(sortStudentWork(rows, 'due', 'asc').map(work => work.id)).toEqual(['new', 'old', 'unknown'])
+  expect(sortStudentWork(rows, 'due', 'desc').map(work => work.id)).toEqual(['new', 'old', 'unknown'])
+})

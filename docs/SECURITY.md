@@ -90,6 +90,8 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 
 ## คลังฝึกไม่มีคะแนน
 
+- สรุปงานนักเรียนใช้ catalog loader ภายใต้ session/RLS เดิมหลัง Auth/student-role/feature-flag check. Allowlist มีเพียง library ID/title, classroom ID/name, จำนวนโจทย์ และเวลาสร้าง/เผยแพร่; projection ใช้ metadata ของห้องที่อยู่ใน roster และยัง active subject เท่านั้น. ไม่อ่าน/ส่ง attempt, answer, correctness, score หรือ access code และไม่ใช้สถานะฝึกเป็น completed/grade/calendar event. ไม่มี admin read หรือ RLS grant ใหม่สำหรับส่วนนี้
+
 - `practice_libraries`, `practice_library_questions` และ `practice_answer_attempts` เป็น security boundary แยกจาก assignment/submission; ห้ามใช้การซ่อนคะแนนใน UI แทนการแยก schema และห้ามเขียน accepted-check เข้า gradebook, analytics, homeroom score หรือ question statistics
 - server-only `PRACTICE_LIBRARY_ENABLED` คุมเพียงการเปิด route/navigation ค่า false ต้องตอบ 404/ซ่อนทางเข้า แต่ค่า true ไม่ให้สิทธิ์เพิ่ม ทุก page, Server Action และ RPC ต้องตรวจ session, role, exact organization, classroom relation และ resource ID ใหม่
 - owner และ co-teacher `admin/manage` จัดการคลังและอ่าน roster progress ได้ ครูร่วม `view` อ่านได้เฉพาะ metadata library และต้องถูกปฏิเสธเมื่อเปิด progress URL/RPC โดยตรง นักเรียนต้องอยู่ใน roster ของ exact classroom และ library ต้อง `published`
