@@ -45,16 +45,17 @@ async function uploadAnnouncementImage(original: File): Promise<string | null> {
   return supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl
 }
 
-export function AssignmentAnnouncementEditor({ value, onChange }: {
+export function AssignmentAnnouncementEditor({ value, onChange, rows }: {
   value: string
   onChange: (value: string) => void
+  rows?: number
 }) {
   return (
     <RichTextEditor
       value={value}
       onChange={onChange}
       placeholder="เช่น โปรดเตรียมเครื่องคิดเลข อ่านกติกาให้ครบ หรือแจ้งสิ่งที่ต้องทำก่อนเริ่ม"
-      rows={5}
+      rows={rows ?? 5}
       ariaLabel="ชี้แจงรายละเอียดเพิ่มเติม"
       images={{
         upload: uploadAnnouncementImage,

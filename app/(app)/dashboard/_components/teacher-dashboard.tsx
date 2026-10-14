@@ -1,27 +1,19 @@
 import Link from 'next/link'
 import {
-  ArrowLeftRight,
   BookOpen,
-  Boxes,
   ChevronRight,
-  FileText,
   Layers,
-  ListChecks,
-  ListOrdered,
-  NotebookPen,
-  Paperclip,
-  PenLine,
   Plus,
   School,
-  Table2,
-  TextCursorInput,
-  ToggleLeft,
 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { TYPE_LABEL } from '@/lib/question-display'
-import type { Classroom } from '@/lib/types'
+import { DashboardQuestionList, type QuestionPreviewLoader } from './dashboard-question-list'
+import type { QuestionCardRow } from '@/components/questions/question-card'
+import type { QuestionCardData } from '@/lib/question-card-data'
+import type { Classroom, QuestionSet } from '@/lib/types'
+import { QuestionSetCard } from '@/components/questions/question-set-card'
 import { ClassroomCard } from '@/app/(app)/classrooms/_components/classroom-card'
 
 /**
@@ -41,28 +33,15 @@ const CLASSROOM_ACCENT: Accent = {
 }
 
 const SET_ACCENT: Accent = {
-  chip: 'bg-tint-2/10 text-tint-2',
-  border: 'border-tint-2/25',
-  hover: 'hover:bg-tint-2/5',
+  chip: 'bg-primary/10 text-primary',
+  border: 'border-primary/25',
+  hover: 'hover:bg-primary/5',
 }
 
 const QUESTION_ACCENT: Accent = {
   chip: 'bg-tint-3/10 text-tint-3',
   border: 'border-tint-3/25',
   hover: 'hover:bg-tint-3/5',
-}
-
-const TYPE_ICON: Record<string, React.ElementType> = {
-  mcq: ListChecks,
-  written: PenLine,
-  essay: NotebookPen,
-  true_false: ToggleLeft,
-  fill_blank: TextCursorInput,
-  matching: ArrowLeftRight,
-  ordering: ListOrdered,
-  file_upload: Paperclip,
-  composite: Boxes,
-  classify: Table2,
 }
 
 export type DashboardClassroom = Pick<
@@ -77,15 +56,13 @@ export interface DashboardQuestionSet {
   id: string
   title: string
   questionCount: number
+  sections?: QuestionSet['sections']
 }
 
-export interface DashboardQuestion {
-  id: string
-  title: string
-  question_type: string
-}
+export type DashboardQuestion = QuestionCardRow
 
 interface Props {
+  currentUserId: string
   classroomsCount: number
   questionsCount: number
   setsCount: number
@@ -93,9 +70,13 @@ interface Props {
   classrooms: DashboardClassroom[]
   questionSets: DashboardQuestionSet[]
   questions: DashboardQuestion[]
+  questionCardData?: QuestionCardData
+  myTeams?: { id: string; name: string }[]
+  loadQuestionPreview?: QuestionPreviewLoader
 }
 
 export function TeacherDashboard({
+  currentUserId,
   classroomsCount,
   questionsCount,
   setsCount,
@@ -103,6 +84,9 @@ export function TeacherDashboard({
   classrooms,
   questionSets,
   questions,
+  questionCardData,
+  myTeams,
+  loadQuestionPreview,
 }: Props) {
   const isEmpty = classroomsCount === 0 && questionsCount === 0 && setsCount === 0
 
@@ -173,15 +157,20 @@ export function TeacherDashboard({
         emptyText="ยังไม่มีแฟ้มโจทย์"
         emptyAction={{ href: '/questions/sets/new', label: 'สร้างแฟ้มโจทย์แรก' }}
       >
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-3">
           {questionSets.map(set => (
-            <CompactResourceCard
+            <QuestionSetCard
               key={set.id}
-              href={`/questions/sets/${set.id}/edit`}
-              title={set.title}
-              meta={`${set.questionCount} ข้อ`}
-              icon={Layers}
-              accent={SET_ACCENT}
+              set={{
+                id: set.id,
+                title: set.title,
+                created_by: currentUserId,
+                sections: set.sections ?? [],
+                valid_question_count: set.questionCount,
+              }}
+              currentUserId={currentUserId}
+              backHref="/dashboard"
+              refreshAfterDelete
             />
           ))}
         </div>
@@ -197,18 +186,12 @@ export function TeacherDashboard({
         emptyText="ยังไม่มีโจทย์ในคลัง"
         emptyAction={{ href: '/questions/new', label: 'สร้างโจทย์แรก' }}
       >
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          {questions.map(question => (
-            <CompactResourceCard
-              key={question.id}
-              href={`/questions/${question.id}/edit`}
-              title={question.title}
-              meta={TYPE_LABEL[question.question_type] ?? question.question_type}
-              icon={TYPE_ICON[question.question_type] ?? FileText}
-              accent={QUESTION_ACCENT}
-            />
-          ))}
-        </div>
+        <DashboardQuestionList
+          questions={questions}
+          cardData={questionCardData}
+          myTeams={myTeams}
+          loadPreview={loadQuestionPreview}
+        />
       </DashboardSection>
     </div>
   )
@@ -306,35 +289,6 @@ function DashboardSection({
         </Card>
       ) : children}
     </section>
-  )
-}
-
-function CompactResourceCard({
-  href,
-  title,
-  meta,
-  icon: Icon,
-  accent,
-}: {
-  href: string
-  title: string
-  meta: string
-  icon: React.ElementType
-  accent: Accent
-}) {
-  return (
-    <Card radius="md" className={cn('overflow-hidden', accent.border)}>
-      <Link href={href} className={cn('flex min-h-20 items-center gap-3 p-3 transition-colors', accent.hover)}>
-        <span className={cn('flex size-10 shrink-0 items-center justify-center rounded-xl', accent.chip)}>
-          <Icon className="size-5" aria-hidden="true" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <strong className="block truncate text-sm">{title}</strong>
-          <span className="mt-0.5 block text-xs text-muted-foreground">{meta}</span>
-        </span>
-        <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-      </Link>
-    </Card>
   )
 }
 

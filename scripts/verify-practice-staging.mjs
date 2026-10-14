@@ -77,6 +77,7 @@ const runLabel = runId.replaceAll('-', '').slice(0, 12)
 const createdAccounts = []
 const questionIds = []
 let classroomId = null
+let secondClassroomId = null
 let libraryId = null
 let verified = false
 let deferredManifestPath = null
@@ -180,8 +181,8 @@ async function insertQuestions(ownerId, orgId) {
 
 async function cleanup() {
   let clean = true
-  if (classroomId) {
-    const removedClassroom = await admin.from('classrooms').delete().eq('id', classroomId)
+  for (const id of [classroomId, secondClassroomId].filter(Boolean)) {
+    const removedClassroom = await admin.from('classrooms').delete().eq('id', id)
     if (removedClassroom.error) clean = false
   }
   for (let start = 0; start < questionIds.length; start += 100) {
@@ -244,6 +245,17 @@ try {
     status: 'active',
     classroom_type: 'subject',
   }), 'Could not create synthetic classroom')
+  secondClassroomId = randomUUID()
+  successful(await admin.from('classrooms').insert({
+    id: secondClassroomId,
+    org_id: ownerOrgId,
+    teacher_id: owner.id,
+    name: `Practice QA second room ${runLabel}`,
+    description: 'Synthetic Staging UAT only',
+    class_code: `Q${runLabel.slice(0, 5).toUpperCase()}`,
+    status: 'active',
+    classroom_type: 'subject',
+  }), 'Could not create second synthetic classroom')
   successful(await admin.from('classroom_co_teachers').insert([
     { classroom_id: classroomId, user_id: coAdmin.id, permission: 'admin', invited_by: owner.id },
     { classroom_id: classroomId, user_id: coManage.id, permission: 'manage', invited_by: owner.id },
@@ -259,17 +271,61 @@ try {
   ]), 'Could not configure synthetic student profiles')
 
   await insertQuestions(owner.id, ownerOrgId)
-  const createdLibrary = await owner.client.rpc('create_practice_library', {
+  const createdLibrary = await owner.client.rpc('create_practice_libraries_for_classrooms', {
     p_org_id: ownerOrgId,
-    p_classroom_id: classroomId,
+    p_classroom_ids: [classroomId, secondClassroomId],
     p_title: `Practice QA ${runLabel} 1,000 questions`,
     p_description: 'Synthetic Staging UAT only',
     p_reveal_answer_key: false,
+    p_access_code: 'SYNTHETIC-QA',
+    p_calculator_enabled: true,
+    p_scratchpad_enabled: true,
+    p_shuffle_questions: false,
+    p_shuffle_options: true,
     p_question_ids: questionIds,
     p_publish: true,
   })
   libraryId = successful(createdLibrary, 'Could not create published practice library')
   assert(typeof libraryId === 'string', 'Practice library id was not returned')
+  const createdRooms = successful(await owner.client.from('practice_libraries')
+    .select('id, classroom_id, access_code, calculator_enabled, scratchpad_enabled, shuffle_questions, shuffle_options')
+    .in('classroom_id', [classroomId, secondClassroomId]), 'Could not read created room settings')
+  assert(createdRooms.length === 2 && createdRooms.some(row => row.id === libraryId
+    && row.classroom_id === classroomId), 'Multi-room creation did not return the primary library')
+  assert(createdRooms.every(row => row.access_code === 'SYNTHETIC-QA'
+    && row.calculator_enabled === true && row.scratchpad_enabled === true
+    && row.shuffle_questions === false && row.shuffle_options === true),
+  'Created practice settings were not persisted in both rooms')
+  for (const row of createdRooms) {
+    const memberships = await owner.client.from('practice_library_questions')
+      .select('question_id', { count: 'exact', head: true }).eq('library_id', row.id)
+    assert(!memberships.error && memberships.count === questionIds.length,
+      'Multi-room creation did not preserve every question in both rooms')
+  }
+  const compatibilityDraft = successful(await owner.client.rpc('create_practice_libraries_for_classrooms', {
+    p_org_id: ownerOrgId, p_classroom_ids: [classroomId],
+    p_title: `Practice QA compatibility ${runLabel}`, p_description: null,
+    p_reveal_answer_key: false, p_access_code: 'KEEP-QA',
+    p_calculator_enabled: true, p_scratchpad_enabled: false,
+    p_shuffle_questions: true, p_shuffle_options: false,
+    p_question_ids: [questionIds[0]], p_publish: false,
+  }), 'Could not create compatibility draft')
+  const oldEditorCount = successful(await coManage.client.rpc('update_practice_library_draft', {
+    p_library_id: compatibilityDraft, p_title: `Practice QA previous editor ${runLabel}`,
+    p_description: null, p_reveal_answer_key: true, p_question_ids: [questionIds[0]],
+  }), 'Previous editor could not save the compatibility draft')
+  assert(Number(oldEditorCount) === 1, 'Previous editor membership count was incorrect')
+  const oldEditorSettings = successful(await owner.client.from('practice_libraries')
+    .select('access_code, calculator_enabled, scratchpad_enabled, shuffle_questions, shuffle_options')
+    .eq('id', compatibilityDraft).single(), 'Could not read compatibility draft settings')
+  assert(oldEditorSettings.access_code === 'KEEP-QA' && oldEditorSettings.calculator_enabled === true
+    && oldEditorSettings.scratchpad_enabled === false && oldEditorSettings.shuffle_questions === true
+    && oldEditorSettings.shuffle_options === false, 'Previous editor overwrote new settings')
+  const deniedOldEditor = await coView.client.rpc('update_practice_library_draft', {
+    p_library_id: compatibilityDraft, p_title: 'Forbidden QA', p_description: null,
+    p_reveal_answer_key: false, p_question_ids: [questionIds[0]],
+  })
+  assert(deniedOldEditor.error?.code === '42501', 'View-only previous editor access was not denied')
 
   const anonymousRead = await anonymous.from('practice_libraries').select('id').eq('id', libraryId)
   assert(anonymousRead.error?.code === '42501', 'Anonymous practice read was not denied')
@@ -434,6 +490,7 @@ try {
       runId,
       runLabel,
       classroomId,
+      secondClassroomId,
       libraryId,
       questionIds,
       accounts: createdAccounts.map(account => ({
@@ -458,6 +515,8 @@ try {
     elapsedMs: Number(elapsedMs.toFixed(2)),
     checks: [
       'authenticated role matrix',
+      'multi-classroom creation with 1,000 questions and persisted settings',
+      'previous editor compatibility preserves settings and permissions',
       'tag AND plus pagination',
       'idempotent append-only progress',
       'student progress isolation',

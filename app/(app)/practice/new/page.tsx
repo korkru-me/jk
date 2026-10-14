@@ -14,6 +14,7 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty'
 import { PracticeLibraryForm } from '../_components/practice-library-form'
+import type { AssignmentQuestionSetOption } from '@/components/assignments/create-assignment-form'
 import {
   authenticatePracticeTeacher,
   loadManageablePracticeClassrooms,
@@ -38,9 +39,14 @@ export default async function NewPracticeLibraryPage({
     redirect('/dashboard')
   }
 
-  const [{ classrooms, error: classroomError }, bank] = await Promise.all([
+  const [{ classrooms, error: classroomError }, bank, { data: questionSets }] = await Promise.all([
     loadManageablePracticeClassrooms(supabase, actor.userId),
     loadSupportedPracticeBankQuestions(supabase, actor.userId),
+    supabase
+      .from('question_sets')
+      .select('id, title, description, question_ids, sections')
+      .eq('created_by', actor.userId)
+      .order('created_at', { ascending: false }),
   ])
   const query = await searchParams
   const requestedClassroom = Array.isArray(query.classroom)
@@ -84,6 +90,7 @@ export default async function NewPracticeLibraryPage({
     <PracticeLibraryForm
       classrooms={classrooms}
       questions={bank.questions}
+      questionSets={(questionSets ?? []) as AssignmentQuestionSetOption[]}
       initialClassroomId={requestedClassroom}
     />
   )

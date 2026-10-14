@@ -50,8 +50,8 @@
 
 ## 1. Feature flag และทางเข้า
 
-- [ ] เมื่อ flag ปิด sidebar เมนูมอบหมาย และตัวเลือกสร้างงานไม่มี “คลังฝึก”; เปิด URL ตรงแล้ว 404 โดยไม่เปิดข้อมูล
-- [ ] เมื่อ flag เปิด ครูเห็น “คลังฝึก · ไม่มีคะแนน” และลิงก์ไป `/practice` หรือ `/practice/new?classroom=<uuid>`; `AssignmentType` ยังมีเฉพาะ `exercise|exam`
+- [ ] เมื่อ flag ปิด เมนูมอบหมายและตัวเลือกสร้างงานไม่มี “คลังฝึก”; เปิด URL ตรงแล้ว 404 โดยไม่เปิดข้อมูล
+- [ ] เมื่อ flag เปิด sidebar หลักไม่มี “คลังฝึก” และครูเห็น “คลังฝึก” เฉพาะทางเข้าสร้างงานภายในห้องเรียน ซึ่งลิงก์ไป `/practice/new?classroom=<uuid>`; `AssignmentType` ยังมีเฉพาะ `exercise|exam`
 - [ ] นักเรียนไม่เห็นเมนูจัดการของครู และทุก route ยังตรวจสิทธิ์แม้แก้ URL เอง
 
 ## 2. เส้นทางครู
@@ -64,6 +64,7 @@
 
 ## 3. เส้นทางนักเรียน
 
+- [ ] เปิด `/practice/[id]` แล้วเห็นหน้ารอก่อนรายการโจทย์; หน้ารอไม่สร้าง event/รอบทำ ไม่โหลด input คำตอบ และปุ่ม “เข้าคลังฝึก” พาไป `/practice/[id]/library`
 - [ ] เห็นเฉพาะคลัง `published` ของห้องที่ยังเป็นสมาชิก; `draft`, `closed`, ห้องอื่น, student ID อื่น และการถอน roster ถูกปฏิเสธ
 - [ ] ค้นชื่อ/ข้อความร่วมกับ `สอวน. ค่าย 1` + `ไฟฟ้า` แล้วได้เฉพาะโจทย์ที่มีครบทั้งสองแท็ก; เพิ่มแท็กทำให้ผลเท่าเดิมหรือน้อยลง ลบ chip/ล้างทั้งหมดได้
 - [ ] reload/back คืน `q`, tag ซ้ำ, page และตำแหน่งรายการเดิม ผลไม่ซ้ำ/หายข้ามหน้า
@@ -105,3 +106,11 @@
 - [x] อนุมัติให้เปิด Production flag แบบจำกัด
 
 ผู้อนุมัติ / วันที่ / หมายเหตุ: เจ้าของผลิตภัณฑ์ / 13 ตุลาคม 2026 / อนุมัติให้ดันขึ้นเว็บจริงเพื่อเริ่มทดลองใช้งานส่วนนี้ โดยห้ามสร้างข้อมูล QA สังเคราะห์บน Production
+
+### Production and local synchronization - 14 October 2026
+
+- The owner authorized synchronizing the completed local source with Production and restoring practice creation. The release includes the committed learning-home changes through `db11c22`, including the completed compact student-classroom and assignment-card changes. The local working tree was clean at this release snapshot.
+- Staging and Production now have `20261014040543_practice_multi_classroom_creation`, `20261014042628_practice_library_settings`, and `20261014043342_practice_draft_backward_compatibility`. The first two SQL files are byte-identical to their original CLI-created files; their canonical filenames now follow the recorded Staging version and dependency order. No migration repair/revert/reset or deferred SEB migration was used.
+- Authenticated Staging gate passed eight synthetic roles, two rooms with 1,000 questions each, persisted settings, previous-editor compatibility, denied view-only permissions, search/pagination, append idempotency, and progress isolation. Cleanup passed. Latest measured search returned 24 of 500 exact tag-AND matches, 5,824 bytes in 162.26ms.
+- Production was updated only after that gate. Isolated post-apply dry-run is up-to-date and database lint at error level passed. All creator/editor function definition hashes, signatures, security modes and fixed search paths match the tested Staging database; all five settings columns exist. Production verification was read-only; no synthetic accounts or practice rows were created there.
+- The final integrated source passed TypeScript, token lint, 242 Vitest files / 3,221 tests, and webpack production build. Local practice signing uses a separate untracked key. Website deployment/alias verification is the remaining rollout step.

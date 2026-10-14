@@ -50,6 +50,10 @@ App shell มี contextual sidebar registry ฝั่ง client ที่ผู
 
 ## Runtime boundaries
 
+“โจทย์ล่าสุด” ของครูใช้ `DashboardQuestionList` เป็น client wrapper ของ `QuestionCard` เดิม โดย server อ่านข้อมูลสรุปของ 5 โจทย์ล่าสุดและใช้ `getQuestionCardData` เดิมอ่านสถิติ/จำนวนข้อย่อย/แฟ้ม/เฉลยเฉพาะ id ที่แสดง พร้อมทีมจาก membership ภายใต้ session/RLS; รายละเอียดโจทย์และเฉลยโหลดเมื่อเปิดดูเท่านั้น · `question-return` รองรับ marker `dashboard=1` ใน `from` และยอมให้ redirect ไป `/dashboard` ที่ตรงตัวเท่านั้น เมื่อแก้ไขหรือยกเลิกจึงกลับหน้าหลักได้โดยไม่เพิ่ม arbitrary redirect
+
+การ์ดแฟ้มโจทย์ใช้ Client Component กลาง `components/questions/question-set-card.tsx` ร่วมกันในคลังและหน้าหลักครู โดยครูยังโหลดรายการล่าสุด/ยอดรวมฝั่ง server; query เพิ่ม `sections` จากแถวเดิมเพื่อแสดงจำนวนแฟ้มย่อย การดาวน์โหลด/ลบเรียก Server Actions เดิมภายใต้ session/RLS เดิม และหน้าหลักรีเฟรช server data หลังลบสำเร็จ · drag handle เป็น optional slot เฉพาะคลัง ไม่เพิ่ม DnD ลงหน้าหลัก
+
 ตาม UI-014/UI-018 (6 ต.ค. 2026) ตัวแถบ `Sidebar` ของ app shell ใช้ `transition-none` แทน width/transform 200ms ทั้งการย่อเป็น icon rail บน desktop และเปิด/ปิด drawer บนมือถือ ปุ่มที่เปลี่ยนความสูง/padding ระหว่าง full/compact ใน contextual sidebar ใช้ `transition-colors` แทน `transition-all` เฉพาะตำแหน่งนั้น เพื่อให้ตำแหน่งไอคอนตามแกน Y เปลี่ยนพร้อมตัวแถบในเฟรมเดียวโดยยังคง color feedback การเปลี่ยนนี้เป็น CSS display-only ไม่เพิ่ม timer/request และไม่เปลี่ยน state persistence, registry หรือ authorization
 
 ตาม UI-025 เมื่อ sidebar อยู่ในสถานะย่อบน desktop หน้า `/assignments/new` จะขยายกรอบสร้างงานไปทางซ้ายเท่ากับพื้นที่ sidebar ที่คืนมา (`w-64` → `w-20`) โดยตรึงขอบขวาไว้ตำแหน่งเดิม; ใช้ marker `assignment-create-stage` เพื่อจำกัดพฤติกรรมไว้เฉพาะหน้าสร้างงาน ไม่จัดกึ่งกลาง direct child อื่นของ `<main>` แบบเหมารวม และ mobile drawer ไม่รับกฎนี้
@@ -116,8 +120,8 @@ Vercel รันโค้ดฝั่ง server ด้วยเขตเวล�
 1. Server อ่าน `PRACTICE_LIBRARY_ENABLED` แล้วส่งเพียง boolean presentation gate เข้า app shell; sidebar และทางเข้าสร้างจึงไม่อ่าน environment ฝั่ง browser ค่า flag ไม่ใช่สิทธิ์ และ route/action/RPC ยังตรวจ authorization ทุกครั้ง
 2. ทางเข้าจากเมนูมอบหมายลิงก์ตรงไป `/practice/new?classroom=<uuid>` โดยไม่เพิ่มค่าใน `AssignmentType`; lifecycle และตารางของคลังฝึกไม่แตะ assignment/submission
 3. หน้าครู `/practice`, `/practice/new`, `/practice/[id]/edit` ใช้ session-bound client และตรวจเจ้าของห้องหรือ co-teacher `admin/manage`; create/update/duplicate/reorder เป็น RPC แบบ atomic ส่วน owner-private membership เดิมอ่านผ่าน service-only manager RPC ที่ผูก exact actor + library โดยไม่ขยายให้ครูร่วมอ่านคลังส่วนตัวทั้งก้อน
-4. หน้านักเรียน `/practice/[id]` รับ `q`, `tag` ซ้ำ และ `page` ที่ validate แล้ว แล้วเรียก `search_practice_library_questions` หนึ่งครั้งต่อหน้าเพื่อกรองคำค้น + exact multi-tag AND, รวม attempt count และ total ก่อนส่ง allowlisted list DTO 24 แถว; answer-bearing field ไม่อยู่ใน initial RSC payload
-5. หน้ารายข้อใช้ `get_practice_question_for_student` ตรวจ published library, roster และ exact membership ใน statement เดียว จากนั้นสุ่ม/ประเมินคำตอบผ่าน server boundary; browser ส่งคำตอบกับ UUID idempotency key และรับเฉพาะ feedback ของ request ตนเอง ใบรับรองพกเพียง nonce กับ keyed binding ไม่พก seed หรือ raw question revision และ server อนุมาน seed ด้วย HMAC หลังตรวจลายเซ็น
+4. หน้านักเรียน `/practice/[id]` ตรวจรหัสผ่านฝั่ง server เมื่อคลังกำหนดไว้ แล้วออก signed HttpOnly session อายุสั้นก่อนอนุญาต `/library` และหน้ารายข้อ; รหัสจริงไม่อยู่ใน DTO จากนั้นรับ `q`, `tag` ซ้ำ และ `page` ที่ validate แล้ว และเรียก `search_practice_library_questions` หนึ่งครั้งต่อหน้าเพื่อกรองคำค้น + exact multi-tag AND, รวม attempt count/total และใช้ลำดับคงที่ต่อนักเรียนเมื่อเปิด `shuffle_questions` ก่อนส่ง allowlisted list DTO 24 แถว
+5. หน้ารายข้อใช้ `get_practice_question_for_student` ตรวจ published library, roster และ exact membership ใน statement เดียว จากนั้นสุ่ม/ประเมินคำตอบผ่าน server boundary; `shuffle_options` ถูกผูกใน signed question revision เครื่องคิดเลขโหลดเมื่อกดใช้ และกระดาษทดเก็บใน IndexedDB ของเครื่องโดยไม่มีทางแนบส่ง browser ส่งคำตอบกับ UUID idempotency key และรับเฉพาะ feedback ของ request ตนเอง ใบรับรองพกเพียง nonce กับ keyed binding ไม่พก seed หรือ raw question revision และ server อนุมาน seedด้วย HMAC หลังตรวจลายเซ็น
 6. หน้าความคืบหน้า `/practice/[id]/progress` และ `/practice/[id]/progress/[studentId]` ใช้ aggregate RPC แบบแบ่งหน้า 50 แถว รวม append-only event เป็น DTO เฉพาะชื่อ/เลขที่ จำนวนข้อที่เคยตอบ จำนวนครั้ง ชื่อโจทย์และแท็ก ไม่ query raw answer table ของ assignment และไม่มี ranking/default sort ตามจำนวน
 7. คำตอบจับคู่ใน practice ใช้ ephemeral token ที่สร้างจาก `right_text + right_image` ที่นักเรียนเห็น ไม่พก authored index จึงรองรับตัวเลือกที่มีเฉพาะรูปโดยไม่เผย mapping; รูปแบบ `right_text[]` ของ assignment/exam เดิมไม่เปลี่ยน และไม่ต้องมี migration เพิ่ม
 8. query ของคลัง/นักเรียน/progress ต้องอยู่ภายใต้ `org_id` + classroom relation เสมอ; admin client ใช้ได้หลัง server authorization และจำกัด exact IDs เท่านั้น ไม่ใช้ขยายการค้น roster
@@ -292,3 +296,15 @@ npm run build
 ```
 
 สำหรับ auth/RLS/grading ต้องทดสอบด้วยหลายบทบาทและข้อมูลคนละ organization ไม่ใช่ทดสอบเฉพาะ happy path
+
+## Student learning home
+
+- Student `/dashboard` composes `StudentView`, `StudentWorkSummary`, recent announcements and `AssignmentCalendar`; the student sidebar calls it **พื้นที่เรียนรู้ของฉัน**. Teacher dashboard rendering stays on the existing role branch. Student `/classrooms` redirects to the classroom anchor (preserving the join code), and `/my-submissions` redirects to the summary anchor after session verification.
+- Server reads are scoped to the verified student's own roster rows and submissions; published work uses enrolled `assignment_classrooms` links and existing group reach rules. The pure `buildStudentLearningData` projection shares the summary page's official-attempt, display-score, passing and visibility helpers across pending badges, work rows and calendar events. It removes hidden score values from presentation props and derives classroom themes from reachable classroom IDs. History remains per attempt; done totals remain per assignment.
+- The synthetic, environment-gated `/exam-screen-lab/student-dashboard` renders the same projection/components without database access. Joining or leaving a classroom revalidates `/dashboard` as well as the classroom list. No schema change is involved.
+
+## Student classroom presentation
+
+- Subject and homeroom student views share `StudentClassroomHeader`, using the teacher's saved cover preset, icon and pattern metadata. The student return link uses the existing validated `back` helper and falls back to the classroom anchor on the combined learning home.
+- `AssignmentList` keeps status/type/category filtering local. Its whole-card links use the pure `studentAssignmentCardState` projection to choose the existing take or submission route, preserve unfinished retries independently of the official attempt, enforce attempt/completion presentation rules, and gate displayed scores with the shared result-visibility helpers. The server's membership, group, scoring and submission queries stay unchanged.
+- The environment-gated `/exam-screen-lab/student-classroom` uses synthetic props and read-only fixture detail links; announcement seen tracking is disabled and no exam start/submit or database access is involved.

@@ -12,7 +12,7 @@ import {
 import {
   canManagePracticeLibrary,
   BULK_UPDATE_PRACTICE_QUESTION_TAGS_RPC,
-  CREATE_PRACTICE_LIBRARY_RPC,
+  CREATE_PRACTICE_LIBRARIES_FOR_CLASSROOMS_RPC,
   DUPLICATE_PRACTICE_LIBRARY_RPC,
   UPDATE_PRACTICE_LIBRARY_DRAFT_RPC,
   isUuid,
@@ -41,6 +41,7 @@ import {
   loadManagedPracticeQuestionRows,
   type ManagedPracticeQuestionRow,
 } from './_lib/teacher-data'
+import { sanitizeRichTextForStorage } from '@/lib/rich-text-sanitize'
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
 
@@ -96,22 +97,32 @@ async function validatePracticeQuestions(
   return null
 }
 
-async function createLibraryRow(input: {
+async function createLibraryRows(input: {
   supabase: SupabaseServerClient
   orgId: string
-  classroomId: string
+  classroomIds: string[]
   title: string
   description: string
   revealAnswerKey: boolean
+  accessCode: string | null
+  calculatorEnabled: boolean
+  scratchpadEnabled: boolean
+  shuffleQuestions: boolean
+  shuffleOptions: boolean
   questionIds: string[]
   publish: boolean
 }): Promise<PracticeLibraryActionResult> {
-  const result = await input.supabase.rpc(CREATE_PRACTICE_LIBRARY_RPC, {
+  const result = await input.supabase.rpc(CREATE_PRACTICE_LIBRARIES_FOR_CLASSROOMS_RPC, {
     p_org_id: input.orgId,
-    p_classroom_id: input.classroomId,
+    p_classroom_ids: input.classroomIds,
     p_title: input.title,
     p_description: input.description || null,
     p_reveal_answer_key: input.revealAnswerKey,
+    p_access_code: input.accessCode,
+    p_calculator_enabled: input.calculatorEnabled,
+    p_scratchpad_enabled: input.scratchpadEnabled,
+    p_shuffle_questions: input.shuffleQuestions,
+    p_shuffle_options: input.shuffleOptions,
     p_question_ids: input.questionIds,
     p_publish: input.publish,
   })
@@ -137,28 +148,40 @@ export async function createPracticeLibrary(
 
   const context = await actionContext()
   if (!context.ok) return context.result
-  const classroom = await loadPracticeClassroomAccess(
-    context.supabase,
-    context.userId,
-    parsed.data.classroomId,
-  )
-  if (!classroom || !canManagePracticeLibrary(classroom.access)) return failure(FORBIDDEN)
-  if (!isEligiblePracticeClassroom({
+  const classrooms = await Promise.all(parsed.data.classroomIds.map(classroomId => (
+    loadPracticeClassroomAccess(context.supabase, context.userId, classroomId)
+  )))
+  if (classrooms.some(classroom => !classroom || !canManagePracticeLibrary(classroom.access))) {
+    return failure(FORBIDDEN, { classroomIds: ['มีห้องเรียนที่คุณไม่มีสิทธิ์จัดการ'] })
+  }
+  const managedClassrooms = classrooms.filter((classroom): classroom is NonNullable<typeof classroom> => Boolean(classroom))
+  if (managedClassrooms.some(classroom => !isEligiblePracticeClassroom({
     status: classroom.status,
     classroomType: classroom.classroom_type,
-  })) {
+  }))) {
     return failure('สร้างคลังฝึกได้เฉพาะในห้องเรียนรายวิชาที่เปิดใช้งาน')
+  }
+  const orgId = managedClassrooms[0]?.org_id
+  if (!orgId || managedClassrooms.some(classroom => classroom.org_id !== orgId)) {
+    return failure('เลือกห้องเรียนจากองค์กรเดียวกันเท่านั้น', {
+      classroomIds: ['ห้องเรียนทั้งหมดต้องอยู่ในองค์กรเดียวกัน'],
+    })
   }
   const questionError = await validatePracticeQuestions(context.supabase, parsed.data.questionIds)
   if (questionError) return failure(questionError, { questionIds: [questionError] })
 
-  return createLibraryRow({
+  return createLibraryRows({
     supabase: context.supabase,
-    orgId: classroom.org_id,
-    classroomId: classroom.id,
+    orgId,
+    classroomIds: managedClassrooms.map(classroom => classroom.id),
     title: parsed.data.title,
-    description: parsed.data.description,
+    description: sanitizeRichTextForStorage(parsed.data.description.trim()),
     revealAnswerKey: parsed.data.revealAnswerKey,
+    accessCode: parsed.data.accessCode,
+    calculatorEnabled: parsed.data.calculatorEnabled,
+    scratchpadEnabled: parsed.data.scratchpadEnabled,
+    shuffleQuestions: parsed.data.shuffleQuestions,
+    shuffleOptions: parsed.data.shuffleOptions,
     questionIds: parsed.data.questionIds,
     publish: parsed.data.intent === 'publish',
   })
@@ -179,6 +202,7 @@ export async function updatePracticeLibrary(
     parsed.data.libraryId,
   )
   if (!loaded?.canManage) return failure(FORBIDDEN)
+  const description = sanitizeRichTextForStorage(parsed.data.description.trim())
 
   const currentMembership = await loadPracticeLibraryQuestionIds(context.supabase, loaded.library.id)
   if (currentMembership.error) return failure(currentMembership.error)
@@ -201,8 +225,13 @@ export async function updatePracticeLibrary(
     const result = await context.supabase.rpc(UPDATE_PRACTICE_LIBRARY_DRAFT_RPC, {
       p_library_id: loaded.library.id,
       p_title: parsed.data.title,
-      p_description: parsed.data.description || null,
+      p_description: description || null,
       p_reveal_answer_key: parsed.data.revealAnswerKey,
+      p_access_code: parsed.data.accessCode,
+      p_calculator_enabled: parsed.data.calculatorEnabled,
+      p_scratchpad_enabled: parsed.data.scratchpadEnabled,
+      p_shuffle_questions: parsed.data.shuffleQuestions,
+      p_shuffle_options: parsed.data.shuffleOptions,
       p_question_ids: parsed.data.questionIds,
     })
     const savedCount = typeof result.data === 'number' ? result.data : Number(result.data)
@@ -215,8 +244,13 @@ export async function updatePracticeLibrary(
       .from('practice_libraries')
       .update({
         title: parsed.data.title,
-        description: parsed.data.description || null,
+        description: description || null,
         reveal_answer_key: parsed.data.revealAnswerKey,
+        access_code: parsed.data.accessCode,
+        calculator_enabled: parsed.data.calculatorEnabled,
+        scratchpad_enabled: parsed.data.scratchpadEnabled,
+        shuffle_questions: parsed.data.shuffleQuestions,
+        shuffle_options: parsed.data.shuffleOptions,
       })
       .eq('id', loaded.library.id)
       .select('id')
@@ -226,6 +260,7 @@ export async function updatePracticeLibrary(
 
   revalidatePath('/practice')
   revalidatePath(`/practice/${loaded.library.id}`)
+  revalidatePath(`/practice/${loaded.library.id}/library`)
   revalidatePath(`/practice/${loaded.library.id}/edit`)
   return { ok: true, id: loaded.library.id }
 }
@@ -273,6 +308,7 @@ async function transitionPracticeLibrary(
 
   revalidatePath('/practice')
   revalidatePath(`/practice/${loaded.library.id}`)
+  revalidatePath(`/practice/${loaded.library.id}/library`)
   revalidatePath(`/practice/${loaded.library.id}/edit`)
   return { ok: true, id: loaded.library.id }
 }
@@ -411,6 +447,7 @@ export async function updatePracticeQuestionTags(
 
   revalidatePath('/questions')
   revalidatePath(`/practice/${loaded.library.id}`)
+  revalidatePath(`/practice/${loaded.library.id}/library`)
   revalidatePath(`/practice/${loaded.library.id}/edit`)
   return { ok: true, id: loaded.library.id }
 }

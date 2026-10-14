@@ -1,10 +1,10 @@
 import Link from 'next/link'
-import { ChevronLeft, GraduationCap, Users, Home } from 'lucide-react'
+import { ChevronLeft, Users } from 'lucide-react'
 import { ClassroomStream } from './classroom-stream'
 import { AssignmentCalendar, type CalendarEvent } from '@/app/(app)/dashboard/_components/assignment-calendar'
 import type { Classroom, ClassroomPost } from '@/lib/types'
 import { Card } from '@/components/ui/card'
-import { displayDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
+import { StudentClassroomHeader } from './student-classroom-header'
 
 interface Classmate { id: string; full_name: string }
 
@@ -18,45 +18,24 @@ interface Props {
   complianceSubmitted: number
   complianceTotal: number
   posts: ClassroomPost[]
+  backHref?: string
+  trackSeen?: boolean
 }
 
 export function HomeroomStudentView({
   classroom, teacherName, studentCount, classmates,
-  calendarEvents, complianceRate, complianceSubmitted, complianceTotal, posts,
+  calendarEvents, complianceRate, complianceSubmitted, complianceTotal, posts, backHref = '/dashboard#classrooms', trackSeen = true,
 }: Props) {
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="flex min-w-0 max-w-5xl flex-col gap-4">
       <Link
-        href="/classrooms"
+        href={backHref}
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
       >
-        <ChevronLeft className="w-4 h-4" /> ห้องเรียนทั้งหมด
+        <ChevronLeft className="w-4 h-4" /> ห้องเรียนของฉัน
       </Link>
 
-      {/* Header card — deliberately themed like the teacher-side homeroom
-          header so students recognize this as their advisory class, not a
-          subject classroom. */}
-      <div className="bg-gradient-to-br from-slate-800 via-slate-800 to-indigo-900 rounded-2xl p-6 text-white">
-        <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-primary mb-1.5">
-          <Home className="w-3 h-3" /> ครูที่ปรึกษาประจำชั้น
-        </p>
-        <h1 className="text-2xl font-bold leading-tight">{classroom.name}</h1>
-        {displayDescription(classroom.description) && (
-          <p className="text-white/50 text-sm mt-1">{displayDescription(classroom.description)}</p>
-        )}
-        <div className="flex items-center gap-5 mt-4 flex-wrap text-sm">
-          <div className="flex items-center gap-2">
-            <GraduationCap className="w-4 h-4 text-white/50" />
-            <span className="text-white/50">ครูที่ปรึกษา:</span>
-            <span className="font-medium">{teacherName}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Users className="w-4 h-4 text-white/50" />
-            <span className="font-semibold">{studentCount}</span>
-            <span className="text-white/50">คนในห้องนี้</span>
-          </div>
-        </div>
-      </div>
+      <StudentClassroomHeader classroom={classroom} teacherName={teacherName} studentCount={studentCount} />
 
       {/* Personal compliance — visible only to this student, never to classmates */}
       <Card padding="lg">
@@ -116,7 +95,7 @@ export function HomeroomStudentView({
         variant="panel"
         maxHeightClass="max-h-[680px]"
         title="ประกาศจากครูที่ปรึกษา"
-        trackSeen
+        trackSeen={trackSeen}
       />
     </div>
   )

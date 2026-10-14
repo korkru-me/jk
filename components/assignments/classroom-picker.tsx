@@ -23,6 +23,9 @@ interface Props {
   classrooms: AssignmentClassroomOption[]
   selectedIds: string[]
   onToggle: (id: string) => void
+  /** Noun used in the contextual helper copy. Assignment keeps the default;
+   *  other classroom-scoped work can reuse the same interaction accurately. */
+  itemNoun?: string
   /** The room the teacher came from. It stays selected while other rooms are
    *  tucked behind an explicit "assign elsewhere too" disclosure. */
   primaryClassroomId?: string
@@ -54,6 +57,7 @@ export function ClassroomPicker({
   classrooms,
   selectedIds,
   onToggle,
+  itemNoun = 'งาน',
   primaryClassroomId,
   outsideClickBoundaryRef,
 }: Props) {
@@ -68,9 +72,8 @@ export function ClassroomPicker({
       const container = outsideClickBoundaryRef?.current ?? containerRef.current
       const target = event.target
       if (!container || !(target instanceof Node)) return
-      // Selecting a room moves its row to the top. Keep the disclosure open
-      // even if React moves or replaces the original target before bubbling
-      // reaches this document listener.
+      // Treat clicks inside the picker as internal even if React replaces
+      // the original target before this document listener runs.
       if (container.contains(target) || event.composedPath().includes(container)) return
       setOpen(false)
     }
@@ -106,11 +109,11 @@ export function ClassroomPicker({
   const selectableRows = primaryRow
     ? rows.filter(row => row.classroom.id !== primaryRow.classroom.id)
     : rows
-  // Picked rooms stay at the top and stay visible even when the search would
-  // hide them: this field decides who sits the งาน, so what is already chosen
-  // must never scroll — or filter — out of sight where it cannot be undone.
+  // Keep the original classroom order when toggling selection. Chosen rooms
+  // still stay visible when they do not match the search, so they can be undone.
   const selectedRows = selectableRows.filter(r => picked.has(r.classroom.id))
-  const otherRows = selectableRows.filter(r => !picked.has(r.classroom.id) && (!term || r.haystack.includes(term)))
+  const matchingRows = selectableRows.filter(r => !term || r.haystack.includes(term))
+  const visibleRows = selectableRows.filter(r => picked.has(r.classroom.id) || !term || r.haystack.includes(term))
 
   const classroomList = (
     <>
@@ -128,26 +131,16 @@ export function ClassroomPicker({
 
       {term && (
         <p className="text-xs text-muted-foreground">
-          พบ {otherRows.length} ห้อง จากทั้งหมด {selectableRows.length} ห้อง
+          พบ {matchingRows.length} ห้อง จากทั้งหมด {selectableRows.length} ห้อง
         </p>
       )}
 
       <div className="flex max-h-64 flex-col gap-2 overflow-y-auto pr-1">
-        {selectedRows.map(row => (
-          <ClassroomRow key={row.classroom.id} row={row} selected onToggle={onToggle} />
+        {visibleRows.map(row => (
+          <ClassroomRow key={row.classroom.id} row={row} selected={picked.has(row.classroom.id)} onToggle={onToggle} />
         ))}
 
-        {!primaryRow && selectedRows.length > 0 && otherRows.length > 0 && (
-          <p className="px-1 pt-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-            ห้องเรียนอื่น
-          </p>
-        )}
-
-        {otherRows.map(row => (
-          <ClassroomRow key={row.classroom.id} row={row} selected={false} onToggle={onToggle} />
-        ))}
-
-        {otherRows.length === 0 && term && (
+        {matchingRows.length === 0 && term && (
           <p className="py-4 text-center text-xs text-muted-foreground">
             ไม่พบห้องเรียนที่ตรงกับ “{query.trim()}”
           </p>
@@ -174,7 +167,7 @@ export function ClassroomPicker({
               <span data-assignment-description className="text-xs font-normal text-muted-foreground">
                 {selectedRows.length > 0
                   ? `เลือกเพิ่มแล้ว ${selectedRows.length} ห้องเรียน`
-                  : 'หากไม่เลือกเพิ่ม งานจะอยู่ในห้องนี้เท่านั้น'}
+                  : `หากไม่เลือกเพิ่ม ${itemNoun}จะอยู่ในห้องนี้เท่านั้น`}
               </span>
             </span>
             <ChevronDown className="size-4 shrink-0 transition-transform group-data-panel-open:rotate-180" aria-hidden="true" />

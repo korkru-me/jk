@@ -30,7 +30,7 @@ import {
 import type { Question } from '@/lib/types'
 
 import { questionExcerpt } from '@/lib/question-display'
-import { questionEditHref, RETURN_SET_PARAM } from '@/lib/question-return'
+import { questionEditHref, RETURN_SET_PARAM, RETURN_DASHBOARD_PARAM } from '@/lib/question-return'
 
 /**
  * The row a full card draws from.
@@ -114,11 +114,13 @@ interface Props {
   hasSolution?: boolean
   /** Present only when the card is listed inside one แฟ้ม. See the type. */
   setContext?: QuestionCardSetContext
+  /** Recent questions return to home and refresh its totals after deletion. */
+  returnToDashboard?: boolean
 }
 
 export function QuestionCard({
   question: q, isFlagged, onPreview, onToggleFlag, myTeams, stats, detailsLoaded = true,
-  allTags, duplicateCount, subQuestionCount, sets, hasSolution, setContext,
+  allTags, duplicateCount, subQuestionCount, sets, hasSolution, setContext, returnToDashboard = false,
 }: Props) {
   const router = useRouter()
   // The edit page carries the bank's current view back with it, so returning
@@ -143,7 +145,9 @@ export function QuestionCard({
   const canEditFromSet = !!setContext?.setId && !!setContext.onBeforeEdit
   const editHref = setContext?.setId
     ? questionEditHref(editPath, '', { [RETURN_SET_PARAM]: setContext.setId })
-    : questionEditHref(editPath, returnQuery)
+    : returnToDashboard
+      ? questionEditHref(editPath, '', { [RETURN_DASHBOARD_PARAM]: '1' })
+      : questionEditHref(editPath, returnQuery)
 
   async function handleDelete() {
     const ok = await confirm({
@@ -155,7 +159,11 @@ export function QuestionCard({
       variant: 'destructive',
     })
     if (!ok) return
-    startTransition(async () => { await deleteQuestion(q.id) })
+    startTransition(async () => {
+      const result = await deleteQuestion(q.id)
+      if (result?.error) toast.error(result.error)
+      else if (returnToDashboard) router.refresh()
+    })
   }
 
   /** แก้ไข from inside a แฟ้ม: the draft is saved before the page is left. */

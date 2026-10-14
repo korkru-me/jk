@@ -10,6 +10,18 @@ const rpcMigration = readFileSync(
   new URL('../supabase/migrations/20261013045149_self_practice_atomic_rpcs.sql', import.meta.url),
   'utf8',
 )
+const multiClassroomMigration = readFileSync(
+  new URL('../supabase/migrations/20261014040543_practice_multi_classroom_creation.sql', import.meta.url),
+  'utf8',
+)
+const settingsMigration = readFileSync(
+  new URL('../supabase/migrations/20261014042628_practice_library_settings.sql', import.meta.url),
+  'utf8',
+)
+const compatibilityMigration = readFileSync(
+  new URL('../supabase/migrations/20261014043342_practice_draft_backward_compatibility.sql', import.meta.url),
+  'utf8',
+)
 
 const ORG_A = '10000000-0000-4000-8000-000000000001'
 const ORG_B = '10000000-0000-4000-8000-000000000002'
@@ -25,6 +37,7 @@ const STUDENT_ZERO = '20000000-0000-4000-8000-000000000009'
 const ROOM_A = '30000000-0000-4000-8000-000000000001'
 const ROOM_B = '30000000-0000-4000-8000-000000000002'
 const ROOM_DELETE = '30000000-0000-4000-8000-000000000003'
+const ROOM_A_SECOND = '30000000-0000-4000-8000-000000000004'
 const QUESTION_A1 = '40000000-0000-4000-8000-000000000001'
 const QUESTION_A2 = '40000000-0000-4000-8000-000000000002'
 const QUESTION_B = '40000000-0000-4000-8000-000000000003'
@@ -210,7 +223,8 @@ beforeAll(async () => {
       ('${STUDENT_ZERO}', 'student', 'active', 'นักเรียนยังไม่ตอบ');
     INSERT INTO public.classrooms VALUES
       ('${ROOM_A}', '${ORG_A}', '${OWNER_A}', 'active', 'subject'),
-      ('${ROOM_B}', '${ORG_B}', '${OWNER_B}', 'active', 'subject');
+      ('${ROOM_B}', '${ORG_B}', '${OWNER_B}', 'active', 'subject'),
+      ('${ROOM_A_SECOND}', '${ORG_A}', '${OWNER_A}', 'active', 'subject');
     INSERT INTO public.classroom_co_teachers VALUES
       ('${ROOM_A}', '${CO_MANAGE}', 'manage'),
       ('${ROOM_A}', '${CO_VIEW}', 'view'),
@@ -251,6 +265,9 @@ beforeAll(async () => {
   `)
   await db.exec(migration)
   await db.exec(rpcMigration)
+  await db.exec(multiClassroomMigration)
+  await db.exec(settingsMigration)
+  await db.exec(compatibilityMigration)
   await as(user(OWNER_A), async tx => {
     await tx.query(
       `INSERT INTO public.practice_libraries
@@ -613,6 +630,8 @@ describe('self-practice RPC privilege and execution contracts', () => {
           'public.bulk_update_practice_question_tags(uuid,uuid[],text,text)'::regprocedure),
         ('create_practice_library',
           'public.create_practice_library(uuid,uuid,text,text,boolean,uuid[],boolean)'::regprocedure),
+        ('create_practice_libraries_for_classrooms',
+          'public.create_practice_libraries_for_classrooms(uuid,uuid[],text,text,boolean,text,boolean,boolean,boolean,boolean,uuid[],boolean)'::regprocedure),
         ('duplicate_practice_library',
           'public.duplicate_practice_library(uuid)'::regprocedure),
         ('get_practice_library_questions_for_manager',
@@ -628,7 +647,7 @@ describe('self-practice RPC privilege and execution contracts', () => {
         ('search_practice_library_questions',
           'public.search_practice_library_questions(uuid,uuid,text[],text[],integer,integer)'::regprocedure),
         ('update_practice_library_draft',
-          'public.update_practice_library_draft(uuid,text,text,boolean,uuid[])'::regprocedure)
+          'public.update_practice_library_draft(uuid,text,text,boolean,text,boolean,boolean,boolean,boolean,uuid[])'::regprocedure)
       ) AS expected(name, signature)
       JOIN pg_proc proc ON proc.oid = expected.signature
       ORDER BY expected.name
@@ -638,6 +657,15 @@ describe('self-practice RPC privilege and execution contracts', () => {
       {
         name: 'bulk_update_practice_question_tags',
         prosecdef: true,
+        provolatile: 'v',
+        proconfig: ['search_path=""'],
+        anon_can: false,
+        authenticated_can: true,
+        service_can: false,
+      },
+      {
+        name: 'create_practice_libraries_for_classrooms',
+        prosecdef: false,
         provolatile: 'v',
         proconfig: ['search_path=""'],
         anon_can: false,
@@ -886,6 +914,10 @@ describe('self-practice RPC privilege and execution contracts', () => {
       library_title: 'คลังทดสอบ',
       library_description: null,
       reveal_answer_key: false,
+      requires_access_code: false,
+      calculator_enabled: false,
+      scratchpad_enabled: true,
+      shuffle_options: true,
       question_id: QUESTION_A1,
       position: 0,
       title: 'Newton Force',
@@ -899,6 +931,7 @@ describe('self-practice RPC privilege and execution contracts', () => {
       'answer_parts',
       'answer_tolerance',
       'answer_unit',
+      'calculator_enabled',
       'classroom_id',
       'extra_data',
       'image_urls',
@@ -912,7 +945,10 @@ describe('self-practice RPC privilege and execution contracts', () => {
       'question_id',
       'question_text',
       'question_type',
+      'requires_access_code',
       'reveal_answer_key',
+      'scratchpad_enabled',
+      'shuffle_options',
       'tags',
       'title',
       'variables',
@@ -1272,6 +1308,105 @@ describe('self-practice RPC privilege and execution contracts', () => {
 })
 
 describe('self-practice atomic authenticated mutations', () => {
+  it('creates equivalent classroom-scoped libraries for every selected room atomically', async () => {
+    await as(user(OWNER_A), async tx => {
+      const primaryId = (await tx.query<{ id: string }>(`
+        SELECT public.create_practice_libraries_for_classrooms(
+          $1, ARRAY[$2, $3]::uuid[], '  คลังหลายห้อง  ', '  ฝึกชุดเดียวกัน  ', true,
+          'ห้องลับ', true, false, true, false,
+          ARRAY[$4, $5]::uuid[], true
+        ) AS id
+      `, [ORG_A, ROOM_A, ROOM_A_SECOND, QUESTION_A2, QUESTION_A1])).rows[0].id
+      const libraries = (await tx.query<{
+        id: string
+        classroom_id: string
+        description: string
+        status: string
+        reveal_answer_key: boolean
+        access_code: string
+        calculator_enabled: boolean
+        scratchpad_enabled: boolean
+        shuffle_questions: boolean
+        shuffle_options: boolean
+      }>(`
+        SELECT id, classroom_id, description, status, reveal_answer_key,
+          access_code, calculator_enabled, scratchpad_enabled, shuffle_questions, shuffle_options
+        FROM public.practice_libraries
+        WHERE title = 'คลังหลายห้อง'
+        ORDER BY CASE classroom_id WHEN $1 THEN 0 ELSE 1 END
+      `, [ROOM_A])).rows
+
+      expect(libraries).toHaveLength(2)
+      expect(libraries[0]).toMatchObject({
+        id: primaryId,
+        classroom_id: ROOM_A,
+        description: 'ฝึกชุดเดียวกัน',
+        status: 'published',
+        reveal_answer_key: true,
+        access_code: 'ห้องลับ',
+        calculator_enabled: true,
+        scratchpad_enabled: false,
+        shuffle_questions: true,
+        shuffle_options: false,
+      })
+      expect(libraries[1]).toMatchObject({
+        classroom_id: ROOM_A_SECOND,
+        description: 'ฝึกชุดเดียวกัน',
+        status: 'published',
+        reveal_answer_key: true,
+        access_code: 'ห้องลับ',
+        calculator_enabled: true,
+        scratchpad_enabled: false,
+        shuffle_questions: true,
+        shuffle_options: false,
+      })
+
+      const memberships = (await tx.query<{
+        classroom_id: string
+        question_id: string
+        position: number
+      }>(`
+        SELECT library.classroom_id, membership.question_id, membership.position
+        FROM public.practice_libraries library
+        JOIN public.practice_library_questions membership ON membership.library_id = library.id
+        WHERE library.title = 'คลังหลายห้อง'
+        ORDER BY library.classroom_id, membership.position
+      `)).rows
+      expect(memberships).toEqual([
+        { classroom_id: ROOM_A, question_id: QUESTION_A2, position: 0 },
+        { classroom_id: ROOM_A, question_id: QUESTION_A1, position: 1 },
+        { classroom_id: ROOM_A_SECOND, question_id: QUESTION_A2, position: 0 },
+        { classroom_id: ROOM_A_SECOND, question_id: QUESTION_A1, position: 1 },
+      ])
+    })
+  })
+
+  it('rejects duplicate or unauthorized room targets without leaving partial libraries', async () => {
+    await as(user(OWNER_A), async tx => {
+      const attempts = [
+        { rooms: [ROOM_A, ROOM_A], code: '22023' },
+        { rooms: [ROOM_A, ROOM_B], code: '42501' },
+      ]
+
+      for (const [index, attempt] of attempts.entries()) {
+        await tx.exec(`SAVEPOINT invalid_rooms_${index}`)
+        await expect(tx.query(`
+          SELECT public.create_practice_libraries_for_classrooms(
+            $1, $2::uuid[], 'ต้องไม่เหลือหลายห้อง', NULL, false,
+            NULL, false, true, false, true,
+            ARRAY[$3]::uuid[], false
+          )
+        `, [ORG_A, attempt.rooms, QUESTION_A1])).rejects.toMatchObject({ code: attempt.code })
+        await tx.exec(`ROLLBACK TO SAVEPOINT invalid_rooms_${index}`)
+      }
+
+      expect((await tx.query<{ count: number }>(`
+        SELECT count(*)::int AS count
+        FROM public.practice_libraries WHERE title = 'ต้องไม่เหลือหลายห้อง'
+      `)).rows[0].count).toBe(0)
+    })
+  })
+
   it('creates and publishes a library with ordered memberships in one RPC', async () => {
     await as(user(OWNER_A), async tx => {
       const id = (await tx.query<{ id: string }>(`
@@ -1349,6 +1484,7 @@ describe('self-practice atomic authenticated mutations', () => {
         )`, params: [LIBRARY] },
         { sql: `SELECT public.update_practice_library_draft(
           $1, 'ใหญ่เกิน', NULL, false,
+          NULL, false, true, false, true,
           ARRAY(SELECT gen_random_uuid() FROM generate_series(1, 1001))
         )`, params: [LIBRARY] },
         { sql: `SELECT public.bulk_update_practice_question_tags(
@@ -1373,6 +1509,12 @@ describe('self-practice atomic authenticated mutations', () => {
 
   it('duplicates an exact source atomically for a co-manager without exposing private questions', async () => {
     await as(user(CO_MANAGE), async tx => {
+      await tx.query(`
+        UPDATE public.practice_libraries
+        SET access_code = 'COPY', calculator_enabled = true, scratchpad_enabled = false,
+          shuffle_questions = true, shuffle_options = false
+        WHERE id = $1
+      `, [LIBRARY])
       const id = (await tx.query<{ id: string }>(`
         SELECT public.duplicate_practice_library($1) AS id
       `, [LIBRARY])).rows[0].id
@@ -1381,14 +1523,25 @@ describe('self-practice atomic authenticated mutations', () => {
         title: string
         status: string
         reveal_answer_key: boolean
+        access_code: string
+        calculator_enabled: boolean
+        scratchpad_enabled: boolean
+        shuffle_questions: boolean
+        shuffle_options: boolean
       }>(`
-        SELECT created_by, title, status, reveal_answer_key
+        SELECT created_by, title, status, reveal_answer_key, access_code,
+          calculator_enabled, scratchpad_enabled, shuffle_questions, shuffle_options
         FROM public.practice_libraries WHERE id = $1
       `, [id])).rows[0]).toEqual({
         created_by: CO_MANAGE,
         title: 'คลังทดสอบ (สำเนา)',
         status: 'draft',
         reveal_answer_key: false,
+        access_code: 'COPY',
+        calculator_enabled: true,
+        scratchpad_enabled: false,
+        shuffle_questions: true,
+        shuffle_options: false,
       })
       expect((await tx.query<{ question_id: string; position: number }>(`
         SELECT question_id, position
@@ -1442,14 +1595,16 @@ describe('self-practice atomic authenticated mutations', () => {
 
       expect((await tx.query<{ count: number }>(`
         SELECT public.update_practice_library_draft(
-          $1, 'แก้โดยครูร่วม', NULL, true, ARRAY[$2, $3, $4]::uuid[]
+          $1, 'แก้โดยครูร่วม', NULL, true, NULL, false, true, false, true,
+          ARRAY[$2, $3, $4]::uuid[]
         ) AS count
       `, [draft, QUESTION_A2, QUESTION_A1, QUESTION_PUBLIC])).rows[0].count).toBe(3)
 
       await tx.exec('SAVEPOINT guessed_private')
       await expect(tx.query(`
         SELECT public.update_practice_library_draft(
-          $1, 'ต้องไม่ค้าง', NULL, false, ARRAY[$2, $3]::uuid[]
+          $1, 'ต้องไม่ค้าง', NULL, false, NULL, false, true, false, true,
+          ARRAY[$2, $3]::uuid[]
         )
       `, [draft, QUESTION_A1, QUESTION_B])).rejects.toMatchObject({ code: '42501' })
       await tx.exec('ROLLBACK TO SAVEPOINT guessed_private')
@@ -1536,7 +1691,8 @@ describe('self-practice atomic authenticated mutations', () => {
       `, [ORG_A, ROOM_A, QUESTION_A1])).rows[0].id
       const count = (await tx.query<{ count: number }>(`
         SELECT public.update_practice_library_draft(
-          $1, '  หลังแก้  ', '  ใหม่  ', true, ARRAY[$2, $3]::uuid[]
+          $1, '  หลังแก้  ', '  ใหม่  ', true, '  OPEN  ', true, false, true, false,
+          ARRAY[$2, $3]::uuid[]
         ) AS count
       `, [draft, QUESTION_A2, QUESTION_A3])).rows[0].count
       expect(count).toBe(2)
@@ -1544,19 +1700,31 @@ describe('self-practice atomic authenticated mutations', () => {
         title: string
         description: string
         reveal_answer_key: boolean
+        access_code: string
+        calculator_enabled: boolean
+        scratchpad_enabled: boolean
+        shuffle_questions: boolean
+        shuffle_options: boolean
       }>(`
-        SELECT title, description, reveal_answer_key
+        SELECT title, description, reveal_answer_key, access_code,
+          calculator_enabled, scratchpad_enabled, shuffle_questions, shuffle_options
         FROM public.practice_libraries WHERE id = $1
       `, [draft])).rows[0]).toEqual({
         title: 'หลังแก้',
         description: 'ใหม่',
         reveal_answer_key: true,
+        access_code: 'OPEN',
+        calculator_enabled: true,
+        scratchpad_enabled: false,
+        shuffle_questions: true,
+        shuffle_options: false,
       })
 
       await tx.exec('SAVEPOINT bad_atomic_update')
       await expect(tx.query(`
         SELECT public.update_practice_library_draft(
-          $1, 'ห้ามค้าง', NULL, false, ARRAY[$2]::uuid[]
+          $1, 'ห้ามค้าง', NULL, false, NULL, false, true, false, true,
+          ARRAY[$2]::uuid[]
         )
       `, [draft, QUESTION_B])).rejects.toMatchObject({ code: '42501' })
       await tx.exec('ROLLBACK TO SAVEPOINT bad_atomic_update')
@@ -1571,6 +1739,54 @@ describe('self-practice atomic authenticated mutations', () => {
         { question_id: QUESTION_A3 },
       ])
     })
+  })
+
+  it('keeps the previous draft editor compatible without overwriting new settings', async () => {
+    const draft = await as(user(OWNER_A), async tx => (
+      (await tx.query<{ id: string }>(`
+        SELECT public.create_practice_libraries_for_classrooms(
+          $1, ARRAY[$2]::uuid[], 'compatibility draft', NULL, false,
+          'KEEP', true, false, true, false, ARRAY[$3]::uuid[], false
+        ) AS id
+      `, [ORG_A, ROOM_A, QUESTION_A1])).rows[0].id
+    ), true)
+    await as(user(CO_MANAGE), async tx => {
+      const result = await tx.query<{ count: number }>(`
+        SELECT public.update_practice_library_draft(
+          $1, 'previous editor saved', NULL, true, ARRAY[$2]::uuid[]
+        ) AS count
+      `, [draft, QUESTION_A1])
+      expect(result.rows[0].count).toBe(1)
+    }, true)
+    await as(user(OWNER_A), async tx => {
+      expect((await tx.query(`
+        SELECT title, access_code, calculator_enabled, scratchpad_enabled,
+          shuffle_questions, shuffle_options FROM public.practice_libraries WHERE id=$1
+      `, [draft])).rows[0]).toEqual({
+        title: 'previous editor saved', access_code: 'KEEP',
+        calculator_enabled: true, scratchpad_enabled: false,
+        shuffle_questions: true, shuffle_options: false,
+      })
+      await tx.query('DELETE FROM public.practice_libraries WHERE id=$1', [draft])
+    }, true)
+  })
+
+  it('denies the previous draft editor to view-only and foreign teachers', async () => {
+    const draft = await as(user(OWNER_A), async tx => (
+      (await tx.query<{ id: string }>(`
+        SELECT public.create_practice_library(
+          $1, $2, 'compatibility denied', NULL, false, ARRAY[$3]::uuid[], false
+        ) AS id
+      `, [ORG_A, ROOM_A, QUESTION_A1])).rows[0].id
+    ), true)
+    for (const actor of [CO_VIEW, OWNER_B]) {
+      await expect(as(user(actor), tx => tx.query(`
+        SELECT public.update_practice_library_draft(
+          $1, 'forbidden', NULL, false, ARRAY[$2]::uuid[]
+        )
+      `, [draft, QUESTION_A1]))).rejects.toMatchObject({ code: '42501' })
+    }
+    await as(user(OWNER_A), tx => tx.query('DELETE FROM public.practice_libraries WHERE id=$1', [draft]), true)
   })
 
   it('normalizes and de-duplicates bulk tags, and rejects a mixed invalid set atomically', async () => {
@@ -1644,7 +1860,8 @@ describe('self-practice atomic authenticated mutations', () => {
     await as(user(OWNER_A), async tx => {
       await expect(tx.query(`
         SELECT public.update_practice_library_draft(
-          $1, 'published', NULL, false, ARRAY[$2, $3, $4]::uuid[]
+          $1, 'published', NULL, false, NULL, false, true, false, true,
+          ARRAY[$2, $3, $4]::uuid[]
         )
       `, [LIBRARY, QUESTION_A1, QUESTION_A2, QUESTION_A3]))
         .rejects.toMatchObject({ code: '23514' })

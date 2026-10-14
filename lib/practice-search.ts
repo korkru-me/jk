@@ -110,7 +110,7 @@ export function buildPracticeSearchHref(
   const boundedTags = tagsWithinUrlBudget(next.q, next.tags, next.page)
   const params = queryParams(next.q, boundedTags, next.page)
   const query = params.toString()
-  return `/practice/${encodeURIComponent(libraryId)}${query ? `?${query}` : ''}`
+  return `/practice/${encodeURIComponent(libraryId)}/library${query ? `?${query}` : ''}`
 }
 
 export function buildPracticeQuestionHref(

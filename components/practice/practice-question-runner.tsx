@@ -2,12 +2,14 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState, useTransition } from 'react'
+import { lazy, Suspense, useState, useTransition } from 'react'
 import {
   ArrowLeft,
+  Calculator,
   CheckCircle2,
   CircleDotDashed,
   LoaderCircle,
+  PenLine,
   RotateCcw,
   XCircle,
 } from 'lucide-react'
@@ -23,7 +25,11 @@ import type { PracticeFeedback } from '@/lib/practice-question'
 import { splitNumberedAnswerBlanks } from '@/lib/answer-blank'
 import type { MathInputModes } from '@/lib/math/input-mode'
 import type { MathInputMode } from '@/lib/types'
+import { DEFAULT_FINGER_INPUT_MODE, type FingerInputMode } from '@/lib/drawing-board-input'
 import { cn } from '@/lib/utils'
+
+const ScientificCalculator = lazy(() => import('@/components/exam/scientific-calculator'))
+const Scratchpad = lazy(() => import('@/components/exam/scratchpad'))
 
 interface PracticeQuestionRunnerProps {
   libraryId: string
@@ -32,6 +38,9 @@ interface PracticeQuestionRunnerProps {
   variantReceipt: string
   returnHref: string
   changesOnRefresh: boolean
+  storageOwnerId: string
+  calculatorEnabled: boolean
+  scratchpadEnabled: boolean
 }
 
 type RetryEnvelope = {
@@ -168,6 +177,9 @@ export function PracticeQuestionRunner({
   variantReceipt,
   returnHref,
   changesOnRefresh,
+  storageOwnerId,
+  calculatorEnabled,
+  scratchpadEnabled,
 }: PracticeQuestionRunnerProps) {
   const router = useRouter()
   const [answer, setAnswer] = useState('')
@@ -176,6 +188,12 @@ export function PracticeQuestionRunner({
   const [error, setError] = useState<string | null>(null)
   const [retry, setRetry] = useState<RetryEnvelope | null>(null)
   const [refreshRequired, setRefreshRequired] = useState(false)
+  const [calculatorLoaded, setCalculatorLoaded] = useState(false)
+  const [showCalculator, setShowCalculator] = useState(false)
+  const [calculatorMode, setCalculatorMode] = useState<MathInputMode>('deg')
+  const [scratchpadLoaded, setScratchpadLoaded] = useState(false)
+  const [showScratchpad, setShowScratchpad] = useState(false)
+  const [fingerInputMode, setFingerInputMode] = useState<FingerInputMode>(DEFAULT_FINGER_INPUT_MODE)
   const [pending, startTransition] = useTransition()
   const question = renderedQuestion(originalQuestion)
   const embedsQuestionText = question.questions.question_type === 'true_false'
@@ -270,6 +288,39 @@ export function PracticeQuestionRunner({
         </div>
       </header>
 
+      {(calculatorEnabled || scratchpadEnabled) && (
+        <div className="flex flex-wrap items-center gap-2" aria-label="เครื่องมือช่วยทำโจทย์">
+          {calculatorEnabled && (
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-11"
+              onClick={() => {
+                setCalculatorLoaded(true)
+                setShowCalculator(true)
+              }}
+            >
+              <Calculator data-icon="inline-start" aria-hidden="true" />
+              เครื่องคิดเลขวิทยาศาสตร์
+            </Button>
+          )}
+          {scratchpadEnabled && (
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-11"
+              onClick={() => {
+                setScratchpadLoaded(true)
+                setShowScratchpad(true)
+              }}
+            >
+              <PenLine data-icon="inline-start" aria-hidden="true" />
+              กระดาษทด
+            </Button>
+          )}
+        </div>
+      )}
+
       <Card className="overflow-hidden">
         <section className="flex flex-col gap-4 p-4 sm:p-5">
           {!embedsQuestionText && (
@@ -313,6 +364,53 @@ export function PracticeQuestionRunner({
           </>
         )}
       </Card>
+
+      {calculatorLoaded && (
+        <Suspense fallback={showCalculator ? (
+          <Card elevation="xl" className="fixed bottom-3 right-3 z-[80] px-4 py-3 text-sm text-muted-foreground">
+            กำลังเปิดเครื่องคิดเลข...
+          </Card>
+        ) : null}>
+          <ScientificCalculator
+            open={showCalculator}
+            mode={calculatorMode}
+            targetLabel={question.questions.question_type === 'written' ? 'คำตอบ' : null}
+            onModeChange={setCalculatorMode}
+            onInsertResult={result => changeAnswer(result)}
+            onClose={() => setShowCalculator(false)}
+          />
+        </Suspense>
+      )}
+
+      {scratchpadLoaded && (
+        <Suspense fallback={showScratchpad ? (
+          <Card elevation="xl" className="fixed inset-x-2 bottom-2 z-[75] px-4 py-3 text-sm text-muted-foreground lg:inset-x-auto lg:right-4">
+            กำลังเปิดกระดาษทด...
+          </Card>
+        ) : null}>
+          <Scratchpad
+            open={showScratchpad}
+            scope={{
+              ownerId: storageOwnerId,
+              submissionId: `practice:${libraryId}`,
+              answerId: question.question_id,
+              partKey: 'practice',
+            }}
+            targetLabel={question.questions.title}
+            persistenceEnabled
+            artifactPartKey="practice"
+            artifact={null}
+            loadAttachedNonce={0}
+            previewMode={false}
+            attachmentEnabled={false}
+            fingerInputMode={fingerInputMode}
+            onFingerInputModeChange={setFingerInputMode}
+            onAttachmentSaved={() => {}}
+            onAttachmentStateChange={() => {}}
+            onClose={() => setShowScratchpad(false)}
+          />
+        </Suspense>
+      )}
     </div>
   )
 }
