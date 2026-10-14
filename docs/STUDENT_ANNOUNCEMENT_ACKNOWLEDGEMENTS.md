@@ -37,3 +37,7 @@
 พบใน Data API จริงว่า SQLSTATE `40001` ของ stale application round ทำให้ PostgREST 14 retry ไม่สิ้นสุดตาม Supabase troubleshooting จึงเพิ่ม migration `20261014071012_announcement_round_conflict_response.sql` เปลี่ยนเฉพาะกรณีนี้เป็น `PT409`/HTTP 409 ไม่เปลี่ยน transaction locking หรือ grants เดิม ไฟล์ migration ที่ apply แล้วไม่ถูกแก้ PGlite รันทั้ง baseline และ follow-up และ server action รองรับโค้ดทั้งสองระหว่าง rollout.
 
 Advisors ของสองตาราง receipt เป็น INFO `rls_enabled_no_policy` ตามการออกแบบ server-only: เปิด RLS พร้อม REVOKE browser grants และ RPC execute ไม่ใช่การเปิด read/write สาธารณะ ตรวจ grant/negative API จริงอีกครั้งก่อนถือว่าใช้งานได้ รายละเอียดแนวทาง [Supabase SQLSTATE 40001](https://supabase.com/docs/guides/troubleshooting/high-cpu-and-infinite-transaction-retries-when-using-custom-error-codes-in-rpc-functions-77326b).
+
+ผล Staging: migration baseline/follow-up ตรงกัน, RLS enabled, browser table/RPC grants=false และ invoker RPC service grant=true. `scripts/qa/student-profile-announcements.mjs` ทดสอบผ่าน real Auth/concurrent ack+resend/roster+permission negative/Storage denial ด้วยข้อมูลจำลอง; Chrome ทดสอบครูกดแจ้งซ้ำจาก 1/1 เป็น 0/1 และ popup นักเรียนเด้งใหม่แล้ว การบันทึกรูปใหม่กับค่า audience ตรวจใน environment เดียวกัน มีคำสั่ง cleanup เฉพาะ UUID ใน manifest; Production flag ยังปิดและเจ้าของให้เก็บทั้งหมดไว้ปล่อยพร้อมเว็บจริง.
+
+Cleanup ของรอบนี้ตรวจครบ: fixture users/rooms/organizations และ avatar objects เหลือ 0 พร้อมล้างเฉพาะ state ของ browser QA/ไฟล์คีย์ชั่วคราว ไม่ลบหรือเปลี่ยนข้อมูล Staging ที่มีอยู่ก่อน.

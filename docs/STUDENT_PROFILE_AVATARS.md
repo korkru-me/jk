@@ -9,6 +9,12 @@
 
 ## การปล่อยและหลักฐาน
 
-- ลง schema และทดสอบ hosted เฉพาะ Staging ที่เจ้าของอนุญาต ไม่มี push/deploy หรือการเขียน Production; Production ยังต้อง migration bucket นี้ในรอบปล่อยจริงก่อนการบันทึกรูปจะทำงาน
+- ลง schema และทดสอบ hosted เฉพาะ Staging ที่เจ้าของอนุญาต ไม่มี push/deploy หรือการเขียน Production; Production ยังต้อง migration bucket นี้ในรอบปล่อยจริงก่อนการบันทึกรูปจะทำงาน; เจ้าของยืนยันให้เก็บไว้ปล่อยพร้อมเว็บจริง บัญชีเดิมบน localhost:3000 ที่เชื่อม Production จึงยังไม่เปิดพื้นที่เก็บรูปในรอบนี้
 - หน้าทดลอง `/exam-screen-lab/student-profile` ไม่เขียนบัญชีจริง ใช้ action error จำลองเพื่อยืนยันว่าคง crop draft เมื่อบันทึกไม่ได้
-- Unit tests ครอบคลุม crop byte/ขนาด, ownership path, rollback/concurrent save, ไม่ลบรูปอื่น, restrictive RLS กับ broad legacy policy, completed result/hidden score และ reverse sorting; browser/runtime/build และ Staging integration รายงานผลเพิ่มเติมหลังตรวจครบ
+- Unit tests ครอบคลุม crop byte/ขนาด, ownership path, rollback/concurrent save, ไม่ลบรูปอื่น, restrictive RLS กับ broad legacy policy, completed result/hidden score และ reverse sorting; TypeScript, token lint, webpack build และ 3,264 unit tests ผ่าน; Chrome จริง 390/1600px light/dark ไม่พบ axe violation, fresh navigation ไม่มี runtime error, mouse wheel ผ่านขอบบน/ล่างจริง, reverse sorting และ completed result link ถูกต้อง
+
+- Staging ลง `20261014053207`, `20261014065458`, `20261014071012` แล้ว ประวัติ local/remote ตรงกัน ทดสอบด้วย Auth accounts/สององค์กร/สอง roster ที่สร้างใหม่เท่านั้น: รับทราบพร้อมกัน idempotent, ack+resend แข่งกัน, stale PT409, manager/view/foreign/student ข้ามห้อง, ออกจาก roster, archived room และ direct anon/auth RPC/table/Storage denial ผ่าน
+- Browser localhost ที่เชื่อม Staging พร้อมป้าย STAGING: บันทึก PNG ผ่าน Server Action จริง กลับเข้าหน้าใหม่รูปยังโหลดเป็น 512px, ไม่มีป้ายดูได้, ครู 1/1 กดแจ้งซ้ำกลับเป็น 0/1 นักเรียนเห็น popup ใหม่และกดรับทราบใหม่ได้ ไม่มีการเริ่ม/ส่ง/ให้คะแนนงานจริง การทดสอบไม่ได้ครอบคลุมอุปกรณ์สัมผัสจริงหรือทุก browser
+- โฟลเดอร์ `.next-*` ถูกยกเว้นจาก Git/Tailwind source scan เพื่อไม่อ่าน binary output ของ isolated build/dev เป็น utility classes; restart dev ของงานนี้โดยคง `.next` แก้ CSS parse error ที่เกิดระหว่างทดสอบได้
+
+- Cleanup รอบทดสอบเสร็จแล้ว ตรวจ users/classrooms/organizations ของ manifest และ Storage ของบัญชี QA เหลือศูนย์ ล้าง browser state และไฟล์คีย์ชั่วคราว ปิด server Staging เฉพาะพอร์ต 3037 คง localhost:3000 ให้ดูต่อ QA runner รองรับ sign out refresh sessions ก่อนลบบัญชีในรอบต่อไป.

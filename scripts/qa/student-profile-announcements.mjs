@@ -47,8 +47,19 @@ if (phase === 'setup') {
   const user=label=>state.users[label].id, post=state.roomPost
   if (phase==='cleanup') {
     for(const account of Object.values(state.users)) {
+      const memberships=must(await admin.from('organization_members').select('org_id').eq('user_id',account.id).eq('org_role','owner'),'fixture-owned organizations')
+      for(const membership of memberships??[]) {
+        const org=must(await admin.from('organizations').select('id,is_personal').eq('id',membership.org_id).maybeSingle(),'fixture personal organization')
+        if(org?.is_personal&&!state.orgs.includes(org.id)) state.orgs.push(org.id)
+      }
+      save(state)
       const files=must(await admin.storage.from('profile-avatars').list(account.id),'list fixture avatar objects')
       if(files?.length) must(await admin.storage.from('profile-avatars').remove(files.filter(x=>/^[0-9a-f-]{36}\.png$/.test(x.name)).map(x=>`${account.id}/${x.name}`)),'remove fixture avatars')
+    }
+    for(const account of Object.values(state.users)) {
+      const client=createClient(url,key('anon'),options)
+      const {error}=await client.auth.signInWithPassword({email:account.email,password:account.password})
+      if(!error) must(await client.auth.signOut({scope:'global'}),'revoke synthetic refresh sessions')
     }
     if(state.rooms.length) must(await admin.from('classrooms').delete().in('id',state.rooms),'remove fixture rooms')
     for(const account of Object.values(state.users)) must(await admin.auth.admin.deleteUser(account.id),'remove fixture account')

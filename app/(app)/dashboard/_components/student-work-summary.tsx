@@ -85,7 +85,7 @@ function WorkRow({ work, now }: { work: StudentWorkItem; now: number }) {
   return (
     <Link href={work.completed && work.submissionId ? `/submissions/${work.submissionId}` : `/assignments/${work.id}/take`} prefetch={false} aria-label={`${work.completed ? 'ดูงานที่ส่งแล้ว' : work.inProgress ? 'ทำต่อ' : work.hasPreviousAttempt ? 'ลองใหม่' : 'เริ่มทำ'}: ${work.title}`}
       className="group block rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-    <Card radius="md" interactive className={cn('relative overflow-hidden', work.completed ? 'border-success/35 bg-success/5 ring-1 ring-success/15 shadow-[0_0_12px_color-mix(in_oklab,var(--success)_14%,transparent)]' : cover?.surface)} data-work-row data-classroom-id={work.classroom?.id} data-work-id={work.id} data-work-completed={work.completed}>
+    <Card radius="md" interactive className={cn('relative overflow-hidden', work.completed ? 'border-success/35 bg-success/5 ring-1 ring-success/15 shadow-md shadow-success/15' : cover?.surface)} data-work-row data-classroom-id={work.classroom?.id} data-work-id={work.id} data-work-completed={work.completed}>
       <span aria-hidden="true" className={cn('absolute inset-y-0 left-0 w-1', work.completed ? 'bg-success' : cover?.solid ?? 'bg-muted-foreground')} />
       <div className="flex items-center gap-3 py-2.5 pl-4 pr-3">
         <div className={cn('hidden size-9 shrink-0 items-center justify-center rounded-lg sm:flex', cover ? `${cover.surface} ${cover.text}` : 'bg-muted text-foreground')}>
