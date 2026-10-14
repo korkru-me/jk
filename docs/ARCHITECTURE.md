@@ -296,3 +296,9 @@ npm run build
 ```
 
 สำหรับ auth/RLS/grading ต้องทดสอบด้วยหลายบทบาทและข้อมูลคนละ organization ไม่ใช่ทดสอบเฉพาะ happy path
+
+## Student learning home
+
+- Student `/dashboard` composes `StudentView`, `StudentWorkSummary`, recent announcements and `AssignmentCalendar`; the student sidebar calls it **พื้นที่เรียนรู้ของฉัน**. Teacher dashboard rendering stays on the existing role branch. Student `/classrooms` redirects to the classroom anchor (preserving the join code), and `/my-submissions` redirects to the summary anchor after session verification.
+- Server reads are scoped to the verified student's own roster rows and submissions; published work uses enrolled `assignment_classrooms` links and existing group reach rules. The pure `buildStudentLearningData` projection shares the summary page's official-attempt, display-score, passing and visibility helpers across pending badges, work rows and calendar events. It removes hidden score values from presentation props and derives classroom themes from reachable classroom IDs. History remains per attempt; done totals remain per assignment.
+- The synthetic, environment-gated `/exam-screen-lab/student-dashboard` renders the same projection/components without database access. Joining or leaving a classroom revalidates `/dashboard` as well as the classroom list. No schema change is involved.

@@ -7,7 +7,6 @@ import {
   ChevronDown,
   ChevronLeft,
   ClipboardCheck,
-  ClipboardList,
   FilePlus2,
   FileUp,
   FlaskConical,
@@ -80,9 +79,7 @@ function teacherNavigation(): NavEntry[] {
 
 function studentNavigation(): NavEntry[] {
   return [
-    homeNav,
-    { href: '/classrooms', label: 'ห้องเรียนของฉัน', icon: School },
-    { href: '/my-submissions', label: 'สรุปงานของฉัน', icon: ClipboardList },
+    { href: '/dashboard', label: 'พื้นที่เรียนรู้ของฉัน', icon: LayoutGrid },
     { href: '/settings/profile', label: 'ข้อมูลส่วนตัว', icon: UserRound },
   ]
 }

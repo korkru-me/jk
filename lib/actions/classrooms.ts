@@ -430,6 +430,7 @@ export async function joinClassroom(classCode: string) {
     return { error: error.message }
   }
   revalidatePath('/classrooms')
+  revalidatePath('/dashboard')
   redirect('/classrooms')
 }
 
@@ -444,6 +445,7 @@ export async function leaveClassroom(classroomId: string) {
     .eq('student_id', user.id)
   if (error) return { error: error.message }
   revalidatePath('/classrooms')
+  revalidatePath('/dashboard')
 }
 
 export async function removeStudent(classroomId: string, studentId: string) {
