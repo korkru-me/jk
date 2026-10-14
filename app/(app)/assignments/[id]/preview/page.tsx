@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/auth/server'
 import { notFound, redirect } from 'next/navigation'
 import { ExamClient } from '@/components/exam/exam-client'
+import { buildSolutionWatermark } from '@/lib/solution-watermark'
 import { buildAssignmentAttempt } from '@/lib/assignment-attempt'
 import { parseSections } from '@/lib/question-set-sections'
 import { matchingChoices } from '@/lib/matching-choices'
@@ -176,6 +177,7 @@ export default async function AssignmentPreviewPage({
     isFullscreenEnforced: false,
     blockClipboard: false,
     watermarkText: a.exam_watermark_enabled ? 'ตัวอย่างผู้เข้าสอบ • PREVIEW' : null,
+    solutionWatermark: buildSolutionWatermark({ full_name: 'ตัวอย่างผู้เรียน • PREVIEW', prefix: null, first_name: null, last_name: null }, null, new Date().toISOString()),
     isWorkImageEnforced: a.require_work_image ?? false,
     // Show the teacher exactly the แบบฝึกหัด their students will get, ปุ่มตรวจ
     // and all — including whether it opens the เฉลย.

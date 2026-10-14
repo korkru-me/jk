@@ -2,6 +2,7 @@
 
 import { ExamClient } from '@/components/exam/exam-client'
 import { ShellClient } from '@/components/layout/shell-client'
+import { buildSolutionWatermark } from '@/lib/solution-watermark'
 import { useAppViewport } from '@/hooks/use-app-viewport'
 import type { ExamScreenQaFixture } from '../_lib/fixture'
 
@@ -14,6 +15,7 @@ export function ExamScreenLabClient({
   startedAt = '2026-01-01T00:00:00.000Z',
   assignmentType = 'exam',
   shell = false,
+  optionalWatermark = true,
 }: {
   fixture: ExamScreenQaFixture
   submissionId: string
@@ -22,6 +24,7 @@ export function ExamScreenLabClient({
   startedAt?: string
   assignmentType?: 'exam' | 'exercise'
   shell?: boolean
+  optionalWatermark?: boolean
   /** Opt-in via ?streak=1, so the default lab screen is unchanged. Lets the
    *  "ถูกติดต่อกัน" chrome be looked at on a real device without a teacher
    *  login or a live attempt behind it. */
@@ -49,7 +52,8 @@ export function ExamScreenLabClient({
         proctoringEnabled: false,
         isFullscreenEnforced: false,
         blockClipboard: false,
-        watermarkText: 'ข้อมูลจำลอง • DEVICE QA',
+        watermarkText: optionalWatermark ? 'ข้อมูลจำลอง • DEVICE QA' : null,
+        solutionWatermark: buildSolutionWatermark({ full_name: 'เด็กชายทดสอบ เรียนรู้ (ข้อมูลจำลอง)', prefix: 'เด็กชาย', first_name: null, last_name: null }, { student_code: '00007', grade_level: 'ม.4', section_number: 1, class_number: 7 }, startedAt),
         isWorkImageEnforced: true,
         instantCheck: true,
         instantCheckAnswerKey: true,

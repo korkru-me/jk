@@ -226,3 +226,9 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 - รูปโปรไฟล์ถาวร (14 ต.ค. 2026): server verified Auth + users.status active ก่อน admin upload/update, decoded PNG square 512px ไม่เกิน 2 MiB, re-encode strip metadata, owner UUID/immutable file UUID; compare-and-set ป้องกัน concurrent overwrite/cleanup และลบเฉพาะ avatar URL ที่เป็น bucket/namespace เจ้าของตรงตัว. Public bucket ใช้เพื่อรูปแสดงตัวตนเท่านั้น restrictive policy ปิด browser metadata/read/write แม้มี broad permissive policy; ไม่เก็บสุขภาพ/ผู้ปกครอง/เอกสารใน bucket นี้. ดู `STUDENT_PROFILE_AVATARS.md`.
 
 - โฮมรูมฝั่งนักเรียน (14 ต.ค. 2026): หลัง verified Auth และ roster membership guard อ่านชื่อเต็มกับ `student_profiles.class_number` ของ UUID เพื่อนในห้องนั้นเท่านั้น เพื่อแสดงรายชื่อเรียงเลขที่ตามคำขอเจ้าของ ไม่เปิด direct profile RLS หรือส่ง profile record; ชื่อ/เลขที่เป็นข้อยกเว้นที่เห็นใน roster ร่วม ส่วน school/สุขภาพ/ครอบครัว/ผู้ปกครอง/คะแนนยังไม่ส่งให้เพื่อน.
+
+## Solution attribution overlay — 14 October 2026
+
+- Required solution identity is read with the service client only after verified Auth plus exact ownership/management checks. The DTO excludes email, guardians, health/contact fields, peers and answers. No browser-provided owner is accepted. Existing release/visibility checks remain authoritative; failed identity lookup does not return unwatermarked solution bodies.
+- The name/code/class/number/date overlay is mandatory for released exam/exercise keys even if optional taking watermark is disabled. Authorized teacher result review has an explicit teacher-view label. No new access or RLS/storage changes are made.
+- This is a visible attribution aid; screenshots can be cropped/edited and browser rendering altered. It is not proof of who shared content. Existing external PDF links have no physical watermark; the inline reader is pending the owner's decision. No production data, migration or hosted deployment changed in this task.

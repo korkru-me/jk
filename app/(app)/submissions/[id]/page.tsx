@@ -6,23 +6,17 @@ import { notFound, redirect } from 'next/navigation'
 import { Suspense } from 'react'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
-import { StudyPathPanel } from '@/components/student/study-path-panel'
-import { CheckCircle2, XCircle, Clock, ChevronLeft, ChevronRight, Trophy, RotateCcw, School, FileText, EyeOff } from 'lucide-react'
-import type { AnswerPart, FillBlankItem, SubmittedFile } from '@/lib/types'
-import { getBlankType, isBlankCorrect } from '@/lib/fill-blank'
-import { CLASSIFY_UNSET, parseClassifyGrid } from '@/lib/classify'
-import {
-  IMAGE_LABEL_PREFIX,
-  isImageLabelMarkerCorrect, parseImageLabelAnswer, parseImageLabelKey,
-} from '@/lib/image-label'
+import { SubmissionAnswerReview, QuestionText } from '@/components/student/submission-answer-review'
+import { SubmissionScoreSummary } from '@/components/student/submission-score-summary'
+import { SolutionWatermark } from '@/components/student/solution-watermark'
+import { loadStudentSolutionWatermark } from '@/lib/solution-watermark-server'
+import { Button } from '@/components/ui/button'
+import { CheckCircle2, XCircle, ChevronLeft, ChevronRight, RotateCcw, School } from 'lucide-react'
 import { computePassed, formatPassingThreshold } from '@/lib/grading'
-import { evaluateStudentAnswer } from '@/lib/math/evaluator'
 import { SCORE_STRATEGY_LABELS, rescaleToDisplayMax, officialSubmissionsByStudent } from '@/lib/scoring'
 import { sortStudents } from '@/lib/student-sort'
 import { ScoreEditor } from '@/components/assignments/score-editor'
 import { Card } from '@/components/ui/card'
-import { containsMath } from '@/lib/math/latex'
-import { renderRichTextHtml } from '@/lib/rich-text-html'
 import { canStudentReviewAnswers, canStudentViewScore } from '@/lib/result-visibility'
 import { MATH_WORK_BUCKET } from '@/lib/math-work'
 import { shouldOfferSebExit } from '@/lib/seb-exit'
@@ -46,7 +40,6 @@ const thaiDateTime = new Intl.DateTimeFormat('th-TH', {
 })
 
 const PART_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ', 'ช', 'ซ']
-const CHOICE_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ']
 
 export const metadata = { title: 'ผลการสอบ — KorKru' }
 
@@ -60,11 +53,6 @@ function reorderOptions<T>(options: T[] | null, order: number[] | null): (T & { 
   if (!options) return null
   const positions = order ?? options.map((_, i) => i)
   return positions.filter(i => options[i]).map(i => ({ ...options[i], index: i }))
-}
-
-function formatAnswer(n: number): string {
-  if (Math.abs(n) >= 1e6 || (Math.abs(n) < 0.001 && n !== 0)) return n.toExponential(3)
-  return parseFloat(n.toPrecision(4)).toString()
 }
 
 // A row nobody has decided yet. Auto-grading leaves is_correct null exactly
@@ -280,8 +268,13 @@ export default async function SubmissionResultPage({
   }
   const solutionsOpen = solutionRelease.state === 'open'
 
+  const solutionWatermark = (canShowAnswers || solutionsOpen)
+    ? await loadStudentSolutionWatermark(admin, submission.student_id) : null
+  const hasSolutionIdentity = solutionWatermark !== null
+
   const page = (
     <div className="max-w-3xl space-y-6">
+      {solutionWatermark && <SolutionWatermark data={solutionWatermark} viewer={isTeacherViewer ? 'teacher' : 'student'} />}
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 flex-wrap">
         <Link
@@ -317,139 +310,21 @@ export default async function SubmissionResultPage({
         </Card>
       )}
 
-      {/* Score summary */}
-      <Card padding="2xl" className="text-center relative overflow-hidden">
-        {/* Background decoration */}
-        <div className={`absolute inset-0 opacity-5 ${
-          !canShowScore ? 'bg-primary' : pct >= 75 ? 'bg-success' : pct >= 50 ? 'bg-warning' : 'bg-destructive'
-        }`} />
-
-        <div className="relative">
-          {canShowScore ? (
-            <>
-              {passed !== null && (
-                <div className="flex flex-col items-center gap-1 mb-3">
-                  <div className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold border ${
-                    passed
-                      ? 'bg-success/10 text-success border-success/20'
-                      : 'bg-destructive/10 text-destructive border-destructive/20'
-                  }`}>
-                    {passed ? <CheckCircle2 size={13} /> : <XCircle size={13} />}
-                    {passed ? 'ผ่านเกณฑ์' : 'ยังไม่ผ่านเกณฑ์'}
-                  </div>
-                  {passingThreshold && (
-                    <p className="text-xs text-muted-foreground">เกณฑ์ผ่าน: ต้องได้ {passingThreshold} ขึ้นไป</p>
-                  )}
-                </div>
-              )}
-              {pct >= 90 && (
-                <div className="flex justify-center mb-3">
-                  <div className="flex items-center gap-1.5 bg-warning/10 text-warning border border-warning/20 rounded-full px-3 py-1 text-xs font-semibold">
-                    <Trophy size={13} />
-                    ยอดเยี่ยม!
-                  </div>
-                </div>
-              )}
-
-              <div className={`inline-flex items-center justify-center w-24 h-24 rounded-full text-3xl font-black mb-4 ${
-                pct >= 75
-                  ? 'bg-success/10 text-success'
-                  : pct >= 50
-                  ? 'bg-warning/10 text-warning'
-                  : 'bg-destructive/10 text-destructive'
-              }`}>
-                {pct}%
-              </div>
-
-              <p className="text-4xl font-black">{displayScore}/{displayMax}</p>
-              <p className="text-muted-foreground mt-1 text-sm">คะแนนที่ได้</p>
-
-              {canShowAnswers && (
-                <div className="flex items-center justify-center gap-4 mt-4 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1 text-success">
-                    <CheckCircle2 size={13} />
-                    ถูก {answers.filter(a => a.is_correct === true).length} ข้อ
-                  </span>
-                  <span className="flex items-center gap-1 text-destructive">
-                    <XCircle size={13} />
-                    ผิด {answers.filter(a => a.is_correct === false).length} ข้อ
-                  </span>
-                  {pendingManualCount > 0 && (
-                    <span className="flex items-center gap-1 text-warning">
-                      <Clock size={13} />
-                      รอตรวจ {pendingManualCount} ข้อ
-                    </span>
-                  )}
-                </div>
-              )}
-
-              {pendingManualCount > 0 && (
-                <div className="mt-3 inline-flex items-center gap-1.5 bg-warning/10 border border-warning/20 text-warning text-xs font-medium px-3 py-1.5 rounded-full">
-                  ⏳ มี {pendingManualCount} ข้อรอครูตรวจ — คะแนนจะอัปเดตภายหลัง
-                </div>
-              )}
-
-              {assignment.max_attempts !== 1 && (
-                <p className="text-xs text-muted-foreground mt-3">
-                  {`การเก็บคะแนน: ${SCORE_STRATEGY_LABELS[assignment.score_strategy as 'best' | 'average' | 'latest']} (จากทั้งหมด ${submission.attempt_number} ครั้งที่ทำ)`}
-                </p>
-              )}
-            </>
-          ) : (
-            <div className="flex flex-col items-center">
-              <div className="w-20 h-20 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-4">
-                <EyeOff size={32} />
-              </div>
-              <h2 className="text-xl font-bold">ส่งคำตอบเรียบร้อยแล้ว</h2>
-              <p className="text-sm text-muted-foreground mt-2 max-w-md">
-                ครูกำหนดไม่แสดงคะแนนและคำตอบรายข้อสำหรับงานนี้
-              </p>
-            </div>
-          )}
-
-          {submission.submitted_at && (
-            <p className="text-xs text-muted-foreground mt-3">
-              ส่งเมื่อ {thaiDateTime.format(new Date(submission.submitted_at))}
-            </p>
-          )}
-
-          {(canRetry || assignment.classroom_id || solutionsOpen) && (
-            <div className="mt-4 flex items-center justify-center gap-2 flex-wrap">
-              {/* Never beside เริ่มทำอีกครั้ง: the เฉลย opens only once the
-                  student cannot make another attempt. */}
-              {solutionsOpen && <AttemptSolutionsButton />}
-              {canRetry && (
-                <Link
-                  href={`/assignments/${submission.assignment_id}/take`}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold px-4 py-2 transition-colors"
-                >
-                  <RotateCcw size={15} />
-                  {isWrongOnlyRetry
-                    ? `แก้เฉพาะข้อที่ยังไม่ได้คะแนนเต็ม (${retryableCount} ข้อ)`
-                    : assignment.type === 'exam' ? 'เริ่มทำข้อสอบอีกครั้ง' : 'เริ่มทำแบบฝึกหัดอีกครั้ง'}
-                </Link>
-              )}
-              {assignment.classroom_id && (
-                <Link
-                  href={`/classrooms/${assignment.classroom_id}`}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-muted hover:bg-muted/70 text-foreground text-sm font-semibold px-4 py-2 transition-colors border"
-                >
-                  <School size={15} />
-                  กลับไปห้องเรียน
-                </Link>
-              )}
-            </div>
-          )}
-
-          {solutionRelease.state === 'locked' && (
-            <SolutionLockNotice
-              lock={solutionRelease}
-              assignmentId={submission.assignment_id}
-              canResume={assignment.status === 'published'}
-            />
-          )}
-        </div>
-      </Card>
+      <SubmissionScoreSummary
+        visible={canShowScore} score={displayScore} maxScore={displayMax} percentage={pct}
+        passed={passed} threshold={passed !== null ? passingThreshold : null}
+        counts={canShowAnswers ? { correct: answers.filter(a => a.is_correct === true).length, wrong: answers.filter(a => a.is_correct === false).length, pending: pendingManualCount } : null}
+        submittedAt={submission.submitted_at ? thaiDateTime.format(new Date(submission.submitted_at)) : null}
+        strategy={assignment.max_attempts !== 1 ? `การเก็บคะแนน: ${SCORE_STRATEGY_LABELS[assignment.score_strategy as 'best' | 'average' | 'latest']} (จากทั้งหมด ${submission.attempt_number} ครั้งที่ทำ)` : null}
+      >
+        {solutionsOpen && hasSolutionIdentity && <AttemptSolutionsButton />}
+        {canRetry && <Button size="sm" render={<Link href={`/assignments/${submission.assignment_id}/take`} />}>
+          <RotateCcw aria-hidden="true" />
+          {isWrongOnlyRetry ? `แก้เฉพาะข้อที่ยังไม่ได้คะแนนเต็ม (${retryableCount} ข้อ)` : assignment.type === 'exam' ? 'เริ่มทำข้อสอบอีกครั้ง' : 'เริ่มทำแบบฝึกหัดอีกครั้ง'}
+        </Button>}
+        {assignment.classroom_id && <Button size="sm" variant="outline" render={<Link href={`/classrooms/${assignment.classroom_id}`} />}><School aria-hidden="true" />กลับไปห้องเรียน</Button>}
+        {solutionRelease.state === 'locked' && <div className="basis-full"><SolutionLockNotice lock={solutionRelease} assignmentId={submission.assignment_id} canResume={assignment.status === 'published'} /></div>}
+      </SubmissionScoreSummary>
 
       {canExitSeb && (
         <Card padding="lg" className="border-success/20 bg-success/5 text-center">
@@ -486,7 +361,8 @@ export default async function SubmissionResultPage({
           )}
         </Card>
       )}
-      {canShowAnswers && (
+      {(canShowAnswers || solutionsOpen) && !hasSolutionIdentity && <Card padding="md" role="alert">โหลดข้อมูลสำหรับลายน้ำไม่สำเร็จ กรุณาโหลดหน้าใหม่เพื่อดูเฉลย</Card>}
+      {canShowAnswers && hasSolutionIdentity && (
         <Suspense fallback={(
           <Card padding="xl" className="text-center text-sm text-muted-foreground">
             กำลังโหลดรายละเอียดคำตอบ...
@@ -503,7 +379,7 @@ export default async function SubmissionResultPage({
   )
 
   // The viewer's code is only sent to a student who can open it.
-  return solutionsOpen
+  return solutionsOpen && hasSolutionIdentity
     ? <AttemptSolutionsProvider submissionId={id}>{page}</AttemptSolutionsProvider>
     : page
 }
@@ -564,12 +440,7 @@ async function SubmissionAnswerDetails({
   const signedArtifactUrls = new Map((signedArtifactRows ?? []).flatMap(row => (
     row.signedUrl ? [[row.path, row.signedUrl] as const] : []
   )))
-  const wrongAnswers = sortedAnswers
-    .filter(a => a.is_correct === false && !isPendingTeacherReview(a))
-    .map(a => ({
-      title: a.questions?.title ?? '',
-      questionText: substituteVars(a.questions?.question_text ?? '', a.random_values ?? {}),
-    }))
+
 
   return (
     <>
@@ -657,7 +528,7 @@ async function SubmissionAnswerDetails({
                 )}
 
                 <div className="pl-11">
-                  <AnswerReview
+                  <SubmissionAnswerReview
                     studentAnswer={a.student_answer}
                     correctAnswer={a.correct_answer}
                     isCorrect={isCorrect}
@@ -695,15 +566,7 @@ async function SubmissionAnswerDetails({
         })}
       </div>
 
-      <div className="space-y-2">
-        <h2 className="font-semibold flex items-center gap-2">
-          <span>🗺️</span> เส้นทางการซ่อมเสริม
-        </h2>
-        <StudyPathPanel
-          wrongQuestions={wrongAnswers}
-          totalQuestions={sortedAnswers.filter(a => !isPendingTeacherReview(a)).length}
-        />
-      </div>
+
     </>
   )
 }
@@ -752,527 +615,11 @@ function SubmittedWorkArtifacts({
   )
 }
 
-// ─── Answer review component ──────────────────────────────────────────────────
-
-function AnswerReview({
-  studentAnswer,
-  correctAnswer,
-  isCorrect,
-  answerParts,
-  answerUnit,
-  questionType,
-  extraData,
-  mcqOptions,
-  workImages,
-}: {
-  studentAnswer: string | null
-  correctAnswer: string
-  isCorrect: boolean | null
-  answerParts: AnswerPart[] | null
-  answerUnit: string | null
-  questionType?: string
-  extraData?: Record<string, unknown>
-  mcqOptions: Array<{ text: string; is_correct: boolean; index?: number; image_url?: string; left_text?: string; right_text?: string; left_image?: string }> | null
-  workImages?: (string | null)[] | null
-}) {
-  // ─── Matching: the pairs in their authored order, each showing what the
-  // student picked next to the right answer. mcqOptions holds MatchingPair
-  // rows here (see MatchingPair in lib/types.ts); option_order shuffled only
-  // the choices the student saw, not the prompts, so pair i still lines up
-  // with the i-th entry of the stored answer.
-  if (questionType === 'matching' && correctAnswer.startsWith('MATCH:')) {
-    let correctRights: string[] = []
-    let studentRights: string[] = []
-    try { correctRights = JSON.parse(correctAnswer.slice(6)) } catch { /* keep empty */ }
-    try { studentRights = JSON.parse(studentAnswer || '[]') } catch { /* keep empty */ }
-
-    return (
-      <div className="space-y-2 mt-2">
-        {correctRights.map((right, i) => {
-          const picked = studentRights[i] ?? ''
-          const ok = picked.trim() === right.trim()
-          const pair = mcqOptions?.[i]
-          return (
-            <div
-              key={i}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border-2 ${
-                ok ? 'border-success bg-success/10' : 'border-destructive bg-destructive/10'
-              }`}
-            >
-              {pair?.left_image && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={pair.left_image} alt="" loading="lazy" decoding="async" className="w-10 h-10 object-contain rounded border shrink-0" />
-              )}
-              <span className="text-sm flex-1 min-w-0">{pair?.left_text ?? `ข้อ ${i + 1}`}</span>
-              <span className={`text-sm font-medium shrink-0 ${ok ? 'text-success' : 'text-destructive'}`}>
-                {picked || '—'}
-              </span>
-              {!ok && (
-                <span className="text-xs font-semibold text-success shrink-0 flex items-center gap-1">
-                  <CheckCircle2 size={13} /> {right}
-                </span>
-              )}
-            </div>
-          )
-        })}
-      </div>
-    )
-  }
-
-  // ─── MCQ: show all options with color highlighting ───────────────────────
-  if (questionType === 'mcq' && mcqOptions && mcqOptions.length > 0) {
-    return (
-      <div className="space-y-2 mt-2">
-        {mcqOptions.map((opt, i) => {
-          // Answers are recorded as MCQ:<position>; anything older stored the
-          // option's text, so both are accepted here.
-          const optionIndex = opt.index ?? i
-          const isStudentChoice = studentAnswer === `MCQ:${optionIndex}`
-            || (!studentAnswer?.startsWith('MCQ:') && studentAnswer === opt.text)
-          const isCorrectOpt = opt.is_correct
-
-          let wrapClass = 'border-border bg-background'
-          let labelClass = 'text-muted-foreground'
-          let indicator = null
-
-          if (isCorrectOpt) {
-            wrapClass = 'border-success bg-success/10'
-            labelClass = 'text-success'
-            indicator = (
-              <span className="text-xs font-semibold text-success shrink-0 flex items-center gap-1">
-                <CheckCircle2 size={13} /> เฉลย
-              </span>
-            )
-          } else if (isStudentChoice && !isCorrectOpt) {
-            wrapClass = 'border-destructive bg-destructive/10'
-            labelClass = 'text-destructive'
-            indicator = (
-              <span className="text-xs font-semibold text-destructive shrink-0 flex items-center gap-1">
-                <XCircle size={13} /> คำตอบคุณ
-              </span>
-            )
-          }
-
-          return (
-            <div key={i} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border-2 transition-all ${wrapClass}`}>
-              <span className={`text-sm font-bold shrink-0 w-5 ${labelClass}`}>{CHOICE_LABELS[i]}</span>
-              {opt.image_url && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={opt.image_url} alt="" loading="lazy" decoding="async" className="max-h-24 w-auto object-contain rounded border shrink-0" />
-              )}
-              {opt.text !== CHOICE_LABELS[i] && (
-                <span className={`text-sm flex-1 ${isCorrectOpt || (isStudentChoice && !isCorrectOpt) ? 'font-medium ' + labelClass : 'text-foreground'}`}>
-                  {opt.text}
-                </span>
-              )}
-              {indicator}
-            </div>
-          )
-        })}
-      </div>
-    )
-  }
-
-  // ─── File upload: submitted files + submit status ────────────────────────
-  if (questionType === 'file_upload') {
-    let files: SubmittedFile[] = []
-    try { files = studentAnswer ? JSON.parse(studentAnswer) : [] } catch { files = [] }
-    const submitted = files.length > 0
-    return (
-      <div className="mt-2 space-y-2 text-sm">
-        <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
-          submitted
-            ? 'bg-success/10 text-success dark:bg-green-950/30'
-            : 'bg-destructive/10 text-destructive'
-        }`}>
-          {submitted ? '✓ ส่งแล้ว' : '✗ ไม่ได้ส่งไฟล์'}
-        </span>
-        {files.length > 0 && (
-          <div className="flex flex-wrap gap-3">
-            {files.map((f, i) => (
-              f.type.startsWith('image/') ? (
-                <a key={i} href={f.url} target="_blank" rel="noopener noreferrer">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={f.url} alt={f.name} loading="lazy" decoding="async" className="w-20 h-20 rounded-lg object-cover border hover:opacity-90 transition-opacity" />
-                </a>
-              ) : (
-                <a key={i} href={f.url} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-xs px-2.5 py-2 rounded-lg border bg-muted/40 hover:bg-muted transition-colors max-w-[160px]">
-                  <FileText size={14} className="shrink-0 text-muted-foreground" />
-                  <span className="truncate">{f.name}</span>
-                </a>
-              )
-            ))}
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  // ─── Essay: writing a teacher reads ──────────────────────────────────────
-  // There is no answer key to compare against, so no เฉลย row is shown here.
-  // Showing one is exactly what put "undefined" — the value an essay's empty
-  // answer_formula evaluated to — in front of students, back when an essay had
-  // no branch of its own and fell through to the single-answer display at the
-  // bottom. Keyed on question_type, so rows still carrying that frozen string
-  // stop displaying it too.
-  if (questionType === 'essay') {
-    return (
-      <div className="mt-2 space-y-2 text-sm">
-        {isCorrect === null && (
-          <p className="text-xs text-warning font-medium">รอครูผู้สอนตรวจสอบและให้คะแนน</p>
-        )}
-        <div className="space-y-1">
-          <p className="text-xs text-muted-foreground">คำตอบคุณ:</p>
-          <p className="whitespace-pre-wrap break-words font-medium">{studentAnswer?.trim() || '—'}</p>
-        </div>
-      </div>
-    )
-  }
-
-  // ─── Fill-blank manual (legacy, pre-dates per-blank types) ───────────────
-  if (correctAnswer.startsWith('FILL_MANUAL:')) {
-    let studentAnswers: string[] = []
-    try { studentAnswers = JSON.parse(studentAnswer ?? '[]') } catch { /* */ }
-    return (
-      <div className="mt-2 space-y-2 text-sm">
-        <p className="text-xs text-warning font-medium">รอครูผู้สอนตรวจสอบและให้คะแนน</p>
-        <div className="space-y-1">
-          {studentAnswers.map((ans, i) => (
-            <div key={i} className="flex gap-2">
-              <span className="text-muted-foreground shrink-0 w-16">ช่อง {i + 1}:</span>
-              <span className="font-medium">{ans || '—'}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  // ─── Fill-blank — per-blank type (text / fixed / dropdown) ───────────────
-  if (correctAnswer.startsWith('FILL:')) {
-    let studentAnswers: string[] = []
-    let correctAnswers: string[][] = []
-    try { studentAnswers = JSON.parse(studentAnswer ?? '[]') } catch { /* */ }
-    try { correctAnswers = JSON.parse(correctAnswer.slice(5)) } catch { /* */ }
-
-    const blanks: FillBlankItem[] = (extraData as any)?.blanks ?? []
-    return (
-      <div className="mt-2 space-y-2 text-sm">
-        {correctAnswers.map((correct, i) => {
-          const student = studentAnswers[i] ?? ''
-          const type = getBlankType(extraData as any, blanks[i])
-
-          if (type === 'text') {
-            return (
-              <div key={i} className="pl-3 border-l-2 border-warning/20 space-y-0.5">
-                <p className="text-xs font-semibold text-warning">ช่อง {i + 1} — รอครูตรวจ</p>
-                <div className="flex gap-2">
-                  <span className="text-muted-foreground w-24 shrink-0">คำตอบคุณ:</span>
-                  <span className="font-medium">{student || '—'}</span>
-                </div>
-              </div>
-            )
-          }
-
-          const cs = blanks[i]?.case_sensitive ?? false
-          const partCorrect = isBlankCorrect(student, correct, type, cs)
-          return (
-            <div key={i} className="pl-3 border-l-2 border-border space-y-0.5">
-              <p className="text-xs font-semibold text-muted-foreground">ช่อง {i + 1}</p>
-              <div className="flex gap-2">
-                <span className="text-muted-foreground w-24 shrink-0">คำตอบคุณ:</span>
-                <span className={`font-medium ${partCorrect ? 'text-success' : 'text-destructive'}`}>{student || '—'}</span>
-              </div>
-              <div className="flex gap-2">
-                <span className="text-muted-foreground w-24 shrink-0">เฉลย:</span>
-                <span className="font-medium">{correct.join(' หรือ ')}</span>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    )
-  }
-
-  // ─── ตารางจำแนก — one line per keyed cell, named by where it sits ────────
-  // Unlike the COMP: branch below, this reads the question's own config rather
-  // than the frozen key alone: a grid of option positions is unreadable as
-  // digits, and "ช่อง 3" tells a teacher nothing about which row a student
-  // misread. Cells the teacher never keyed are skipped — they were left out of
-  // the score, so there is nothing to report about them.
-  if (correctAnswer.startsWith('CLS:')) {
-    const correctGrid = parseClassifyGrid(correctAnswer.slice(4))
-    const studentGrid = parseClassifyGrid(studentAnswer ?? '')
-    const config = (extraData ?? {}) as {
-      columns?: Array<{ title?: string; options?: string[] }>
-      rows?: Array<{ text?: string }>
-    }
-    const columns = Array.isArray(config.columns) ? config.columns : []
-    const configRows = Array.isArray(config.rows) ? config.rows : []
-    const optionText = (c: number, index: number) => {
-      const option = columns[c]?.options?.[index]
-      return typeof option === 'string' && option.trim() !== '' ? option : `ตัวเลือกที่ ${index + 1}`
-    }
-    const plain = (html: string) => html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()
-
-    const cells: Array<{ key: string; row: string; column: string; student: string; correct: string; ok: boolean }> = []
-    correctGrid.forEach((keyRow, r) => keyRow.forEach((key, c) => {
-      if (key === CLASSIFY_UNSET) return
-      const picked = studentGrid[r]?.[c] ?? CLASSIFY_UNSET
-      cells.push({
-        key: `${r}-${c}`,
-        row: plain(configRows[r]?.text ?? '') || `แถวที่ ${r + 1}`,
-        column: columns[c]?.title?.trim() || `มิติที่ ${c + 1}`,
-        student: picked === CLASSIFY_UNSET ? '—' : optionText(c, picked),
-        correct: optionText(c, key),
-        ok: picked === key,
-      })
-    }))
-
-    return (
-      <div className="mt-2 space-y-2 text-sm">
-        {cells.map(cell => (
-          <div key={cell.key} className={`pl-3 border-l-2 space-y-0.5 ${cell.ok ? 'border-success/30' : 'border-destructive/30'}`}>
-            <p className={`text-xs font-semibold ${cell.ok ? 'text-success' : 'text-destructive'}`}>
-              {cell.ok ? '✓' : '✗'} {cell.row} · {cell.column}
-            </p>
-            <div className="flex gap-2">
-              <span className="text-muted-foreground w-24 shrink-0">คำตอบคุณ:</span>
-              <span className="font-medium">{cell.student}</span>
-            </div>
-            {!cell.ok && (
-              <div className="flex gap-2">
-                <span className="text-muted-foreground w-24 shrink-0">เฉลย:</span>
-                <span className="font-medium">{cell.correct}</span>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    )
-  }
-
-  // ─── เติมคำในรูป — one line per keyed point, named after the point ──────
-  // Like the classify branch above, this reads the question's own config as
-  // well as the frozen key: the key knows what each point should say but not
-  // which place on the picture it is, and "จุดที่ 3" sends a teacher back to
-  // count dots. Points the teacher never keyed are skipped — they were left
-  // out of the score, so there is nothing to report about them.
-  if (correctAnswer.startsWith(IMAGE_LABEL_PREFIX)) {
-    const key = parseImageLabelKey(correctAnswer.slice(IMAGE_LABEL_PREFIX.length))
-    const answers = parseImageLabelAnswer(studentAnswer ?? '')
-    const config = (extraData ?? {}) as { markers?: Array<{ label?: string }> }
-    const markers = Array.isArray(config.markers) ? config.markers : []
-    const plain = (html: string) => html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()
-
-    const points = key.flatMap((marker, index) => {
-      if (marker.answers.length === 0) return []
-      const student = (answers[index] ?? '').trim()
-      return [{
-        key: String(index),
-        name: plain(markers[index]?.label ?? '') || `จุดที่ ${index + 1}`,
-        student: student || '—',
-        correct: marker.answers.join(' หรือ '),
-        ok: isImageLabelMarkerCorrect(answers[index] ?? '', marker),
-      }]
-    })
-
-    return (
-      <div className="mt-2 space-y-2 text-sm">
-        {points.map(point => (
-          <div key={point.key} className={`pl-3 border-l-2 space-y-0.5 ${point.ok ? 'border-success/30' : 'border-destructive/30'}`}>
-            <p className={`text-xs font-semibold ${point.ok ? 'text-success' : 'text-destructive'}`}>
-              {point.ok ? '✓' : '✗'} {point.name}
-            </p>
-            <div className="flex gap-2">
-              <span className="text-muted-foreground w-24 shrink-0">คำตอบคุณ:</span>
-              <span className="font-medium">{point.student}</span>
-            </div>
-            {!point.ok && (
-              <div className="flex gap-2">
-                <span className="text-muted-foreground w-24 shrink-0">เฉลย:</span>
-                <span className="font-medium">{point.correct}</span>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    )
-  }
-
-  // ─── Composite — each part re-dispatches to its own type's display ───────
-  if (correctAnswer.startsWith('COMP:')) {
-    type CompCorrectPart = { type: string; correct: unknown; caseSensitive?: boolean }
-    let correctParts: CompCorrectPart[] = []
-    let studentAnswers: string[] = []
-    try { correctParts = JSON.parse(correctAnswer.slice(5)) } catch { correctParts = [] }
-    try { studentAnswers = JSON.parse(studentAnswer ?? '[]') } catch { studentAnswers = [] }
-
-    return (
-      <div className="mt-2 space-y-2 text-sm">
-        {correctParts.map((cp, i) => {
-          const student = studentAnswers[i] ?? ''
-          const label = PART_LABELS[i] ?? String(i + 1)
-
-          if (cp.type === 'fill_blank' && Array.isArray(cp.correct) && cp.correct.length === 0) {
-            return (
-              <div key={i} className="pl-3 border-l-2 border-warning/20 space-y-0.5">
-                <p className="text-xs font-semibold text-warning">ข้อ {label} — รอครูตรวจ</p>
-                <div className="flex gap-2">
-                  <span className="text-muted-foreground w-24 shrink-0">คำตอบคุณ:</span>
-                  <span className="font-medium">{student || '—'}</span>
-                </div>
-              </div>
-            )
-          }
-
-          let partCorrect = false
-          let correctDisplay = ''
-          let studentDisplay = student || '—'
-          let showCorrectRow = true
-
-          if (cp.type === 'true_false') {
-            partCorrect = student === cp.correct
-            correctDisplay = cp.correct === 'true' ? 'ถูก' : 'ผิด'
-            studentDisplay = student === 'true' ? 'ถูก' : student === 'false' ? 'ผิด' : '—'
-          } else if (cp.type === 'mcq') {
-            partCorrect = student === cp.correct
-            correctDisplay = String(cp.correct ?? '—')
-          } else if (cp.type === 'fill_blank') {
-            const accepted = (cp.correct as string[]) ?? []
-            const cs = !!cp.caseSensitive
-            partCorrect = accepted.some(a => cs ? student.trim() === a.trim() : student.trim().toLowerCase() === a.trim().toLowerCase())
-            correctDisplay = accepted.join(' หรือ ')
-          } else if (cp.type === 'ordering') {
-            const correctOrder = (cp.correct as string[]) ?? []
-            let studentOrder: string[] = []
-            try { studentOrder = JSON.parse(student || '[]') } catch { studentOrder = [] }
-            partCorrect = correctOrder.length > 0 && studentOrder.length === correctOrder.length && correctOrder.every((id, idx) => studentOrder[idx] === id)
-            studentDisplay = studentOrder.length > 0 ? (partCorrect ? 'เรียงถูกต้อง' : 'เรียงไม่ถูกต้อง') : '—'
-            showCorrectRow = false
-          }
-
-          return (
-            <div key={i} className="pl-3 border-l-2 border-border space-y-0.5">
-              <p className="text-xs font-semibold text-muted-foreground">ข้อ {label}</p>
-              <div className="flex gap-2">
-                <span className="text-muted-foreground w-24 shrink-0">คำตอบคุณ:</span>
-                <span className={`font-medium ${partCorrect ? 'text-success' : 'text-destructive'}`}>{studentDisplay}</span>
-              </div>
-              {showCorrectRow && (
-                <div className="flex gap-2">
-                  <span className="text-muted-foreground w-24 shrink-0">เฉลย:</span>
-                  <span className="font-medium">{correctDisplay}</span>
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
-    )
-  }
-
-  // ─── Multi-part numeric ───────────────────────────────────────────────────
-  const isMultiPart = correctAnswer.startsWith('[')
-  if (isMultiPart) {
-    let correctArr: string[] = []
-    let studentArr: string[] = []
-    try { correctArr = JSON.parse(correctAnswer) } catch { correctArr = [] }
-    try { studentArr = JSON.parse(studentAnswer ?? '[]') } catch { studentArr = [] }
-
-    return (
-      <div className="mt-2 space-y-2 text-sm">
-        {correctArr.map((correct, i) => {
-          const student = studentArr[i] ?? '—'
-          const part = answerParts?.[i]
-          const unit = part?.unit ?? answerUnit ?? ''
-          const sv = evaluateStudentAnswer(student) ?? NaN
-          const cv = parseFloat(correct)
-          const tol = part?.tolerance ?? 0.1
-          const absTol = tol < 0 ? Math.abs(cv) * (Math.abs(tol) / 100) : tol
-          const partCorrect = !isNaN(sv) && !isNaN(cv) && Math.abs(sv - cv) <= absTol
-
-          return (
-            <div key={i} className="pl-3 border-l-2 border-border space-y-0.5">
-              <p className="text-xs font-semibold text-muted-foreground">{PART_LABELS[i] ?? i + 1})</p>
-              <div className="flex gap-2">
-                <span className="text-muted-foreground w-24 shrink-0">คำตอบคุณ:</span>
-                <span className={`font-medium ${partCorrect ? 'text-success' : 'text-destructive'}`}>
-                  {student} {unit && <UnitText html={unit} />}
-                </span>
-              </div>
-              <div className="flex gap-2">
-                <span className="text-muted-foreground w-24 shrink-0">เฉลย:</span>
-                <span className="font-medium">
-                  {formatAnswerDisplay(correct)} {unit && <UnitText html={unit} />}
-                </span>
-              </div>
-              <WorkImageThumbnail url={workImages?.[i]} />
-            </div>
-          )
-        })}
-      </div>
-    )
-  }
-
-  // ─── Single answer (numeric / text) ──────────────────────────────────────
-  return (
-    <div className="mt-2 space-y-1 text-sm">
-      <div className="flex gap-2">
-        <span className="text-muted-foreground w-24 shrink-0">คำตอบคุณ:</span>
-        <span className={`font-medium ${isCorrect ? 'text-success' : 'text-destructive'}`}>
-          {studentAnswer ?? '—'} {answerUnit}
-        </span>
-      </div>
-      <div className="flex gap-2">
-        <span className="text-muted-foreground w-24 shrink-0">เฉลย:</span>
-        <span className="font-medium">
-          {formatAnswerDisplay(correctAnswer)} {answerUnit}
-        </span>
-      </div>
-      <WorkImageThumbnail url={workImages?.[0]} />
-    </div>
-  )
-}
-
-function WorkImageThumbnail({ url }: { url?: string | null }) {
-  if (!url) return null
-  return (
-    <a href={url} target="_blank" rel="noopener noreferrer" className="inline-block mt-1">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={url} alt="รูปวิธีทำ" loading="lazy" decoding="async" className="w-24 h-24 rounded-lg object-cover border hover:opacity-90 transition-opacity" />
-    </a>
-  )
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function formatAnswerDisplay(val: string): string {
-  const n = parseFloat(val)
-  if (isNaN(n)) return val
-  return formatAnswer(n)
-}
-
-function UnitText({ html }: { html: string }) {
-  const isHtml = /<[a-z][\s\S]*>/i.test(html) || containsMath(html)
-  if (isHtml) {
-    return <span className="[&_p]:inline" dangerouslySetInnerHTML={{ __html: renderRichTextHtml(html) }} />
-  }
-  return <>{html}</>
-}
+// ─── Display variables ────────────────────────────────────────────────────────
 
 function substituteVars(text: string, values: Record<string, number>) {
   return text.replace(/\{(\w+)\}/g, (_, name) => {
     if (!(name in values)) return `{${name}}`
     return `${values[name]}`
   })
-}
-
-function QuestionText({ text, className }: { text: string; className?: string }) {
-  const isHtml = /<[a-z][\s\S]*>/i.test(text) || containsMath(text)
-  if (isHtml) {
-    return <div className={`rich-text-content ${className ?? ''}`} dangerouslySetInnerHTML={{ __html: renderRichTextHtml(text) }} />
-  }
-  return <p className={`whitespace-pre-line ${className ?? ''}`}>{text}</p>
 }

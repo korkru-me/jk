@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic'
 export default async function ExamScreenLabPage({
   searchParams,
 }: {
-  searchParams: Promise<{ perPage?: string | string[]; streak?: string | string[]; at?: string | string[]; timed?: string | string[]; type?: string | string[]; shell?: string | string[] }>
+  searchParams: Promise<{ perPage?: string | string[]; streak?: string | string[]; at?: string | string[]; timed?: string | string[]; type?: string | string[]; shell?: string | string[]; watermark?: string | string[] }>
 }) {
   if (!isExamScreenLabEnabled(process.env)) notFound()
 
@@ -52,6 +52,7 @@ export default async function ExamScreenLabPage({
       startedAt={new Date().toISOString()}
       assignmentType={params.type === 'exercise' ? 'exercise' : 'exam'}
       shell={params.shell === '1'}
+      optionalWatermark={params.watermark !== 'off'}
     />
   )
 }

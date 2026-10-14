@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { CheckCircle2, XCircle } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { buildSolutionWatermark } from '@/lib/solution-watermark'
+import { SubmissionScoreSummary } from '@/components/student/submission-score-summary'
 import {
   AttemptSolutionShortcut, AttemptSolutionsButton, AttemptSolutionsProvider,
   type AttemptSolutionsLoader,
@@ -172,7 +174,7 @@ function makeLoader(fail: boolean): AttemptSolutionsLoader {
     // Long enough to see the loading state, short enough not to wait on it.
     await new Promise(resolve => setTimeout(resolve, 600))
     if (fail) return { error: 'โหลดเฉลยไม่สำเร็จ — กดลองอีกครั้ง หรือกลับมาเปิดใหม่ภายหลัง' }
-    return { data: { items: buildItems() } }
+    return { data: { items: buildItems(), watermark: buildSolutionWatermark({ full_name: 'เด็กชายทดสอบ เรียนรู้ (ข้อมูลจำลอง)', prefix: 'เด็กชาย', first_name: null, last_name: null }, { student_code: '00007', grade_level: 'ม.4', section_number: 1, class_number: 7 }, new Date().toISOString()) } }
   }
 }
 
@@ -224,20 +226,10 @@ export function SolutionReleaseLabClient({ state, failLoads }: { state: LabRelea
       </Card>
 
       {/* The summary card, as the student's page lays it out. */}
-      <Card padding="2xl" className="text-center">
-        <p className="text-4xl font-black">18/30</p>
-        <p className="mt-1 text-sm text-muted-foreground">คะแนนที่ได้</p>
-        <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-          {open && <AttemptSolutionsButton />}
-        </div>
-        {state !== 'open' && (
-          <SolutionLockNotice
-            lock={LOCKS[state]}
-            assignmentId={ASSIGNMENT_ID}
-            canResume={state !== 'unfinished-closed'}
-          />
-        )}
-      </Card>
+      <SubmissionScoreSummary visible score={18} maxScore={30} percentage={60} passed={null} threshold={null} counts={null} submittedAt={null} strategy={null}>
+        {open && <AttemptSolutionsButton />}
+        {state !== 'open' && <div className="basis-full"><SolutionLockNotice lock={LOCKS[state]} assignmentId={ASSIGNMENT_ID} canResume={state !== 'unfinished-closed'} /></div>}
+      </SubmissionScoreSummary>
 
       <div className="space-y-3">
         <h2 className="flex items-center gap-2 font-semibold"><span>📋</span> ตรวจเฉลยทีละข้อ</h2>

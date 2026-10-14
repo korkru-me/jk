@@ -68,6 +68,9 @@ import { ExamToolbarDock } from './exam-toolbar-dock'
 import { Textarea } from '@/components/ui/textarea'
 import { NativeSelect } from '@/components/ui/native-select'
 import { ExamWatermark } from './exam-watermark'
+import { SolutionWatermark } from '@/components/student/solution-watermark'
+import { SubmissionScoreSummary } from '@/components/student/submission-score-summary'
+import type { SolutionWatermarkData } from '@/lib/solution-watermark'
 import { MathAnswerField } from './math-answer-field'
 import { mathInputPartKey, readMathInputMode, type MathInputModes } from '@/lib/math/input-mode'
 import { hasCompleteWorkEvidence, workArtifactPartKey, type StudentWorkArtifactView } from '@/lib/math-work'
@@ -150,6 +153,7 @@ export interface ExamConfig {
   isFullscreenEnforced: boolean
   blockClipboard: boolean
   watermarkText: string | null
+  solutionWatermark: SolutionWatermarkData
   // Whether this งาน asks students to attach evidence of their working. One
   // decision for the whole assignment, made by the teacher when they create it
   // — every เติมคำตอบตัวเลข question in it either needs a photo or none does.
@@ -1175,6 +1179,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   const progress      = answers.length ? Math.round((answeredCount / answers.length) * 100) : 0
   const timerUrgent   = secondsLeft !== null && secondsLeft < 300
   const timerDanger   = secondsLeft !== null && secondsLeft < 60
+  const showingSolution = previewResult !== null || Object.values(checked).some(feedback => feedback.revealed)
 
   const navigationLegendItems = [
     { cls: 'bg-primary', label: 'ข้อปัจจุบัน' },
@@ -1735,7 +1740,8 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
 
   return (
     <>
-      {config.watermarkText && <ExamWatermark text={config.watermarkText} />}
+      {showingSolution ? <SolutionWatermark data={config.solutionWatermark} layer="dialog" />
+        : config.watermarkText && <ExamWatermark text={config.watermarkText} />}
 
       {/* ── Fullscreen warning overlay ─────────────────────────────────────── */}
       {config.isFullscreenEnforced && showFullscreenWarning && (
@@ -2264,8 +2270,8 @@ function InstantCheckPanel({
                   <CheckCircle2 size={13} /> เฉลย
                 </span>
               )}
-              {choice.picked && !choice.correct && (
-                <span className="text-xs font-semibold text-destructive shrink-0">คำตอบคุณ</span>
+              {choice.picked && (
+                <span className={cn('text-xs font-semibold shrink-0', choice.correct ? 'text-[color-mix(in_oklab,var(--success)_60%,var(--foreground))]' : 'text-destructive')}>คำตอบของคุณ</span>
               )}
             </div>
           ))}
@@ -2327,36 +2333,9 @@ function PreviewResultSummary({
 
   return (
     <div className="max-w-2xl mx-auto space-y-4 py-4">
-      <Card padding="2xl" className="text-center">
-        <div className={`inline-flex items-center justify-center w-24 h-24 rounded-full text-3xl font-black mb-4 ${
-          pct >= 75 ? 'bg-success/10 text-success'
-          : pct >= 50 ? 'bg-warning/10 text-warning'
-          : 'bg-destructive/10 text-destructive'
-        }`}>
-          {pct}%
-        </div>
-        <p className="text-4xl font-black">{totalScore}/{totalMax}</p>
-        <p className="text-muted-foreground mt-1 text-sm">คะแนนที่จะได้ (ตัวอย่าง — ไม่บันทึกจริง)</p>
-        <div className="flex items-center justify-center gap-4 mt-4 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1 text-[color-mix(in_oklab,var(--success)_60%,var(--foreground))]">
-            <CheckCircle2 size={13} /> ถูก {correctCount} ข้อ
-          </span>
-          <span className="flex items-center gap-1 text-destructive">
-            <XCircle size={13} /> ผิด {wrongCount} ข้อ
-          </span>
-          {pendingCount > 0 && (
-            <span className="flex items-center gap-1 text-warning">
-              <Clock size={13} /> ต้องตรวจเอง {pendingCount} ข้อ
-            </span>
-          )}
-        </div>
-        <a
-          href={returnHref}
-          className="mt-6 inline-flex items-center gap-1.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold px-4 py-2 transition-colors"
-        >
-          กลับไปหน้าชุดข้อสอบ
-        </a>
-      </Card>
+      <SubmissionScoreSummary visible score={totalScore} maxScore={totalMax} percentage={pct} passed={null} threshold={null} counts={{ correct: correctCount, wrong: wrongCount, pending: pendingCount }} submittedAt={null} strategy="ตัวอย่างผลคะแนน · ไม่บันทึกจริง">
+        <Button size="sm" render={<a href={returnHref} />}>กลับไปหน้าชุดข้อสอบ</Button>
+      </SubmissionScoreSummary>
 
       <div className="space-y-2">
         <h2 className="font-semibold text-sm px-1">ตรวจเฉลยทีละข้อ</h2>
