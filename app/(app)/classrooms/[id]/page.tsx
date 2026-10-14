@@ -29,6 +29,7 @@ import { backHrefFromSearchParams } from '@/lib/back-link'
 import { ClassroomRecentViewTracker } from './_components/classroom-recent-view-tracker'
 import { isPracticeLibraryEnabled } from '@/lib/practice-question'
 import { loadClassroomPracticeLibraries } from '@/lib/classroom-practice-libraries.server'
+import { loadClassroomRecentWork } from '@/lib/classroom-recent-work.server'
 
 export default async function ClassroomDetailPage({
   params,
@@ -390,6 +391,9 @@ export default async function ClassroomDetailPage({
   // Assignments linked to this classroom (via assignment_classrooms, not the
   // legacy single classroom_id column, so multi-classroom assignments count too)
   const linkedAssignmentIds = Array.from(new Set((assignmentLinkRows ?? []).map((l: any) => l.assignment_id)))
+  const recentWorkPromise = c.classroom_type === 'subject' && canManage
+    ? loadClassroomRecentWork(supabase, id, authUser.id, linkedAssignmentIds, showPracticeLibraries)
+    : Promise.resolve(null)
   const displayOrderByAssignment = new Map(
     (assignmentLinkRows ?? []).map((l: any) => [l.assignment_id as string, l.display_order as number | null])
   )
@@ -602,6 +606,7 @@ export default async function ClassroomDetailPage({
         invites={invites}
         classroomAssignments={classroomAssignments}
         practiceLibraries={practiceLibraries}
+        recentWork={await recentWorkPromise}
         assignmentCategories={assignmentCategories}
         classroomSubmissions={classroomSubmissions}
         classroomExtensions={classroomExtensions}

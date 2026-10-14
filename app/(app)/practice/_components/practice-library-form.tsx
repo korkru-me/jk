@@ -43,6 +43,7 @@ import type { AssignmentQuestionSetOption } from '@/components/assignments/creat
 import { toggleQuestionSetSelection } from '@/lib/question-set-selection'
 import { questionExcerpt } from '@/lib/question-display'
 import { cn } from '@/lib/utils'
+import { classroomNavigationPath } from '@/lib/classroom-navigation'
 import {
   closePracticeLibrary,
   createPracticeLibrary,
@@ -396,13 +397,11 @@ export function PracticeLibraryForm({
       }
 
       setSavedSnapshot(currentSnapshot)
-      if (initialLibrary) {
-        toast.success('บันทึกคลังฝึกแล้ว')
-        router.refresh()
-      } else {
-        toast.success(intent === 'publish' ? 'สร้างและเผยแพร่คลังฝึกแล้ว' : 'บันทึกร่างคลังฝึกแล้ว')
-        router.push(`/practice/${result.id}/edit`)
-      }
+      allowNavigationRef.current = true
+      toast.success(initialLibrary ? 'บันทึกคลังฝึกแล้ว'
+        : intent === 'publish' ? 'สร้างและเผยแพร่คลังฝึกแล้ว' : 'บันทึกร่างคลังฝึกแล้ว')
+      const returnClassroomId = initialLibrary?.classroomId ?? contextualPrimaryClassroomId ?? classroomIds[0]
+      router.push(returnClassroomId ? classroomNavigationPath(returnClassroomId, 'assignments') : '/practice')
     })
   }
 
