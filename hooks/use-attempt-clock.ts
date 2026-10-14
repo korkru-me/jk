@@ -1,10 +1,10 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { attemptSecondsLeft } from '@/lib/attempt-expiry'
+import { attemptElapsedMs, attemptSecondsLeft } from '@/lib/attempt-expiry'
 
-/** Anchor to server time, then use a monotonic clock rather than the device's
- * editable wall clock. A resumed page receives a new server anchor. */
+/** Anchor to server time. Keep elapsed time advancing through device sleep
+ * and never rewind it with a device clock change. Resume refreshes the anchor. */
 export function useAttemptClock(expiresAt: string | null | undefined, serverNow: string | null | undefined,
   onExpire?: () => void) {
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null)
@@ -12,11 +12,15 @@ export function useAttemptClock(expiresAt: string | null | undefined, serverNow:
   useEffect(() => { callback.current = onExpire }, [onExpire])
   useEffect(() => {
     if (!expiresAt) { setSecondsLeft(null); return }
-    const serverMs = serverNow ? Date.parse(serverNow) : Date.now()
+    const wallOrigin = Date.now()
+    const parsedServerMs = serverNow ? Date.parse(serverNow) : NaN
+    const serverMs = Number.isFinite(parsedServerMs) ? parsedServerMs : wallOrigin
     const origin = performance.now()
+    let elapsed = 0
     let fired = false
     const tick = () => {
-      const left = attemptSecondsLeft(expiresAt, serverMs + performance.now() - origin)
+      elapsed = attemptElapsedMs(elapsed, performance.now() - origin, Date.now() - wallOrigin)
+      const left = attemptSecondsLeft(expiresAt, serverMs + elapsed)
       setSecondsLeft(left)
       if (left === 0 && !fired) { fired = true; callback.current?.() }
     }

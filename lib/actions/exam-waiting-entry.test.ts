@@ -12,7 +12,7 @@ vi.mock('@/lib/exam-access-session', () => ({ getExamAccessSession: m.access }))
 vi.mock('@/lib/seb-assignment-release.server', () => ({ readCurrentAssignmentSebRelease: m.release, createAssignmentSebSignedDownloadUrl: async () => 'https://synthetic.invalid/seed.seb' }))
 vi.mock('@/lib/seb-session', () => ({ createSebChallenge: () => 'challenge', validateSebChallenge: () => null, getSebSession: vi.fn() }))
 
-import { readSubmissionEntry, startAssignmentFromWaiting as startExamFromWaiting } from './submissions'
+import { readSubmissionEntry, startAssignmentFromWaiting as startExamFromWaiting, finalizeExpiredSubmission, submitSubmission } from './submissions'
 import { waitingResumeId, type ExamWaitingSummary } from '@/lib/exam-waiting-room'
 
 /** Real entry/action/grading/snapshot code; external Auth/DB/native boundaries
@@ -142,6 +142,13 @@ afterEach(() => { expect(fetch).not.toHaveBeenCalled(); vi.unstubAllGlobals(); v
 
 describe.each(['exam', 'exercise'])('question-free %s entry', type => {
   beforeEach(() => { db.assignments[0].type = type })
+  it('returns only an idempotent receipt, never a hidden score, for completed rounds', async () => {
+    db.assignments[0].show_results = 'hidden'
+    db.submissions = [attempt({ status: 'submitted', total_score: 9 })]
+    expect(await finalizeExpiredSubmission(S)).toEqual({ success: true })
+    expect(await submitSubmission(S)).toEqual({ success: true })
+    expect(writes).toEqual([])
+  })
   it('opens the waiting room against the legacy production schema without writes', async () => {
     revisionColumnMissing = true
     expect((await summary()).assignmentType).toBe(type)

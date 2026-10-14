@@ -1,6 +1,6 @@
 # Security และ privacy guardrails
 
-Timed closure (`20261014072745`, rollout pending): SECURITY INVOKER RPCs use `search_path = ''` and revoke PUBLIC/anon/authenticated execution. Student actions derive identity from verified Auth, constrain the owned row, and SQL checks ownership/server expiry before forced closure. Answer/working triggers lock the same submission as closure; late writes fail between cron ticks. Grade publication is atomic and duplicate requests preserve completed/teacher grades. Global processing requires a constant-time comparison of a separate environment-specific worker secret. Vault dispatch credentials are used only by postgres cron, not exposed to browsers or worker/service-role callers. Responses contain aggregate outcomes, not student IDs, answers or keys; Staging credentials must never be reused in Production.
+การปิดรอบ (`20261014072745`, apply เฉพาะ Staging): RPC เป็น SECURITY INVOKER, `search_path = ''` และ revoke PUBLIC/anon/authenticated Student action ใช้ Auth ที่ตรวจแล้วและ exact owned row โดย SQL ตรวจ owner/expiry ก่อน forced closure Trigger คำตอบ/วิธีทำใช้ row lock เดียวกับการปิดและปฏิเสธ late writes ระหว่าง cron ticks เขียนคะแนนแบบ atomic และส่ง receipt ที่ไม่มีคะแนนซ่อน Global worker ต้องผ่าน constant-time secret comparison แยก environment Vault dispatch ใช้โดย postgres cron เท่านั้น ไม่เปิดให้ browser/service-role worker อ่าน Responses มีเฉพาะยอดรวม ไม่พิมพ์ข้อมูลนักเรียนหรือ key และไม่ใช้ credential ของ Staging ใน Production
 
 ## Reset numeric variants safely — 15 October 2026
 

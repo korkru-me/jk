@@ -75,7 +75,7 @@ export default async function TakeExamPage({
       assignmentId={id} summary={result.waitingRoom} sebChallenge={sebChallenge} />
   }
   const exam = await getExamTakingData(submissionId)
-  if (!exam) redirect('/assignments')
+  if (!exam) redirect(`/assignments/${id}/take`)
   if (result.waitingRoom) {
     // A slow safe-data read may cross the timer/deadline boundary. Do not
     // serialize the questions then: show question-free recovery instead.
