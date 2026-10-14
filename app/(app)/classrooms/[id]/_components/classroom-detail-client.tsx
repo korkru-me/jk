@@ -20,6 +20,7 @@ import type { StudentNoteRow, StudentProfileRow } from './homeroom-overview'
 import type { HomeroomAssignmentRow } from '@/lib/homeroom-data'
 import { targetedStudentIds, type ClassroomGroup } from '@/lib/classroom-groups'
 import type { AssignmentCategory } from '@/lib/assignment-categories'
+import type { ClassroomPracticeLibrariesResult } from '@/lib/classroom-practice-libraries'
 import {
   classroomNavigationHref,
   classroomNavigationFor,
@@ -75,6 +76,7 @@ interface Props {
   coTeachers: CoTeacherRow[]
   invites: InviteRow[]
   classroomAssignments: ClassroomAssignmentRow[]
+  practiceLibraries?: ClassroomPracticeLibrariesResult | null
   assignmentCategories: AssignmentCategory[]
   classroomSubmissions: {
     id: string; assignment_id: string; student_id: string; status: string
@@ -108,7 +110,7 @@ interface Props {
 
 export function ClassroomDetailClient({
   classroom, switchableClassrooms, students, assignmentCount, isOwner, canManage, coTeachers, invites,
-  classroomAssignments, assignmentCategories, classroomSubmissions, classroomExtensions,
+  classroomAssignments, practiceLibraries, assignmentCategories, classroomSubmissions, classroomExtensions,
   homeroomAssignments, homeroomSubmissions, studentNotes, studentProfiles, ownerName, posts,
   pendingReviewByAssignment, seenByPost, crossPostTargets,
   groups, groupMembers, initialNavigationItem, initialPeopleView, backHref,
@@ -357,6 +359,7 @@ export function ClassroomDetailClient({
             classroomId={classroom.id}
             assignments={classroomAssignments}
             categories={assignmentCategories}
+            practiceLibraries={practiceLibraries}
             submissions={classroomSubmissions}
             studentCount={students.length}
             audienceByAssignment={audienceByAssignment}

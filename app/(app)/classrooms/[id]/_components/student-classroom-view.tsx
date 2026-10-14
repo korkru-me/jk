@@ -7,6 +7,8 @@ import type { Classroom, ClassroomPost } from '@/lib/types'
 import type { AssignmentCategory } from '@/lib/assignment-categories'
 import { Card } from '@/components/ui/card'
 import { StudentClassroomHeader } from './student-classroom-header'
+import { ClassroomPracticeLibraries } from '@/components/practice/classroom-practice-libraries'
+import type { ClassroomPracticeLibrariesResult } from '@/lib/classroom-practice-libraries'
 
 export type { StudentAssignmentRow }
 
@@ -21,9 +23,10 @@ interface Props {
   trackSeen?: boolean
   assignmentHrefs?: Record<string, string>
   initialNow?: string
+  practiceLibraries?: ClassroomPracticeLibrariesResult | null
 }
 
-export function StudentClassroomView({ classroom, teacherName, studentCount, assignments, categories, posts, backHref = '/dashboard#classrooms', trackSeen = true, assignmentHrefs, initialNow }: Props) {
+export function StudentClassroomView({ classroom, teacherName, studentCount, assignments, categories, posts, backHref = '/dashboard#classrooms', trackSeen = true, assignmentHrefs, initialNow, practiceLibraries }: Props) {
 
   return (
     <div className="flex min-w-0 max-w-5xl flex-col gap-4">
@@ -50,6 +53,8 @@ export function StudentClassroomView({ classroom, teacherName, studentCount, ass
         <h2 className="text-sm font-semibold">ประกาศจากครู</h2>
         <p className="text-xs text-muted-foreground">ยังไม่มีประกาศ</p>
       </Card>}
+
+      {practiceLibraries && <ClassroomPracticeLibraries result={practiceLibraries} studentView />}
 
       {/* Assignments */}
       <section aria-labelledby="classroom-work-heading" className="flex min-w-0 flex-col gap-2.5">

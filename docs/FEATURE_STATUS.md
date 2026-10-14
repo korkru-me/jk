@@ -1,5 +1,15 @@
 # Feature status
 
+### แสดงคลังฝึกในหน้าห้องเรียน — 14 ตุลาคม 2026
+
+- แก้กรณีสร้างและเผยแพร่คลังฝึกสำเร็จ แต่ไม่พบในห้องเรียน: หน้า `/classrooms/[id]` เดิมอ่านเฉพาะ `assignments` จึงไม่ได้แสดงแถวที่บันทึกใน `practice_libraries`; ไม่ใช่ข้อมูลสูญหาย
+- ครูผู้จัดการห้องเห็นส่วน **คลังฝึก · ไม่มีคะแนน** ในแท็บงานที่มอบหมาย พร้อมจำนวนข้อ สถานะร่าง/เผยแพร่/ปิด ลิงก์ตั้งค่า และเมนู lifecycle/ความคืบหน้าเดิม นักเรียนเห็นเฉพาะคลังที่เผยแพร่ในห้องของตน และเปิดหน้ารอก่อนเข้าฝึกได้
+- อ่าน metadata ของ exact classroom ด้วย session client และ RLS เดิม พร้อม aggregate จำนวนสมาชิกโจทย์และ pagination; RSC allowlist มีเพียง id, title, status, questionCount ไม่ส่งรหัสผ่าน คำตอบ หรือความคืบหน้า แยก error จาก empty state และซ่อนส่วนนี้เมื่อปิด feature flag/ห้อง homeroom
+- create หลายห้อง, update, publish/close, duplicate และ delete revalidate หน้าห้องที่ได้รับผล เพื่อให้กลับเข้าห้องแล้วพบรายการล่าสุด ไม่เปลี่ยน AssignmentType, submission, scoring หรือ schema
+- ตรวจ Production แบบ read-only ตามคำขอ: คลังที่ผู้ใช้สร้างยังเป็น published และมีสมาชิกโจทย์ 143 ข้อ; ไม่สร้างข้อมูล QA หรือแก้ข้อมูลจริงบน Production
+- ตรวจ UI/role isolation ด้วยบัญชีจำลองใน Staging, type-check, token lint, unit suite และ production build; ผลละเอียดอยู่ `docs/SELF_PRACTICE_UAT.md`
+
+
 ### Sync เว็บจริงกับ local และแก้สร้างคลังฝึก — 14 ตุลาคม 2026
 
 - เจ้าของอนุมัติให้รวม source ที่เสร็จแล้วใน local กับ Production ล่าสุด: wizard/หน้ารอ/การตั้งค่าคลังฝึก, ตัวเลือกห้องที่คงลำดับ, การ์ดห้องนักเรียน และ dashboard/calendar ใช้ชุดเดียวกับโลโก้ Production รอบ PR #48–49
