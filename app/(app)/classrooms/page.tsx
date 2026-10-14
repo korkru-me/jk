@@ -4,9 +4,6 @@ import { getAuthUser } from '@/lib/auth/server'
 import { redirect } from 'next/navigation'
 import type { Classroom } from '@/lib/types'
 import { TeacherViewClient } from './_components/teacher-view-client'
-import { StudentView, type StudentClassroom } from './_components/student-view'
-import { linkReachesGroup } from '@/lib/classroom-groups'
-import { getStudentGroups } from '@/lib/classroom-groups-server'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'ห้องเรียน — KorKru' }
@@ -78,51 +75,5 @@ export default async function ClassroomsPage({
     )
   }
 
-  // Student view
-  const { data: memberships } = await admin
-    .from('classroom_students')
-    .select('classroom_id, classrooms(id, name, description, status, classroom_type)')
-    .eq('student_id', authUser.id)
-
-  const classrooms = (memberships ?? [])
-    .map((m: any) => m.classrooms)
-    .filter((c: any) => c && c.status === 'active') as StudentClassroom[]
-
-  const classroomIds = classrooms.map(c => c.id)
-  const [{ data: links }, { data: subRows }, groupOf] = classroomIds.length > 0
-    ? await Promise.all([
-        admin
-          .from('assignment_classrooms')
-          .select('assignment_id, classroom_id, group_ids, assignments!inner(status)')
-          .in('classroom_id', classroomIds)
-          .eq('assignments.status', 'published'),
-        admin
-          .from('submissions')
-          .select('assignment_id, status')
-          .eq('student_id', authUser.id)
-          .in('status', ['submitted', 'graded']),
-        getStudentGroups(admin, authUser.id, classroomIds),
-      ])
-    : [{ data: [] }, { data: [] }, new Map<string, string>()]
-
-  const doneAssignmentIds = new Set(
-    (subRows ?? []).map((s: any) => s.assignment_id)
-  )
-
-  const pendingCountMap: Record<string, number> = {}
-  for (const l of (links ?? []) as any[]) {
-    // งาน handed to another กลุ่มย่อย is not pending for this student.
-    if (!linkReachesGroup(l.group_ids ?? null, groupOf.get(l.classroom_id))) continue
-    if (!doneAssignmentIds.has(l.assignment_id)) {
-      pendingCountMap[l.classroom_id] = (pendingCountMap[l.classroom_id] ?? 0) + 1
-    }
-  }
-
-  return (
-    <StudentView
-      classrooms={classrooms}
-      pendingCountMap={pendingCountMap}
-      initialJoinCode={initialJoinCode}
-    />
-  )
+  redirect(`/dashboard${initialJoinCode ? `?join=${encodeURIComponent(initialJoinCode)}` : ''}#classrooms`)
 }

@@ -6,21 +6,28 @@ import type { User } from '@/lib/types'
 import {
   TeacherDashboard, type DashboardClassroom,
 } from './_components/teacher-dashboard'
-import type { CalendarEvent } from './_components/assignment-calendar'
 import { StudentDashboard, type StudentDashboardPost } from './_components/student-dashboard'
-import { computePassed } from '@/lib/grading'
-import { rescaleToDisplayMax } from '@/lib/scoring'
-import { filterAssignmentsForStudent } from '@/lib/classroom-groups-server'
+import { getStudentGroups } from '@/lib/classroom-groups-server'
+import type { StudentClassroom } from '../classrooms/_components/student-view'
+import { buildStudentLearningData, type LearningAssignment, type LearningSubmission } from './_components/student-learning-data'
 import { getQuestionCardData } from '@/lib/actions/question-card-data'
 import type { QuestionCardRow } from '@/components/questions/question-card'
 import { sortClassroomsByRecentViews } from '@/lib/classroom-recency'
 
-export const metadata = { title: 'หน้าหลัก — KorKru' }
+export async function generateMetadata() {
+  const user = await getAuthUser()
+  if (!user) return { title: 'หน้าหลัก — KorKru' }
+  const supabase = await createClient()
+  const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single()
+  return { title: `${profile?.role === 'student' ? 'พื้นที่เรียนรู้ของฉัน' : 'หน้าหลัก'} — KorKru` }
+}
 
 /** How many rows each "recent" list on the teacher home shows. */
 const RECENT_LIMIT = 5
 
-export default async function DashboardPage() {
+export default async function DashboardPage({ searchParams }: {
+  searchParams: Promise<{ join?: string | string[] }>
+}) {
   const supabase = await createClient()
   const authUser = await getAuthUser()
   if (!authUser) redirect('/login')
@@ -126,131 +133,51 @@ export default async function DashboardPage() {
     )
   }
 
-  // ─── Student path ─────────────────────────────────────────────────────────────
+  // Student path: every service-role read is scoped to the verified user or
+  // their roster rows. Classroom links, group targets and score visibility
+  // retain the same rules as the former student pages.
   const [membershipsRes, submissionsRes] = await Promise.all([
-    supabase
-      .from('classroom_students')
-      .select('classroom_id')
+    admin.from('classroom_students')
+      .select('classroom_id, classrooms(id, name, description, status, classroom_type)')
       .eq('student_id', user.id),
-    admin
-      .from('submissions')
-      .select('id, total_score, score_adjustment, max_score, status, assignment_id, created_at, assignments(display_max_score, show_results, end_at)')
-      .eq('student_id', user.id),
+    admin.from('submissions')
+      .select('id, assignment_id, total_score, max_score, score_adjustment, status, attempt_number, created_at, assignments(id, classroom_id, title, type, end_at, duration_minutes, passing_type, passing_value, score_strategy, display_max_score, show_results, classrooms(name))')
+      .eq('student_id', user.id)
+      .order('created_at', { ascending: false }),
   ])
-
-  const classroomIds = (membershipsRes.data ?? []).map((m: any) => m.classroom_id)
-  const rawSubmissions = submissionsRes.data ?? []
-
-  // Fetch score-display settings through the submission relation so every
-  // attempt can be rescaled without a second assignment lookup.
-  const displayMaxByAssignment = new Map(rawSubmissions.map((s: any) => [
-    s.assignment_id as string,
-    (s.assignments?.display_max_score ?? null) as number | null,
-  ]))
-  const allSubmissions = rescaleToDisplayMax(
-    rawSubmissions as any[],
-    row => displayMaxByAssignment.get(row.assignment_id) ?? null
-  )
-  const completed = allSubmissions.filter(
-    (s: any) => s.status === 'submitted' || s.status === 'graded'
-  )
-  // Once memberships are known, assignments and announcements are
-  // independent and can be loaded in the same database round-trip window.
-  // The inner join replaces the old links -> assignment-id -> assignments
-  // waterfall while still using assignment_classrooms as the source of truth.
-  const [assignmentsRes, recentPostsRes] = classroomIds.length > 0
+  if (membershipsRes.error || submissionsRes.error) throw new Error('ไม่สามารถโหลดข้อมูลการเรียนได้ กรุณาลองใหม่')
+  // Supabase's ungenerated relationship types infer arrays for these to-one
+  // joins. Only the query boundary is cast; all projections below are typed.
+  const memberships = (membershipsRes.data ?? []) as unknown as { classroom_id: string; classrooms: StudentClassroom | null }[]
+  const classrooms = memberships.flatMap(row => row.classrooms ? [row.classrooms] : [])
+  const classroomIds = classrooms.map(c => c.id)
+  const [assignmentsRes, recentPostsRes, groupOf] = classroomIds.length > 0
     ? await Promise.all([
-        admin
-          .from('assignments')
-          .select('id, title, question_ids, random_question_count, completion_rule, streak_target, classrooms(name), end_at, duration_minutes, type, passing_type, passing_value, assignment_classrooms!inner(classroom_id, group_ids)')
+        admin.from('assignments')
+          .select('id, classroom_id, title, type, end_at, duration_minutes, passing_type, passing_value, score_strategy, display_max_score, show_results, assignment_classrooms!inner(classroom_id, group_ids)')
           .in('assignment_classrooms.classroom_id', classroomIds)
           .eq('status', 'published')
           .order('end_at', { ascending: true, nullsFirst: false }),
-        supabase
-          .from('classroom_posts')
-          .select('id, classroom_id, body, created_at, users(full_name), classrooms(name)')
+        supabase.from('classroom_posts')
+          // post_reads also links posts to users; explicitly choose the author.
+          .select('id, classroom_id, body, created_at, users!classroom_posts_author_id_fkey(full_name), classrooms(name)')
           .in('classroom_id', classroomIds)
-          .order('created_at', { ascending: false })
-          .limit(5),
+          .order('created_at', { ascending: false }).limit(5),
+        getStudentGroups(admin, user.id, classroomIds),
       ])
-    : [{ data: [] }, { data: [] }]
-
-  // A งาน handed to กลุ่มย่อย the student is not in is not theirs to do.
-  const allAssignments = await filterAssignmentsForStudent(
-    admin,
-    user.id,
-    classroomIds,
-    (assignmentsRes.data ?? []) as any[],
-    new Set(allSubmissions.map((s: any) => s.assignment_id as string)),
-  )
-  const recentPosts = recentPostsRes.data ?? []
-
-  let pendingAssignments: any[] = []
-  let calendarEvents: CalendarEvent[] = []
-
-  if (classroomIds.length > 0) {
-    const inProgressMap = new Map(
-      allSubmissions
-        .filter((s: any) => s.status === 'in_progress')
-        .map((s: any) => [s.assignment_id, s])
-    )
-    // Best (highest-scoring) submitted/graded attempt per assignment — an
-    // exercise may have several retry attempts behind it.
-    const bestByAssignment = new Map<string, any>()
-    for (const s of completed) {
-      const prev = bestByAssignment.get(s.assignment_id)
-      if (!prev || (s.total_score ?? -1) > (prev.total_score ?? -1)) {
-        bestByAssignment.set(s.assignment_id, s)
-      }
-    }
-
-    // An exercise submission that hasn't cleared its passing threshold isn't
-    // "done" yet — the student is expected to retry. Exams count once submitted.
-    function isDone(a: any): boolean {
-      const best = bestByAssignment.get(a.id)
-      if (!best) return false
-      if (a.type === 'exercise') {
-        if (computePassed(best.total_score, best.max_score, a.passing_type, a.passing_value) === false) return false
-      }
-      return true
-    }
-
-    pendingAssignments = (allAssignments ?? [])
-      .filter((a: any) => !isDone(a))
-      .slice(0, 6)
-      .map((a: any) => ({
-        id: a.id,
-        title: a.title,
-        question_ids: a.question_ids,
-        random_question_count: a.random_question_count,
-        completion_rule: a.completion_rule,
-        streak_target: a.streak_target,
-        classrooms: a.classrooms,
-        end_at: a.end_at,
-        duration_minutes: a.duration_minutes,
-        inProgress: inProgressMap.has(a.id),
-        submissionId: inProgressMap.get(a.id)?.id ?? null,
-      }))
-
-    calendarEvents = (allAssignments ?? [])
-      .filter((a: any) => a.end_at)
-      .map((a: any) => ({
-        id: a.id,
-        title: a.title,
-        classroomName: (a.classrooms as any)?.name ?? '',
-        endAt: a.end_at as string,
-        done: isDone(a),
-        submissionId: bestByAssignment.get(a.id)?.id ?? null,
-      }))
-  }
+    : [{ data: [], error: null }, { data: [], error: null }, new Map<string, string>()]
+  if (assignmentsRes.error || recentPostsRes.error) throw new Error('ไม่สามารถโหลดงานและประกาศได้ กรุณาลองใหม่')
+  const data = buildStudentLearningData({
+    classrooms, groupOf,
+    assignments: (assignmentsRes.data ?? []) as unknown as LearningAssignment[],
+    submissions: (submissionsRes.data ?? []) as unknown as LearningSubmission[],
+  })
+  const { join } = await searchParams
 
   return (
-    <StudentDashboard
-      user={user}
-      classroomsCount={classroomIds.length}
-      pendingAssignments={pendingAssignments}
-      calendarEvents={calendarEvents}
-      recentPosts={recentPosts as unknown as StudentDashboardPost[]}
+    <StudentDashboard user={user} data={data}
+      initialJoinCode={(Array.isArray(join) ? join[0] : join) ?? ''}
+      recentPosts={(recentPostsRes.data ?? []) as unknown as StudentDashboardPost[]}
     />
   )
 }

@@ -10,12 +10,44 @@
 - Staging apply migration ครบและ integration gate ผ่าน 8 บทบาท / 1,000 โจทย์ / 2 ห้อง: ค่าตั้งค่าบันทึกตรงกัน, exact AND search/pagination, idempotency, progress isolation และ closed-library denial ผ่าน; cleanup PASS · Production dry-run มีเฉพาะสองไฟล์นี้ และ Staging database lint ระดับ error ผ่าน
 - เพื่อให้ติดตั้งฐานข้อมูลก่อนเผยแพร่ source โดยเว็บรุ่นเดิมยังบันทึกร่างได้ เพิ่ม migration `20261014043342_practice_draft_backward_compatibility.sql`: RPC signature เดิมอ่านค่าตั้งค่าที่บันทึกแล้วภายใต้สิทธิ์เดิมและ row lock ก่อนเรียกตัวบันทึกรุ่นใหม่ ไม่เดาค่า default หรือเปิดสิทธิ์เพิ่ม; unit/hosted gate ต้องตรวจผู้ช่วยสอน manage บันทึกได้โดยค่าตั้งค่าไม่หาย และ view/ครูต่างห้องยังถูกปฏิเสธ
 
+### แก้หน้ารวมนักเรียนโหลดไม่สำเร็จ — 14 ตุลาคม 2026
+
+- หน้า `/dashboard` ล้มระหว่างโหลดประกาศ เพราะ `users(full_name)` มีทั้งความสัมพันธ์ผู้เขียนประกาศและผู้อ่านผ่าน `post_reads` ทำให้ PostgREST ตอบ `PGRST201`; ระบุ `users!classroom_posts_author_id_fkey(full_name)` เช่นเดียวกับ stream ของห้องเรียน โดยคง RLS และการจำกัดห้องจาก memberships เดิม
+- ทดสอบ Data API บน **Korkru Staging** แบบอ่านอย่างเดียว ด้วย UUID จำลองและ `limit=0`: query เดิม HTTP 300 / PGRST201, query ที่แก้ HTTP 200 / 0 rows; ไม่อ่านเนื้อหาประกาศหรือข้อมูลนักเรียน และไม่แก้ฐานข้อมูล Production ไม่มี migration
+- TypeScript ผ่าน บันทึก commit เฉพาะในเครื่องตามคำสั่งเจ้าของ แล้วกลับไปทำหน้าห้องเรียนและรายการงานแบบกระชับต่อ
+
+### พื้นที่เรียนรู้ของฉัน: รวมสามหน้านักเรียน — 14 ตุลาคม 2026
+
+- หน้านักเรียน `/dashboard` ใช้ชื่อ **พื้นที่เรียนรู้ของฉัน** และแทนเมนู หน้าหลัก / ห้องเรียนของฉัน / สรุปงานของฉัน ด้วยทางเข้าเดียว เรียงห้องเรียนของฉัน → สรุปงานของฉัน → ประกาศล่าสุด พร้อมปฏิทินย่อด้านข้างบนจอใหญ่; ทางเข้าของครูยังใช้หน้าหลักเดิม
+- เอา “ชุดข้อสอบที่รอทำ” และ Card สถิติสามใบออก สรุปต้องทำ / ใกล้หรือเลยกำหนด / ส่งแล้ว เป็น Badge ในแถวหัวข้อ และแสดงงานที่ต้องทำครบทุกงานด้วย Card สั้น (แถวทั่วไปประมาณ 74px) สีปกและไอคอนตรงกับห้องเรียนที่มอบหมายงาน; การจัดห้องเรียนอิงความกว้างพื้นที่จริงด้วย container query และประวัติการสอบพับเก็บได้
+- `buildStudentLearningData` ใช้กติกางานสำเร็จจากหน้าสรุปเดิมผ่าน `selectOfficialAttempt`, `rescaleToDisplayMax` และ `computePassed` ร่วมกันทั้งยอดบนห้องเรียน รายการงาน และปฏิทิน รองรับ best/latest/average และการปรับคะแนน; คะแนนที่ครูตั้งซ่อนถูกตัดออกจาก props ประวัติและคะแนนเดิมก่อน render
+- อ่านเฉพาะ memberships และ submissions ของ session ที่ตรวจแล้ว งานที่เผยแพร่จำกัดผ่าน `assignment_classrooms` ของห้องที่นักเรียนอยู่ และใช้กติกา group target เดิม รวมการเก็บงานที่เคยเริ่มหลังย้ายกลุ่ม งานที่มอบหลายห้องนับครั้งเดียวในสรุปและนับให้แต่ละห้องที่เกี่ยวข้อง; สีมาจาก ID ห้องที่นักเรียนเข้าถึงได้
+- `/classrooms` ของนักเรียนพาไป `/dashboard#classrooms` และคงรหัส `?join=`; `/my-submissions` พาไป `/dashboard#work-summary` เพื่อรองรับ bookmark และลิงก์กลับเดิม การเข้าร่วม/ออกห้องเรียน revalidate หน้ารวมด้วย ไม่มีการแก้ schema หรือกติกาสิทธิ์
+- local fixture `/exam-screen-lab/student-dashboard` ใช้ component และตัวรวมข้อมูลเดียวกับหน้าจริง มีสถานะปกติ/ว่าง/งานมาก/ส่งครบ/ปีอธิกสุรทิน และ server action จำลองสำหรับฟอร์มเข้าร่วม; ไม่มีการอ่านหรือเขียนข้อมูลนักเรียนจริง
+- ตรวจ TypeScript, design-token lint, unit suite 241 ไฟล์ / 3,212 เคส และ webpack production build ผ่าน; Next MCP compilation/runtime และ browser console ไม่มี error ตรวจ 320/390/768/1024/1280px, โหมดสว่าง/มืด, รายละเอียด hover 12 งานในวันเดียว, ขยาย/ปิดปฏิทิน/คืน focus, ฟอร์มจำลอง, งานครบและประวัติคะแนนที่ซ่อน · axe ไม่มี violation ในหน้ารวม (contrast ของข้อความใต้ card overlay บางจุดเป็น incomplete จึงตรวจภาพร่วมด้วย)
+- ตามคำสั่งเจ้าของ: commit ในเครื่องและแสดง localhost เท่านั้น ยังไม่ push หรือเผยแพร่ Production; ไม่ทดสอบบัญชี/ฐานข้อมูลจริง ไม่มี migration
+
 ### ปฏิทินนักเรียนแบบย่อและหน้าหลักประหยัดพื้นที่ — 14 ตุลาคม 2026
 
 - **UI-118** — ปฏิทินนักเรียนเป็น Card กว้างไม่เกิน `14rem` แสดงวันที่และจุดสีตามสถานะงาน; hover/Tab หรือแตะวันเปิดรายการทุกงานพร้อมชื่อห้องวิชา เวลาส่ง สถานะ และลิงก์ทำงาน/ดูผล ปุ่มขยายเปิดเดือนพร้อมรายละเอียดในช่องวันบน desktop และปฏิทินกับรายการเรียงตามวันบนมือถือ; วันที่มาจากเขตเวลาไทย และ popup ที่ขยายเป็นการอ่านอย่างเดียวจึงปิดได้โดยไม่ทิ้งข้อมูลร่าง
 - หน้าหลักนักเรียนนำ Card “ห้องเรียน / ส่งงานแล้ว / คะแนนเฉลี่ย” ออก รวมถึงการคำนวณค่าเฉลี่ยที่ใช้เฉพาะ Card นั้น; รายการงาน/ประกาศและกติกานับงานที่ทำสำเร็จยังใช้ข้อมูลและสิทธิ์เดิม ปฏิทินวางข้างรายการงานบนจอใหญ่ แยก `StudentDashboard` ให้ย้ายไปจัดรวมหน้าภายหลังได้ โดยยังไม่รวมหน้าหลัก ห้องเรียน และสรุปงานจนกว่าเจ้าของจะกำหนดรูปแบบ
 - local fixture `/exam-screen-lab/student-dashboard` มีสถานะปกติ/ว่าง/12 งานในวันเดียว/กุมภาพันธ์ปีอธิกสุรทิน ใช้ข้อมูลสังเคราะห์เท่านั้น; ตรวจ 320/390/768/1280px, hover และ Tab, สลับวัน/เดือน/ปี/กลับวันนี้, ปิด popup ภายนอก/Escape/คืน focus, scroll ในรายละเอียด, วันกำหนดส่ง 00:30 น. ของไทยและ 29 กุมภาพันธ์ · axe ไม่มี violation ในหน้าและปฏิทินที่ขยาย (บาง mobile scroll/ขอบ focus มี contrast incomplete จึงตรวจภาพแยก)
 - TypeScript, design-token lint และ webpack production build ผ่าน; Next MCP compilation/runtime และ browser console ไม่มี error · ไม่รัน unit suite เพราะไม่แก้ `lib/`, ไม่ทดสอบบัญชี/ฐานข้อมูลจริง, ไม่มี migration; เจ้าของขอ commit ในเครื่องและดู localhost เท่านั้น ยังไม่ push หรือเผยแพร่ Production
+
+### ไอคอนเว็บวงกลมขาวและ local branding — 14 ตุลาคม 2026
+
+- เจ้าของขอให้ icon ที่แท็บ Chrome เป็นกวางสามเขาสีม่วงขนาดใหญ่บนวงกลมขาวเต็ม canvas มี alpha โปร่งใสนอกวงกลม; `app/icon.png` และ Apple touch icon สร้างจาก SVG เดียวกันด้วย `scripts/build-brand-icons.mjs`
+- โลโก้เว็บจริงรอบ PR #48 เสร็จแล้ว แต่ checkout ที่รัน localhost:3000 ยังไม่ได้รับไฟล์ใหม่; รอบนี้ sync เฉพาะไฟล์แบรนด์กลับโฟลเดอร์ local โดยรักษางาน practice/dashboard/student classroom ที่ยังไม่อยู่ Production
+
+### โลโก้กวางสามเขา — 14 ตุลาคม 2026
+
+- เจ้าของเลือกภาพตัวอย่างที่เขาที่สามโค้งกางไปด้านซ้ายเหนือหู และอนุมัติปรับทุกจุดพร้อมเผยแพร่ Production
+- SVG ใหม่ trace จากภาพที่เลือก ใช้สีเดียวและคง theme token เดิม; header, landing/footer, หน้าบัญชี, watermark หน้ารอสอบ/แบบฝึกหัด, ลายปกห้องเรียน และไอคอน browser/Apple ใช้ geometry ใหม่ครบ พร้อม version URL กัน cache รูปเก่า
+- ตรวจ TypeScript, design-token lint, 50 tests ของ cover/waiting UI และ production webpack build ผ่าน; local Chrome ตรวจ header/หน้าบัญชี/หน้ารอ, mobile 390px ไม่ล้น และโลโก้โหมดมืดอ่านได้; Next MCP compilation/runtime ไม่พบ error และ React tree ใช้ BrandLogo/ClassroomCoverPattern เดิม · ไม่ทดสอบ Auth-to-DB หรือ mutation บน hosted site
+- เผยแพร่ผ่าน GitHub/Vercel project `jk` ตามการอนุมัติของเจ้าของ โดยแยก branch `codex/three-antler-logo` จาก Production base `9adb8b3` เพื่อกันงาน practice/dashboard ที่ยังไม่เผยแพร่ออกจาก release · ก่อนรายงาน success ต้องยืนยัน READY, alias `korkru.com` และ hash SVG/icons ตรงกับ candidate · การลอง CLI ก่อนเชื่อม GitHub ใหม่ (`dpl_ErSAd3Ed1eGsyxx5NzNBvRBTF2tx`) ถูก BLOCKED เพราะ author permission และ push ล้มเหลวจาก token invalid; เจ้าของยืนยัน GitHub CLI ใหม่แล้ว 14 ตุลาคม 2026 ไม่เปลี่ยน author metadata หรือสิทธิ์เพื่อข้าม gate
+- `.vercelignore` กัน local dependencies/build caches/environment files จาก CLI uploads; source package 9.9 MB
+- เก็บภาพต้นฉบับและ legacy assets เดิมไว้สำหรับประวัติ ไม่แตะ schema, Auth, RLS, ข้อมูลนักเรียน หรือ migration
+
 
 ### การ์ดห้องเรียนของนักเรียนและช่องเข้าร่วมห้องแบบย่อ — 14 ตุลาคม 2026
 
