@@ -18,7 +18,6 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { IconButton } from '@/components/ui/icon-button'
 import { cn, downloadTextFile } from '@/lib/utils'
 import { DIFF_META, TYPE_LABEL } from '@/lib/question-display'
-import { difficultyLabel, discriminationLabel, type QuestionStats } from '@/lib/question-stats'
 import { QuestionTagsEditor } from './question-tags-editor'
 import { SubQuestionCountBadge } from './sub-question-count-badge'
 import { QuestionSetBadges, type QuestionSetRef } from './question-set-badges'
@@ -91,15 +90,14 @@ interface Props {
   onToggleFlag: () => void
   /** Teams the signed-in teacher belongs to — the real targets a question can be shared to. */
   myTeams: { id: string; name: string }[]
-  /** Item analysis, absent until the question has been answered in a graded attempt. */
-  stats?: QuestionStats
+  /** Assignment lists reuse the card without question-bank mutations. */
+  readOnly?: boolean
+  position?: number
+  sectionTitles?: string[]
   /**
    * False while the per-card read for this โจทย์ is still in flight.
    *
-   * Two things then stay off the card rather than being guessed at: the สถิติ
-   * strip, which would otherwise print "ยังไม่มีสถิติ" — a claim about the
-   * โจทย์ when the truth is about the page — and the controls that only make
-   * sense once it is known whether this row is a โจทย์หลายขั้นตอน.
+   * Group-specific controls stay hidden until placement metadata is known.
    */
   detailsLoaded?: boolean
   /** Every tag in view, offered as suggestions when adding one from this card. */
@@ -119,7 +117,7 @@ interface Props {
 }
 
 export function QuestionCard({
-  question: q, isFlagged, onPreview, onToggleFlag, myTeams, stats, detailsLoaded = true,
+  question: q, isFlagged, onPreview, onToggleFlag, myTeams, detailsLoaded = true, readOnly = false, position, sectionTitles,
   allTags, duplicateCount, subQuestionCount, sets, hasSolution, setContext, returnToDashboard = false,
 }: Props) {
   const router = useRouter()
@@ -131,9 +129,6 @@ export function QuestionCard({
   const [isPending, startTransition] = useTransition()
   const diff = DIFF_META[q.difficulty]
   const isGroup = q.order_in_group === 0
-
-  const pPercent = stats ? Math.round(stats.pValue * 100) : null
-  const rMeta = stats?.discrimination != null ? discriminationLabel(stats.discrimination) : null
 
   const isGroupUnknown = !detailsLoaded
 
@@ -228,12 +223,12 @@ export function QuestionCard({
         </div>
       )}
 
-      <div className="p-4">
-        <div className="flex flex-col @md:flex-row @md:items-start gap-3">
+      <div className="p-3">
+        <div className="flex flex-col @md:flex-row @md:items-start gap-2">
           {/* Inside a แฟ้ม, the tick and the position come before the โจทย์
               itself: bulk actions and the numbering students will see are the
               two things this list exists to control. */}
-          {setContext && (
+          {!readOnly && setContext && (
             <div className="flex @md:flex-col items-center gap-2 shrink-0 @md:pt-0.5">
               <input
                 type="checkbox"
@@ -251,7 +246,8 @@ export function QuestionCard({
           {/* Left: content */}
           <div className="flex-1 min-w-0">
             {/* Badge row */}
-            <div className="flex items-center gap-1.5 flex-wrap mb-2">
+            <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+              {position !== undefined && <span className="text-xs font-semibold text-muted-foreground">ข้อ {position}</span>}
               {isGroup && (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">📚 หลายขั้นตอน</span>
               )}
@@ -286,8 +282,8 @@ export function QuestionCard({
                   {q.question_categories.name}
                 </span>
               )}
-              {!setContext && <QuestionSetBadges sets={sets} showEmpty />}
-              <QuestionTagsEditor questionId={q.id} tags={q.tags ?? []} allTags={allTags} />
+              {!readOnly && !setContext && <QuestionSetBadges sets={sets} showEmpty />}
+              {readOnly ? (q.tags ?? []).map(tag => <span key={tag} className="text-xs text-muted-foreground">#{tag}</span>) : <QuestionTagsEditor questionId={q.id} tags={q.tags ?? []} allTags={allTags} />}
             </div>
 
             {/* Title */}
@@ -301,11 +297,13 @@ export function QuestionCard({
             {/* Question text preview */}
             <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{questionExcerpt(q.question_text)}</p>
 
+            {sectionTitles && <QuestionSectionBadges titles={sectionTitles} showEmpty className="mt-1.5" />}
+
             {/* Keep แฟ้มย่อย out of the metadata row above. A title such as
                 "งาน" can also be a category or a tag; this labelled row makes
                 the location unambiguous and names every แฟ้มย่อย rather than
                 shortening several memberships to "+N". */}
-            {setContext && (
+            {!readOnly && setContext && (
               <QuestionSectionBadges
                 titles={setContext.sectionTitles}
                 showEmpty
@@ -313,57 +311,6 @@ export function QuestionCard({
               />
             )}
 
-            {/* Stats row — measured from graded attempts, so absent on a question
-                nobody has answered yet. While the read is still in flight the
-                whole strip stays out: "ยังไม่มีสถิติ" would be a claim about
-                the โจทย์, not about the page. */}
-            <div className={cn(
-              'flex flex-wrap items-center gap-x-5 gap-y-2 mt-3 pt-3 border-t border-border',
-              !detailsLoaded && 'hidden',
-            )}>
-              {!stats || pPercent === null ? (
-                <p className="text-[10px] text-muted-foreground">ยังไม่มีสถิติ — จะคำนวณให้เมื่อมีนักเรียนส่งคำตอบข้อนี้</p>
-              ) : (
-                <>
-                  {/* p-value bar */}
-                  <div className="flex-1 min-w-0 max-w-[180px]">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] text-muted-foreground">ความยาก (p={stats.pValue.toFixed(2)})</span>
-                      <span className="text-[10px] font-semibold text-muted-foreground">
-                        {pPercent}% · {difficultyLabel(stats.pValue)}
-                      </span>
-                    </div>
-                    <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all ${diff?.bar}`}
-                        style={{ width: `${pPercent}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* r-value */}
-                  <div className="shrink-0 text-right">
-                    <p className="text-[10px] text-muted-foreground">อำนาจจำแนก</p>
-                    {stats.discrimination != null && rMeta ? (
-                      <p className={`text-xs font-bold ${rMeta.color}`}>
-                        r={stats.discrimination.toFixed(2)}{' '}
-                        <span className="font-normal text-muted-foreground">({rMeta.label})</span>
-                      </p>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">ข้อมูลยังไม่พอ</p>
-                    )}
-                  </div>
-
-                  {/* Usage count */}
-                  {stats.usedIn > 0 && (
-                    <div className="shrink-0 text-right">
-                      <p className="text-[10px] text-muted-foreground">ใช้ใน</p>
-                      <p className="text-xs font-bold text-muted-foreground">{stats.usedIn} ชุดสอบ</p>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
           </div>
 
           {/* Right: actions (always visible on hover) */}
@@ -374,116 +321,118 @@ export function QuestionCard({
                 on a narrow one — a grid column — where side by side would
                 take its width out of the title. */}
             <div className="flex items-center gap-1.5 @md:flex-col @md:items-end @2xl:flex-row @2xl:items-center">
-              <SolutionButton questionId={q.id} questionTitle={q.title} hasSolution={hasSolution} />
+              {!readOnly && <SolutionButton questionId={q.id} questionTitle={q.title} hasSolution={hasSolution} />}
               <Button onClick={onPreview} size="sm" className="bg-primary/10 text-primary hover:bg-primary/20">
                 <Eye /> ดูตัวอย่าง
               </Button>
             </div>
 
             {/* Secondary actions row */}
-            <div className="flex items-center flex-wrap gap-0.5">
-              {/* Share */}
-              <div className="relative">
-                <IconButton
-                  onClick={() => setShareOpen(o => !o)}
-                  label="แชร์ให้ครูท่านอื่น"
-                  size="sm"
-                  className="hover:text-tint-1 hover:bg-tint-1/10 dark:hover:text-violet-300 dark:hover:bg-violet-950/40"
-                >
-                  <Share2 />
-                </IconButton>
-                {shareOpen && (
-                  <>
-                    <div className="fixed inset-0 z-30" onClick={() => setShareOpen(false)} />
-                    <Card radius="md" edge="ring" elevation="xl" className="absolute right-0 top-8 z-40 w-52 overflow-hidden">
-                      <div className="px-3 py-2.5 border-b border-border">
-                        <p className="text-xs font-semibold text-muted-foreground">แชร์ให้ครูท่านอื่น</p>
-                      </div>
-                      {!isGroup && (
-                        <button
-                          onClick={handleExport}
-                          disabled={isPending}
-                          className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-muted transition-colors text-left border-b border-border disabled:opacity-50"
-                        >
-                          <span className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 bg-muted text-muted-foreground">
-                            <Download className="w-3.5 h-3.5" />
-                          </span>
-                          <span className="text-sm text-muted-foreground">ดาวน์โหลดเป็นไฟล์ (ส่งให้ครูต่างโรงเรียน)</span>
-                        </button>
-                      )}
-                      {myTeams.length === 0 ? (
-                        <p className="px-3 py-2.5 text-xs text-muted-foreground">
-                          ยังไม่ได้อยู่ในทีมใด — สร้างหรือเข้าร่วมทีมก่อนจึงจะแชร์ให้ครูท่านอื่นได้
-                        </p>
-                      ) : (
-                        myTeams.map(team => (
+            {!readOnly && (
+              <div className="flex items-center flex-wrap gap-0.5">
+                {/* Share */}
+                <div className="relative">
+                  <IconButton
+                    onClick={() => setShareOpen(o => !o)}
+                    label="แชร์ให้ครูท่านอื่น"
+                    size="sm"
+                    className="hover:text-tint-1 hover:bg-tint-1/10 dark:hover:text-violet-300 dark:hover:bg-violet-950/40"
+                  >
+                    <Share2 />
+                  </IconButton>
+                  {shareOpen && (
+                    <>
+                      <div className="fixed inset-0 z-30" onClick={() => setShareOpen(false)} />
+                      <Card radius="md" edge="ring" elevation="xl" className="absolute right-0 top-8 z-40 w-52 overflow-hidden">
+                        <div className="px-3 py-2.5 border-b border-border">
+                          <p className="text-xs font-semibold text-muted-foreground">แชร์ให้ครูท่านอื่น</p>
+                        </div>
+                        {!isGroup && (
                           <button
-                            key={team.id}
-                            onClick={() => handleShareToTeam(team.id, team.name)}
+                            onClick={handleExport}
                             disabled={isPending}
-                            className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-muted transition-colors text-left disabled:opacity-50"
+                            className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-muted transition-colors text-left border-b border-border disabled:opacity-50"
                           >
-                            <span className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 bg-primary/10 text-primary">
-                              <Users className="w-3.5 h-3.5" />
+                            <span className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 bg-muted text-muted-foreground">
+                              <Download className="w-3.5 h-3.5" />
                             </span>
-                            <span className="text-sm text-muted-foreground">{team.name}</span>
+                            <span className="text-sm text-muted-foreground">ดาวน์โหลดเป็นไฟล์ (ส่งให้ครูต่างโรงเรียน)</span>
                           </button>
-                        ))
-                      )}
-                    </Card>
-                  </>
+                        )}
+                        {myTeams.length === 0 ? (
+                          <p className="px-3 py-2.5 text-xs text-muted-foreground">
+                            ยังไม่ได้อยู่ในทีมใด — สร้างหรือเข้าร่วมทีมก่อนจึงจะแชร์ให้ครูท่านอื่นได้
+                          </p>
+                        ) : (
+                          myTeams.map(team => (
+                            <button
+                              key={team.id}
+                              onClick={() => handleShareToTeam(team.id, team.name)}
+                              disabled={isPending}
+                              className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-muted transition-colors text-left disabled:opacity-50"
+                            >
+                              <span className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 bg-primary/10 text-primary">
+                                <Users className="w-3.5 h-3.5" />
+                              </span>
+                              <span className="text-sm text-muted-foreground">{team.name}</span>
+                            </button>
+                          ))
+                        )}
+                      </Card>
+                    </>
+                  )}
+                </div>
+
+                {/* Flag */}
+                <IconButton
+                  onClick={onToggleFlag}
+                  label={isFlagged ? 'ยกเลิกการรายงาน' : 'รายงานปัญหา'}
+                  size="sm"
+                  className={isFlagged ? 'text-flag bg-flag/10' : 'hover:text-flag hover:bg-flag/10'}
+                >
+                  <Flag />
+                </IconButton>
+
+                {/* Duplicate (non-group only) */}
+                {!isGroup && !isGroupUnknown && (
+                  <IconButton onClick={handleDuplicate} label="ทำสำเนาเพื่อแก้ไข" size="sm"
+                    className="hover:text-primary hover:bg-primary/10">
+                    <Copy />
+                  </IconButton>
+                )}
+
+                {/* Edit. From inside a แฟ้ม this cannot be a plain link: the แฟ้ม
+                    draft has to be written down before the page is left. */}
+                {setContext ? (canEditFromSet && (
+                  <IconButton onClick={handleEditFromSet} disabled={isPending} label="แก้ไข" size="sm">
+                    <Edit2 />
+                  </IconButton>
+                )) : (
+                  <Link
+                    href={editHref}
+                    title="แก้ไข"
+                    aria-label="แก้ไข"
+                    className={cn(buttonVariants({ variant: 'ghost', size: 'icon-sm' }))}
+                  >
+                    <Edit2 />
+                  </Link>
+                )}
+
+                {/* Delete (non-group only). Inside a แฟ้ม it moves into the ⋯ menu
+                    below — "ลบถาวรจากคลัง" and "เอาออกจากแฟ้ม" sitting side by
+                    side as two similar icons is exactly how a โจทย์ gets lost. */}
+                {!isGroup && !isGroupUnknown && !setContext && (
+                  <IconButton onClick={handleDelete} disabled={isPending} label="ลบโจทย์" size="sm"
+                    className="hover:text-destructive hover:bg-destructive/10">
+                    <Trash2 />
+                  </IconButton>
                 )}
               </div>
-
-              {/* Flag */}
-              <IconButton
-                onClick={onToggleFlag}
-                label={isFlagged ? 'ยกเลิกการรายงาน' : 'รายงานปัญหา'}
-                size="sm"
-                className={isFlagged ? 'text-flag bg-flag/10' : 'hover:text-flag hover:bg-flag/10'}
-              >
-                <Flag />
-              </IconButton>
-
-              {/* Duplicate (non-group only) */}
-              {!isGroup && !isGroupUnknown && (
-                <IconButton onClick={handleDuplicate} label="ทำสำเนาเพื่อแก้ไข" size="sm"
-                  className="hover:text-primary hover:bg-primary/10">
-                  <Copy />
-                </IconButton>
-              )}
-
-              {/* Edit. From inside a แฟ้ม this cannot be a plain link: the แฟ้ม
-                  draft has to be written down before the page is left. */}
-              {setContext ? (canEditFromSet && (
-                <IconButton onClick={handleEditFromSet} disabled={isPending} label="แก้ไข" size="sm">
-                  <Edit2 />
-                </IconButton>
-              )) : (
-                <Link
-                  href={editHref}
-                  title="แก้ไข"
-                  aria-label="แก้ไข"
-                  className={cn(buttonVariants({ variant: 'ghost', size: 'icon-sm' }))}
-                >
-                  <Edit2 />
-                </Link>
-              )}
-
-              {/* Delete (non-group only). Inside a แฟ้ม it moves into the ⋯ menu
-                  below — "ลบถาวรจากคลัง" and "เอาออกจากแฟ้ม" sitting side by
-                  side as two similar icons is exactly how a โจทย์ gets lost. */}
-              {!isGroup && !isGroupUnknown && !setContext && (
-                <IconButton onClick={handleDelete} disabled={isPending} label="ลบโจทย์" size="sm"
-                  className="hover:text-destructive hover:bg-destructive/10">
-                  <Trash2 />
-                </IconButton>
-              )}
-            </div>
+            )}
 
             {/* แฟ้ม controls: position, membership, and the destructive action
                 that belongs to the คลัง rather than to this list. */}
-            {setContext && (
+            {!readOnly && setContext && (
               <div className="flex items-center flex-wrap gap-0.5">
                 <IconButton
                   label="ย้ายขึ้น"

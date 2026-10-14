@@ -11,12 +11,10 @@ import {
 } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { updateAssignmentStatus, deleteAssignment } from '@/lib/actions/assignments'
-import { DIFF_META, TYPE_SHORT } from '@/lib/question-display'
 import type { Assignment, Question } from '@/lib/types'
 import type { SubmissionRow } from '../page'
 import { Card } from '@/components/ui/card'
-import { questionExcerpt } from '@/lib/question-display'
-import { sectionByQuestionId, parseSections, type QuestionSetSection } from '@/lib/question-set-sections'
+import { parseSections } from '@/lib/question-set-sections'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
@@ -35,6 +33,8 @@ import { Progress, ProgressLabel } from '@/components/ui/progress'
 import { useContextualSidebar } from '@/components/layout/sidebar-context'
 import { assignmentSizeLabel } from '@/lib/assignment-size-label'
 import { cn } from '@/lib/utils'
+import { ClassroomWorkHeader } from '@/components/assignments/classroom-work-header'
+import { AssignmentQuestionCards } from '@/components/assignments/assignment-question-cards'
 import { AssignmentContextNavigation } from './assignment-context-sidebar'
 
 const STATUS_META = {
@@ -44,7 +44,7 @@ const STATUS_META = {
 } as const
 
 interface Props {
-  assignment: Assignment & { classrooms: { name: string } | null }
+  assignment: Assignment & { classrooms: { name: string; description?: string | null } | null }
   questions: Question[]
   submissions: SubmissionRow[]
   /** Hand-ins with at least one ข้อ still waiting for a teacher to score it —
@@ -177,81 +177,24 @@ export function AssignmentDetailClient({
 
   return (
     <div className="flex max-w-[1200px] flex-col gap-4">
-      {/* Header card */}
-      <Card
-        data-assignment-summary
-        radius="md"
-        edge="border"
-        padding="md"
-        className="border-primary/20 bg-primary/10 text-foreground"
-      >
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0">
-            <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
-              <Badge variant="secondary" className={statusMeta.color}>
-                <span aria-hidden="true" className={`size-1.5 rounded-full ${statusMeta.dot}`} />
-                {statusMeta.label}
-              </Badge>
-              <Badge variant="outline">{assignmentTypeLabel}</Badge>
-              {a.secure_browser_mode === 'seb_required' && (
-                <Badge variant="outline" className="border-success/40 bg-success/10 text-success">
-                  <LockKeyhole /> Safe Exam Browser
-                </Badge>
-              )}
-              {a.android_exam_mode === 'monitored' && (
-                <Badge variant="warning">
-                  <Smartphone /> Android ครูอนุมัติรายคน
-                </Badge>
-              )}
-            </div>
-            <h1 className="text-xl font-bold leading-tight sm:text-2xl">{a.title}</h1>
-            {a.classrooms?.name && <p className="mt-1 text-sm text-foreground/70">ห้องหลัก · {a.classrooms.name}</p>}
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            render={<Link href={`/assignments/${a.id}/edit`} />}
-            className="shrink-0 bg-background/70 sm:self-start"
-          >
-            <Settings2 data-icon="inline-start" /> {settingsLabel}
-          </Button>
-        </div>
-
-        <Separator className="my-3 bg-primary/20" />
-
-        <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3 xl:grid-cols-5">
-          {assignmentDetails.map(detail => {
-            const Icon = detail.icon
-            return (
-              <div
-                key={detail.label}
-                className={cn(
-                  'flex min-w-0 items-start gap-2',
-                  detail.wide && 'col-span-2 sm:col-span-2 xl:col-span-1',
-                )}
-              >
-                <Icon aria-hidden="true" className="mt-0.5 size-3.5 shrink-0 text-primary" />
-                <div className="min-w-0">
-                  <p className="text-xs text-foreground/70">{detail.label}</p>
-                  <p className="text-sm font-medium leading-5 text-foreground">{detail.value}</p>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-
-        {a.status !== 'draft' && (
-          <>
-            <Separator className="my-3 bg-primary/20" />
-            <AssignmentSubmissionSummary
-              submittedCount={submittedSubs.length}
-              inProgressCount={inProgressSubs.length}
-              totalSubs={submissions.length}
-              avgScore={avgScore}
-            />
-          </>
-        )}
-      </Card>
+      <ClassroomWorkHeader
+        kind="assignment"
+        title={a.title}
+        classroom={a.classrooms}
+        badges={<>
+          <Badge variant="secondary" className={statusMeta.color}>
+            <span aria-hidden="true" className={`size-1.5 rounded-full ${statusMeta.dot}`} />{statusMeta.label}
+          </Badge>
+          <Badge variant="outline">{assignmentTypeLabel}</Badge>
+          {a.secure_browser_mode === 'seb_required' && <Badge variant="outline" className="border-success/40 bg-success/10 text-success"><LockKeyhole /> Safe Exam Browser</Badge>}
+          {a.android_exam_mode === 'monitored' && <Badge variant="warning"><Smartphone /> Android ครูอนุมัติรายคน</Badge>}
+        </>}
+        actions={<Button size="sm" variant="outline" render={<Link href={`/assignments/${a.id}/edit`} />} className="shrink-0 bg-background/70">
+          <Settings2 data-icon="inline-start" /> {settingsLabel}
+        </Button>}
+        details={assignmentDetails}
+        summary={a.status !== 'draft' && <AssignmentSubmissionSummary submittedCount={submittedSubs.length} inProgressCount={inProgressSubs.length} totalSubs={submissions.length} avgScore={avgScore} />}
+      />
 
       {a.status === 'draft' && a.secure_browser_mode === 'seb_required' && (
         <div className="flex flex-col gap-3 rounded-xl border border-warning/30 bg-warning/5 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
@@ -279,7 +222,7 @@ export function AssignmentDetailClient({
         gradeHref={gradeHref}
       />
 
-      <QuestionsTab
+      <AssignmentQuestionCards
         questions={questions}
         sections={parseSections(a.sections)}
         showSections={a.show_sections !== false}
@@ -302,41 +245,22 @@ function AssignmentSubmissionSummary({ submittedCount, inProgressCount, totalSub
   const stats = [
     { label: 'ส่งแล้ว', value: submittedCount, icon: CheckCircle2, color: 'text-success' },
     { label: 'กำลังทำ', value: inProgressCount, icon: Activity, color: 'text-warning' },
-    { label: 'คะแนนเฉลี่ย', value: avgScore !== null ? `${avgScore}%` : '—', icon: TrendingUp, color: 'text-primary' },
+    { label: 'คะแนนเฉลี่ย', value: avgScore !== null ? `${avgScore}%` : '—', icon: TrendingUp, color: 'text-current' },
   ]
   const progressValue = totalSubs > 0 ? (submittedCount / totalSubs) * 100 : 0
 
   return (
-    <div
-      data-assignment-overview
-      className="grid grid-cols-3 gap-2 xl:grid-cols-[repeat(3,minmax(0,0.55fr))_minmax(18rem,1.55fr)]"
-    >
+    <div data-assignment-overview className="flex max-w-full flex-wrap items-center gap-x-4 gap-y-2">
       {stats.map(stat => {
         const Icon = stat.icon
-        return (
-          <div key={stat.label} className="flex min-w-0 flex-col items-start gap-1.5 rounded-xl bg-background/60 px-2.5 py-2.5 sm:flex-row sm:items-center sm:gap-2.5 sm:px-3">
-            <span className={cn('flex size-8 shrink-0 items-center justify-center rounded-lg bg-background/80', stat.color)}>
-              <Icon aria-hidden="true" className="size-4" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-lg font-bold leading-none text-foreground">{stat.value}</p>
-              <p className="mt-1 text-xs leading-4 text-foreground/70">{stat.label}</p>
-            </div>
-          </div>
-        )
+        return <p key={stat.label} className="flex items-center gap-1.5 text-xs">
+          <Icon aria-hidden="true" className={cn('size-3.5 shrink-0', stat.color)} />
+          <span className="font-bold tabular-nums">{stat.value}</span><span className="text-foreground/70">{stat.label}</span>
+        </p>
       })}
-
-      <Progress
-        value={progressValue}
-        className="col-span-3 gap-x-3 gap-y-1.5 rounded-xl bg-background/60 px-3 py-2.5 xl:col-span-1 [&_[data-slot=progress-track]]:order-2 [&_[data-slot=progress-track]]:h-2 [&_[data-slot=progress-track]]:bg-background/80 [&_[data-slot=progress-indicator]]:bg-success"
-      >
-        <ProgressLabel className="text-xs font-medium text-foreground/70">ความคืบหน้าการส่ง</ProgressLabel>
-        <span className="ml-auto shrink-0 text-xs text-foreground/70 tabular-nums">
-          {submittedCount} / {totalSubs} คน
-        </span>
-        {inProgressCount > 0 && (
-          <p className="order-3 w-full text-xs text-foreground/70">{inProgressCount} คนกำลังทำอยู่</p>
-        )}
+      <Progress value={progressValue} className="w-40 max-w-full gap-x-2 gap-y-1 [&_[data-slot=progress-track]]:order-2 [&_[data-slot=progress-track]]:h-1.5 [&_[data-slot=progress-track]]:bg-background/80 [&_[data-slot=progress-indicator]]:bg-success">
+        <ProgressLabel className="text-xs text-foreground/70">การส่ง</ProgressLabel>
+        <span className="ml-auto text-xs tabular-nums">{submittedCount}/{totalSubs} คน</span>
       </Progress>
     </div>
   )
@@ -448,126 +372,6 @@ function OverviewTab({ a, questions, totalSubs, pendingCount, pendingReviewCappe
         ตรวจให้คะแนน <ChevronRight className="size-3.5" />
       </span>
     </Link>
-  )
-}
-
-// ─── Collapsible question table ───────────────────────────────────────────────
-
-function QuestionsTab({ questions, sections, showSections }: {
-  questions: Question[]
-  sections: QuestionSetSection[]
-  showSections: boolean
-}) {
-  const [open, setOpen] = useState(true)
-  // The teacher always sees the แฟ้มย่อย they grouped by, even when students
-  // don't — with a note saying so, rather than the grouping vanishing.
-  const sectionOwner = sectionByQuestionId(sections)
-  const diffCounts = questions.reduce((acc, q) => {
-    acc[q.difficulty] = (acc[q.difficulty] ?? 0) + 1
-    return acc
-  }, {} as Record<string, number>)
-
-  return (
-    <Collapsible open={open} onOpenChange={setOpen}>
-      <Card edge="ring" className="overflow-hidden">
-        <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <FileText aria-hidden="true" className="size-4" />
-            </div>
-            <div className="min-w-0">
-              <h2 className="font-semibold text-foreground">โจทย์</h2>
-              <p className="text-xs text-muted-foreground">{questions.length} ข้อ · ตรวจรายการโจทย์ทั้งหมดในงานนี้</p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-1 sm:justify-end">
-            <CollapsibleTrigger
-              className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'group')}
-            >
-              {open ? 'พับตาราง' : 'แสดงตาราง'}
-              {open
-                ? <ChevronUp data-icon="inline-end" />
-                : <ChevronDown data-icon="inline-end" />}
-            </CollapsibleTrigger>
-          </div>
-        </div>
-
-        <CollapsibleContent className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 ease-out data-ending-style:h-0 data-starting-style:h-0">
-          <Separator />
-          {Object.keys(diffCounts).length > 0 && (
-            <div className="flex flex-wrap items-center gap-2 px-4 py-3">
-              {Object.entries(diffCounts).map(([difficulty, count]) => {
-                const meta = DIFF_META[difficulty]
-                return (
-                  <Badge
-                    key={difficulty}
-                    variant="secondary"
-                    className={meta?.badge ?? 'bg-muted text-muted-foreground'}
-                  >
-                    {meta?.label ?? difficulty} · {count} ข้อ
-                  </Badge>
-                )
-              })}
-            </div>
-          )}
-
-          <Table className="min-w-[760px]">
-            <TableCaption className="sr-only">รายการโจทย์ทั้งหมดในงานนี้</TableCaption>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-16 text-center">ข้อ</TableHead>
-                <TableHead>โจทย์</TableHead>
-                <TableHead className="w-32">แฟ้มย่อย</TableHead>
-                <TableHead className="w-28">ประเภท</TableHead>
-                <TableHead className="w-28">ระดับ</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {questions.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="h-28 text-center text-muted-foreground">
-                    ยังไม่มีโจทย์ที่เปิดดูได้
-                  </TableCell>
-                </TableRow>
-              ) : questions.map((question, index) => {
-                const difficulty = DIFF_META[question.difficulty]
-                const section = sectionOwner.get(question.id)
-                return (
-                  <TableRow key={question.id}>
-                    <TableCell className="text-center font-medium text-muted-foreground">{index + 1}</TableCell>
-                    <TableCell className="min-w-80 whitespace-normal py-3">
-                      <p className="font-medium text-foreground">{question.title}</p>
-                      <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-muted-foreground">
-                        {questionExcerpt(question.question_text) || 'ไม่มีคำอธิบายเพิ่มเติม'}
-                      </p>
-                    </TableCell>
-                    <TableCell className="max-w-40 whitespace-normal text-xs text-muted-foreground">
-                      {section?.title ? (
-                        <span>
-                          {section.title}
-                          {!showSections && <span className="block">ไม่แสดงให้นักเรียนเห็น</span>}
-                        </span>
-                      ) : '—'}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{TYPE_SHORT[question.question_type] ?? question.question_type}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="secondary"
-                        className={difficulty?.badge ?? 'bg-muted text-muted-foreground'}
-                      >
-                        {difficulty?.label ?? question.difficulty}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-        </CollapsibleContent>
-      </Card>
-    </Collapsible>
   )
 }
 

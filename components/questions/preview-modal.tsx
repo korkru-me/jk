@@ -2,11 +2,10 @@
 
 import { useState } from 'react'
 import {
-  X, Flag, AlertTriangle, BookOpen, GitBranch, BarChart2, Clock,
-  CheckCircle2, TrendingUp, Activity,
+  X, Flag, AlertTriangle, BookOpen, GitBranch, Clock,
+  Activity,
 } from 'lucide-react'
 import { DIFF_META } from '@/lib/question-display'
-import { difficultyLabel, discriminationLabel, type QuestionStats } from '@/lib/question-stats'
 import { QuestionPreviewContent } from './question-preview'
 import { RichText } from '@/components/ui/rich-text'
 import { SolutionFiles } from '@/components/questions/solution-files'
@@ -25,20 +24,18 @@ import { Card } from '@/components/ui/card'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-type Tab = 'content' | 'history' | 'stats'
+type Tab = 'content' | 'history'
 
 interface Props {
   question: QuestionDetailWithCategory
   isFlagged: boolean
   onClose: () => void
   onToggleFlag: () => void
-  /** Item analysis, absent until the question has been answered in a graded attempt. */
-  stats?: QuestionStats
 }
 
 // ── Main Modal ─────────────────────────────────────────────────────────────────
 
-export function PreviewModal({ question: q, isFlagged, onClose, onToggleFlag, stats }: Props) {
+export function PreviewModal({ question: q, isFlagged, onClose, onToggleFlag }: Props) {
   const [tab, setTab] = useState<Tab>('content')
   const diff = DIFF_META[q.difficulty]
 
@@ -94,7 +91,6 @@ export function PreviewModal({ question: q, isFlagged, onClose, onToggleFlag, st
           {([
             { key: 'content' as Tab, label: 'ลองทำโจทย์',        icon: BookOpen },
             { key: 'history' as Tab, label: 'ประวัติการแก้ไข',   icon: GitBranch },
-            { key: 'stats'   as Tab, label: 'สถิติ',              icon: BarChart2 },
           ]).map(t => {
             const Icon = t.icon
             return (
@@ -117,7 +113,6 @@ export function PreviewModal({ question: q, isFlagged, onClose, onToggleFlag, st
         <div className="flex-1 overflow-y-auto p-6">
           {tab === 'content' && <InteractiveTab key={q.id} q={q} />}
           {tab === 'history' && <HistoryTab question={q} />}
-          {tab === 'stats'   && <StatsTab stats={stats} />}
         </div>
       </div>
     </div>
@@ -225,103 +220,6 @@ function HistoryTab({ question: q }: { question: QuestionDetailWithCategory }) {
         <p className="text-xs text-muted-foreground leading-relaxed">
           ขณะนี้ระบบเก็บเฉพาะเวลาที่สร้างและเวลาที่แก้ไขล่าสุด ยังไม่ได้บันทึกรายละเอียดของการแก้ไขแต่ละครั้งหรือผู้ที่แก้ไข
         </p>
-      </div>
-    </div>
-  )
-}
-
-// ── Stats Tab ──────────────────────────────────────────────────────────────────
-
-function StatsTab({ stats }: { stats?: QuestionStats }) {
-  if (!stats) {
-    return (
-      <div className="bg-muted rounded-2xl p-8 text-center">
-        <p className="text-sm font-medium text-foreground">ยังไม่มีสถิติสำหรับโจทย์ข้อนี้</p>
-        <p className="text-xs text-muted-foreground mt-1">
-          ค่าความยากและอำนาจจำแนกจะคำนวณจากคำตอบจริง หลังจากนักเรียนส่งข้อสอบที่มีโจทย์ข้อนี้
-        </p>
-      </div>
-    )
-  }
-
-  const pPct = Math.round(stats.pValue * 100)
-  const r = stats.discrimination
-  const rPct = r != null ? Math.round(Math.max(0, r) * 100) : 0
-  const correct = Math.round(stats.pValue * stats.attempts)
-
-  const pLabel = difficultyLabel(stats.pValue)
-  const pColor = pPct <= 30 ? 'text-destructive' : pPct <= 50 ? 'text-flag' : pPct <= 70 ? 'text-warning' : 'text-success'
-  const rMeta = r != null ? discriminationLabel(r) : null
-  const rBarColor = r == null ? 'bg-muted-foreground'
-    : r >= 0.4 ? 'bg-success' : r >= 0.3 ? 'bg-primary' : r >= 0.2 ? 'bg-warning' : 'bg-destructive'
-
-  return (
-    <div className="space-y-4">
-      {/* p-value & r-value */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-muted rounded-2xl p-4">
-          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-3">ค่าความยาก (p-value)</p>
-          <p className={`text-4xl font-black leading-none ${pColor}`}>{stats.pValue.toFixed(2)}</p>
-          <p className={`text-sm font-semibold mt-1 ${pColor}`}>ระดับ{pLabel}</p>
-          {/* Gradient bar */}
-          <div className="mt-3 relative">
-            <div className="h-2 bg-gradient-to-r from-green-400 via-amber-400 to-red-400 rounded-full" />
-            <div
-              className="absolute top-0 -translate-x-1/2 w-3 h-2 bg-foreground rounded-full"
-              style={{ left: `${100 - pPct}%` }}
-            />
-          </div>
-          <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
-            <span>ง่าย</span><span>ยาก</span>
-          </div>
-          <p className="text-xs text-muted-foreground mt-2">สัดส่วนนักเรียนที่ตอบถูก</p>
-        </div>
-
-        <div className="bg-muted rounded-2xl p-4">
-          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-3">อำนาจจำแนก (r-value)</p>
-          <p className={`text-4xl font-black leading-none ${rMeta?.color ?? 'text-muted-foreground'}`}>
-            {r != null ? r.toFixed(2) : '—'}
-          </p>
-          <p className={`text-sm font-semibold mt-1 ${rMeta?.color ?? 'text-muted-foreground'}`}>
-            {rMeta?.label ?? 'ข้อมูลยังไม่พอ'}
-          </p>
-          <div className="mt-3">
-            <div className="h-2 bg-muted rounded-full overflow-hidden">
-              <div className={`h-full ${rBarColor} rounded-full transition-all`} style={{ width: `${rPct}%` }} />
-            </div>
-          </div>
-          <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
-            <span>0.00</span><span>0.50</span><span>1.00</span>
-          </div>
-          <p className="text-xs text-muted-foreground mt-2">ค่าสหสัมพันธ์พอยต์ไบซีเรียล</p>
-        </div>
-      </div>
-
-      {/* Usage stats */}
-      <Card edge="ring" padding="md">
-        <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-3">สถิติการใช้งาน</p>
-        <div className="grid grid-cols-3 gap-4 text-center">
-          {[
-            { label: 'ใช้ในชุดสอบ', value: stats.usedIn, icon: BookOpen, color: 'text-primary' },
-            { label: 'ครั้งที่ตอบ', value: stats.attempts, icon: TrendingUp, color: 'text-tint-1' },
-            { label: 'ตอบถูก', value: correct, icon: CheckCircle2, color: 'text-success' },
-          ].map(s => {
-            const Icon = s.icon
-            return (
-              <div key={s.label}>
-                <Icon className={`w-4 h-4 ${s.color} mx-auto mb-1`} />
-                <p className="text-2xl font-bold text-foreground">{s.value}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
-              </div>
-            )
-          })}
-        </div>
-      </Card>
-
-      {/* Guide */}
-      <div className="p-4 bg-primary/10 rounded-xl border border-primary/20 text-xs text-primary space-y-1 leading-relaxed">
-        <p><strong>p-value</strong> ควรอยู่ระหว่าง 0.30–0.70 เพื่อให้โจทย์มีความยากเหมาะสม</p>
-        <p><strong>r-value</strong> ควร ≥ 0.30 ถือว่าโจทย์มีอำนาจจำแนกที่ดีตามมาตรฐาน PISA</p>
       </div>
     </div>
   )

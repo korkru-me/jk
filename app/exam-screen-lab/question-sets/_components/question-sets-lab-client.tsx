@@ -117,7 +117,7 @@ const STRUCTURE_CARD_DATA: QuestionCardData = {
   details: Object.fromEntries(STRUCTURE_QUESTIONS.map(question => [question.id, {
     subject: 'ฟิสิกส์', category: 'งานและพลังงาน', group_id: null, order_in_group: null,
   }])),
-  stats: {}, duplicateCounts: {}, subQuestionCounts: {}, setMemberships: {}, solutionPresence: {},
+ duplicateCounts: {}, subQuestionCounts: {}, setMemberships: {}, solutionPresence: {},
 }
 const STRUCTURE_QUESTION_IDS = STRUCTURE_QUESTIONS.map(question => question.id)
 const AUTOSAVE_QUESTIONS: BankQuestion[] = STRUCTURE_QUESTIONS.map(question => ({

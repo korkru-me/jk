@@ -7,7 +7,7 @@ import type { Assignment } from '@/lib/types'
 const ASSIGNMENT_ID = '00000000-0000-4000-b000-000000000044'
 const NOW = '2026-10-07T02:15:00.000Z'
 
-const assignment: Assignment & { classrooms: { name: string } } = {
+const assignment: Assignment & { classrooms: { name: string; description: string } } = {
   id: ASSIGNMENT_ID,
   org_id: '00000000-0000-4000-a000-000000000044',
   classroom_id: '00000000-0000-4000-c000-000000000044',
@@ -58,7 +58,7 @@ const assignment: Assignment & { classrooms: { name: string } } = {
   android_exam_mode: 'blocked',
   created_at: NOW,
   updated_at: NOW,
-  classrooms: { name: 'ทดสอบ สอบแก้กลางภาค' },
+  classrooms: { name: 'ห้องเรียนฟิสิกส์ธีมส้ม', description: 'หน้าปก: orange' },
 }
 
 const submissions: SubmissionRow[] = Array.from({ length: 63 }, (_, index) => ({

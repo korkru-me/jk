@@ -2,8 +2,6 @@ import { describe, it, expect } from 'vitest'
 import {
   applyQuestionSort,
   compareQuestions,
-  isDatabaseSortable,
-  rankQuestionIds,
   DEFAULT_QUESTION_SORT,
   questionSortParams,
   readQuestionSort,
@@ -11,19 +9,8 @@ import {
   QUESTION_SORT_KEYS,
   TEAM_QUESTION_SORT_KEYS,
   type QuestionSort,
-  type QuestionStatsForSort,
   type SortableQuestion,
 } from './question-sort'
-
-/** Item analysis for one question, overridable per case. */
-const stat = (over: Partial<QuestionStatsForSort>): QuestionStatsForSort => ({
-  attempts: 10,
-  pValue: 0.5,
-  discrimination: 0.3,
-  usedIn: 1,
-  lastUsedAt: '2026-01-01T00:00:00Z',
-  ...over,
-})
 
 /** A row with everything the sort can read, overridable per case. */
 const row = (over: Partial<SortableQuestion> & { id: string }): SortableQuestion => ({
@@ -85,9 +72,10 @@ describe('readQuestionSort', () => {
       expect(QUESTION_SORT_KEYS).toContain(key)
       expect(TEAM_QUESTION_SORT_KEYS).toContain(key)
     }
-    // Read from this teacher's own students' answers: own bank only.
+    // Removed item-analysis URLs fall back safely in both views.
     for (const key of ['usage', 'pvalue', 'discrimination', 'lastUsed'] as const) {
-      expect(QUESTION_SORT_KEYS).toContain(key)
+      expect(QUESTION_SORT_KEYS).not.toContain(key)
+      expect(readQuestionSort({ sort: key })).toEqual(DEFAULT_QUESTION_SORT)
       expect(TEAM_QUESTION_SORT_KEYS).not.toContain(key)
       expect(readQuestionSort({ tsort: key }, 't')).toEqual(DEFAULT_QUESTION_SORT)
     }
@@ -306,87 +294,5 @@ describe('the keys added for วิชา, หมวดหมู่ and แท�
       expect(readQuestionSort({ sort: key })).toEqual({ key, dir: QUESTION_SORTS[key].defaultDir })
       expect(readQuestionSort({ tsort: key }, 't')).toEqual({ key, dir: QUESTION_SORTS[key].defaultDir })
     }
-  })
-})
-
-describe('rankQuestionIds', () => {
-  const ids = ['a', 'b', 'c', 'd']
-  const stats = {
-    a: stat({ usedIn: 1, pValue: 0.9, discrimination: 0.1, lastUsedAt: '2026-01-01T00:00:00Z' }),
-    b: stat({ usedIn: 5, pValue: 0.2, discrimination: 0.6, lastUsedAt: '2026-06-01T00:00:00Z' }),
-    c: stat({ usedIn: 3, pValue: 0.5, discrimination: null, lastUsedAt: null }),
-    // 'd' has never been answered and so has no entry at all.
-  }
-
-  it('knows which keys the database cannot sort', () => {
-    for (const key of ['usage', 'pvalue', 'discrimination', 'lastUsed'] as const) {
-      expect(isDatabaseSortable(key)).toBe(false)
-    }
-    for (const key of ['created', 'title', 'tags', 'category', 'creator'] as const) {
-      expect(isDatabaseSortable(key)).toBe(true)
-    }
-  })
-
-  it('ranks by how often a question has been used', () => {
-    expect(rankQuestionIds(ids, stats, { key: 'usage', dir: 'desc' })).toEqual(['b', 'c', 'a', 'd'])
-    expect(rankQuestionIds(ids, stats, { key: 'usage', dir: 'asc' })).toEqual(['a', 'c', 'b', 'd'])
-  })
-
-  it('reads a low p as a hard question, so ascending is hardest first', () => {
-    expect(rankQuestionIds(ids, stats, { key: 'pvalue', dir: 'asc' })).toEqual(['b', 'c', 'a', 'd'])
-    expect(rankQuestionIds(ids, stats, { key: 'pvalue', dir: 'desc' })).toEqual(['a', 'c', 'b', 'd'])
-  })
-
-  it('treats an uncomputable discrimination as unmeasured, not as zero', () => {
-    // 'c' has stats but no correlation, so it joins 'd' at the bottom rather
-    // than sorting below 'a' as if it had scored 0.
-    expect(rankQuestionIds(ids, stats, { key: 'discrimination', dir: 'desc' }))
-      .toEqual(['b', 'a', 'c', 'd'])
-    expect(rankQuestionIds(ids, stats, { key: 'discrimination', dir: 'asc' }))
-      .toEqual(['a', 'b', 'c', 'd'])
-  })
-
-  it('ranks by when a question was last put in front of students', () => {
-    expect(rankQuestionIds(ids, stats, { key: 'lastUsed', dir: 'desc' })).toEqual(['b', 'a', 'c', 'd'])
-    expect(rankQuestionIds(ids, stats, { key: 'lastUsed', dir: 'asc' })).toEqual(['a', 'b', 'c', 'd'])
-  })
-
-  it('leaves unmeasured questions in the order they arrived, in both directions', () => {
-    // The incoming ids are already newest-first, and that is what the tail of
-    // the list should keep looking like.
-    const many = ['n1', 'n2', 'n3']
-    for (const dir of ['asc', 'desc'] as const) {
-      expect(rankQuestionIds(many, {}, { key: 'pvalue', dir })).toEqual(many)
-    }
-  })
-
-  it('does not lose or duplicate a question, whatever the key', () => {
-    for (const key of ['usage', 'pvalue', 'discrimination', 'lastUsed'] as const) {
-      for (const dir of ['asc', 'desc'] as const) {
-        const out = rankQuestionIds(ids, stats, { key, dir })
-        expect([...out].sort()).toEqual([...ids].sort())
-      }
-    }
-  })
-
-  it('leaves the ids alone for a key the database sorts', () => {
-    expect(rankQuestionIds(ids, stats, { key: 'title', dir: 'asc' })).toEqual(ids)
-  })
-})
-
-describe('applyQuestionSort with a key it cannot express', () => {
-  it('falls back to the default column rather than sending an unknown one', () => {
-    const calls: { column: string; ascending: boolean }[] = []
-    const query = {
-      calls,
-      order(column: string, options: { ascending: boolean; nullsFirst?: boolean }) {
-        calls.push({ column, ascending: options.ascending })
-        return query
-      },
-    }
-    applyQuestionSort(query, { key: 'pvalue', dir: 'asc' })
-    // created_at, not "pvalue" — a column PostgREST would reject outright,
-    // emptying the คลัง instead of merely ordering it unhelpfully.
-    expect(calls[0].column).toBe('created_at')
   })
 })

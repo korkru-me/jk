@@ -199,3 +199,7 @@ MCQ แบบคำนวณสามารถสร้างสูตรคำ�
 ## ยืนยันงานที่เพิ่งสร้างในห้องเรียน
 
 หน้ารายการงานของครูรวม metadata ของ assignments ที่ link มาห้องนี้ และ practice libraries ของห้องเดียวกัน เฉพาะ `created_by` ของ actor ที่มีสิทธิ์จัดการแล้ว แสดงหน้าต่างเวลา 72 ชั่วโมงจาก `created_at` ไม่ใช้ `updated_at` ไม่สร้าง receipt หรือเปลี่ยนสถานะงานเพื่อยืนยัน UI งานร่างยังเป็นร่างและไม่ถูกแสดงแก่นักเรียนเพราะกรอบนี้ กรอบยืนยันหมดอายุโดยไม่ลบ assignments/practice libraries หรือ attempt ใด ๆ
+
+### Item analysis deferred — 14 October 2026
+
+Question-bank, set, dashboard and assignment question cards no longer calculate or expose answer-derived item analysis (usage, empirical difficulty, discrimination or last-used timestamps). The associated answer queries, calculator and sort options are removed at the owner’s request; a future research feature must define its own authorization and data contract. Assignment scoring, completion rules, answer review and submission-level summaries remain in scope. No persisted answers or questions are removed.

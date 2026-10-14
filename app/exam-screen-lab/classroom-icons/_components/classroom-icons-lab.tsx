@@ -26,9 +26,6 @@ const DASHBOARD_CARD_DATA: QuestionCardData = {
   details: Object.fromEntries(DASHBOARD_QUESTIONS.map(q => [q.id, {
     subject: q.subject, category: null, group_id: q.group_id, order_in_group: q.order_in_group,
   }])),
-  stats: {
-    'qa-question-written': { attempts: 20, pValue: 0.7, discrimination: 0.35, usedIn: 2, lastUsedAt: null },
-  },
   duplicateCounts: {},
   subQuestionCounts: Object.fromEntries(DASHBOARD_QUESTIONS.map(q => [q.id, subQuestionCount(q)])),
   setMemberships: {

@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { classroomNavigationPath } from '@/lib/classroom-navigation'
 import { getMyOrgId } from '@/lib/actions/org'
 import { filterSectionsToQuestions, parseSections, type QuestionSetSection } from '@/lib/question-set-sections'
 import type { AndroidExamMode, AssignmentMode, AssignmentStatus, CompletionRule, RetryScope, ScoreStrategy, SecureBrowserMode, ShowResultsMode } from '@/lib/types'
@@ -486,7 +487,8 @@ export async function createAssignment(data: CreateAssignmentData) {
   }
 
   revalidatePath('/assignments')
-  redirect(`/assignments/${assignment.id}`)
+  for (const classroomId of data.classroom_ids) revalidatePath(`/classrooms/${classroomId}`)
+  redirect(classroomNavigationPath(data.classroom_ids[0], 'assignments'))
 }
 
 export async function updateAssignmentStatus(id: string, status: AssignmentStatus) {
