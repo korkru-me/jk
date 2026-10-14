@@ -1,16 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getAuthUser } from '@/lib/auth/server'
-import { JoinClassroomForm } from '@/components/classrooms/join-classroom-form'
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { School, GraduationCap, ArrowRight } from 'lucide-react'
 import type { Classroom } from '@/lib/types'
 import { TeacherViewClient } from './_components/teacher-view-client'
-import { Card } from '@/components/ui/card'
-import { displayDescription, parseDescription } from './_components/classroom-meta'
-import { ClassroomIcon } from '@/components/classrooms/classroom-icon'
-import { withBackHref } from '@/lib/back-link'
+import { StudentView, type StudentClassroom } from './_components/student-view'
 import { linkReachesGroup } from '@/lib/classroom-groups'
 import { getStudentGroups } from '@/lib/classroom-groups-server'
 
@@ -21,8 +15,6 @@ type ClassroomListRow = Classroom & {
   classroom_students: { count: number }[]
   assignment_classrooms: { count: number }[]
 }
-
-type StudentClassroom = Pick<Classroom, 'id' | 'name' | 'description' | 'status' | 'classroom_type'>
 
 export default async function ClassroomsPage({
   searchParams,
@@ -132,106 +124,5 @@ export default async function ClassroomsPage({
       pendingCountMap={pendingCountMap}
       initialJoinCode={initialJoinCode}
     />
-  )
-}
-
-function StudentView({
-  classrooms,
-  pendingCountMap,
-  initialJoinCode,
-}: {
-  classrooms: StudentClassroom[]
-  pendingCountMap: Record<string, number>
-  initialJoinCode: string
-}) {
-  const homeroomClassrooms = classrooms.filter(c => c.classroom_type === 'homeroom')
-  const subjectClassrooms = classrooms.filter(c => c.classroom_type !== 'homeroom')
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold">ห้องเรียนของฉัน</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">{classrooms.length} ห้องเรียน</p>
-      </div>
-
-      <Card padding="lg">
-        <p className="text-sm font-medium mb-3">เข้าร่วมห้องเรียนใหม่</p>
-        <JoinClassroomForm initialCode={initialJoinCode} />
-      </Card>
-
-      {classrooms.length === 0 ? (
-        <div className="text-center py-16 border-2 border-dashed rounded-2xl">
-          <School className="mx-auto mb-3 size-10 text-primary" aria-hidden="true" />
-          <p className="text-muted-foreground font-medium">ยังไม่ได้เข้าร่วมห้องเรียนใด</p>
-          <p className="text-sm text-muted-foreground/70 mt-1">กรอกรหัสห้องเรียนจากครูเพื่อเริ่มต้น</p>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {homeroomClassrooms.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                <GraduationCap className="w-3.5 h-3.5" /> ห้อง Homeroom
-              </div>
-              <div className="space-y-3">
-                {homeroomClassrooms.map(c => (
-                  <Link
-                    key={c.id}
-                    href={withBackHref(`/classrooms/${c.id}`, '/classrooms')}
-                    className="flex items-center gap-5 bg-surface-inverse rounded-2xl px-6 py-5 hover:opacity-90 transition-opacity"
-                  >
-                    <div className="w-12 h-12 rounded-2xl bg-card/10 flex items-center justify-center shrink-0">
-                      <ClassroomIcon iconKey={parseDescription(c.description).iconKey} className="size-6 text-surface-inverse-foreground" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-primary">ครูที่ปรึกษาประจำชั้น</p>
-                      <p className="text-white font-bold text-xl leading-tight truncate mt-0.5">{c.name}</p>
-                      {displayDescription(c.description) && (
-                        <p className="text-white/50 text-xs mt-1 truncate">{displayDescription(c.description)}</p>
-                      )}
-                    </div>
-                    <span className="flex items-center gap-1 text-sm font-medium text-primary shrink-0">
-                      เข้าห้อง <ArrowRight className="w-3.5 h-3.5" />
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-3">
-            {homeroomClassrooms.length > 0 && (
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                <School className="size-3.5" aria-hidden="true" /> ห้องเรียนวิชา
-              </div>
-            )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {subjectClassrooms.map((c) => {
-                const pending = pendingCountMap[c.id] ?? 0
-                return (
-                  <Link
-                    key={c.id}
-                    href={withBackHref(`/classrooms/${c.id}`, '/classrooms')}
-                    className="block p-5 bg-card border rounded-2xl hover:border-primary/20 dark:hover:border-primary hover:shadow-sm transition-all"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="font-semibold truncate">{c.name}</p>
-                      <ClassroomIcon iconKey={parseDescription(c.description).iconKey} className="size-6 shrink-0 text-primary" />
-                    </div>
-                    {displayDescription(c.description) && (
-                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{displayDescription(c.description)}</p>
-                    )}
-                    {pending > 0 && (
-                      <span className="inline-flex items-center gap-1 mt-3 text-xs font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                        {pending} รอทำ
-                      </span>
-                    )}
-                  </Link>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
   )
 }
