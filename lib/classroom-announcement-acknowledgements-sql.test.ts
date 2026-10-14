@@ -36,6 +36,7 @@ beforeAll(async () => {
     insert into public.post_reads(post_id,user_id) values ('${POST}','${STUDENT}');
   `)
   await db.exec(readFileSync(new URL('../supabase/migrations/20261014053207_classroom_announcement_acknowledgements.sql', import.meta.url), 'utf8'))
+  await db.exec(readFileSync(new URL('../supabase/migrations/20261014071012_announcement_round_conflict_response.sql', import.meta.url), 'utf8'))
 }, 30000)
 afterAll(async () => { await db?.close() })
 
@@ -56,7 +57,7 @@ describe('explicit announcement receipts', () => {
     expect(await rpc('remind_classroom_announcement', [TEACHER, POST])).toMatchObject({ round: 2 })
     expect(await rpc('classroom_announcement_acknowledgement_status', [TEACHER, ROOM])).toMatchObject({ [POST]: { round: 2, studentIds: [] } })
     expect(await rpc('pending_classroom_announcements', [STUDENT])).toMatchObject([{ id: POST, round: 2 }])
-    await expect(rpc('acknowledge_classroom_announcement', [STUDENT, POST, 1])).rejects.toMatchObject({ code: '40001' })
+    await expect(rpc('acknowledge_classroom_announcement', [STUDENT, POST, 1])).rejects.toMatchObject({ code: 'PT409' })
     await rpc('acknowledge_classroom_announcement', [STUDENT, POST, 2])
     expect((await db.query('select * from public.classroom_announcement_acknowledgements')).rows).toHaveLength(2)
   })

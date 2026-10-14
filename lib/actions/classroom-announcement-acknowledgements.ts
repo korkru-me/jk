@@ -27,9 +27,9 @@ export async function acknowledgeClassroomAnnouncement(postId: string, round: nu
   if (!user) return { error: 'กรุณาเข้าสู่ระบบใหม่' }
   const { error } = await createAdminClient().rpc('acknowledge_classroom_announcement', { p_actor: user.id, p_post: postId, p_round: round })
   if (error) return {
-    error: error.code === '40001' ? 'ครูแจ้งประกาศนี้ใหม่ กรุณาโหลดประกาศล่าสุดก่อนรับทราบ'
+    error: (error.code === 'PT409' || error.code === '40001') ? 'ครูแจ้งประกาศนี้ใหม่ กรุณาโหลดประกาศล่าสุดก่อนรับทราบ'
       : error.code === '42501' ? 'ประกาศนี้ไม่พร้อมรับทราบแล้ว กรุณาโหลดรายการล่าสุด' : 'รับทราบประกาศไม่สำเร็จ กรุณาลองใหม่',
-    stale: error.code === '40001' || error.code === '42501',
+    stale: (error.code === 'PT409' || error.code === '40001') || error.code === '42501',
   }
   revalidatePath('/dashboard')
   revalidatePath('/classrooms/[id]', 'page')

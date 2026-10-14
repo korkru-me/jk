@@ -29,3 +29,11 @@
 - PGlite ทดสอบ migration/RPC จริงด้วยข้อมูลสังเคราะห์: ไม่ย้าย sighting เก่า, explicit/idempotent ack, รอบใหม่และ stale ack, owner/manager/foreign/view/student permission, ออกจากห้อง, archived room และสิทธิ์ตรงของ anon/authenticated การทดสอบ connection เดียวไม่แทน Staging concurrent test
 - `/exam-screen-lab/announcement-acknowledgements` ใช้ component จริงกับ callbacks จำลอง สถานะใน sessionStorage มีเฉพาะรอบ/receipt ของ fixture ไม่เคยเรียก action บัญชีจริง; `?scenario=error` ให้ครั้งแรกไม่สำเร็จเพื่อพิสูจน์ว่า popup และจำนวนไม่เปลี่ยน
 - Browser ตรวจรับทราบครบ/โหลดใหม่ไม่เด้ง, ครูแจ้งใหม่/รับทราบใหม่, พักคิว/กลับมาใหม่, คลิกนอก/ย้อนกลับไปอ่าน, รูปขยายซ้อนและ Escape, mobile/light/dark การใช้ SQL ใน hosted Staging และ advisors ยังไม่รันเพราะ migration baseline ไม่ตรง
+
+## Staging rollout · 14 ตุลาคม 2026
+
+เจ้าของอนุญาตเฉพาะ Staging แล้ว คืนไฟล์ `20261009142610_atomic_seb_exam_start.sql` จาก `supabase migration fetch --project-ref` ในโฟลเดอร์ชั่วคราว ประวัติ baseline ตรงกันแล้ว จึง apply เฉพาะ migration ใหม่รับทราบประกาศ/รูปโปรไฟล์ ไม่มี repair/revert หรือรัน SQL เก่าซ้ำ และไม่เปลี่ยน Production.
+
+พบใน Data API จริงว่า SQLSTATE `40001` ของ stale application round ทำให้ PostgREST 14 retry ไม่สิ้นสุดตาม Supabase troubleshooting จึงเพิ่ม migration `20261014071012_announcement_round_conflict_response.sql` เปลี่ยนเฉพาะกรณีนี้เป็น `PT409`/HTTP 409 ไม่เปลี่ยน transaction locking หรือ grants เดิม ไฟล์ migration ที่ apply แล้วไม่ถูกแก้ PGlite รันทั้ง baseline และ follow-up และ server action รองรับโค้ดทั้งสองระหว่าง rollout.
+
+Advisors ของสองตาราง receipt เป็น INFO `rls_enabled_no_policy` ตามการออกแบบ server-only: เปิด RLS พร้อม REVOKE browser grants และ RPC execute ไม่ใช่การเปิด read/write สาธารณะ ตรวจ grant/negative API จริงอีกครั้งก่อนถือว่าใช้งานได้ รายละเอียดแนวทาง [Supabase SQLSTATE 40001](https://supabase.com/docs/guides/troubleshooting/high-cpu-and-infinite-transaction-retries-when-using-custom-error-codes-in-rpc-functions-77326b).
