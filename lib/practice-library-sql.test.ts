@@ -11,11 +11,11 @@ const rpcMigration = readFileSync(
   'utf8',
 )
 const multiClassroomMigration = readFileSync(
-  new URL('../supabase/migrations/20261013124500_practice_multi_classroom_creation.sql', import.meta.url),
+  new URL('../supabase/migrations/20261014040543_practice_multi_classroom_creation.sql', import.meta.url),
   'utf8',
 )
 const settingsMigration = readFileSync(
-  new URL('../supabase/migrations/20261013130836_practice_library_settings.sql', import.meta.url),
+  new URL('../supabase/migrations/20261014042628_practice_library_settings.sql', import.meta.url),
   'utf8',
 )
 

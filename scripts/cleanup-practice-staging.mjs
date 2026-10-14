@@ -65,8 +65,10 @@ function fail(step, error = null) {
   })
 }
 
-const removedClassroom = await admin.from('classrooms').delete().eq('id', manifest.classroomId)
-if (removedClassroom.error) fail('classroom-delete', removedClassroom.error)
+for (const id of [manifest.classroomId, manifest.secondClassroomId].filter(Boolean)) {
+  const removedClassroom = await admin.from('classrooms').delete().eq('id', id)
+  if (removedClassroom.error) fail('classroom-delete', removedClassroom.error)
+}
 for (let start = 0; start < manifest.questionIds.length; start += 100) {
   const removed = await admin.from('questions').delete()
     .in('id', manifest.questionIds.slice(start, start + 100))

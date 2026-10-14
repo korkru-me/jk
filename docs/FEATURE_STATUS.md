@@ -1,5 +1,14 @@
 # Feature status
 
+### Sync เว็บจริงกับ local และแก้สร้างคลังฝึก — 14 ตุลาคม 2026
+
+- เจ้าของอนุมัติให้รวม source ที่เสร็จแล้วใน local กับ Production ล่าสุด: wizard/หน้ารอ/การตั้งค่าคลังฝึก, ตัวเลือกห้องที่คงลำดับ, การ์ดห้องนักเรียน และ dashboard/calendar ใช้ชุดเดียวกับโลโก้ Production รอบ PR #48–49
+- สาเหตุสร้างคลังฝึกไม่ได้คือ local ใช้ Production Supabase ซึ่งยังไม่มี `create_practice_libraries_for_classrooms` รุ่นตั้งค่าและคอลัมน์ `access_code`; ตรวจ schema แบบ read-only ยืนยัน `PGRST202`/`42703` โดยไม่สร้างข้อมูล QA บน Production
+- migration สำหรับหลายห้องเปลี่ยนชื่อเป็น `20261014040543_practice_multi_classroom_creation.sql` ให้ตรง version ที่ Supabase migration connector บันทึกใน Staging; SQL ไม่เปลี่ยนแม้แต่ byte (SHA-256 `abdc8ded675a7afe894eb0ba4c92e0e1ef67b7f73597368bd5aaeb27007d8ed8`) ส่วน settings ที่ยังไม่ได้ apply ย้ายไปชื่อ CLI ใหม่ `20261014042628_practice_library_settings.sql` เพื่อรักษาลำดับ dependency (SHA-256 `673a28a8287b9bebb901d8b9c924820672543bf69c4cdbfe97211eccff8bb61b`) · ไม่ย้อน migration, reset หรือ replay schema เก่า
+- เตรียม isolated release view จาก ledger ของแต่ละ environment เพื่อกัน SEB/Staging-only migrations ออกจาก Production; runner Staging ใช้ RPC รุ่นเดียวกับ wizard สร้างสองห้อง × 1,000 ข้อพร้อม access code และค่าตั้งค่า พร้อม cleanup ที่รองรับสองห้อง
+- TypeScript, design-token lint, full Vitest 240 files / 3,204 tests และ production webpack build ของชุดรวมผ่าน; local เพิ่ม signing key สำหรับ receipt/access session แยกจาก Staging/Production โดยไม่ commit secret
+- สถานะ rollout: ตรวจ dry-run และ authenticated Staging integration ก่อน apply Production; ยังไม่ promote เว็บจริงจนกว่าฐานข้อมูลและ deployment จะพร้อม
+
 ### ปฏิทินนักเรียนแบบย่อและหน้าหลักประหยัดพื้นที่ — 14 ตุลาคม 2026
 
 - **UI-118** — ปฏิทินนักเรียนเป็น Card กว้างไม่เกิน `14rem` แสดงวันที่และจุดสีตามสถานะงาน; hover/Tab หรือแตะวันเปิดรายการทุกงานพร้อมชื่อห้องวิชา เวลาส่ง สถานะ และลิงก์ทำงาน/ดูผล ปุ่มขยายเปิดเดือนพร้อมรายละเอียดในช่องวันบน desktop และปฏิทินกับรายการเรียงตามวันบนมือถือ; วันที่มาจากเขตเวลาไทย และ popup ที่ขยายเป็นการอ่านอย่างเดียวจึงปิดได้โดยไม่ทิ้งข้อมูลร่าง
