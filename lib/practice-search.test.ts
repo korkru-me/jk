@@ -92,3 +92,12 @@ it('keeps an exercise through question and paging links and validates untrusted 
   expect(buildPracticeSearchHref('library', state, { exerciseId: '', page: 1 })).toBe('/practice/library/library')
   expect(parsePracticeSearchParams({ exercise: 'not-a-uuid' }).exerciseId).toBeUndefined()
 })
+
+it('retains review-only search across paging and question return links', () => {
+  const state = parsePracticeSearchParams({ review: '1', q: 'test', page: '2' })
+  expect(state.reviewOnly).toBe(true)
+  expect(new URL(buildPracticeSearchHref('library', state, { page: 3 }), 'https://test.invalid').searchParams.get('review')).toBe('1')
+  expect(new URL(buildPracticeQuestionHref('library', 'question', state), 'https://test.invalid').searchParams.get('review')).toBe('1')
+  expect(parsePracticeSearchParams({ review: 'yes' }).reviewOnly).toBeUndefined()
+  expect(parsePracticeSearchParams({ review: '1', exercise: '80000000-0000-4000-8000-000000000001' }).reviewOnly).toBeUndefined()
+})

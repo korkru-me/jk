@@ -1,5 +1,10 @@
 # Architecture
 
+## Local-first personal exercise editing and pins
+
+PracticeLibraryView persists edit draft identity/revision/title and selected questions in actor/library-scoped sessionStorage. It invokes separate create/update/pin actions; the server remains the authority for owner/membership/revision checks. The list DTO supplies member titles so removal works beyond the current page. The review URL flag persists through search, pagination and question return links and selects its own bounded RPC. The synthetic lab overrides actions and URL builders, persists only labelled sample groups/pins in browser localStorage, and stays isolated from Auth and database writes. Hosted rollout is deferred by the owner.
+
+
 ## Student personal practice exercise boundary (prepared 14 October 2026)
 
 The access assertion helper alone is service-only SECURITY DEFINER with an empty search_path, to share-lock protected library/roster rows without expanding direct UPDATE grants. Main creation/list/page RPCs remain SECURITY INVOKER.

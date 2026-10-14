@@ -1,5 +1,10 @@
 # Brand, language และ UI rules
 
+## แก้ชุดฝึกและปักข้อในคลังฝึก
+
+การ์ดชุดฝึกแยกลิงก์เปิดชุดออกจากปุ่ม “แก้ชื่อและโจทย์” เพื่อไม่ให้คลิกแก้ไขแล้วเปลี่ยนหน้า แถบแก้ไขมีชื่อ รายการสมาชิกที่เลื่อนภายใน ปุ่มเอาออก และเพิ่มโจทย์จากคลัง เมื่อบันทึกล้มเหลวต้องคงร่างและแสดง error; revision conflict มีปุ่มโหลดข้อมูลล่าสุดที่ยืนยันก่อนทิ้งร่าง ปุ่มปักใช้ข้อความพร้อม aria-pressed และพื้นที่สัมผัส 44px มีทางเปิดดูเฉพาะข้อที่ปักและ empty state สำหรับรายการว่าง
+
+
 Student attached-solution dialogs request confirmation on outside/Escape dismissal; explicit Close returns to the invoking button.
 
 ## Student practice cards and personal exercise groups - 14 October 2026

@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { getAuthUser } from '@/lib/auth/server'
 import { hasPracticeAccessSession } from '@/lib/practice-access-session.server'
 import { loadPracticeLibraryWaiting, loadPracticeQuestionForStudent } from '@/lib/practice-question-access.server'
-import { practiceExerciseSchema } from '@/lib/practice-exercises'
+import { practiceExerciseSchema, practiceExerciseUpdateSchema, practiceReviewPinSchema } from '@/lib/practice-exercises'
 import { isPracticeLibraryEnabled } from '@/lib/practice-question'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { buildQuestionSolution, type QuestionSolution } from '@/lib/question-solution'
@@ -52,4 +52,41 @@ export async function getPracticeAttachedSolution(libraryId: string, questionId:
     if (error || !data) return denied
     return { data: buildQuestionSolution(data, []) }
   } catch { return denied }
+}
+
+
+export async function updatePracticeExercise(input: unknown): Promise<
+  { ok: true } | { ok: false; error: string; conflict?: boolean }
+> {
+  const parsed = practiceExerciseUpdateSchema.safeParse(input)
+  if (!parsed.success) return { ok: false, error: 'กรุณาตั้งชื่อแบบฝึกหัดและเลือกโจทย์ 1–500 ข้อ' }
+  try {
+    const access = await studentAccess(parsed.data.libraryId)
+    if (!access) return { ok: false, error: 'ไม่สามารถเข้าถึงคลังฝึกนี้ได้ กรุณาเข้าคลังฝึกอีกครั้ง' }
+    const { error } = await createAdminClient().rpc('update_student_practice_exercise', {
+      p_actor_id: access.user.id, p_library_id: parsed.data.libraryId, p_id: parsed.data.id,
+      p_title: parsed.data.title, p_question_ids: parsed.data.questionIds,
+      p_expected_revision: parsed.data.expectedRevision,
+    })
+    if (error?.code === 'PT409') return { ok: false, conflict: true, error: 'แบบฝึกหัดถูกแก้จากอีกหน้าต่าง กรุณาโหลดข้อมูลล่าสุดก่อนแก้ไขต่อ' }
+    if (error) return { ok: false, error: 'ยังบันทึกการแก้ไขไม่ได้ กรุณาลองอีกครั้ง' }
+    revalidatePath(`/practice/${parsed.data.libraryId}/library`)
+    return { ok: true }
+  } catch { return { ok: false, error: 'ยังบันทึกการแก้ไขไม่ได้ กรุณาลองอีกครั้ง' } }
+}
+
+export async function setPracticeReviewPin(input: unknown): Promise<{ ok: true } | { ok: false; error: string }> {
+  const parsed = practiceReviewPinSchema.safeParse(input)
+  if (!parsed.success) return { ok: false, error: 'ข้อมูลโจทย์ไม่ถูกต้อง' }
+  try {
+    const access = await studentAccess(parsed.data.libraryId)
+    if (!access) return { ok: false, error: 'ไม่สามารถเข้าถึงคลังฝึกนี้ได้ กรุณาเข้าคลังฝึกอีกครั้ง' }
+    const { error } = await createAdminClient().rpc('set_student_practice_review_pin', {
+      p_actor_id: access.user.id, p_library_id: parsed.data.libraryId,
+      p_question_id: parsed.data.questionId, p_pinned: parsed.data.pinned,
+    })
+    if (error) return { ok: false, error: 'ยังบันทึกการปักโจทย์ไม่ได้ กรุณาลองอีกครั้ง' }
+    revalidatePath(`/practice/${parsed.data.libraryId}/library`)
+    return { ok: true }
+  } catch { return { ok: false, error: 'ยังบันทึกการปักโจทย์ไม่ได้ กรุณาลองอีกครั้ง' } }
 }

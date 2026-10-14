@@ -261,7 +261,7 @@ export async function loadPracticeLibrarySearch(
           p_actor_id: actorId, p_library_id: libraryId, p_exercise_id: state.exerciseId,
           p_limit: PRACTICE_PAGE_SIZE, p_offset: (page - 1) * PRACTICE_PAGE_SIZE,
         })
-      : admin.rpc(PRACTICE_STORAGE.searchQuestionsRpc, {
+      : admin.rpc(state.reviewOnly ? 'search_student_practice_review_questions' : PRACTICE_STORAGE.searchQuestionsRpc, {
         p_actor_id: actorId,
         p_library_id: libraryId,
         p_terms: practiceSearchTerms(state.q),

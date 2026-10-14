@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { PracticeAccessState } from '@/components/practice/practice-access-state'
 import { PracticeLibraryView } from '@/components/practice/practice-library-view'
-import { loadPracticeExercises } from '@/lib/practice-exercises.server'
+import { loadPracticeExercises, loadPracticeReviewPins } from '@/lib/practice-exercises.server'
 import { getAuthUser } from '@/lib/auth/server'
 import { isPracticeLibraryEnabled } from '@/lib/practice-question'
 import { loadPracticeLibrarySearch } from '@/lib/practice-question-access.server'
@@ -38,7 +38,7 @@ export default async function StudentPracticeLibraryQuestionsPage({
     redirect(buildPracticeSearchHref(id, state, { page: result.canonicalPage }))
   }
 
-  const groups = await loadPracticeExercises(user.id, id)
+  const [groups, pins] = await Promise.all([loadPracticeExercises(user.id, id), loadPracticeReviewPins(user.id, id)])
   if (state.exerciseId && (!groups.ready || !groups.exercises.some(exercise => exercise.id === state.exerciseId))) {
     if (!groups.ready) return <PracticeAccessState kind="unavailable" returnHref={`/practice/${id}/library`} />
     notFound()
@@ -55,6 +55,8 @@ export default async function StudentPracticeLibraryQuestionsPage({
       storageOwnerId={user.id}
       exercises={groups.ready ? groups.exercises : []}
       exercisesReady={groups.ready}
+      pinnedQuestionIds={pins.ready ? pins.questionIds : []}
+      pinsReady={pins.ready}
     />
   )
 }

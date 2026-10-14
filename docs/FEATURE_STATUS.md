@@ -1,5 +1,16 @@
 # Feature status
 
+## แก้แบบฝึกหัดส่วนตัวและปักโจทย์ไว้ทบทวน — 14 ตุลาคม 2026 (local review)
+
+- เจ้าของเปลี่ยนคำสั่งเป็น commit ในเครื่องและเปิดเว็บโลคอลก่อน จึงพัก hosted Staging UAT, schema application และ Production release; ไม่มี push/deploy หรือ database mutation ในรอบนี้
+- เพิ่มแก้ชื่อและเพิ่ม/เอาโจทย์ออกจากชุดเดิมผ่าน inline editor โดยใช้ selection ข้ามหน้า/ค้นหาและรายการสมาชิกที่เอาออกได้โดยตรง ร่างชื่อและรายการคงหลัง reload; ยกเลิกหรือเปลี่ยนไปแก้ชุดอื่นต้องยืนยันเมื่อมีร่าง
+- เพิ่มปักโจทย์รายข้อและดูเฉพาะที่ปักไว้ ปักหมุดเป็นส่วนตัวแยก actor/library/question ไม่มีผลกับประวัติการตอบหรือความคืบหน้าเดิม การเอาข้อออกจากชุดเปลี่ยนเฉพาะ denominator และ count ที่คำนวณ ไม่ลบ accepted checks
+- update RPC ล็อกแถวชุด ตรวจ owner/library/membership และ expected revision เพื่อกันการแก้ทับจากสองหน้าต่าง Retry payload เดิมไม่เพิ่ม revision; pin RPC ใช้ target boolean เพื่อให้ retry เป็น idempotent ทุก RPC service-only และตรวจ active roster/published library ซ้ำ
+- คืน `20261014072745_attempt_expiry_finalization.sql` จาก `supabase migration fetch` ใน temp directory หลังเทียบ SQL statements กับ committed source แล้วตรงกัน SHA-256 ของไฟล์ที่คืนคือ `f0066cc0966ed97714bac32e5f7383c6d67be569d8357378b5dbd565f523bb0b` ตรวจ history อ่านอย่างเดียวแล้วไม่มี remote-only เหลือ local-only ที่ตั้งใจยังไม่ apply: `20261014125654`, `20261014134748`, `20261014144828`
+- ห้องทดลองโลคอล `/exam-screen-lab/practice-library?view=student` ใช้ component จริงและ callbacks จำลอง เก็บชุด/ปักหมุดสังเคราะห์ใน localStorage ของ browser เพื่อ review หลัง refresh ได้ โดยไม่ใช้ฐานข้อมูล; ปุ่มดูตัวอย่างและลิงก์ชุดยังอยู่ในห้องทดลอง
+- TypeScript, token lint, full suite 258 files / 3,332 tests, production build และ Next MCP ผ่าน Browser local ตรวจแก้ชื่อ/add/remove, draft หลัง reload, save, pin/unpin/filter, และ 320px ไม่มี horizontal overflow; hosted Auth/Data API/server-action persistence และ separate-connection concurrency tests ยังไม่ได้ทำตามคำสั่งพัก release
+
+
 ## Student practice cards and personal exercises - 14 October 2026 (source ready, not deployed)
 
 The access assertion helper alone is service-only SECURITY DEFINER with an empty search_path, to share-lock protected library/roster rows without expanding direct UPDATE grants. Main creation/list/page RPCs remain SECURITY INVOKER.

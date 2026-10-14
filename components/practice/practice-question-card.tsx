@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Eye, Check } from 'lucide-react'
+import { Eye, Check, Bookmark, BookmarkCheck } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -10,12 +10,15 @@ import { TYPE_LABEL, DIFF_META } from '@/lib/question-display'
 import type { PracticeQuestionListItem } from '@/lib/practice-question-access.server'
 import { cn } from '@/lib/utils'
 
-export function PracticeQuestionCard({ item, href, selected, onSelect, selectionDisabled }: {
+export function PracticeQuestionCard({ item, href, selected, onSelect, selectionDisabled, pinned, onTogglePin, pinDisabled }: {
   item: PracticeQuestionListItem
   href: string
   selected: boolean
   onSelect: (checked: boolean) => void
   selectionDisabled: boolean
+  pinned: boolean
+  onTogglePin: () => void
+  pinDisabled: boolean
 }) {
   const difficulty = item.difficulty ? DIFF_META[item.difficulty] : undefined
   return (
@@ -45,6 +48,11 @@ export function PracticeQuestionCard({ item, href, selected, onSelect, selection
             </span>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2 @lg:justify-end">
+            <Button variant={pinned ? 'navigation' : 'outline'} className="min-h-11" disabled={pinDisabled}
+              aria-pressed={pinned} aria-label={`${pinned ? 'เอาปักหมุดออกจาก' : 'ปักไว้ทบทวน'} ${item.title}`} onClick={onTogglePin}>
+              {pinned ? <BookmarkCheck data-icon="inline-start" aria-hidden="true" /> : <Bookmark data-icon="inline-start" aria-hidden="true" />}
+              {pinned ? 'ปักไว้แล้ว' : 'ปักไว้ทบทวน'}
+            </Button>
             {item.hasSolution && <SolutionButton questionId={item.id} questionTitle={item.title} hasSolution canAttach={false} confirmDismissal />}
             <Button variant="secondary" className="min-h-11 bg-primary/10 text-primary hover:bg-primary/20"
               render={<Link href={href} />}>

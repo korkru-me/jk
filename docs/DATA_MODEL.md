@@ -1,5 +1,10 @@
 # Data model และ invariants
 
+## Prepared editing and review-pin schema
+
+Migration `20261014144828` adds revision/updated_at to student_practice_exercises. Update locks the exact owner/library exercise row and checks expectedRevision; a retry of the same payload returns its existing revision. List DTO adds revision and allowlisted member titles. student_practice_review_pins has composite library/student/question PK, a membership FK and student FK with cascade deletion and supporting indexes. Browser grants are revoked with RLS enabled; set/list/search RPCs are service-only and share the active student library access assertion. Pins store no answers or correctness. All new schema remains unapplied for local review.
+
+
 ## Prepared personal practice exercise schema
 
 The access assertion helper alone is service-only SECURITY DEFINER with an empty search_path, to share-lock protected library/roster rows without expanding direct UPDATE grants. Main creation/list/page RPCs remain SECURITY INVOKER.

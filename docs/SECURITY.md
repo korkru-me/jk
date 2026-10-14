@@ -1,5 +1,10 @@
 # Security และ privacy guardrails
 
+## Prepared personal exercise update and pin authorization
+
+Update and pin actions reverify session, exact library/roster and signed access-code session. SQL rechecks those resource relations, exact exercise owner and all selected memberships. Updates serialize with FOR UPDATE and revision checks; stale payloads receive PT409 and are not written. Pins are private per actor/library/question, with no browser table or execute grants. Pinned search uses literal term matching and exact tag AND semantics with 24-row bounds. Local QA uses synthetic browser storage and PGlite only; no live schema or student data was changed.
+
+
 ## Prepared student personal exercise access boundary
 
 The access assertion helper alone is service-only SECURITY DEFINER with an empty search_path, to share-lock protected library/roster rows without expanding direct UPDATE grants. Main creation/list/page RPCs remain SECURITY INVOKER.
