@@ -18,6 +18,10 @@ const settingsMigration = readFileSync(
   new URL('../supabase/migrations/20261014042628_practice_library_settings.sql', import.meta.url),
   'utf8',
 )
+const compatibilityMigration = readFileSync(
+  new URL('../supabase/migrations/20261014043342_practice_draft_backward_compatibility.sql', import.meta.url),
+  'utf8',
+)
 
 const ORG_A = '10000000-0000-4000-8000-000000000001'
 const ORG_B = '10000000-0000-4000-8000-000000000002'
@@ -263,6 +267,7 @@ beforeAll(async () => {
   await db.exec(rpcMigration)
   await db.exec(multiClassroomMigration)
   await db.exec(settingsMigration)
+  await db.exec(compatibilityMigration)
   await as(user(OWNER_A), async tx => {
     await tx.query(
       `INSERT INTO public.practice_libraries
@@ -1734,6 +1739,52 @@ describe('self-practice atomic authenticated mutations', () => {
         { question_id: QUESTION_A3 },
       ])
     })
+  })
+
+  it('keeps the previous draft editor compatible without overwriting new settings', async () => {
+    const draft = await as(user(OWNER_A), async tx => (
+      (await tx.query<{ id: string }>(`
+        SELECT public.create_practice_libraries_for_classrooms(
+          $1, ARRAY[$2]::uuid[], 'compatibility draft', NULL, false,
+          'KEEP', true, false, true, false, ARRAY[$3]::uuid[], false
+        ) AS id
+      `, [ORG_A, ROOM_A, QUESTION_A1])).rows[0].id
+    ))
+    await as(user(CO_MANAGE), async tx => {
+      const result = await tx.query<{ count: number }>(`
+        SELECT public.update_practice_library_draft(
+          $1, 'previous editor saved', NULL, true, ARRAY[$2]::uuid[]
+        ) AS count
+      `, [draft, QUESTION_A1])
+      expect(result.rows[0].count).toBe(1)
+    })
+    await as(user(OWNER_A), async tx => {
+      expect((await tx.query(`
+        SELECT title, access_code, calculator_enabled, scratchpad_enabled,
+          shuffle_questions, shuffle_options FROM public.practice_libraries WHERE id=$1
+      `, [draft])).rows[0]).toEqual({
+        title: 'previous editor saved', access_code: 'KEEP',
+        calculator_enabled: true, scratchpad_enabled: false,
+        shuffle_questions: true, shuffle_options: false,
+      })
+    })
+  })
+
+  it('denies the previous draft editor to view-only and foreign teachers', async () => {
+    const draft = await as(user(OWNER_A), async tx => (
+      (await tx.query<{ id: string }>(`
+        SELECT public.create_practice_library(
+          $1, $2, 'compatibility denied', NULL, false, ARRAY[$3]::uuid[], false
+        ) AS id
+      `, [ORG_A, ROOM_A, QUESTION_A1])).rows[0].id
+    ))
+    for (const actor of [CO_VIEW, OWNER_B]) {
+      await expect(as(user(actor), tx => tx.query(`
+        SELECT public.update_practice_library_draft(
+          $1, 'forbidden', NULL, false, ARRAY[$2]::uuid[]
+        )
+      `, [draft, QUESTION_A1]))).rejects.toMatchObject({ code: '42501' })
+    }
   })
 
   it('normalizes and de-duplicates bulk tags, and rejects a mixed invalid set atomically', async () => {

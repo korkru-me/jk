@@ -7,7 +7,8 @@
 - migration สำหรับหลายห้องเปลี่ยนชื่อเป็น `20261014040543_practice_multi_classroom_creation.sql` ให้ตรง version ที่ Supabase migration connector บันทึกใน Staging; SQL ไม่เปลี่ยนแม้แต่ byte (SHA-256 `abdc8ded675a7afe894eb0ba4c92e0e1ef67b7f73597368bd5aaeb27007d8ed8`) ส่วน settings ที่ยังไม่ได้ apply ย้ายไปชื่อ CLI ใหม่ `20261014042628_practice_library_settings.sql` เพื่อรักษาลำดับ dependency (SHA-256 `673a28a8287b9bebb901d8b9c924820672543bf69c4cdbfe97211eccff8bb61b`) · ไม่ย้อน migration, reset หรือ replay schema เก่า
 - เตรียม isolated release view จาก ledger ของแต่ละ environment เพื่อกัน SEB/Staging-only migrations ออกจาก Production; runner Staging ใช้ RPC รุ่นเดียวกับ wizard สร้างสองห้อง × 1,000 ข้อพร้อม access code และค่าตั้งค่า พร้อม cleanup ที่รองรับสองห้อง
 - TypeScript, design-token lint, full Vitest 240 files / 3,204 tests และ production webpack build ของชุดรวมผ่าน; local เพิ่ม signing key สำหรับ receipt/access session แยกจาก Staging/Production โดยไม่ commit secret
-- สถานะ rollout: ตรวจ dry-run และ authenticated Staging integration ก่อน apply Production; ยังไม่ promote เว็บจริงจนกว่าฐานข้อมูลและ deployment จะพร้อม
+- Staging apply migration ครบและ integration gate ผ่าน 8 บทบาท / 1,000 โจทย์ / 2 ห้อง: ค่าตั้งค่าบันทึกตรงกัน, exact AND search/pagination, idempotency, progress isolation และ closed-library denial ผ่าน; cleanup PASS · Production dry-run มีเฉพาะสองไฟล์นี้ และ Staging database lint ระดับ error ผ่าน
+- เพื่อให้ติดตั้งฐานข้อมูลก่อนเผยแพร่ source โดยเว็บรุ่นเดิมยังบันทึกร่างได้ เพิ่ม migration `20261014043342_practice_draft_backward_compatibility.sql`: RPC signature เดิมอ่านค่าตั้งค่าที่บันทึกแล้วภายใต้สิทธิ์เดิมและ row lock ก่อนเรียกตัวบันทึกรุ่นใหม่ ไม่เดาค่า default หรือเปิดสิทธิ์เพิ่ม; unit/hosted gate ต้องตรวจผู้ช่วยสอน manage บันทึกได้โดยค่าตั้งค่าไม่หาย และ view/ครูต่างห้องยังถูกปฏิเสธ
 
 ### ปฏิทินนักเรียนแบบย่อและหน้าหลักประหยัดพื้นที่ — 14 ตุลาคม 2026
 
