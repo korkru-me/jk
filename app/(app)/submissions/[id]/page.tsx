@@ -4,6 +4,7 @@ import { getAuthUser } from '@/lib/auth/server'
 import { canManageAssignment } from '@/lib/auth/assignment-access'
 import { notFound, redirect } from 'next/navigation'
 import { Suspense } from 'react'
+import { ExpiredAttemptStatus } from '@/components/exam/expired-attempt-status'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { StudyPathPanel } from '@/components/student/study-path-panel'
@@ -95,7 +96,7 @@ export default async function SubmissionResultPage({
   const { data: ownSubmission } = await admin
     .from('submissions')
     .select(`
-      id, assignment_id, student_id, status, total_score, score_adjustment, max_score, attempt_number, submitted_at, secure_browser_verified_at,
+      id, assignment_id, student_id, status, closed_at, close_reason, missing_work_evidence, total_score, score_adjustment, max_score, attempt_number, submitted_at, secure_browser_verified_at,
       users!submissions_student_id_fkey(full_name),
       assignments(id, title, show_results, show_solutions, end_at, duration_minutes, passing_type, passing_value, completion_rule, type, status, max_attempts, score_strategy, retry_scope, classroom_id, display_max_score, secure_browser_mode)
     `)
@@ -125,7 +126,7 @@ export default async function SubmissionResultPage({
     const { data: teacherVisibleSubmission } = await admin
       .from('submissions')
       .select(`
-        id, assignment_id, student_id, status, total_score, score_adjustment, max_score, attempt_number, submitted_at, secure_browser_verified_at,
+        id, assignment_id, student_id, status, closed_at, close_reason, missing_work_evidence, total_score, score_adjustment, max_score, attempt_number, submitted_at, secure_browser_verified_at,
         users!submissions_student_id_fkey(full_name),
         assignments(title, show_results, end_at, passing_type, passing_value, type, status, max_attempts, score_strategy, retry_scope, classroom_id, display_max_score, secure_browser_mode),
         submission_answers(id, correct_answer, is_correct)
@@ -143,6 +144,8 @@ export default async function SubmissionResultPage({
   const isTeacherViewer = !isOwnSubmission
 
   if (submission.status === 'in_progress') {
+    if (submission.closed_at) return isOwnSubmission ? <ExpiredAttemptStatus submissionId={id} timeExpired={submission.close_reason !== 'manual'} />
+      : <Card padding="lg"><p role="status">รอบนี้ปิดรับคำตอบแล้ว กำลังรอระบบตรวจคะแนน</p></Card>
     if (!isOwnSubmission) notFound()
     redirect(`/assignments/${submission.assignment_id}/take`)
   }
@@ -407,6 +410,8 @@ export default async function SubmissionResultPage({
             </div>
           )}
 
+          {submission.close_reason && submission.close_reason !== 'manual' && <p className="text-sm text-muted-foreground">ปิดรอบอัตโนมัติเมื่อ{submission.close_reason === 'time_limit' ? 'หมดเวลาทำ' : 'ถึงเวลาปิดรับ'}</p>}
+          {submission.missing_work_evidence && <p className="text-sm text-destructive">วิธีทำที่แนบยังไม่ครบ · รอครูพิจารณา</p>}
           {submission.submitted_at && (
             <p className="text-xs text-muted-foreground mt-3">
               ส่งเมื่อ {thaiDateTime.format(new Date(submission.submitted_at))}

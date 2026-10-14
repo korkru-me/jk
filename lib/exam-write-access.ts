@@ -34,6 +34,7 @@ export interface WritableExamSubmission {
   id: string
   student_id: string
   status: string
+  closed_at?: string | null
   started_at: string
   assignment_id: string
   seb_config_revision?: number | null
@@ -81,7 +82,7 @@ export async function getWritableStudentAnswer(
       id, submission_id, student_answer, work_images, carried_over, check_count,
       questions(question_type, answer_parts),
       submissions(
-        id, student_id, status, started_at, assignment_id, ${includeRevision ? 'seb_config_revision, ' : ''}exam_access_mode,
+        id, student_id, status, closed_at, started_at, assignment_id, ${includeRevision ? 'seb_config_revision, ' : ''}exam_access_mode,
         current_streak, best_streak, streak_reached,
         assignments(
           id, duration_minutes, end_at, secure_browser_mode, android_exam_mode, type, mode,
@@ -98,6 +99,7 @@ export async function getWritableStudentAnswer(
   const submission = Array.isArray(answer.submissions) ? answer.submissions[0] : answer.submissions
   if (!submission || submission.student_id !== studentId) return { error: 'ไม่มีสิทธิ์' as const }
   if (submission.status !== 'in_progress') return { error: 'ส่งงานแล้ว' as const }
+  if (submission.closed_at) return { error: 'รอบนี้ปิดรับคำตอบแล้ว' as const }
 
   const assignment = Array.isArray(submission.assignments)
     ? submission.assignments[0]
@@ -108,7 +110,7 @@ export async function getWritableStudentAnswer(
   }
   if (durationMinutes) {
     const deadline = new Date(submission.started_at).getTime() + durationMinutes * 60_000
-    if (Date.now() > deadline) return { error: 'หมดเวลาทำข้อสอบแล้ว' as const }
+    if (Date.now() >= deadline) return { error: 'หมดเวลาทำข้อสอบแล้ว' as const }
   }
 
   if (assignment?.end_at && new Date(assignment.end_at).getTime() < Date.now()) {

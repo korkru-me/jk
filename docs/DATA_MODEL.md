@@ -1,5 +1,7 @@
 # Data model และ invariants
 
+Timed closure (`20261014072745`, rollout pending): `submissions.closed_at` freezes student answers/working; `close_reason` is `manual|time_limit|close_time`, `answer_revision` fences manual evidence validation, and `missing_work_evidence` flags incomplete required working at automatic closure. A closed round may remain `in_progress` while waiting for evaluation, without a published `total_score`; the atomic grade commit sets `submitted_at = closed_at` and `status = submitted`. Repeated commits cannot overwrite completed or teacher grades. Grading scales and late-colour policy remain the existing policy.
+
 ## Pending: explicit classroom announcement receipts
 
 Migration `20261014053207_classroom_announcement_acknowledgements.sql` is prepared locally, not applied: `classroom_announcement_rounds` stores current round/reminded_at per post; `classroom_announcement_acknowledgements` stores the first explicit receipt per `(post_id, student_id, round_no)`. Both cascade from the existing post/user, enable RLS and permit service-only RPC access. Legacy `post_reads.seen_at` remains a separate sighting and is never backfilled as consent/acknowledgement. The server rollout flag stays off until migration parity and Staging verification pass.

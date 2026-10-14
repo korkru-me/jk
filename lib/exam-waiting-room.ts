@@ -53,8 +53,12 @@ export interface ExamWaitingSummary {
   previousSubmissionId: string | null
   activeSubmissionId: string | null
   completedSubmissionId: string | null
+  finishedSubmissionId?: string | null
   expired: boolean
   startedAt: string | null
+  expiresAt?: string | null
+  serverNow?: string
+  closeReason?: 'manual' | 'time_limit' | 'close_time' | null
   blockedReason: string | null
 }
 

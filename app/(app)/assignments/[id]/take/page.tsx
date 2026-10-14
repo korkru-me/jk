@@ -83,8 +83,8 @@ export default async function TakeExamPage({
     const deadlinePassed = result.waitingRoom.endAt != null && new Date(result.waitingRoom.endAt).getTime() < Date.now()
     if (expired || deadlinePassed) {
       return <ExamWaitingClient assignmentId={id} sebChallenge={sebChallenge}
-        summary={{ ...result.waitingRoom, activeSubmissionId: null, expired,
-          blockedReason: deadlinePassed ? 'หมดเวลาส่งแล้ว กรุณาติดต่อครูผู้สอน' : null }} />
+        summary={{ ...result.waitingRoom, activeSubmissionId: null, expired: expired || deadlinePassed,
+          blockedReason: null }} />
     }
   }
 
@@ -138,6 +138,8 @@ export default async function TakeExamPage({
         initialWorkArtifacts={artifacts}
         durationMinutes={assignment.duration_minutes}
         startedAt={submission.started_at}
+        expiresAt={result.waitingRoom.expiresAt}
+        serverNow={new Date().toISOString()}
         config={examConfig}
         sections={assignment.show_sections === false ? [] : parseSections(assignment.sections)}
         questionsPerPage={assignment.questions_per_page}

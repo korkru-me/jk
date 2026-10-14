@@ -1,5 +1,7 @@
 # Architecture
 
+Timed rounds (14 October 2026) have two steps: database cron/write triggers freeze the round at its effective cutoff without a browser, then the existing TypeScript evaluator processes frozen answers. Service-only claim/commit RPCs serialize answer writes, manual submission, automatic closure and duplicate grading through a submission row lock/revision fence; grade publication is atomic. A secret-authenticated POST worker is dispatched by pg_net/Vault once per minute; exact-owned browser recovery is an idempotent fallback. GET/prefetch still does not start or grade an attempt. Migration `20261014072745` and worker configuration are required before rollout; Production is unchanged by local implementation.
+
 อัปเดตล่าสุด: 12 ตุลาคม 2026
 
 เอกสารนี้อธิบายสถาปัตยกรรมที่พบใน repository ปัจจุบัน ไม่ใช่การรับรองว่าทุกส่วนถูก deploy หรือผ่านการทดสอบ production แล้ว

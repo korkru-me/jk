@@ -1,5 +1,13 @@
 # Feature status
 
+### Timed attempt closure — source prepared, rollout pending (14 October 2026)
+
+- Both exams and exercises use the earlier of per-attempt duration and effective hard close (`extended_end_at` overrides `end_at`; `due_at` is not a cutoff). Waiting rooms show **ทำต่อ** and a live countdown anchored to server time; reconnect/foreground refresh does not allocate another attempt.
+- Migration `20261014072745_attempt_expiry_finalization.sql` adds a database write fence and `closed_at`/`close_reason`/`answer_revision`/`missing_work_evidence`. Database cron closes abandoned rounds every 10 seconds at the actual cutoff, even with no browser. A closed round remains `in_progress` only while grading is pending, cannot accept answers/working, and is not counted as active or given a provisional zero grade.
+- Manual submission validates evidence and an answer revision before freezing. Timeout recovery bypasses missing-evidence/native-session requirements only after SQL proves expiry or prior closure. The existing evaluator grades frozen database answers; one transaction writes all verdicts and the header. Duplicate requests preserve completed/teacher grades. Missing working is flagged for teacher consideration rather than keeping an expired round open.
+- POST `/api/internal/attempt-finalizer` requires server-only `ATTEMPT_FINALIZER_SECRET`. Minute cron dispatches through pg_net using environment-specific Vault names `korkru_attempt_finalizer_url` and `korkru_attempt_finalizer_secret`; the HTTPS URL must end `/api/internal/attempt-finalizer`. Exact-owned recovery retries after reconnect. Offline answers cannot be admitted by trusting client timestamps.
+- Source is isolated on `codex/attempt-expiry`, based on the other chat's completed `32f5e16`. Production schema/deployment is unchanged. Rollout requires the migration before this app version, active cron jobs, matching worker environment/Vault credentials, and verification of job/HTTP failures. Local tests pass 3,282 cases; browser exam recovery/expiry was verified with synthetic UI, while hosted Staging evidence remains pending.
+
 ### หน้ารวมเรียนกระชับและรับทราบประกาศ — 14 ตุลาคม 2026 (local source/preview)
 
 - กรอบห้องเรียน/สรุปงาน/ประกาศของนักเรียนใช้ขอบขวาที่ notification anchor ของ shell เมื่อมีพื้นที่สำหรับปฏิทิน ปฏิทินอยู่คอลัมน์ถัดไปและ sticky ใน main scroll; บนจอแคบใช้คอลัมน์เดียว ห้อง Homeroom อยู่ต้น grid ร่วมกับห้องวิชา แถวละ 3 Card เมื่อพื้นที่พอ ไม่แยกแถวว่างสำหรับ Homeroom เดี่ยว
