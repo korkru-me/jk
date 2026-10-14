@@ -16,6 +16,7 @@ import {
   practiceVariantSecret,
   signPracticeVariantReceipt,
 } from '@/lib/practice-variant.server'
+import { hasPracticeAccessSession } from '@/lib/practice-access-session.server'
 
 export const metadata = { title: 'ฝึกทำโจทย์ — KorKru' }
 
@@ -44,6 +45,8 @@ export default async function StudentPracticeQuestionPage({
     }
     notFound()
   }
+  if (access.library.requiresAccessCode
+    && !await hasPracticeAccessSession(user.id, id)) redirect(`/practice/${id}`)
 
   const secret = practiceVariantSecret(process.env)
   if (!secret) return <PracticeAccessState kind="unavailable" returnHref={returnHref} />
@@ -51,7 +54,7 @@ export default async function StudentPracticeQuestionPage({
     actorId: user.id,
     libraryId: id,
     questionId,
-    questionRevision: practiceQuestionRevision(access.question),
+    questionRevision: practiceQuestionRevision(access.question, access.library.shuffleOptions),
   }
   let seed: number | null = null
   let nonce: string | null = null
@@ -62,7 +65,7 @@ export default async function StudentPracticeQuestionPage({
     const candidateNonce = createPracticeVariantNonce()
     const candidateSeed = derivePracticeVariantSeed(identity, candidateNonce, secret)
     try {
-      variant = buildPracticeQuestionVariant(access.question, candidateSeed)
+      variant = buildPracticeQuestionVariant(access.question, candidateSeed, access.library.shuffleOptions)
       seed = candidateSeed
       nonce = candidateNonce
     } catch {
@@ -82,7 +85,10 @@ export default async function StudentPracticeQuestionPage({
       question={variant.safeQuestion}
       variantReceipt={variantReceipt}
       returnHref={returnHref}
-      changesOnRefresh={practiceVariantChangesOnRefresh(access.question)}
+      changesOnRefresh={practiceVariantChangesOnRefresh(access.question, access.library.shuffleOptions)}
+      storageOwnerId={user.id}
+      calculatorEnabled={access.library.calculatorEnabled}
+      scratchpadEnabled={access.library.scratchpadEnabled}
     />
   )
 }

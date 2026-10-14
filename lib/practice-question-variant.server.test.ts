@@ -97,6 +97,12 @@ describe('practice question variant', () => {
     expect(practiceQuestionRevision(edited)).not.toBe(practiceQuestionRevision(original))
   })
 
+  it('keeps MCQ source order when option shuffling is disabled', () => {
+    const variant = buildPracticeQuestionVariant(mcq(), 42, false)
+    expect(variant.optionOrder).toEqual([0, 1, 2])
+    expect(practiceQuestionRevision(mcq(), false)).not.toBe(practiceQuestionRevision(mcq(), true))
+  })
+
   it('keeps exact case and response-token ids in the signed revision', () => {
     const original = {
       ...mcq(),

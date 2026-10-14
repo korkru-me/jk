@@ -139,7 +139,7 @@ export function AssignmentTypeChoice({
               </div>
             </div>
             <Button variant="outline" className="mt-auto w-full" render={<Link href={practiceHref} />}>
-              <BookOpenCheck data-icon="inline-start" /> สร้างคลังฝึก · ไม่มีคะแนน
+              <BookOpenCheck data-icon="inline-start" /> สร้างคลังฝึก
             </Button>
           </Card>
         )}

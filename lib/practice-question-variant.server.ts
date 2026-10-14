@@ -94,7 +94,7 @@ function exactPracticeCorrectAnswer(
  * was rendered. The fingerprint covers what the student sees and what counts
  * as correct, but not labels such as tags or difficulty.
  */
-export function practiceQuestionRevision(question: Question): string {
+export function practiceQuestionRevision(question: Question, shuffleOptions = true): string {
   // Unlike the bank's duplicate-detection fingerprint, a signed attempt must
   // preserve exact case, markup, and nested response-token IDs. Those values
   // can change what is rendered or graded even when two questions still look
@@ -113,6 +113,7 @@ export function practiceQuestionRevision(question: Question): string {
     logic_rules: question.logic_rules,
     is_random: question.is_random,
     extra_data: question.extra_data,
+    shuffle_options: shuffleOptions,
   })
   return createHash('sha256').update(JSON.stringify(content)).digest('hex')
 }
@@ -126,7 +127,7 @@ function shuffledPositions(length: number, random: () => number): number[] {
   return positions
 }
 
-function practiceOptionOrder(question: Question, seed: number): number[] | null {
+function practiceOptionOrder(question: Question, seed: number, shuffleOptions: boolean): number[] | null {
   if (question.question_type !== 'mcq' && question.question_type !== 'matching') return null
   const count = question.question_type === 'matching'
     ? matchingChoices(
@@ -134,6 +135,9 @@ function practiceOptionOrder(question: Question, seed: number): number[] | null 
         question.extra_data as MatchingConfig | undefined,
       ).length
     : (question.mcq_options ?? []).length
+  if (question.question_type === 'mcq' && !shuffleOptions) {
+    return Array.from({ length: count }, (_, index) => index)
+  }
   return shuffledPositions(
     count,
     questionRandom(seed, `${question.id}:practice-option-order`),
@@ -147,6 +151,7 @@ function practiceOptionOrder(question: Question, seed: number): number[] | null 
 export function buildPracticeQuestionVariant(
   question: Question,
   seed: number,
+  shuffleOptions = true,
 ): PracticeQuestionVariant {
   if (!isSharedRandomSeed(seed)) throw new Error('invalid practice question seed')
   const skeleton = buildAttemptQuestion(question, {
@@ -160,7 +165,7 @@ export function buildPracticeQuestionVariant(
     skeleton.correct_answer,
   )
   assertFiniteWrittenAnswer(question, correctAnswer)
-  const optionOrder = practiceOptionOrder(question, seed)
+  const optionOrder = practiceOptionOrder(question, seed, shuffleOptions)
   const safeQuestion = toSafeExamAnswer({
     id: `practice-${question.id}`,
     question_id: question.id,
@@ -192,8 +197,8 @@ export function buildPracticeQuestionVariant(
   }
 }
 
-export function practiceVariantChangesOnRefresh(question: Question): boolean {
-  return question.question_type === 'mcq'
+export function practiceVariantChangesOnRefresh(question: Question, shuffleOptions = true): boolean {
+  return (question.question_type === 'mcq' && shuffleOptions)
     || question.question_type === 'matching'
     || drawsRandomValues(question)
 }

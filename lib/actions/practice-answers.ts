@@ -19,6 +19,7 @@ import {
   loadPracticeQuestionForStudent,
   PRACTICE_STORAGE,
 } from '@/lib/practice-question-access.server'
+import { hasPracticeAccessSession } from '@/lib/practice-access-session.server'
 import {
   buildPracticeQuestionVariant,
   practiceQuestionRevision,
@@ -79,6 +80,10 @@ export async function checkPracticeAnswer(input: unknown): Promise<PracticeAnswe
       parsed.data.questionId,
     )
     if (access.status !== 'ready') return { ok: false, error: GENERIC_ERROR }
+    if (access.library.requiresAccessCode
+      && !await hasPracticeAccessSession(user.id, parsed.data.libraryId)) {
+      return { ok: false, error: 'กรุณากรอกรหัสผ่านเข้าคลังฝึกอีกครั้ง', refreshRequired: true }
+    }
 
     const receipt = verifyPracticeVariantReceipt(
       parsed.data.variantReceipt,
@@ -86,7 +91,7 @@ export async function checkPracticeAnswer(input: unknown): Promise<PracticeAnswe
         actorId: user.id,
         libraryId: parsed.data.libraryId,
         questionId: parsed.data.questionId,
-        questionRevision: practiceQuestionRevision(access.question),
+        questionRevision: practiceQuestionRevision(access.question, access.library.shuffleOptions),
       },
       secret,
     )
@@ -105,7 +110,11 @@ export async function checkPracticeAnswer(input: unknown): Promise<PracticeAnswe
     if (mathInputModes === null) return { ok: false, error: 'โหมดหน่วยมุมไม่ถูกต้อง กรุณาลองใหม่' }
     let variant: ReturnType<typeof buildPracticeQuestionVariant>
     try {
-      variant = buildPracticeQuestionVariant(access.question, receipt.seed)
+      variant = buildPracticeQuestionVariant(
+        access.question,
+        receipt.seed,
+        access.library.shuffleOptions,
+      )
     } catch {
       return {
         ok: false,
@@ -180,6 +189,7 @@ export async function checkPracticeAnswer(input: unknown): Promise<PracticeAnswe
     }
 
     revalidatePath(`/practice/${parsed.data.libraryId}`)
+    revalidatePath(`/practice/${parsed.data.libraryId}/library`)
     return { ok: true, feedback }
   } catch {
     return { ok: false, error: GENERIC_ERROR, retryable: true }

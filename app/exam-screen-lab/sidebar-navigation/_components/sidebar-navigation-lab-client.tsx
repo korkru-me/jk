@@ -27,6 +27,7 @@ export function SidebarNavigationLabShell({ children }: { children: ReactNode })
       user={{ id: CLASSROOM_ID, email: 'sidebar@example.invalid', full_name: 'ครูจำลอง', role: searchParams.get('role') === 'student' ? 'student' : 'teacher' }}
       initialUnreadCount={0}
       notificationsEnabled={false}
+      practiceLibraryEnabled
       previewNavigationOnly={previewNavigationOnly}
     >
       <p className="mb-4 text-xs text-muted-foreground">ห้องทดลองแถบห้องเรียน · ข้อมูลจำลอง · ไม่อ่านหรือบันทึก Supabase</p>

@@ -5,6 +5,7 @@ import { isPracticeLibraryEnabled } from '@/lib/practice-question'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { PracticeLibraryForm } from '../../_components/practice-library-form'
+import type { AssignmentQuestionSetOption } from '@/components/assignments/create-assignment-form'
 import {
   authenticatePracticeTeacher,
   loadPracticeEditorQuestions,
@@ -49,12 +50,19 @@ export default async function EditPracticeLibraryPage({
     )
   }
 
-  const bank = await loadPracticeEditorQuestions(
-    supabase,
-    actor.userId,
-    loaded.library.id,
-    membership.ids,
-  )
+  const [bank, { data: questionSets }] = await Promise.all([
+    loadPracticeEditorQuestions(
+      supabase,
+      actor.userId,
+      loaded.library.id,
+      membership.ids,
+    ),
+    supabase
+      .from('question_sets')
+      .select('id, title, description, question_ids, sections')
+      .eq('created_by', actor.userId)
+      .order('created_at', { ascending: false }),
+  ])
 
   return (
     <PracticeLibraryForm
@@ -62,8 +70,10 @@ export default async function EditPracticeLibraryPage({
         id: loaded.classroom.id,
         orgId: loaded.classroom.org_id,
         name: loaded.classroom.name,
+        description: loaded.classroom.description,
       }]}
       questions={bank.questions}
+      questionSets={(questionSets ?? []) as AssignmentQuestionSetOption[]}
       missingQuestionIds={bank.missingIds}
       unsupportedQuestionIds={bank.unsupportedIds}
       loadingWarning={bank.error}
@@ -76,6 +86,11 @@ export default async function EditPracticeLibraryPage({
         questionIds: membership.ids,
         status: loaded.library.status,
         revealAnswerKey: loaded.library.reveal_answer_key,
+        accessCode: loaded.library.access_code,
+        calculatorEnabled: loaded.library.calculator_enabled,
+        scratchpadEnabled: loaded.library.scratchpad_enabled,
+        shuffleQuestions: loaded.library.shuffle_questions,
+        shuffleOptions: loaded.library.shuffle_options,
       }}
     />
   )

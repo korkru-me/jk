@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { questionEditHref, questionsReturnTo, safeQuestionsRedirect } from './question-return'
+import { questionEditHref, questionsReturnTo, safeQuestionsRedirect, RETURN_DASHBOARD_PARAM } from './question-return'
 
 describe('questionEditHref', () => {
   it('carries the bank view along as one encoded param', () => {
@@ -66,5 +66,22 @@ describe('returning to a แฟ้มโจทย์ editor', () => {
     expect(safeQuestionsRedirect(`/questions/sets/${setId}/edit`)).toBe(`/questions/sets/${setId}/edit`)
     expect(safeQuestionsRedirect('/questions/sets/not-a-uuid/edit')).toBe('/questions')
     expect(safeQuestionsRedirect(`/questions/sets/${setId}/edit/../../../admin`)).toBe('/questions')
+  })
+})
+
+describe('returning to the dashboard', () => {
+  it('returns to the dashboard after editing a recent question', () => {
+    const href = questionEditHref('/questions/abc/edit', '', { [RETURN_DASHBOARD_PARAM]: '1' })
+    const returnTo = questionsReturnTo(new URLSearchParams(href.split('?')[1]))
+    expect(returnTo).toBe('/dashboard')
+    expect(safeQuestionsRedirect(returnTo)).toBe('/dashboard')
+  })
+
+  it('never treats a dashboard origin marker as an arbitrary path', () => {
+    expect(questionsReturnTo(new URLSearchParams({ from: 'dashboard=https://evil.example' })))
+      .toBe('/questions?dashboard=https%3A%2F%2Fevil.example')
+    for (const target of ['/dashboard?next=https://evil.example', '/dashboard/../admin', '//dashboard', 'https://evil.example/dashboard']) {
+      expect(safeQuestionsRedirect(target)).toBe('/questions')
+    }
   })
 })

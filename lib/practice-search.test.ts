@@ -31,7 +31,7 @@ describe('practice search URL contract', () => {
     })
     const url = new URL(href, 'https://korkru.test')
 
-    expect(url.pathname).toBe('/practice/library-1')
+    expect(url.pathname).toBe('/practice/library-1/library')
     expect(url.searchParams.get('q')).toBe('สนามไฟฟ้า')
     expect(url.searchParams.getAll('tag')).toEqual(['สอวน. ค่าย 1', 'ไฟฟ้า'])
     expect(url.searchParams.get('page')).toBe('3')

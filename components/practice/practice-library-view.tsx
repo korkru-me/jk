@@ -19,6 +19,7 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty'
 import { Input } from '@/components/ui/input'
+import { RichText } from '@/components/ui/rich-text'
 import { TYPE_LABEL } from '@/lib/question-display'
 import type {
   PracticeQuestionListItem,
@@ -57,8 +58,8 @@ export function PracticeLibraryView({
           variant="ghost"
           size="icon"
           className="size-[44px]"
-          render={<Link href="/practice" />}
-          aria-label="กลับไปรายการคลังฝึก"
+          render={<Link href={`/practice/${library.id}`} />}
+          aria-label="กลับไปหน้ารอเข้าคลังฝึก"
         >
           <ArrowLeft aria-hidden="true" />
         </Button>
@@ -72,7 +73,7 @@ export function PracticeLibraryView({
             </Badge>
           </div>
           {library.description && (
-            <p className="line-clamp-1 text-sm text-muted-foreground">{library.description}</p>
+            <RichText text={library.description} className="line-clamp-1 text-sm text-muted-foreground" />
           )}
         </div>
       </header>
@@ -157,7 +158,7 @@ export function PracticeLibraryView({
             variant="link"
             size="sm"
             className="min-h-[44px]"
-            render={<Link href={`/practice/${library.id}`} />}
+            render={<Link href={buildPracticeSearchHref(library.id, state, { q: '', tags: [], page: 1 })} />}
           >
             ล้างตัวกรอง
           </Button>
@@ -181,7 +182,7 @@ export function PracticeLibraryView({
                 <Button
                   variant="outline"
                   className="min-h-[44px]"
-                  render={<Link href={`/practice/${library.id}`} />}
+                  render={<Link href={buildPracticeSearchHref(library.id, state, { q: '', tags: [], page: 1 })} />}
                 >
                   ล้างตัวกรอง
                 </Button>

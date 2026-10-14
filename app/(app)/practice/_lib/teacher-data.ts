@@ -68,6 +68,7 @@ export interface PracticeClassroomAccessRow {
   org_id: string
   teacher_id: string
   name: string
+  description: string | null
   status: string
   classroom_type: string
   access: PracticeClassroomAccess
@@ -288,7 +289,7 @@ export async function loadPracticeClassroomAccess(
 ): Promise<PracticeClassroomAccessRow | null> {
   const { data: classroom } = await supabase
     .from('classrooms')
-    .select('id, org_id, teacher_id, name, status, classroom_type')
+    .select('id, org_id, teacher_id, name, description, status, classroom_type')
     .eq('id', classroomId)
     .maybeSingle()
   if (!classroom) return null
@@ -317,14 +318,14 @@ export async function loadManageablePracticeClassrooms(
   const [{ data: owned, error: ownedError }, { data: coTeaching, error: coError }] = await Promise.all([
     supabase
       .from('classrooms')
-      .select('id, org_id, teacher_id, name, status, classroom_type')
+      .select('id, org_id, teacher_id, name, description, status, classroom_type')
       .eq('teacher_id', userId)
       .eq('status', 'active')
       .neq('classroom_type', 'homeroom')
       .order('created_at', { ascending: false }),
     supabase
       .from('classroom_co_teachers')
-      .select('classroom_id, permission, classrooms(id, org_id, teacher_id, name, status, classroom_type)')
+      .select('classroom_id, permission, classrooms(id, org_id, teacher_id, name, description, status, classroom_type)')
       .eq('user_id', userId)
       .in('permission', ['admin', 'manage']),
   ])
@@ -335,13 +336,23 @@ export async function loadManageablePracticeClassrooms(
 
   const rows = new Map<string, PracticeClassroomOption>()
   for (const classroom of (owned ?? []) as ClassroomRow[]) {
-    rows.set(classroom.id, { id: classroom.id, orgId: classroom.org_id, name: classroom.name })
+    rows.set(classroom.id, {
+      id: classroom.id,
+      orgId: classroom.org_id,
+      name: classroom.name,
+      description: classroom.description,
+    })
   }
   for (const relation of (coTeaching ?? []) as unknown as CoTeacherRow[]) {
     const classroom = oneClassroom(relation.classrooms)
     if (!classroom || classroom.status !== 'active' || classroom.classroom_type === 'homeroom') continue
     if (!canManagePracticeLibrary(accessForPermission(relation.permission))) continue
-    rows.set(classroom.id, { id: classroom.id, orgId: classroom.org_id, name: classroom.name })
+    rows.set(classroom.id, {
+      id: classroom.id,
+      orgId: classroom.org_id,
+      name: classroom.name,
+      description: classroom.description,
+    })
   }
 
   return {

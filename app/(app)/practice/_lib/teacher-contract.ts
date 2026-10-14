@@ -20,14 +20,20 @@ export interface PracticeClassroomOption {
   id: string
   orgId: string
   name: string
+  description: string | null
 }
 
 export interface PracticeLibraryEditorValue {
   title: string
   description: string
-  classroomId: string
+  classroomIds: string[]
   questionIds: string[]
   revealAnswerKey: boolean
+  accessCode: string | null
+  calculatorEnabled: boolean
+  scratchpadEnabled: boolean
+  shuffleQuestions: boolean
+  shuffleOptions: boolean
 }
 
 export type PracticeLibraryActionResult =
@@ -47,6 +53,19 @@ const questionIdsSchema = z
     }
   })
 
+const classroomIdsSchema = z
+  .array(uuidSchema)
+  .min(1, 'เลือกห้องเรียนอย่างน้อย 1 ห้อง')
+  .max(50, 'เลือกห้องเรียนได้ไม่เกิน 50 ห้อง')
+  .superRefine((ids, context) => {
+    if (new Set(ids).size !== ids.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'รายการห้องเรียนมีห้องซ้ำ',
+      })
+    }
+  })
+
 const practiceLibraryFields = {
   title: z
     .string()
@@ -59,6 +78,15 @@ const practiceLibraryFields = {
     .max(2_000, 'คำชี้แจงต้องไม่เกิน 2,000 ตัวอักษร'),
   questionIds: questionIdsSchema,
   revealAnswerKey: z.boolean(),
+  accessCode: z.string()
+    .trim()
+    .min(1, 'กรุณากรอกรหัสผ่าน')
+    .max(100, 'รหัสผ่านต้องไม่เกิน 100 ตัวอักษร')
+    .nullable(),
+  calculatorEnabled: z.boolean(),
+  scratchpadEnabled: z.boolean(),
+  shuffleQuestions: z.boolean(),
+  shuffleOptions: z.boolean(),
 }
 
 /**
@@ -68,7 +96,7 @@ const practiceLibraryFields = {
  */
 export const createPracticeLibrarySchema = z.object({
   ...practiceLibraryFields,
-  classroomId: uuidSchema,
+  classroomIds: classroomIdsSchema,
   intent: z.enum(['draft', 'publish']),
 }).strict()
 

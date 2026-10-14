@@ -110,7 +110,7 @@ export function AssignmentCreationMenu({
               )}
             >
               <BookOpenCheck aria-hidden="true" />
-              <span>คลังฝึก · ไม่มีคะแนน</span>
+              <span>คลังฝึก</span>
             </DropdownMenuItem>
           )}
           <DropdownMenuItem

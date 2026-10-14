@@ -55,7 +55,7 @@ Invariant สำคัญ:
 
 ## คลังฝึกด้วยตนเอง
 
-- `practice_libraries` — คลังฝึกหนึ่งห้องต่อแถว มี `org_id`, `classroom_id`, `created_by`, ชื่อ/คำชี้แจง, `status = draft|published|closed`, นโยบาย `reveal_answer_key` และเวลาจากฐาน `published_at`, `closed_at`, `created_at`, `updated_at`; ไม่มีคะแนน กำหนดส่ง เวลา เกณฑ์ผ่าน หรือวิธีคิดคะแนน
+- `practice_libraries` — คลังฝึกหนึ่งห้องต่อแถว มี `org_id`, `classroom_id`, `created_by`, ชื่อ/คำชี้แจง, `status = draft|published|closed`, `reveal_answer_key`, `access_code`, `calculator_enabled`, `scratchpad_enabled`, `shuffle_questions`, `shuffle_options` และเวลาจากฐาน `published_at`, `closed_at`, `created_at`, `updated_at`; ไม่มีคะแนน กำหนดส่ง เวลา เกณฑ์ผ่าน หรือวิธีคิดคะแนน รหัสผ่านอ่าน/ตรวจเฉพาะ server และไม่อยู่ใน student DTO
 - `practice_library_questions` — สมาชิกโจทย์และ `position` ของคลัง คีย์หลัก `(library_id, question_id)` และ unique `(library_id, position)`; FK คู่ยืนยันว่า accepted-check อ้างได้เฉพาะโจทย์ที่อยู่ใน exact library สมาชิกเปลี่ยนได้เฉพาะ `draft` และการลบโจทย์ต้นทางที่ถูกใช้ต้องไม่ทำลายประวัติแบบเงียบ ๆ
 - `practice_answer_attempts` — append-only accepted-check event มีเพียง `library_id`, `student_id`, `question_id`, `checked_at` จากนาฬิกาฐานข้อมูล และ `idempotency_key`; unique `(library_id, student_id, idempotency_key)` ทำให้ retry ของการกดเดียวกันไม่นับซ้ำ
 - ตาราง event **ห้ามมี** answer payload, answer key, correctness, score, points, verdict, solution หรือ field ที่อนุมานคุณภาพคำตอบได้ จำนวนครั้งคำนวณด้วย `count(*)` และจำนวนข้อที่เคยตอบด้วย `count(distinct question_id)` ไม่เก็บ aggregate counter คู่ขนาน
