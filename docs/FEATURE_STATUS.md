@@ -1,5 +1,14 @@
 # Feature status
 
+### แก้การเข้าแบบฝึกหัด/ข้อสอบบน schema Production — 14 ตุลาคม 2026
+
+- Production ยังไม่ apply SEB release-binding migration จึงไม่มี `submissions.seb_config_revision`; คำขออ่านหน้ารอเดิมเลือกคอลัมน์นี้เสมอ ทำให้งาน browser ทั้งข้อสอบและแบบฝึกหัดตอบ 42703 และขึ้น “ตรวจสอบสถานะงานไม่สำเร็จ”
+- เพิ่ม compatibility read เฉพาะ error 42703 ที่ระบุคอลัมน์นี้ขาด แล้วอ่าน projection รุ่นเดิมโดยคง exact assignment/student filters ครอบคลุมหน้ารอ ทำต่อ ตรวจสิทธิ์บันทึก และการจ่ายโจทย์ streak; permission, network และ schema error อื่นไม่เข้า fallback
+- SEB-required entry/read/write/draw ยังคง fail closed เมื่อ revision column ไม่พร้อม ไม่สร้าง revision สมมติ ไม่ข้าม native session ไม่เปิด SEB rollout และไม่ apply migration ใหม่
+- GET/prefetch ยังอ่าน metadata เท่านั้น การเริ่มและ resume ยังเป็น explicit POST พร้อมตรวจ roster เวลา รหัสผ่าน และ attempt limits เดิม; privacy/คะแนน/คำตอบ/การแนบวิธีทำยังใช้ contract เดิม
+- Regression ครอบคลุม legacy/current schema, browser start/resume/write และ SEB denial; Production schema-only projections หน้ารอ/ทำต่อ/write ผ่าน HTTP 200 ด้วย limit=0 โดยไม่อ่านคำตอบหรือเขียนข้อมูลจริง ทดสอบ UI ด้วย synthetic Staging และบันทึกผลใน `docs/SEB_COMPLETION_PLAN.md`
+
+
 ### กวางดำเฉพาะ browser tab — 14 ตุลาคม 2026
 
 - เจ้าของขอเพิ่ม contrast เฉพาะ icon แท็บ Chrome: `app/icon.png` เป็นกวางดำบนวงกลมขาวเต็มพื้นที่ ขนาด/geometry/alpha คงเดิม; generator เปลี่ยนสีเฉพาะ input ของ browser icon โดยไม่แก้ SVG ต้นฉบับ

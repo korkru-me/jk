@@ -19,7 +19,7 @@ import {
   type PreviousAttemptAnswer,
 } from '@/lib/assignment-attempt'
 import { buildAnswerFeedback, type FeedbackQuestion } from '@/lib/answer-feedback'
-import type { Question } from '@/lib/types'
+import type { Question, Submission } from '@/lib/types'
 import { createSebChallenge, validateSebChallenge } from '@/lib/seb-session'
 import { getExamAccessSession } from '@/lib/exam-access-session'
 import {
@@ -35,6 +35,10 @@ import { loadAssignmentQuestionsByProvenance } from '@/lib/assignment-question-a
 import { completionAttemptLimit, findPassingCompletion } from '@/lib/assignment-completion'
 import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
 import { exerciseWaitingDetails, type ExamWaitingSummary } from '@/lib/exam-waiting-room'
+import { readWithSubmissionRevision } from '@/lib/submission-revision-compatibility'
+
+type EntrySubmissionRow = Pick<Submission, 'id' | 'status' | 'attempt_number' | 'started_at' | 'exam_access_mode'> & { seb_config_revision?: number | null }
+type StreakSubmissionRow = Pick<Submission, 'id' | 'student_id' | 'status' | 'started_at' | 'assignment_id' | 'exam_access_mode' | 'current_streak' | 'best_streak' | 'streak_reached'> & { seb_config_revision?: number | null; assignments: unknown }
 
 export async function startSubmission(
   assignmentId: string,
@@ -116,14 +120,14 @@ async function submissionEntry(
       .eq('assignment_id', assignmentId)
       .eq('student_id', user.id)
       .maybeSingle(),
-    admin
+    readWithSubmissionRevision<EntrySubmissionRow>(includeRevision => admin
       .from('submissions')
-      .select('id, status, attempt_number, started_at, exam_access_mode, seb_config_revision')
+      .select(`id, status, attempt_number, started_at, ${includeRevision ? 'seb_config_revision, ' : ''}exam_access_mode`)
       .eq('assignment_id', assignmentId)
       .eq('student_id', user.id)
       .order('attempt_number', { ascending: false })
       .limit(1)
-      .maybeSingle(),
+      .maybeSingle()),
   ])
 
   const assignment = assignmentRes.data
@@ -162,6 +166,9 @@ async function submissionEntry(
   // path: it still requires a short-lived signed session issued only after a
   // teacher approves that exact student and assignment in the proctor room.
   const secureBrowserRequired = assignment.secure_browser_mode === 'seb_required'
+  if (secureBrowserRequired && !existingRes.revisionColumnAvailable) {
+    return { error: 'ข้อสอบนี้ยังไม่พร้อมให้เข้า กรุณาแจ้งครูผู้สอน' }
+  }
   const androidMonitoredAllowed = assignment.android_exam_mode === 'monitored'
   const currentSebRelease = secureBrowserRequired
     ? await readCurrentAssignmentSebRelease(assignmentId)
@@ -952,10 +959,10 @@ export async function drawNextStreakQuestion(
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   const admin = createAdminClient()
 
-  const { data: submission } = await admin
+  const { data: submission, revisionColumnAvailable } = await readWithSubmissionRevision<StreakSubmissionRow>(includeRevision => admin
     .from('submissions')
     .select(`
-      id, student_id, status, started_at, assignment_id, seb_config_revision, exam_access_mode,
+      id, student_id, status, started_at, assignment_id, ${includeRevision ? 'seb_config_revision, ' : ''}exam_access_mode,
       current_streak, best_streak, streak_reached,
       assignments(
         id, org_id, created_by, question_ids, question_points, shuffle_options, shared_random_seed, mode, duration_minutes, end_at,
@@ -964,7 +971,7 @@ export async function drawNextStreakQuestion(
       )
     `)
     .eq('id', submissionId)
-    .maybeSingle()
+    .maybeSingle())
 
   if (!submission) return { error: 'ไม่พบการทำข้อสอบ' }
   const assignment = (Array.isArray(submission.assignments)
@@ -988,6 +995,9 @@ export async function drawNextStreakQuestion(
       streak_recycle_pool: boolean | null
     } | null
 
+  if (assignment?.secure_browser_mode === 'seb_required' && !revisionColumnAvailable) {
+    return { error: 'ข้อสอบนี้ยังไม่พร้อมให้เข้า กรุณาแจ้งครูผู้สอน' }
+  }
   const blocked = await attemptWriteBlocked(
     admin,
     {
