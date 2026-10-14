@@ -1678,3 +1678,10 @@ Physical iPad UAT ของ candidate `r7` ยืนยันแล้วว่�
 - Generated database types หรือขั้นตอนตรวจ schema drift ที่ชัดเจน
 - Production-ready feature flags สำหรับซ่อน prototype UI
 - การตรวจ claims ด้าน PDPA, encryption, ISO, SLA และ pricing โดยเจ้าของธุรกิจ/กฎหมาย
+
+
+### ปรับหน้าเรียนรู้นักเรียนและรูปโปรไฟล์ · 14 ตุลาคม 2026 รอบบันทึกถาวร
+
+- รูปโปรไฟล์เปลี่ยนจาก preview เป็น server save ของ crop PNG 512×512 ลง bucket แยกและ users.avatar_url หลังตรวจ Auth/บัญชี active; rollback เมื่อบันทึกไม่สำเร็จและคง draft, ไม่รับ owner/URL จาก client ไม่มีการใช้รูป/ข้อมูลนักเรียนจริงในการทดสอบ
+- งานที่เสร็จแสดงติ๊ก/กรอบเขียวและลิงก์ submission ในรายการรวม ยังคงเกณฑ์ผ่าน/ซ่อนคะแนนเดิม; ลบประวัติแยก กดปุ่มเรียงเดิมกลับทิศได้ และกรอบงาน/ประกาศใช้ wheel scroll chaining หัวต้อนรับใหญ่ขึ้น ป้ายผู้ดูข้อมูลเหลือตาและบทบาท
+- ดึง migration Staging ที่ขาด `20261009142610` กลับจาก CLI history โดยไม่รัน SQL เก่าซ้ำ; migration ใหม่รับทราบประกาศและ profile-avatars จัดไว้สำหรับ Staging ที่อนุญาต Production ไม่เปลี่ยน รายละเอียดใน `docs/STUDENT_PROFILE_AVATARS.md` และ `docs/STUDENT_ANNOUNCEMENT_ACKNOWLEDGEMENTS.md`

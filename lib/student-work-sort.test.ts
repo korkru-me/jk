@@ -19,3 +19,8 @@ it('handles invalid and equal timestamps deterministically', () => {
   expect(sortStudentWork(rows, 'due').map(w => w.id)).toEqual(['a', 'b'])
   expect(sortStudentWork(rows, 'latest').map(w => w.id)).toEqual(['a', 'b'])
 })
+
+it('reverses dated items while leaving unknown deadlines at the bottom', () => {
+  expect(sortStudentWork(items, 'due', 'desc').map(w => w.id)).toEqual(['latest', 'soon', 'overdue', 'no-date'])
+  expect(sortStudentWork(items, 'latest', 'asc').map(w => w.id)).toEqual(['overdue', 'soon', 'latest', 'no-date'])
+})

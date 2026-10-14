@@ -12,12 +12,14 @@ import { AVATAR_MAX_ZOOM, avatarCrop, moveAvatarCrop, type AvatarCropPosition } 
 interface ImageDraft { source: string; image: HTMLImageElement; ownedUrl: boolean }
 const CENTER: AvatarCropPosition = { x: .5, y: .5 }
 
-/** Keeps the existing page-only avatar preview; no upload or account mutation. */
-export function AvatarCropEditor({ src, onChange }: { src: string | null; onChange: (src: string) => void }) {
+/** Saves the square crop through the parent; retains the draft when saving fails. */
+export function AvatarCropEditor({ src, onChange }: { src: string | null; onChange: (file: File) => Promise<{ error?: string }> }) {
   const [draft, setDraft] = useState<ImageDraft | null>(null)
   const [open, setOpen] = useState(false)
   const [confirmClose, setConfirmClose] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const saveLock = useRef(false)
   const [zoom, setZoom] = useState(1)
   const [position, setPosition] = useState(CENTER)
   const [frameSize, setFrameSize] = useState(288)
@@ -96,35 +98,39 @@ export function AvatarCropEditor({ src, onChange }: { src: string | null; onChan
     setDraft(null)
   }
   function requestClose() {
+    if (saveLock.current) return
     const active = document.activeElement
     dismissFocusRef.current = active instanceof HTMLElement && popupRef.current?.contains(active)
       ? active : lastEditorFocusRef.current ?? frameRef.current
     setConfirmClose(true)
   }
-  function useImage() {
-    if (!draft || !crop) return
+  async function useImage() {
+    if (!draft || !crop || saveLock.current) return
+    saveLock.current = true
+    setSaving(true)
     try {
       const canvas = document.createElement('canvas')
       canvas.width = canvas.height = 512
       const context = canvas.getContext('2d')
       if (!context) throw new Error('Canvas unavailable')
       context.drawImage(draft.image, crop.x, crop.y, crop.side, crop.side, 0, 0, 512, 512)
-      // PNG retains transparency. The result belongs only to the parent preview.
-      onChange(canvas.toDataURL('image/png'))
+      const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('Empty crop')), 'image/png'))
+      const result = await onChange(new File([blob], 'avatar.png', { type: 'image/png' }))
+      if (result.error) { toast.error(result.error); return }
       discardDraft()
     } catch {
-      toast.error('จัดตำแหน่งรูปนี้ไม่ได้ กรุณาเลือกไฟล์รูปจากเครื่อง')
-    }
+      toast.error('บันทึกรูปนี้ไม่ได้ กรุณาลองใหม่อีกครั้ง')
+    } finally { saveLock.current = false; setSaving(false) }
   }
 
   return (
     <>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <Button ref={fileButtonRef} type="button" variant="link" size="xs" className="px-0" disabled={loading}
+        <Button ref={fileButtonRef} type="button" variant="link" size="xs" className="px-0" disabled={loading || saving}
           onClick={event => { triggerRef.current = event.currentTarget; fileRef.current?.click() }}>
           {loading ? 'กำลังเปิดรูป…' : 'เปลี่ยนรูปโปรไฟล์'}
         </Button>
-        {src && <Button type="button" variant="ghost" size="xs" disabled={loading}
+        {src && <Button type="button" variant="ghost" size="xs" disabled={loading || saving}
           onClick={event => { triggerRef.current = event.currentTarget; void beginEditing(src, false) }}>
           <Crop size={13} /> จัดตำแหน่งรูป
         </Button>}
@@ -140,12 +146,12 @@ export function AvatarCropEditor({ src, onChange }: { src: string | null; onChan
             <DialogTitle>จัดตำแหน่งรูปโปรไฟล์</DialogTitle>
             <DialogDescription>ลากรูปให้ส่วนที่ต้องการอยู่ในกรอบ ใช้ปุ่มซูมหรือปุ่มลูกศรปรับตำแหน่งได้</DialogDescription>
           </DialogHeader>
-          <Button type="button" variant="ghost" size="icon-sm" className="absolute right-2 top-2" aria-label="ปิดการจัดตำแหน่งรูป" onClick={requestClose}><X size={16} /></Button>
+          <Button type="button" variant="ghost" size="icon-sm" className="absolute right-2 top-2" aria-label="ปิดการจัดตำแหน่งรูป" disabled={saving} onClick={requestClose}><X size={16} /></Button>
           <Card ref={attachFrame} edge="ring" radius="lg" role="group" tabIndex={0}
             aria-label="พื้นที่จัดตำแหน่งรูปโปรไฟล์ ใช้ปุ่มลูกศรเลื่อนรูป"
             className="relative mx-auto aspect-square w-full max-w-72 touch-none cursor-grab overflow-hidden bg-muted outline-none focus-visible:ring-2 focus-visible:ring-primary active:cursor-grabbing"
             onPointerDown={event => {
-              if (event.button !== 0) return
+              if (saving || event.button !== 0) return
               event.preventDefault()
               event.currentTarget.focus()
               event.currentTarget.setPointerCapture(event.pointerId)
@@ -162,6 +168,7 @@ export function AvatarCropEditor({ src, onChange }: { src: string | null; onChan
             }}
             onPointerCancel={() => { drag.current = null }}
             onKeyDown={event => {
+              if (saving) return
               const amount = event.shiftKey ? 36 : 12
               const delta: Record<string, [number, number]> = { ArrowLeft: [-amount, 0], ArrowRight: [amount, 0], ArrowUp: [0, -amount], ArrowDown: [0, amount] }
               if (delta[event.key]) { event.preventDefault(); move(...delta[event.key]) }
@@ -177,14 +184,14 @@ export function AvatarCropEditor({ src, onChange }: { src: string | null; onChan
             )}
           </Card>
           <div className="flex items-center justify-center gap-2">
-            <Button type="button" variant="outline" size="icon-sm" aria-label="ซูมออก" disabled={zoom <= 1} onClick={() => changeZoom(zoom - .1)}><Minus size={15} /></Button>
+            <Button type="button" variant="outline" size="icon-sm" aria-label="ซูมออก" disabled={saving || zoom <= 1} onClick={() => changeZoom(zoom - .1)}><Minus size={15} /></Button>
             <output className="w-12 text-center text-xs tabular-nums" aria-label="ระดับการซูม" aria-live="polite">{Math.round(zoom * 100)}%</output>
-            <Button type="button" variant="outline" size="icon-sm" aria-label="ซูมเข้า" disabled={zoom >= AVATAR_MAX_ZOOM} onClick={() => changeZoom(zoom + .1)}><Plus size={15} /></Button>
-            <Button type="button" variant="ghost" size="xs" onClick={() => { setZoom(1); setPosition(CENTER) }}><RotateCcw size={13} /> เริ่มใหม่</Button>
+            <Button type="button" variant="outline" size="icon-sm" aria-label="ซูมเข้า" disabled={saving || zoom >= AVATAR_MAX_ZOOM} onClick={() => changeZoom(zoom + .1)}><Plus size={15} /></Button>
+            <Button type="button" variant="ghost" size="xs" disabled={saving} onClick={() => { setZoom(1); setPosition(CENTER) }}><RotateCcw size={13} /> เริ่มใหม่</Button>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={requestClose}>ยกเลิก</Button>
-            <Button type="button" onClick={useImage}>ใช้รูปนี้</Button>
+            <Button type="button" variant="outline" disabled={saving} onClick={requestClose}>ยกเลิก</Button>
+            <Button type="button" disabled={saving} onClick={() => { void useImage() }}>{saving ? 'กำลังบันทึก…' : 'บันทึกรูป'}</Button>
           </DialogFooter>
         </DialogContent>
         <ConfirmDialog open={confirmClose} onOpenChange={setConfirmClose} title="ยกเลิกการจัดรูปนี้?"

@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
+import { updateMyAvatar } from '@/lib/actions/avatar'
 import { toast } from 'sonner'
 import { updatePassword } from '@/lib/actions/settings'
 import { updateMyStudentProfile } from '@/lib/actions/student-profile'
@@ -30,7 +32,7 @@ function AudienceNotice({ title, audience, detail }: { title: string; audience: 
         className="h-auto min-h-7 max-w-full gap-1.5 whitespace-normal py-1 text-left text-xs font-normal text-muted-foreground"
         aria-label={`ผู้ที่ดู${title}ได้: ${audience}`} aria-expanded={open}
         onClick={() => setOpen(value => !value)}>
-        <Eye size={13} className="shrink-0" /><span>ดูได้: {audience}</span>
+        <Eye size={13} className="shrink-0" /><span>{audience}</span>
       </HoverCardTrigger>
       <HoverCardContent align="end" role="region" aria-label={`รายละเอียดผู้ที่ดู${title}ได้`}
         className="max-w-[calc(100vw-2rem)] text-xs leading-relaxed">{detail}</HoverCardContent>
@@ -80,9 +82,11 @@ interface StudentProfileSettingsProps {
   /** Synthetic lab routes substitute actions so preview forms cannot mutate accounts. */
   saveProfileAction?: typeof updateMyStudentProfile
   changePasswordAction?: typeof updatePassword
+  saveAvatarAction?: typeof updateMyAvatar
 }
 
-export function StudentProfileSettings({ user, profile, saveProfileAction = updateMyStudentProfile, changePasswordAction = updatePassword }: StudentProfileSettingsProps) {
+export function StudentProfileSettings({ user, profile, saveProfileAction = updateMyStudentProfile, changePasswordAction = updatePassword, saveAvatarAction = updateMyAvatar }: StudentProfileSettingsProps) {
+  const router = useRouter()
   const [isPwPending, startPwTransition] = useTransition()
   const [isInfoPending, startInfoTransition] = useTransition()
 
@@ -153,7 +157,16 @@ export function StudentProfileSettings({ user, profile, saveProfileAction = upda
             <p className="text-sm font-medium">{displayName}</p>
             <p className="break-all text-xs text-muted-foreground">{user.email}</p>
             <p className="text-[10px] text-muted-foreground">สมาชิกตั้งแต่ {joinedDate}</p>
-            <AvatarCropEditor src={avatarPreview} onChange={setAvatarPreview} />
+            <AvatarCropEditor src={avatarPreview} onChange={async file => {
+              const form = new FormData()
+              form.set('avatar', file)
+              const result = await saveAvatarAction(form)
+              if (result.error || !result.avatarUrl) return { error: result.error ?? 'บันทึกรูปไม่สำเร็จ' }
+              setAvatarPreview(result.avatarUrl)
+              toast('บันทึกรูปโปรไฟล์แล้ว')
+              router.refresh()
+              return {}
+            }} />
           </div>
         </div>
         <p className="text-[10px] text-muted-foreground mt-4">

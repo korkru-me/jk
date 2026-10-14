@@ -37,7 +37,7 @@ export function StudentDashboard({ user, data, calendarNow, recentPosts, initial
   return (
     <div className="student-learning-stage @container/learning flex w-full min-w-0 flex-col gap-3 [--student-content-width:calc(100%-15rem)]" data-student-dashboard>
       <h1 className="sr-only">พื้นที่เรียนรู้ของฉัน</h1>
-      <p className="text-xs text-muted-foreground">{greeting} 👋 {user.full_name}</p>
+      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-base font-medium"><span>{greeting} 👋</span><span className="text-lg font-bold text-primary">{user.full_name}</span></p>
       {previewLabel && <p className="text-xs text-muted-foreground">{previewLabel}</p>}
       <div className="grid items-start gap-4 @min-[46rem]/learning:grid-cols-[minmax(0,var(--student-content-width))_minmax(0,1fr)]" data-student-learning-grid>
         <div className="flex min-w-0 flex-col gap-6">
@@ -46,10 +46,15 @@ export function StudentDashboard({ user, data, calendarNow, recentPosts, initial
           </section>
           <StudentWorkSummary data={data} now={calendarNow ? Date.parse(calendarNow) : Date.now()} />
           {recentPosts.length > 0 && (
-            <section aria-labelledby="student-announcements-heading" className="flex flex-col gap-3">
+            <section aria-labelledby="student-announcements-heading" className="min-w-0">
+              <Card className="overflow-hidden">
+              <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
               <h2 id="student-announcements-heading" className="flex items-center gap-2 text-xl font-bold">
                 <Megaphone className="size-5 text-primary" aria-hidden="true" /> ประกาศล่าสุด
               </h2>
+              <span className="text-xs text-muted-foreground">{recentPosts.length} ประกาศ</span>
+              </div>
+              <div className="max-h-[min(24rem,60dvh)] overflow-y-auto p-3 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring" tabIndex={0} role="region" aria-label="รายการประกาศล่าสุด" data-student-announcements-scroll>
               <div className="flex flex-col gap-2">
                 {recentPosts.map(p => {
                   const room = data.classrooms.find(c => c.id === p.classroom_id)
@@ -71,6 +76,8 @@ export function StudentDashboard({ user, data, calendarNow, recentPosts, initial
                   </Link>
                 })}
               </div>
+              </div>
+              </Card>
             </section>
           )}
         </div>

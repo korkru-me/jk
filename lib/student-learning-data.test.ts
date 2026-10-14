@@ -77,7 +77,16 @@ describe('combined student learning data', () => {
     expect(data.pendingWork.at(-1)?.id).toBe('0')
     expect(data.urgentCount).toBe(15)
     expect(buildStudentLearningData({ classrooms: [], assignments: [], submissions: [], now })).toEqual({
-      classrooms: [], pendingCountMap: {}, pendingWork: [], urgentCount: 0, doneCount: 0, calendarEvents: [], history: [],
+      classrooms: [], pendingCountMap: {}, pendingWork: [], completedWork: [], urgentCount: 0, doneCount: 0, calendarEvents: [], history: [],
     })
   })
+})
+
+it('projects completed work once with its official result link while keeping hidden scores redacted', () => {
+  const a = assignment({ show_results: 'never' })
+  const data = build([a, a], [attempt(a, 9), attempt(a, 2, 2)])
+  expect(data.pendingWork).toHaveLength(0)
+  expect(data.completedWork).toHaveLength(1)
+  expect(data.completedWork[0]).toMatchObject({ completed: true, submissionId: 'submission-1', previousScore: null })
+  expect(build([a], [attempt(a, 2)]).completedWork).toHaveLength(0)
 })

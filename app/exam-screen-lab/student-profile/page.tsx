@@ -35,7 +35,7 @@ export default async function StudentProfileLabPage({ searchParams }: { searchPa
         {isTeacherShell ? <Card padding="md">ตัวอย่างเมนูตั้งค่าของครู</Card> : <StudentProfileSettings
           user={scenario === 'empty' ? { ...USER, avatar_url: null } : USER}
           profile={scenario === 'empty' ? null : PROFILE}
-          saveProfileAction={previewOnlyAction} changePasswordAction={previewOnlyAction} />}
+          saveProfileAction={previewOnlyAction} changePasswordAction={previewOnlyAction} saveAvatarAction={previewOnlyAction} />}
       </SettingsShell>
     </ShellClient>
   )

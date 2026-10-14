@@ -25,6 +25,8 @@ export type StudentWorkItem = {
   assignedAt: string | null
   durationMinutes: number | null
   inProgress: boolean
+  completed: boolean
+  submissionId: string | null
   hasPreviousAttempt: boolean
   previousScore: { total: number | null; max: number } | null
 }
@@ -40,6 +42,7 @@ export type StudentLearningData = {
   classrooms: StudentClassroom[]
   pendingCountMap: Record<string, number>
   pendingWork: StudentWorkItem[]
+  completedWork: StudentWorkItem[]
   urgentCount: number
   doneCount: number
   history: StudentWorkHistory[]
@@ -93,22 +96,25 @@ export function buildStudentLearningData({ classrooms, assignments, submissions,
     )
   }
   const pendingCountMap: Record<string, number> = {}
-  const pendingWork = visibleAssignments.filter(a => !doneIds.has(a.id)).map(a => {
+  const work = visibleAssignments.map(a => {
     const rooms = roomsFor(a)
-    for (const room of rooms) pendingCountMap[room.id] = (pendingCountMap[room.id] ?? 0) + 1
+    if (!doneIds.has(a.id)) for (const room of rooms) pendingCountMap[room.id] = (pendingCountMap[room.id] ?? 0) + 1
     const previous = officialByAssignment.get(a.id)
     return {
       id: a.id, title: a.title, classroom: rooms[0] ?? null,
       otherClassroomNames: rooms.slice(1).map(c => c.name),
       endAt: a.end_at, assignedAt: a.created_at ?? null, durationMinutes: a.duration_minutes,
-      inProgress: inProgressIds.has(a.id), hasPreviousAttempt: !!previous,
+      inProgress: !doneIds.has(a.id) && inProgressIds.has(a.id), completed: doneIds.has(a.id), submissionId: previous?.id ?? null, hasPreviousAttempt: !!previous,
       previousScore: previous && canStudentViewScore(previous.assignments?.show_results, previous.assignments?.end_at, now)
         ? { total: previous.total_score, max: previous.max_score } : null,
     }
   }).sort((a, b) => (a.endAt ? Date.parse(a.endAt) : Infinity) - (b.endAt ? Date.parse(b.endAt) : Infinity))
 
+  const pendingWork = work.filter(item => !item.completed)
+  const completedWork = work.filter(item => item.completed)
+
   return {
-    classrooms: classrooms.filter(c => c.status === 'active'), pendingCountMap, pendingWork,
+    classrooms: classrooms.filter(c => c.status === 'active'), pendingCountMap, pendingWork, completedWork,
     urgentCount: pendingWork.filter(a => a.endAt && Date.parse(a.endAt) - now <= 3 * 86400000).length,
     doneCount: doneIds.size,
     calendarEvents: visibleAssignments.filter(a => a.end_at).map(a => ({

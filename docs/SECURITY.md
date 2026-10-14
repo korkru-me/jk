@@ -222,3 +222,5 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 - ตรวจ privacy notice, consent และการจัดการข้อมูลผู้เยาว์กับผู้เชี่ยวชาญที่เกี่ยวข้อง
 
 เอกสารนี้เป็น engineering guardrail ไม่ใช่คำรับรองทางกฎหมาย
+
+- รูปโปรไฟล์ถาวร (14 ต.ค. 2026): server verified Auth + users.status active ก่อน admin upload/update, decoded PNG square 512px ไม่เกิน 2 MiB, re-encode strip metadata, owner UUID/immutable file UUID; compare-and-set ป้องกัน concurrent overwrite/cleanup และลบเฉพาะ avatar URL ที่เป็น bucket/namespace เจ้าของตรงตัว. Public bucket ใช้เพื่อรูปแสดงตัวตนเท่านั้น restrictive policy ปิด browser metadata/read/write แม้มี broad permissive policy; ไม่เก็บสุขภาพ/ผู้ปกครอง/เอกสารใน bucket นี้. ดู `STUDENT_PROFILE_AVATARS.md`.

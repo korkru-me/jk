@@ -237,3 +237,5 @@ Notification body ต้องไม่เปิดเผยข้อมูล�
 5. ทดสอบ RLS ด้วยอย่างน้อย teacher, student, unrelated user และ admin ที่เกี่ยวข้อง
 6. ทดสอบ rollback/recovery plan แม้ migration จะไม่มี down script
 7. อัปเดตเอกสารนี้และ `docs/FEATURE_STATUS.md`
+
+- 14 ต.ค. 2026: `users.avatar_url` เดิมเก็บ URL ของ PNG crop 512×512 ใน public display-identity bucket `profile-avatars`; ไม่เพิ่ม student profile column. Migration `20261014065458_account_avatars.sql` จำกัด 2 MiB/image/png และ restrictive server-only Storage policy ไม่มีการใช้ bucket รูปโจทย์หรือข้อมูลส่วนตัวร่วมกัน. Staging history `20261009142610_atomic_seb_exam_start.sql` คืนจาก CLI history เป็นสำเนา ไม่รันซ้ำ.
