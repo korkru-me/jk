@@ -1,5 +1,11 @@
 # Feature status
 
+### กวางดำเฉพาะ browser tab — 14 ตุลาคม 2026
+
+- เจ้าของขอเพิ่ม contrast เฉพาะ icon แท็บ Chrome: `app/icon.png` เป็นกวางดำบนวงกลมขาวเต็มพื้นที่ ขนาด/geometry/alpha คงเดิม; generator เปลี่ยนสีเฉพาะ input ของ browser icon โดยไม่แก้ SVG ต้นฉบับ
+- ตรวจ pixel ของ browser icon ไม่พบสีม่วง มีพื้นที่กวางดำและมุมนอกวงกลม alpha 0; Apple icon/ต้นฉบับ SVG ไม่เปลี่ยนไฟล์ · local served asset hashes ตรงกับ candidate, header ยังเป็นสีม่วง/theme และ favicon metadata เปลี่ยน URL แล้ว · design-token lint, production webpack build/TypeScript ผ่าน, Next MCP compilation/runtime ไม่มี error; ไม่มี migration และไม่ทดสอบ Auth-to-DB หรือเขียนข้อมูล hosted
+- Apple touch icon, โลโก้ในหน้าเว็บ, watermark และลายปกยังใช้สีม่วง/theme เดิม; sync favicon กับ generator ลง checkout ที่รัน localhost:3000 และเผยแพร่เฉพาะงานนี้จาก master ล่าสุด
+
 ### แสดงคลังฝึกในหน้าห้องเรียน — 14 ตุลาคม 2026
 
 - แก้กรณีสร้างและเผยแพร่คลังฝึกสำเร็จ แต่ไม่พบในห้องเรียน: หน้า `/classrooms/[id]` เดิมอ่านเฉพาะ `assignments` จึงไม่ได้แสดงแถวที่บันทึกใน `practice_libraries`; ไม่ใช่ข้อมูลสูญหาย
@@ -8,7 +14,6 @@
 - create หลายห้อง, update, publish/close, duplicate และ delete revalidate หน้าห้องที่ได้รับผล เพื่อให้กลับเข้าห้องแล้วพบรายการล่าสุด ไม่เปลี่ยน AssignmentType, submission, scoring หรือ schema
 - ตรวจ Production แบบ read-only ตามคำขอ: คลังที่ผู้ใช้สร้างยังเป็น published และมีสมาชิกโจทย์ 143 ข้อ; ไม่สร้างข้อมูล QA หรือแก้ข้อมูลจริงบน Production
 - ตรวจ UI/role isolation ด้วยบัญชีจำลองใน Staging, type-check, token lint, unit suite และ production build; ผลละเอียดอยู่ `docs/SELF_PRACTICE_UAT.md`
-
 
 ### Sync เว็บจริงกับ local และแก้สร้างคลังฝึก — 14 ตุลาคม 2026
 
