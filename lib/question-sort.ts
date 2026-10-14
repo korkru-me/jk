@@ -21,7 +21,6 @@ export type QuestionSortKey =
   | 'created' | 'updated' | 'title' | 'difficulty' | 'type'
   | 'subject' | 'category' | 'tags'
   | 'creator' | 'team'
-  | 'usage' | 'pvalue' | 'discrimination' | 'lastUsed'
 
 export type QuestionSortDir = 'asc' | 'desc'
 
@@ -37,13 +36,8 @@ export interface QuestionSortSpec {
    * What PostgREST orders by. A `relation(column)` form orders the questions
    * by a to-one embedded row, which only the team query selects — so a key
    * using one must be team-only.
-   *
-   * `null` means the database cannot express this order at all: the value is
-   * computed from graded answers, not stored on the row. Those are ranked with
-   * `rankQuestionIds` instead — see there for why that is not simply a missing
-   * column waiting for a migration.
    */
-  column: string | null
+  column: string
   /**
    * Where this key starts when it is first chosen.
    *
@@ -69,20 +63,7 @@ export interface QuestionSortSpec {
   value: (question: SortableQuestion) => string | number | null
   /** True when `value` returns text, which is compared with Thai collation. */
   text?: boolean
-  /** The value this key ranks on, for the keys read from item analysis. */
-  statValue?: (stats: QuestionStats) => number | null
 }
-
-/** What ranking by item analysis needs. Structural, so this module does not
- *  depend on how the stats are fetched. */
-export interface QuestionStatsForSort {
-  attempts: number
-  pValue: number
-  discrimination: number | null
-  usedIn: number
-  lastUsedAt: string | null
-}
-type QuestionStats = QuestionStatsForSort
 
 /** What sorting in memory needs off a row. */
 export interface SortableQuestion {
@@ -209,44 +190,6 @@ export const QUESTION_SORTS: Record<QuestionSortKey, QuestionSortSpec> = {
     dirLabel: { desc: 'มีแท็กมากสุดก่อน', asc: 'ยังไม่มีแท็กก่อน' },
     value: q => q.tags?.length ?? 0,
   },
-  usage: {
-    label: 'ใช้ในข้อสอบบ่อย',
-    column: null,
-    defaultDir: 'desc',
-    dirLabel: { desc: 'ใช้บ่อยสุดก่อน', asc: 'ใช้น้อยสุดก่อน' },
-    value: () => null,
-    statValue: stats => stats.usedIn,
-  },
-  pvalue: {
-    // p is the fraction of the points students actually earned, so a *low* p
-    // is a hard question. Ascending therefore means "hardest first", which is
-    // what a teacher opening this is looking for.
-    label: 'ความยากจริง (จากคะแนน)',
-    column: null,
-    defaultDir: 'asc',
-    dirLabel: { asc: 'ยากจริงสุดก่อน', desc: 'ง่ายจริงสุดก่อน' },
-    value: () => null,
-    statValue: stats => stats.pValue,
-  },
-  discrimination: {
-    // Null for a question with too few attempts or no variance to correlate.
-    // Those rank with the questions that have no stats at all — "not measured"
-    // rather than "measured as zero".
-    label: 'อำนาจจำแนก',
-    column: null,
-    defaultDir: 'desc',
-    dirLabel: { desc: 'จำแนกดีสุดก่อน', asc: 'จำแนกแย่สุดก่อน' },
-    value: () => null,
-    statValue: stats => stats.discrimination,
-  },
-  lastUsed: {
-    label: 'ใช้ครั้งล่าสุด',
-    column: null,
-    defaultDir: 'desc',
-    dirLabel: { desc: 'เพิ่งใช้ล่าสุดก่อน', asc: 'ไม่ได้ใช้นานสุดก่อน' },
-    value: () => null,
-    statValue: stats => (stats.lastUsedAt ? Date.parse(stats.lastUsedAt) || null : null),
-  },
   creator: {
     // Ordering the parent rows by a to-one embedded row. Only the team query
     // selects `users`, which is why this key never reaches the own bank.
@@ -271,29 +214,15 @@ export const QUESTION_SORTS: Record<QuestionSortKey, QuestionSortSpec> = {
 const SHARED_SORT_KEYS: QuestionSortKey[] =
   ['created', 'updated', 'title', 'subject', 'category', 'difficulty', 'type', 'tags']
 
-/**
- * What the own-bank menu offers.
- *
- * The item-analysis keys are here and not on the team list because the stats a
- * teacher can see are their own students' results. Ranking a teammate's bank by
- * "ความยากจริง" would rank it by how *my* classes did on questions I have
- * mostly never assigned, which is a number about me, not about their question.
- */
+/** Own-bank sorting uses question metadata only, never student answers. */
 export const QUESTION_SORT_KEYS: QuestionSortKey[] =
-  [...SHARED_SORT_KEYS, 'usage', 'pvalue', 'discrimination', 'lastUsed']
+  [...SHARED_SORT_KEYS]
 
 /** The same shared keys, plus the two only a list of other people's work can answer. */
 export const TEAM_QUESTION_SORT_KEYS: QuestionSortKey[] =
   [...SHARED_SORT_KEYS, 'creator', 'team']
 
-/**
- * What the โจทย์ browser at the foot of คลังแฟ้มโจทย์ offers.
- *
- * The shared keys and nothing else: the four orders that rank from item
- * analysis need the whole stats pipeline, which that page has no other reason
- * to load. Offering an order the page cannot honour is worse than not
- * offering it.
- */
+/** The library question browser shares the stored-field sorting menu. */
 export const LIBRARY_QUESTION_SORT_KEYS: QuestionSortKey[] = [...SHARED_SORT_KEYS]
 
 /** Which list a set of params belongs to. `'t'` is the แชร์ในทีม list, `'u'`
@@ -373,62 +302,10 @@ interface OrderableQuery<Q> {
 export function applyQuestionSort<Q extends OrderableQuery<Q>>(query: Q, sort: QuestionSort): Q {
   const ascending = sort.dir === 'asc'
   const { column } = QUESTION_SORTS[sort.key]
-  // A stats key has no column to order by; the caller was supposed to take the
-  // ranked path. Falling back to the default order is wrong but visible — an
-  // unordered list, not a 400 that empties the คลัง.
-  const orderBy = column ?? QUESTION_SORTS[DEFAULT_QUESTION_SORT.key].column!
+  const orderBy = column
   return query
     .order(orderBy, { ascending, nullsFirst: false })
     .order('id', { ascending })
-}
-
-/** Whether the database can express this ordering, or it has to be ranked here. */
-export const isDatabaseSortable = (key: QuestionSortKey) => QUESTION_SORTS[key].column !== null
-
-/**
- * Orders question ids by item analysis.
- *
- * These four keys are the ones the database cannot sort: p, discrimination and
- * "used in" are not columns, they are read out of every graded answer a
- * teacher's students have left, and the rule that turns those answers into the
- * numbers lives in `computeQuestionStats`. Restating that rule in SQL just to
- * be able to write `order=p_value` would put two implementations of the same
- * item analysis in the codebase, and the day they disagreed the list would be
- * ordered by one and labelled with the other.
- *
- * So the ids are ranked here instead, from the same stats the cards display,
- * and the page fetches only the ids the ranking put on the current page.
- *
- * A question with no stats has not been measured — it is not a zero. Those
- * stay in `ids` order at the bottom in both directions, which keeps the rest of
- * the bank in its usual newest-first sequence behind the measured ones.
- */
-export function rankQuestionIds(
-  ids: string[],
-  stats: Record<string, QuestionStats | undefined>,
-  sort: QuestionSort,
-): string[] {
-  const read = QUESTION_SORTS[sort.key].statValue
-  if (!read) return ids
-
-  const flip = sort.dir === 'asc' ? 1 : -1
-  const position = new Map(ids.map((id, index) => [id, index]))
-  const valueOf = (id: string) => {
-    const forQuestion = stats[id]
-    return forQuestion ? read(forQuestion) : null
-  }
-
-  return [...ids].sort((a, b) => {
-    const av = valueOf(a)
-    const bv = valueOf(b)
-    // Unmeasured last in both directions, and among themselves left alone.
-    if (av === null || bv === null) {
-      if (av === bv) return position.get(a)! - position.get(b)!
-      return av === null ? 1 : -1
-    }
-    if (av !== bv) return av < bv ? -flip : flip
-    return position.get(a)! - position.get(b)!
-  })
 }
 
 /**

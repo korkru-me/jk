@@ -26,6 +26,7 @@ import { assignmentSizeLabel } from '@/lib/assignment-size-label'
 import { withBackHref } from '@/lib/back-link'
 import { classroomNavigationPath } from '@/lib/classroom-navigation'
 import type { Assignment } from '@/lib/types'
+import { coverOf, parseDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
 
 const STATUS_META = {
   draft: { label: 'ร่าง', color: 'bg-muted text-muted-foreground', dot: 'bg-muted-foreground' },
@@ -45,7 +46,7 @@ export type AssignmentSidebarSummary = Pick<
   | 'random_question_count'
   | 'completion_rule'
   | 'streak_target'
-> & { classrooms: { name: string } | null }
+> & { classrooms: { name: string; description?: string | null } | null }
 
 interface AssignmentContextNavigationProps {
   assignment: AssignmentSidebarSummary
@@ -82,6 +83,7 @@ export function AssignmentContextNavigation({
 }: AssignmentContextNavigationProps) {
   const compact = useSidebarCompact()
   const statusMeta = STATUS_META[a.status]
+  const cover = coverOf(parseDescription(a.classrooms?.description ?? null))
   const assignmentTypeLabel = a.type === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'
   const isOpeningAgain = a.status === 'closed'
   const canOpenAssignment = a.status === 'draft' || isOpeningAgain
@@ -106,7 +108,7 @@ export function AssignmentContextNavigation({
         <ChevronLeft data-icon="inline-start" />
       </SidebarButton>
 
-      <Card radius="md" padding="sm" className={cn('flex flex-col gap-2.5 border-primary/20 bg-primary/5', compact && 'md:hidden')}>
+      <Card radius="md" padding="sm" className={cn('flex flex-col gap-2', cover ? `${cover.surface} ${cover.text}` : 'bg-muted/50', compact && 'md:hidden')}>
         <div className="flex items-center justify-between gap-2">
           <Badge variant="secondary" className={statusMeta.color}>
             <span aria-hidden="true" className={`size-1.5 rounded-full ${statusMeta.dot}`} />

@@ -2,10 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/auth/server'
 import { redirect } from 'next/navigation'
 import type { Question } from '@/lib/types'
-import { type QuestionStats } from '@/lib/question-stats'
 import {
   fetchDuplicateCounts,
-  fetchQuestionStats,
   fetchSetMemberships,
   fetchSolutionPresence,
 } from '@/lib/question-card-data'
@@ -24,8 +22,6 @@ import {
   applyQuestionSort,
   compareQuestions,
   DEFAULT_QUESTION_SORT,
-  isDatabaseSortable,
-  rankQuestionIds,
   readQuestionSort,
   type QuestionSort,
 } from '@/lib/question-sort'
@@ -198,14 +194,12 @@ export default async function QuestionsPage({
       ? questionSearchGroupFilters(filters.q, await ownTagsPromise)
       : null
 
-    // 'rows' returns the cards, 'count' asks only how many there are, and
-    // 'ids' returns the identifiers alone — enough to rank the whole filtered
-    // bank in memory without carrying its text across the wire.
-    const buildQuery = (group?: QuestionSearchGroup, mode: 'rows' | 'count' | 'ids' = 'rows') => {
+    // Count requests use the same filters as the visible card rows.
+    const buildQuery = (group?: QuestionSearchGroup, mode: 'rows' | 'count' = 'rows') => {
       let query = supabase
         .from('questions')
         .select(
-          mode === 'ids' ? 'id' : `${summaryFields}, question_categories(name)`,
+          `${summaryFields}, question_categories(name)`,
           { count: 'exact', head: mode === 'count' },
         )
         .eq('created_by', userId)
@@ -238,66 +232,9 @@ export default async function QuestionsPage({
       return query
     }
 
-    /**
-     * One page of a bank ordered by something the database cannot sort by.
-     *
-     * The item-analysis keys rank on numbers that are computed from graded
-     * answers rather than stored on the question, so PostgREST has no column
-     * to order by and no `.range()` can page it. This does the paging instead:
-     * read the identifiers of every question the current filters match, rank
-     * those, and fetch the cards for the two dozen the ranking put on this
-     * page.
-     *
-     * Only the ids cross the wire for the whole bank — the reason the list
-     * pages in the database in the first place is the weight of the rows, not
-     * the count of them. It is still the one order that costs a read
-     * proportional to the bank rather than to the page, which is why it is
-     * reached only when one of those four keys is chosen.
-     */
-    async function rankedPage(group: QuestionSearchGroup | undefined, from: number, to: number) {
-      // The select string is chosen at runtime, so supabase-js cannot infer the
-      // narrower row type the 'ids' mode actually returns.
-      const { rows, error } = await fetchAllRows<{ id: string }>((rangeFrom, rangeTo) =>
-        applyQuestionSort(buildQuery(group, 'ids'), DEFAULT_QUESTION_SORT)
-          .range(rangeFrom, rangeTo) as unknown as
-          PromiseLike<{ data: { id: string }[] | null; error: unknown }>)
-      if (error) console.error('[questions/page] ranked id query failed:', error)
-      const ids = rows.map(row => row.id)
-
-      // Ranked from the same stats the cards show, so the order and the
-      // numbers printed on it can never be two different measurements. Asked
-      // for in one scope-wide read rather than by naming every id: the answer
-      // set is the same either way, and RLS is already the filter.
-      const stats = await fetchQuestionStats(supabase, 'all')
-      const pageIds = rankQuestionIds(ids, stats, filters.sort).slice(from, to + 1)
-      if (pageIds.length === 0) return { questions: [] as QuestionWithCategory[], count: ids.length }
-
-      const { data, error: rowError } = await buildQuery(group).in('id', pageIds)
-      if (rowError) console.error('[questions/page] ranked row query failed:', rowError)
-      const cards = (data ?? []) as unknown as QuestionWithCategory[]
-
-      // `in` answers in whatever order it likes; the ranking decides the page.
-      const byId = new Map(cards.map(card => [card.id, card]))
-      return {
-        questions: pageIds
-          .map(id => byId.get(id))
-          .filter((card): card is QuestionWithCategory => card != null),
-        count: ids.length,
-      }
-    }
-    const ranked = !isDatabaseSortable(filters.sort.key)
-
     if (!searchSpec) {
       const from = (filters.page - 1) * QUESTIONS_PER_PAGE
-      if (ranked) {
-        const { questions, count } = await rankedPage(undefined, from, from + QUESTIONS_PER_PAGE - 1)
-        return {
-          questions,
-          total: count,
-          groups: [] as QuestionSearchResultGroup<QuestionWithCategory>[],
-          groupCounts: { tag: 0, title: 0, content: 0 } satisfies QuestionSearchGroupCounts,
-        }
-      }
+
       const { data, error, count } = await applyQuestionSort(buildQuery(), filters.sort)
         .range(from, from + QUESTIONS_PER_PAGE - 1)
       if (error) console.error('[questions/page] query failed:', error)
@@ -325,12 +262,7 @@ export default async function QuestionsPage({
           return { group, count: 0, questions: [] as QuestionWithCategory[] }
         }
         const shouldLoadRows = visibleGroups.includes(group)
-        if (shouldLoadRows && ranked) {
-          const { questions, count } = await rankedPage(
-            group, directFrom, directFrom + QUESTIONS_PER_PAGE - 1,
-          )
-          return { group, count, questions }
-        }
+
         const result = shouldLoadRows
           ? await applyQuestionSort(buildQuery(group), filters.sort)
             .range(directFrom, directFrom + QUESTIONS_PER_PAGE - 1)
@@ -390,11 +322,6 @@ export default async function QuestionsPage({
     const groups = await Promise.all(visibleGroups.map(async group => {
       const slice = slices[group]
       if (!slice) return { group, questions: [] }
-
-      if (ranked) {
-        const { questions } = await rankedPage(group, slice.from, slice.to)
-        return { group, questions }
-      }
 
       const { data, error } = await applyQuestionSort(buildQuery(group), filters.sort)
         .range(slice.from, slice.to)
@@ -741,13 +668,12 @@ export default async function QuestionsPage({
   const { myTeams, teamQuestions, teamTotal, teamPaged, teamSearchGroups, teamSearchGroupCounts } = teamContext
 
   const ownQuestions = ownResult.questions
-  // Only the questions actually on screen need stats, part counts, a แฟ้ม
+  // Only the questions actually on screen need part counts, a แฟ้ม
   // lookup, a duplicate check or a เฉลย check now. The duplicate badge stays
   // an own-bank question, so it is asked about `ownQuestions` alone — a
   // teammate's card never shows one. The ดูเฉลย button shows on both.
   const visibleQuestions = [...ownQuestions, ...teamQuestions]
-  const [stats, subQuestionCounts, duplicateCounts, setMemberships, solutionPresence] = await Promise.all([
-    fetchQuestionStats(supabase, visibleQuestions.map(q => q.id)),
+  const [subQuestionCounts, duplicateCounts, setMemberships, solutionPresence] = await Promise.all([
     fetchSubQuestionCounts(supabase, visibleQuestions),
     fetchDuplicateCounts(supabase, userId, ownQuestions),
     fetchSetMemberships(supabase, userId, visibleQuestions.map(q => q.id)),
@@ -757,7 +683,6 @@ export default async function QuestionsPage({
   return (
     <QuestionBankClient
       questions={ownQuestions}
-      stats={stats}
       teamQuestions={teamQuestions}
       hasTeamOrg={myTeams.length > 0}
       hasMultipleTeams={myTeams.length > 1}

@@ -43,6 +43,7 @@ import type { AssignmentQuestionSetOption } from '@/components/assignments/creat
 import { toggleQuestionSetSelection } from '@/lib/question-set-selection'
 import { questionExcerpt } from '@/lib/question-display'
 import { cn } from '@/lib/utils'
+import { ClassroomWorkHeader } from '@/components/assignments/classroom-work-header'
 import { classroomNavigationPath } from '@/lib/classroom-navigation'
 import {
   closePracticeLibrary,
@@ -440,24 +441,16 @@ export function PracticeLibraryForm({
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-4">
-      <header className="flex min-h-16 flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-bold text-foreground">
-              {initialLibrary ? 'ตั้งค่าคลังฝึก' : 'สร้างคลังฝึก'}
-            </h1>
-            <Badge variant="outline">ไม่มีคะแนน</Badge>
-            {initialLibrary && (
-              <Badge variant={statusBadgeVariant(initialLibrary.status)}>
-                {PRACTICE_LIBRARY_STATUS_LABELS[initialLibrary.status]}
-              </Badge>
-            )}
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            ครูเห็นเพียงข้อที่นักเรียนเคยตอบและจำนวนครั้ง ไม่เห็นคำตอบหรือผลถูกผิด
-          </p>
-        </div>
-        {initialLibrary && (
+      <ClassroomWorkHeader
+        kind="practice"
+        title={initialLibrary ? title || 'คลังฝึก' : 'สร้างคลังฝึก'}
+        classroom={classrooms.find(room => room.id === (initialLibrary?.classroomId ?? contextualPrimaryClassroomId ?? classroomIds[0]))}
+        badges={<>
+          {initialLibrary && <span className="font-medium">ตั้งค่าคลังฝึก</span>}
+          <Badge variant="outline">ไม่มีคะแนน</Badge>
+          {initialLibrary && <Badge variant={statusBadgeVariant(initialLibrary.status)}>{PRACTICE_LIBRARY_STATUS_LABELS[initialLibrary.status]}</Badge>}
+        </>}
+        actions={initialLibrary && (
           <div className="flex min-h-11 flex-wrap items-center justify-end gap-2">
             {initialLibrary.status === 'draft' && (
               <Button
@@ -486,7 +479,9 @@ export function PracticeLibraryForm({
             )}
           </div>
         )}
-      </header>
+        details={initialLibrary ? [{ label: 'โจทย์', value: `${selectedIds.length} ข้อ` }] : []}
+        note="ครูเห็นเฉพาะข้อที่เคยตอบและจำนวนครั้ง ไม่เห็นคำตอบหรือผลถูกผิด"
+      />
 
       {!initialLibrary && (
         <nav className="flex items-start" aria-label="ขั้นตอนการสร้างคลังฝึก">
