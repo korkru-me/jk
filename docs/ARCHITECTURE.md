@@ -353,3 +353,6 @@ npm run build
 `useAppViewport` รักษาเอกสารไว้ที่จุดเริ่มต้นทั้งจาก visual viewport events และ window scroll ซึ่ง Chrome desktop อาจสร้างเมื่อโฟกัส input หรือใช้ scrollIntoView โดยไม่ส่ง visualViewport.scroll; main/คอลัมน์โจทย์ยังเลื่อนภายใน และ appShellHeight ยังไม่บังคับตำแหน่งระหว่าง pinch zoom MCQ radio อยู่ในแถวจริงเพื่อไม่ให้ตำแหน่งของ input ที่ซ่อนทำเอกสารหลุดจอ
 
 `ExamQuestionFrame` จัดหนึ่งพื้นผิวต่อข้อและใช้ container width เลือกการวางรูปข้างคำตอบ; `ExamQuestionNavigation` แยกสีคำตอบ ขอบข้อปัจจุบัน และไอคอนธง ทั้งสองเป็น presentation เท่านั้น ไม่เปลี่ยนคำตอบที่ serialize, autosave, authorization หรือ grading
+
+
+- Classroom card entry (14 October 2026): native anchors retain the existing state-derived href and perform document GET, avoiding dependence on a pending/stale App Router transition. The take route has a lightweight loading boundary; ownership/access/schedule checks and explicit waiting-room start POST remain unchanged. Synthetic browser verification blocks RSC transitions and asserts a new document plus the expected destination for mouse/keyboard entry. This does not establish the underlying cause of the real account's pending request.

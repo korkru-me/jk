@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 import { ArrowRight, BookOpen, CheckCircle2, Clock, Folder, Repeat, SlidersHorizontal, Target } from 'lucide-react'
 import { TYPE_CFG } from '@/lib/assignment-display'
 import { cn } from '@/lib/utils'
@@ -131,7 +130,9 @@ function StudentAssignmentCard({ assignment: a, cover, now, href }: { assignment
 
   return (
     <Tooltip>
-    <TooltipTrigger render={<Link href={href ?? state.href} prefetch={false} />} aria-label={`${state.actionLabel}: ${a.title} · ${STUDENT_WORK_STATUS_DESCRIPTION[severity]}`} className="group block h-full min-w-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background" data-student-assignment-card data-assignment-id={a.id} data-work-status={severity}>
+    {/* Enter through a document GET so a stale/pending client router cannot
+        strand the student on the classroom. Starting still requires POST. */}
+    <TooltipTrigger render={<a href={href ?? state.href} />} aria-label={`${state.actionLabel}: ${a.title} · ${STUDENT_WORK_STATUS_DESCRIPTION[severity]}`} className="group block h-full min-w-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background" data-student-assignment-card data-assignment-id={a.id} data-work-status={severity}>
       <Card radius="md" interactive className={cn('relative flex h-full min-w-0 items-start gap-2.5 overflow-hidden py-3 pl-4 pr-3', completed ? 'border-success/35 bg-success/5 shadow-[0_0_0_1px_color-mix(in_oklab,var(--success)_12%,transparent),0_3px_14px_color-mix(in_oklab,var(--success)_10%,transparent)] group-hover:border-success/60' : 'group-hover:border-primary/30')}>
         <span className={cn('absolute inset-y-3 left-0 w-[3px] rounded-r-full', SEVERITY_DOT[severity])} aria-hidden="true" data-work-status-stripe={severity} />
         <span className={cn('mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg', cover ? `${cover.surface} ${cover.text}` : 'bg-muted text-foreground')}><TypeIcon className="size-4" aria-hidden="true" /></span>

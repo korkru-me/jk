@@ -1732,3 +1732,9 @@ Physical iPad UAT ของ candidate `r7` ยืนยันแล้วว่�
 - แถบซ้ายการ์ดตรงสีปฏิทิน: ส่งแล้วเขียว, เลยกำหนดแดง, ใกล้ส่งภายใน 48 ชั่วโมงเหลือง, ยังไม่ถึงกำหนด/ไม่มีกำหนดเป็น primary มี Tooltip/legend งานเสร็จมีติ๊ก/ป้ายและเงาเขียวอ่อน คง completion/retry/ซ่อนคะแนนเดิม
 - ย้ายงานเสร็จท้ายกลุ่มและกลุ่มเสร็จทั้งหมดท้ายรายการแบบ stable โดยตรวจทั้งกลุ่มก่อนตัวกรอง รายละเอียด source guards และผลตรวจใน STUDENT_CLASSROOM_CALENDAR.md
 - TypeScript, token lint, webpack build และ 3,299 unit tests ผ่าน Browser ใช้ข้อมูลจำลอง ตรวจสี/ordering/scope/sticky/จอ 320–1600px ไม่เขียนฐานข้อมูล ไม่มี migration/push/deploy ตามคำสั่งเจ้าของ ยังไม่ตรวจบัญชีนักเรียนจริงหรืออุปกรณ์จริง
+
+
+### แก้เปิดงานจากการ์ดห้องเรียนค้าง Rendering — 14 ตุลาคม 2026
+
+- การ์ดห้องเรียนใช้ native anchor/document GET ไปยัง href เดิมแทน client transition และหน้าทำงานมี loading state “กำลังเปิดงาน”; คง Tooltip สีและ start-on-POST เดิม ไม่เปลี่ยน auth/เวลา/คะแนน
+- ตรวจ mouse/Enter และ Tooltip เปิดอยู่ ด้วยงานใหม่ ทำต่อ เลยกำหนด และส่งแล้วใน fixture พร้อมบล็อก RSC transition ยืนยัน document navigation จริง TypeScript/token/build/Next runtime ผ่าน ยังไม่ยืนยันสาเหตุคำขอของบัญชีจริงหรือทดสอบกับข้อมูล Production ไม่มี migration/push/deploy จากงานนี้ รายละเอียด STUDENT_CLASSROOM_CALENDAR.md

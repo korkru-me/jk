@@ -17,3 +17,10 @@
 - Axe เฉพาะกริดห้องเรียนไม่พบ violation ทั้งโหมดสว่าง/มืด มี color-contrast incomplete จากข้อความที่ซ้อน/ถูกตัดใน scrollport ตรวจภาพเพิ่มเติมแล้ว ไม่ใช่การรับรอง full-page accessibility ตรวจ React tree/props และ Next MCP compile/runtime แล้ว
 - Staging zero-row query ยืนยันคอลัมน์ assignments/assignment_classrooms/submissions ที่ใช้ได้ โดยไม่คืนข้อมูลบุคคลหรือเปลี่ยน schema
 - ยังไม่ได้ตรวจการอ่าน calendar ด้วยบัญชีนักเรียนจริง, native SEB หรืออุปกรณ์สัมผัสจริง ไม่มีการแตะ Production
+
+## การเปิดงานจากการ์ด — 14 ตุลาคม 2026
+
+- ผู้ใช้รายงานกดการ์ดแล้วค้างอยู่หน้าห้องเรียนพร้อม Rendering ลิงก์จำลองเดิมเปิดได้รวมกรณี Tooltip เปิดอยู่ จึงยังไม่ยืนยันสาเหตุของคำขอในบัญชีจริง
+- ปรับเฉพาะการ์ดห้องเรียนเป็น native anchor/document GET ไปยัง href เดิม เพื่อไม่พึ่ง client-router transition ที่อาจค้าง และเพิ่ม loading.tsx ในหน้าทำงานให้แสดง “กำลังเปิดงาน” ขณะตรวจสถานะ ไม่เปลี่ยนสิทธิ์/เวลา/การให้คะแนน หรือ start-on-POST
+- Browser regression ใช้ fixture อย่างเดียว: บล็อก RSC client transition แล้วงานใหม่ ทำต่อ เลยกำหนด และส่งแล้วเปิดด้วย document request จริงได้ รวม hover Tooltip ก่อนคลิกและ Enter ไม่เขียน attempt หรือคำตอบ
+- TypeScript, token lint, webpack build และ Next compile/runtime ผ่าน ไม่รัน full unit suite ซ้ำเพราะไม่มี lib/scoring change ยังไม่ได้ยืนยันการเปิดหน้ารอด้วยบัญชีนักเรียนจริง ผู้ใช้ต้องรีเฟรชแท็บที่มี transition เก่าค้างก่อนใช้ลิงก์ใหม่
