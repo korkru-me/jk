@@ -39,7 +39,7 @@ if (phase === 'setup') {
     title:'QA timed question', question_text:'เลือก 10', question_type:'mcq', variables:[], logic_rules:[],
     mcq_options:[{text:'10',is_correct:true},{text:'20',is_correct:false}], extra_data:{} }).select('id').single(), 'fixture question').id; save(state)
   for (const assignmentType of ['exam','exercise']) {
-    const row = must(await admin.from('assignments').insert({ created_by:state.teacher.id, org_id:state.org,
+    const row = must(await admin.from('assignments').insert({ classroom_id:state.room, created_by:state.teacher.id, org_id:state.org,
       title:`QA ${state.run} ${assignmentType}`, type:assignmentType, mode:'online', status:'published',
       question_ids:[state.question], duration_minutes:30, max_attempts:3, shuffle_questions:false, shuffle_options:false,
       fullscreen_required:false, proctoring_enabled:false, secure_browser_mode:'browser', android_exam_mode:'blocked', show_results:'immediate' }).select('id').single(), 'fixture assignment')

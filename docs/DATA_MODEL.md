@@ -1,6 +1,6 @@
 # Data model และ invariants
 
-Timed closure (`20261014072745`, rollout pending): `submissions.closed_at` freezes student answers/working; `close_reason` is `manual|time_limit|close_time`, `answer_revision` fences manual evidence validation, and `missing_work_evidence` flags incomplete required working at automatic closure. A closed round may remain `in_progress` while waiting for evaluation, without a published `total_score`; the atomic grade commit sets `submitted_at = closed_at` and `status = submitted`. Repeated commits cannot overwrite completed or teacher grades. Grading scales and late-colour policy remain the existing policy.
+การปิดรอบ (`20261014072745`, apply เฉพาะ Staging): `submissions.closed_at` หยุดคำตอบ/วิธีทำ, `close_reason` เป็น `manual|time_limit|close_time`, `answer_revision` ตรวจข้อมูลที่เปลี่ยนระหว่างยืนยันส่ง และ `missing_work_evidence` แจ้งหลักฐานที่ไม่ครบ รอบที่ปิดอาจยังเป็น `in_progress` ขณะรอตรวจโดยไม่เผยแพร่คะแนนชั่วคราว Commit คะแนนตั้ง `submitted_at = closed_at` กับ `status = submitted` ใน transaction เดียว การเรียกซ้ำไม่ทับผลที่เสร็จหรือครูแก้แล้ว ใช้สเกลคะแนนและช่วงสีเดิม
 
 ## Pending: explicit classroom announcement receipts
 

@@ -1215,10 +1215,13 @@ export async function submitSubmission(submissionId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   const admin = createAdminClient()
-  return gradeAndFinalizeSubmission(admin, submissionId, user.id, {
+  const result = await gradeAndFinalizeSubmission(admin, submissionId, user.id, {
     enforceWorkImage: true,
     enforceSecureBrowser: true,
   })
+  // Score visibility belongs to the result route. The submission receipt
+  // must not leak a hidden/after-close score through the action response.
+  return result.success ? { success: true as const } : { error: result.error ?? 'ยืนยันการส่งไม่สำเร็จ' }
 }
 
 /** Only server-expired/closed rounds can bypass evidence and native-session
@@ -1230,7 +1233,9 @@ export async function finalizeExpiredSubmission(submissionId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ กรุณาเข้าสู่ระบบเพื่อยืนยันผลรอบเดิม' }
-  return gradeAndFinalizeSubmission(createAdminClient(), submissionId, user.id, {
+  const result = await gradeAndFinalizeSubmission(createAdminClient(), submissionId, user.id, {
     enforceWorkImage: false, enforceSecureBrowser: false, expiredOnly: true,
   })
+  return result.success ? { success: true as const } : { error: result.error ?? 'ยืนยันการส่งไม่สำเร็จ',
+    ...(result.notExpired ? { notExpired: true as const } : {}) }
 }

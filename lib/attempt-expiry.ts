@@ -18,3 +18,11 @@ export function attemptSecondsLeft(expiresAt: string | null | undefined, nowMs: 
   const end = Date.parse(expiresAt)
   return Number.isFinite(end) ? Math.max(0, Math.ceil((end - nowMs) / 1000)) : 0
 }
+
+/** Some browser monotonic clocks pause during device sleep. Wall-clock
+ * advancement covers that gap, while the monotonic/previous floors prevent
+ * a device clock rewind from extending the displayed time. Admission and
+ * closure still use the database clock, never this display estimate. */
+export function attemptElapsedMs(previous: number, monotonicDelta: number, wallDelta: number): number {
+  return Math.max(0, previous, monotonicDelta, wallDelta)
+}

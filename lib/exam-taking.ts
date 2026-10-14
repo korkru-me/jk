@@ -10,6 +10,7 @@ import { MATH_WORK_BUCKET, type StudentWorkArtifactView } from '@/lib/math-work'
 
 type TakingSubmissionRow = Pick<Submission, 'id' | 'started_at' | 'assignment_id' | 'student_id' | 'status' | 'exam_access_mode' | 'current_streak' | 'best_streak' | 'streak_reached'> & {
   seb_config_revision?: number | null
+  closed_at?: string | null
   users: { full_name: string | null } | { full_name: string | null }[] | null
   assignments: TakingAssignmentRow | TakingAssignmentRow[] | null
 }
@@ -72,12 +73,12 @@ export async function getExamTakingData(submissionId: string): Promise<ExamTakin
   // query, which reads here as an attempt that cannot be opened at all.
   const { data: submission, revisionColumnAvailable } = await readWithSubmissionRevision<TakingSubmissionRow>(includeRevision => admin
     .from('submissions')
-    .select(`id, started_at, assignment_id, student_id, status, exam_access_mode, ${includeRevision ? 'seb_config_revision, ' : ''}current_streak, best_streak, streak_reached, users!submissions_student_id_fkey(full_name), assignments(duration_minutes, require_work_image, sections, show_sections, proctoring_enabled, fullscreen_required, block_clipboard, exam_watermark_enabled, secure_browser_mode, android_exam_mode, questions_per_page, type, mode, instant_check, instant_check_answer_key, calculator_enabled, scratchpad_enabled, completion_rule, streak_target, streak_question_cap)`)
+    .select(`id, started_at, assignment_id, student_id, status, closed_at, exam_access_mode, ${includeRevision ? 'seb_config_revision, ' : ''}current_streak, best_streak, streak_reached, users!submissions_student_id_fkey(full_name), assignments(duration_minutes, require_work_image, sections, show_sections, proctoring_enabled, fullscreen_required, block_clipboard, exam_watermark_enabled, secure_browser_mode, android_exam_mode, questions_per_page, type, mode, instant_check, instant_check_answer_key, calculator_enabled, scratchpad_enabled, completion_rule, streak_target, streak_question_cap)`)
     .eq('id', submissionId)
     .eq('student_id', user.id)
     .maybeSingle())
 
-  if (!submission || submission.status !== 'in_progress') return null
+  if (!submission || submission.status !== 'in_progress' || submission.closed_at) return null
 
   const assignment = Array.isArray(submission.assignments)
     ? submission.assignments[0]

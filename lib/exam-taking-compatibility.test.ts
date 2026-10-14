@@ -14,6 +14,17 @@ beforeEach(() => {
 })
 
 describe('legacy-schema attempt resume', () => {
+  it('never reads questions from a closed round while grading is pending', async () => {
+    const from = vi.fn(() => {
+      const query = { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(),
+        maybeSingle: async () => ({ data: { id:'attempt', status:'in_progress', closed_at:new Date().toISOString() }, error:null }) }
+      return query
+    })
+    mocks.admin.mockReturnValue({ from })
+    expect(await getExamTakingData('attempt')).toBeNull()
+    expect(from).toHaveBeenCalledTimes(1)
+    expect(from).not.toHaveBeenCalledWith('submission_answers')
+  })
   it.each(['browser', 'seb_required'])('reads only an authorized attempt and preserves secure mode: %s', async mode => {
     const selects: string[] = []
     const from = vi.fn((table: string) => {
