@@ -29,6 +29,8 @@ import {
 } from '@/lib/classroom-navigation'
 import { backHrefFromSearchParams } from '@/lib/back-link'
 import { ClassroomRecentViewTracker } from './_components/classroom-recent-view-tracker'
+import { isPracticeLibraryEnabled } from '@/lib/practice-question'
+import { loadClassroomPracticeLibraries } from '@/lib/classroom-practice-libraries.server'
 
 export default async function ClassroomDetailPage({
   params,
@@ -54,6 +56,7 @@ export default async function ClassroomDetailPage({
 
   const isTeacher = profile?.role === 'teacher' || profile?.role === 'admin'
   const c = classroom as Classroom
+  const showPracticeLibraries = isPracticeLibraryEnabled(process.env) && c.classroom_type === 'subject'
 
   // ─── Student path ─────────────────────────────────────────────────────────
   if (!isTeacher) {
@@ -133,6 +136,7 @@ export default async function ClassroomDetailPage({
       assignmentCategoryRows,
       posts,
       { data: myGroup },
+      practiceLibraries,
     ] = await Promise.all([
       admin.from('users').select('full_name').eq('id', c.teacher_id).single(),
       admin.from('classroom_students').select('id', { count: 'exact', head: true }).eq('classroom_id', id),
@@ -145,6 +149,9 @@ export default async function ClassroomDetailPage({
         .eq('classroom_id', id)
         .eq('student_id', authUser!.id)
         .maybeSingle(),
+      showPracticeLibraries
+        ? loadClassroomPracticeLibraries(supabase, id, 'student_member')
+        : Promise.resolve(null),
     ])
     const assignmentIds = Array.from(new Set((links ?? []).map((l: any) => l.assignment_id)))
     const categoryByAssignment = new Map(
@@ -245,6 +252,7 @@ export default async function ClassroomDetailPage({
         assignments={assignments}
         categories={(assignmentCategoryRows ?? []) as AssignmentCategory[]}
         posts={posts}
+        practiceLibraries={practiceLibraries}
         backHref={backHrefFromSearchParams(sp, '/dashboard#classrooms')}
       />
     )
@@ -293,6 +301,7 @@ export default async function ClassroomDetailPage({
     posts,
     { data: groupRows },
     { data: groupMemberRows },
+    practiceLibraries,
   ] = await Promise.all([
     admin
       .from('classroom_co_teachers')
@@ -345,6 +354,11 @@ export default async function ClassroomDetailPage({
           .select('student_id, group_id')
           .eq('classroom_id', id)
       : Promise.resolve({ data: [] as { student_id: string; group_id: string }[] }),
+    showPracticeLibraries
+      ? loadClassroomPracticeLibraries(supabase, id, isOwner ? 'classroom_owner'
+        : myCoTeacherPermission === 'admin' ? 'co_teacher_admin'
+        : myCoTeacherPermission === 'manage' ? 'co_teacher_manage' : 'co_teacher_view')
+      : Promise.resolve(null),
   ])
 
   // Co-teacher roster + active invites
@@ -593,6 +607,7 @@ export default async function ClassroomDetailPage({
         coTeachers={coTeachers}
         invites={invites}
         classroomAssignments={classroomAssignments}
+        practiceLibraries={practiceLibraries}
         assignmentCategories={assignmentCategories}
         classroomSubmissions={classroomSubmissions}
         classroomExtensions={classroomExtensions}

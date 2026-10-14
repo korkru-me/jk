@@ -130,6 +130,7 @@ async function createLibraryRows(input: {
   if (result.error || !libraryId) return failure('สร้างคลังฝึกไม่สำเร็จ กรุณาลองใหม่')
 
   revalidatePath('/practice')
+  for (const classroomId of input.classroomIds) revalidatePath(`/classrooms/${classroomId}`)
   return { ok: true, id: libraryId }
 }
 
@@ -262,6 +263,7 @@ export async function updatePracticeLibrary(
   revalidatePath(`/practice/${loaded.library.id}`)
   revalidatePath(`/practice/${loaded.library.id}/library`)
   revalidatePath(`/practice/${loaded.library.id}/edit`)
+  revalidatePath(`/classrooms/${loaded.library.classroom_id}`)
   return { ok: true, id: loaded.library.id }
 }
 
@@ -310,6 +312,7 @@ async function transitionPracticeLibrary(
   revalidatePath(`/practice/${loaded.library.id}`)
   revalidatePath(`/practice/${loaded.library.id}/library`)
   revalidatePath(`/practice/${loaded.library.id}/edit`)
+  revalidatePath(`/classrooms/${loaded.library.classroom_id}`)
   return { ok: true, id: loaded.library.id }
 }
 
@@ -331,6 +334,8 @@ export async function duplicatePracticeLibrary(rawInput: unknown): Promise<Pract
   })
   if (result.error || !isUuid(result.data)) return failure('ทำสำเนาคลังฝึกไม่สำเร็จ')
   revalidatePath('/practice')
+  const copy = await loadPracticeLibraryForTeacher(context.supabase, context.userId, result.data)
+  if (copy) revalidatePath(`/classrooms/${copy.library.classroom_id}`)
   return { ok: true, id: result.data }
 }
 
@@ -415,6 +420,7 @@ export async function deletePracticeLibrary(rawInput: unknown): Promise<Practice
     return failure('ลบคลังฝึกไม่สำเร็จ กรุณาโหลดหน้าใหม่แล้วลองอีกครั้ง')
   }
   revalidatePath('/practice')
+  revalidatePath(`/classrooms/${loaded.library.classroom_id}`)
   return { ok: true, id: loaded.library.id }
 }
 
