@@ -18,6 +18,8 @@ import { formatThaiDate, thaiHour } from '@/lib/thai-time'
 import { filterAssignmentsForStudent } from '@/lib/classroom-groups-server'
 import { Clock, BookOpen, School, ChevronRight, TrendingUp, AlertCircle, Megaphone } from 'lucide-react'
 import { Card } from '@/components/ui/card'
+import { getQuestionCardData } from '@/lib/actions/question-card-data'
+import type { QuestionCardRow } from '@/components/questions/question-card'
 import { sortClassroomsByRecentViews } from '@/lib/classroom-recency'
 
 export const metadata = { title: 'หน้าหลัก — KorKru' }
@@ -45,7 +47,7 @@ export default async function DashboardPage() {
     // Everything shown to a teacher is their own real data. Counts come back
     // with the first page of rows (`count: 'exact'` alongside `limit`), so the
     // totals and the previews cost one query each rather than two.
-    const [classroomsRes, questionsRes, setsRes, recentClassroomViewsRes] = await Promise.all([
+    const [classroomsRes, questionsRes, setsRes, recentClassroomViewsRes, teamsRes] = await Promise.all([
       // Roster and assignment tallies ride along on the classroom relation,
       // the same way the classroom list page reads them.
       admin
@@ -56,7 +58,7 @@ export default async function DashboardPage() {
         .order('created_at', { ascending: false }),
       supabase
         .from('questions')
-        .select('id, title, question_type', { count: 'exact' })
+        .select('id, title, question_text, question_type, difficulty, tags, group_id, order_in_group, subject, question_categories(name)', { count: 'exact' })
         .eq('created_by', user.id)
         .eq('is_research_snapshot', false)
         // Grouped questions are stored one row per member; only the first row
@@ -74,6 +76,11 @@ export default async function DashboardPage() {
         .from('classroom_recent_views')
         .select('classroom_id, viewed_at')
         .eq('user_id', user.id),
+      supabase
+        .from('organization_members')
+        .select('organizations!inner(id, name, is_personal)')
+        .eq('user_id', user.id)
+        .eq('organizations.is_personal', false),
     ])
 
     // A set's question_ids keep pointing at deleted questions, so the stored
@@ -81,9 +88,13 @@ export default async function DashboardPage() {
     // those — the same rule the set library itself displays.
     const setRows = (setsRes.data ?? []) as any[]
     const referencedIds = Array.from(new Set(setRows.flatMap(set => set.question_ids ?? [])))
-    const { data: liveQuestions } = referencedIds.length > 0
-      ? await supabase.from('questions').select('id').in('id', referencedIds)
-      : { data: [] as { id: string }[] }
+    const questionRows = (questionsRes.data ?? []) as unknown as QuestionCardRow[]
+    const [questionCardData, { data: liveQuestions }] = await Promise.all([
+      getQuestionCardData(questionRows.map(question => question.id)),
+      referencedIds.length > 0
+        ? supabase.from('questions').select('id').in('id', referencedIds)
+        : Promise.resolve({ data: [] as { id: string }[] }),
+    ])
     const liveQuestionIds = new Set((liveQuestions ?? []).map(q => q.id))
 
     const classroomRows = sortClassroomsByRecentViews(
@@ -114,11 +125,10 @@ export default async function DashboardPage() {
           questionCount: ((set.question_ids ?? []) as string[])
             .filter(id => liveQuestionIds.has(id)).length,
         }))}
-        questions={((questionsRes.data ?? []) as any[]).map(question => ({
-          id: question.id,
-          title: question.title,
-          question_type: question.question_type,
-        }))}
+        questions={questionRows}
+        questionCardData={questionCardData}
+        myTeams={((teamsRes.data ?? []) as unknown as { organizations: { id: string; name: string } }[])
+          .map(row => ({ id: row.organizations.id, name: row.organizations.name }))}
       />
     )
   }

@@ -50,6 +50,8 @@ App shell มี contextual sidebar registry ฝั่ง client ที่ผู
 
 ## Runtime boundaries
 
+“โจทย์ล่าสุด” ของครูใช้ `DashboardQuestionList` เป็น client wrapper ของ `QuestionCard` เดิม โดย server อ่านข้อมูลสรุปของ 5 โจทย์ล่าสุดและใช้ `getQuestionCardData` เดิมอ่านสถิติ/จำนวนข้อย่อย/แฟ้ม/เฉลยเฉพาะ id ที่แสดง พร้อมทีมจาก membership ภายใต้ session/RLS; รายละเอียดโจทย์และเฉลยโหลดเมื่อเปิดดูเท่านั้น · `question-return` รองรับ marker `dashboard=1` ใน `from` และยอมให้ redirect ไป `/dashboard` ที่ตรงตัวเท่านั้น เมื่อแก้ไขหรือยกเลิกจึงกลับหน้าหลักได้โดยไม่เพิ่ม arbitrary redirect
+
 การ์ดแฟ้มโจทย์ใช้ Client Component กลาง `components/questions/question-set-card.tsx` ร่วมกันในคลังและหน้าหลักครู โดยครูยังโหลดรายการล่าสุด/ยอดรวมฝั่ง server; query เพิ่ม `sections` จากแถวเดิมเพื่อแสดงจำนวนแฟ้มย่อย การดาวน์โหลด/ลบเรียก Server Actions เดิมภายใต้ session/RLS เดิม และหน้าหลักรีเฟรช server data หลังลบสำเร็จ · drag handle เป็น optional slot เฉพาะคลัง ไม่เพิ่ม DnD ลงหน้าหลัก
 
 ตาม UI-014/UI-018 (6 ต.ค. 2026) ตัวแถบ `Sidebar` ของ app shell ใช้ `transition-none` แทน width/transform 200ms ทั้งการย่อเป็น icon rail บน desktop และเปิด/ปิด drawer บนมือถือ ปุ่มที่เปลี่ยนความสูง/padding ระหว่าง full/compact ใน contextual sidebar ใช้ `transition-colors` แทน `transition-all` เฉพาะตำแหน่งนั้น เพื่อให้ตำแหน่งไอคอนตามแกน Y เปลี่ยนพร้อมตัวแถบในเฟรมเดียวโดยยังคง color feedback การเปลี่ยนนี้เป็น CSS display-only ไม่เพิ่ม timer/request และไม่เปลี่ยน state persistence, registry หรือ authorization

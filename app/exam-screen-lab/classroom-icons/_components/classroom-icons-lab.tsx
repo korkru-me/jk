@@ -15,6 +15,32 @@ import { Button } from '@/components/ui/button'
 import { classroomNavigationFor } from '@/lib/classroom-navigation'
 import type { ClassroomCoverPatternKey } from '@/lib/classroom-cover-patterns'
 import type { Classroom } from '@/lib/types'
+import { buildExamScreenQaQuestions } from '../../_lib/fixture'
+import { subQuestionCount } from '@/lib/question-parts'
+import type { QuestionCardData } from '@/lib/question-card-data'
+
+const DASHBOARD_QUESTIONS = buildExamScreenQaQuestions()
+  .filter(q => ['classify', 'written', 'file_upload', 'essay', 'mcq'].includes(q.question_type))
+  .map(q => ({ ...q, solution_text: '', question_categories: null }))
+const DASHBOARD_CARD_DATA: QuestionCardData = {
+  details: Object.fromEntries(DASHBOARD_QUESTIONS.map(q => [q.id, {
+    subject: q.subject, category: null, group_id: q.group_id, order_in_group: q.order_in_group,
+  }])),
+  stats: {
+    'qa-question-written': { attempts: 20, pValue: 0.7, discrimination: 0.35, usedIn: 2, lastUsedAt: null },
+  },
+  duplicateCounts: {},
+  subQuestionCounts: Object.fromEntries(DASHBOARD_QUESTIONS.map(q => [q.id, subQuestionCount(q)])),
+  setMemberships: {
+    'qa-question-written': [{ id: 'set-2', title: 'ทดสอบ', isOwner: true }],
+  },
+  solutionPresence: Object.fromEntries(DASHBOARD_QUESTIONS.map(q => [q.id, false])),
+}
+
+const loadDashboardPreview = async (id: string) => {
+  const question = DASHBOARD_QUESTIONS.find(q => q.id === id)
+  return question ? { data: question } : { error: 'ไม่พบโจทย์จำลอง' }
+}
 
 const ROOM_ID = '90000000-0000-4000-8000-000000000001'
 const DEFAULT: Classroom = {
@@ -80,11 +106,9 @@ function LabContent({ initialCoverPattern }: { initialCoverPattern: ClassroomCov
           { id: 'set-2', title: 'ทดสอบ', questionCount: 5 },
           { id: 'set-3', title: 'แบบฝึกหัดกลศาสตร์', questionCount: 18 },
         ]}
-        questions={[
-          { id: 'question-1', title: 'การเคลื่อนที่แนวระดับ', question_type: 'written' },
-          { id: 'question-2', title: 'แรงลัพธ์จากแรงหลายแรง', question_type: 'mcq' },
-          { id: 'question-3', title: 'พลังงานกลของวัตถุ', question_type: 'true_false' },
-        ]}
+        questions={DASHBOARD_QUESTIONS}
+        questionCardData={DASHBOARD_CARD_DATA}
+        loadQuestionPreview={loadDashboardPreview}
       />
     </Card>
     <Card className="flex flex-col gap-3 p-4">
