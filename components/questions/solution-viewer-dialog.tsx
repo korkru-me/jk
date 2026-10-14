@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Lightbulb } from 'lucide-react'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 import { Button } from '@/components/ui/button'
 import {
   Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -43,6 +44,7 @@ interface Props {
   questionTitle: string
   open: boolean
   onOpenChange: (open: boolean) => void
+  confirmDismissal?: boolean
 }
 
 /**
@@ -57,7 +59,8 @@ interface Props {
  * Read afresh each time it opens rather than kept from last time: the same
  * teacher may have just fixed the เฉลย in another tab, and the read is small.
  */
-export function SolutionViewerDialog({ questionId, questionTitle, open, onOpenChange }: Props) {
+export function SolutionViewerDialog({ questionId, questionTitle, open, onOpenChange, confirmDismissal = false }: Props) {
+  const [confirm, confirmation] = useConfirm()
   const load = useSolutionLoader()
   const [view, setView] = useState<ViewState | null>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -80,7 +83,15 @@ export function SolutionViewerDialog({ questionId, questionTitle, open, onOpenCh
   const loaded = view && 'solution' in view ? view : null
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(next, details) => {
+      if (!next && confirmDismissal && details.reason !== 'close-press') {
+        details.cancel()
+        void confirm({ title: 'ปิดเฉลยวิธีทำ?', description: 'กลับไปยังรายการโจทย์ได้ โดยความคืบหน้าจะไม่เปลี่ยน', confirmLabel: 'ยืนยันปิด', cancelLabel: 'อ่านต่อ' })
+          .then(accepted => { if (accepted) onOpenChange(false) })
+        return
+      }
+      onOpenChange(next)
+    }}>
       {/* Only the เฉลย scrolls: a long one — a whole page of working, or a
           โจทย์หลายขั้นตอน step by step — keeps which โจทย์ it belongs to and
           the way out on screen the whole time. */}
@@ -119,6 +130,7 @@ export function SolutionViewerDialog({ questionId, questionTitle, open, onOpenCh
           <DialogClose render={<Button variant="outline" />}>ปิด</DialogClose>
         </DialogFooter>
       </DialogContent>
+      {confirmation}
     </Dialog>
   )
 }

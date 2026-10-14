@@ -1,5 +1,17 @@
 # Brand, language และ UI rules
 
+## แก้ชุดฝึกและปักข้อในคลังฝึก
+
+การ์ดชุดฝึกแยกลิงก์เปิดชุดออกจากปุ่ม “แก้ชื่อและโจทย์” เพื่อไม่ให้คลิกแก้ไขแล้วเปลี่ยนหน้า แถบแก้ไขมีชื่อ รายการสมาชิกที่เลื่อนภายใน ปุ่มเอาออก และเพิ่มโจทย์จากคลัง เมื่อบันทึกล้มเหลวต้องคงร่างและแสดง error; revision conflict มีปุ่มโหลดข้อมูลล่าสุดที่ยืนยันก่อนทิ้งร่าง ปุ่มปักใช้ข้อความพร้อม aria-pressed และพื้นที่สัมผัส 44px มีทางเปิดดูเฉพาะข้อที่ปักและ empty state สำหรับรายการว่าง
+
+
+Student attached-solution dialogs request confirmation on outside/Escape dismissal; explicit Close returns to the invoking button.
+
+## Student practice cards and personal exercise groups - 14 October 2026
+
+The owner's request replaces compact student-library rows with home-style question cards: metadata badges, title, short stem, and a separate selection checkbox. Only preview and available attached solutions are shown. Personal group cards sit above individual questions and show answered X of Y with Progress; an explanation states that checks, including prior checks, determine progress. Naming is an inline form that preserves draft/selection after save errors. Long tags truncate within card width; titles/stems allow two lines, with 44px checkbox/action targets on mobile. This overrides the compact-row rule only for the student library list.
+
+
 ## รายการงานครูรวมคลังฝึก — 14 ตุลาคม 2026
 
 - กรอบ “งานที่เพิ่งมอบหมาย” ใช้ข้อความรอง “สร้างสำเร็จแล้ว” แต่ละงานเป็น Card มีขอบแยก กดได้ทั้งกรอบ ไม่มีลูกศรด้านขวา; แถบตัวกรองและปุ่มมอบหมาย/จัดการกลุ่มอยู่ด้านล่าง

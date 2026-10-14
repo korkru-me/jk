@@ -1,3 +1,10 @@
+'use client'
+
+import { useRouter } from 'next/navigation'
+import { useConfirm } from '@/components/ui/confirm-dialog'
+import { isUuid } from '@/lib/practice-library-contracts'
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
+import { toast } from 'sonner'
 import Link from 'next/link'
 import {
   ArrowLeft,
@@ -6,6 +13,11 @@ import {
   ChevronRight,
   Search,
   X,
+  Plus,
+  Layers,
+  Pencil,
+  Bookmark,
+  Minus,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -20,7 +32,13 @@ import {
 } from '@/components/ui/empty'
 import { Input } from '@/components/ui/input'
 import { RichText } from '@/components/ui/rich-text'
-import { TYPE_LABEL } from '@/lib/question-display'
+import { PracticeQuestionCard } from './practice-question-card'
+import { SolutionLoaderProvider } from '@/components/questions/solution-loader'
+import { Progress } from '@/components/ui/progress'
+import { Field, FieldLabel, FieldGroup } from '@/components/ui/field'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { createPracticeExercise, updatePracticeExercise, setPracticeReviewPin, getPracticeAttachedSolution } from '@/lib/actions/practice-exercises'
+import { PRACTICE_EXERCISE_MAX_QUESTIONS, type PracticeExercise } from '@/lib/practice-exercises'
 import type {
   PracticeQuestionListItem,
   StudentPracticeLibrary,
@@ -31,7 +49,6 @@ import {
   PRACTICE_MAX_TAGS,
   type PracticeSearchState,
 } from '@/lib/practice-search'
-import { cn } from '@/lib/utils'
 
 interface PracticeLibraryViewProps {
   library: StudentPracticeLibrary
@@ -39,6 +56,18 @@ interface PracticeLibraryViewProps {
   total: number
   totalPages: number
   state: PracticeSearchState
+  storageOwnerId: string
+  exercises: PracticeExercise[]
+  exercisesReady: boolean
+  pinnedQuestionIds: string[]
+  pinsReady: boolean
+  searchHiddenFields?: Record<string, string>
+  updateExerciseAction?: typeof updatePracticeExercise
+  pinAction?: typeof setPracticeReviewPin
+  libraryHrefBuilder?: typeof buildPracticeSearchHref
+  questionHrefBuilder?: typeof buildPracticeQuestionHref
+  createExerciseAction?: typeof createPracticeExercise
+  solutionLoader?: (questionId: string) => ReturnType<typeof getPracticeAttachedSolution>
 }
 
 export function PracticeLibraryView({
@@ -47,7 +76,137 @@ export function PracticeLibraryView({
   total,
   totalPages,
   state,
+  storageOwnerId,
+  exercises,
+  exercisesReady,
+  pinnedQuestionIds,
+  pinsReady,
+  searchHiddenFields = {},
+  updateExerciseAction = updatePracticeExercise,
+  pinAction = setPracticeReviewPin,
+  libraryHrefBuilder = buildPracticeSearchHref,
+  questionHrefBuilder = buildPracticeQuestionHref,
+  createExerciseAction = createPracticeExercise,
+  solutionLoader,
 }: PracticeLibraryViewProps) {
+  const router = useRouter()
+  const [confirm, confirmation] = useConfirm()
+  const [editing, setEditing] = useState<PracticeExercise | null>(null)
+  const [conflict, setConflict] = useState(false)
+  const [pins, setPins] = useState(new Set(pinnedQuestionIds))
+  const [pinPending, startPinTransition] = useTransition()
+  const editorRef = useRef<HTMLInputElement>(null)
+  const storageKey = `practice-selection:${storageOwnerId}:${library.id}`
+  const [selected, setSelected] = useState<Record<string, string>>({})
+  const [naming, setNaming] = useState(false)
+  const [title, setTitle] = useState('')
+  const [error, setError] = useState('')
+  const [pending, startTransition] = useTransition()
+  const requestId = useRef<string | null>(null)
+  const draftKey = `${storageKey}:editing`
+  useEffect(() => { setPins(new Set(pinnedQuestionIds)) }, [pinnedQuestionIds])
+  useEffect(() => { if (editing) editorRef.current?.focus() }, [editing?.id])
+  const selectedIds = Object.keys(selected)
+  const activeExercise = exercises.find(exercise => exercise.id === state.exerciseId)
+  const loadSolution = useCallback((questionId: string) => getPracticeAttachedSolution(library.id, questionId), [library.id])
+  useEffect(() => {
+    if (!exercisesReady) return
+    setSelected({})
+    try {
+      const raw: unknown = JSON.parse(sessionStorage.getItem(storageKey) || '{}')
+      if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+        const entries = Object.entries(raw).filter(([id, value]) => isUuid(id) && typeof value === 'string')
+        setSelected(Object.fromEntries(entries.slice(0, PRACTICE_EXERCISE_MAX_QUESTIONS)))
+      }
+      const draft: unknown = JSON.parse(sessionStorage.getItem(draftKey) || 'null')
+      if (draft && typeof draft === 'object' && 'id' in draft && 'title' in draft && 'expectedRevision' in draft) {
+        const found = exercises.find(group => group.id === draft.id)
+        if (found && typeof draft.title === 'string' && draft.title.length <= 120
+          && typeof draft.expectedRevision === 'number' && Number.isSafeInteger(draft.expectedRevision) && draft.expectedRevision > 0) {
+          setEditing({ ...found, revision: draft.expectedRevision })
+          setTitle(draft.title)
+          setNaming(true)
+        }
+      }
+    } catch { /* Selection remains usable when browser storage is unavailable. */ }
+  }, [storageKey, exercisesReady])
+  function updateSelection(next: Record<string, string>) {
+    setSelected(next)
+    requestId.current = null
+    setError('')
+    setConflict(false)
+    try { sessionStorage.setItem(storageKey, JSON.stringify(next)) } catch { /* In-memory selection still works. */ }
+  }
+  function choose(item: PracticeQuestionListItem, checked: boolean) {
+    if (checked && selectedIds.length >= PRACTICE_EXERCISE_MAX_QUESTIONS) return
+    const next = { ...selected }
+    if (checked) next[item.id] = item.title
+    else delete next[item.id]
+    updateSelection(next)
+  }
+  function rememberEdit(group: PracticeExercise | null, name: string) {
+    try {
+      if (group) sessionStorage.setItem(draftKey, JSON.stringify({ id: group.id, title: name, expectedRevision: group.revision }))
+      else sessionStorage.removeItem(draftKey)
+    } catch { /* The editor remains usable without browser storage. */ }
+  }
+  function clearEditor() {
+    updateSelection({})
+    rememberEdit(null, '')
+    setEditing(null)
+    setTitle('')
+    setNaming(false)
+  }
+  async function beginEdit(group: PracticeExercise) {
+    if (selectedIds.length > 0 || naming) {
+      const accepted = await confirm({ title: 'เปิดแก้ไขแบบฝึกหัดนี้?', description: 'รายการที่เลือกและชื่อที่ยังไม่บันทึกจะถูกแทนด้วยข้อมูลของแบบฝึกหัดนี้', confirmLabel: 'เปิดแก้ไข', cancelLabel: 'กลับไปเลือกต่อ' })
+      if (!accepted) return
+    }
+    updateSelection(Object.fromEntries(group.questionIds.map(id => [id, group.questionTitles[id] ?? 'โจทย์ในแบบฝึกหัด'])))
+    setEditing(group)
+    setTitle(group.title)
+    setNaming(true)
+    rememberEdit(group, group.title)
+  }
+  async function cancelEdit() {
+    const changed = editing && (title.trim() !== editing.title || JSON.stringify(selectedIds) !== JSON.stringify(editing.questionIds))
+    if (changed && !await confirm({ title: 'ยกเลิกการแก้ไข?', description: 'ชื่อและรายการโจทย์ที่เปลี่ยนไว้จะไม่ถูกบันทึก แบบฝึกหัดเดิมและประวัติการตอบยังอยู่', confirmLabel: 'ยกเลิกการแก้ไข', cancelLabel: 'แก้ไขต่อ' })) return
+    clearEditor()
+  }
+  function saveExercise(event: React.FormEvent) {
+    event.preventDefault()
+    if (!title.trim() || selectedIds.length === 0 || pending) return
+    requestId.current ??= crypto.randomUUID()
+    const id = editing?.id ?? requestId.current
+    startTransition(async () => {
+      try {
+        const payload = { id, libraryId: library.id, title, questionIds: selectedIds }
+        const result = editing
+          ? await updateExerciseAction({ ...payload, expectedRevision: editing.revision })
+          : await createExerciseAction(payload)
+        if (!result.ok) { setError(result.error); setConflict('conflict' in result && result.conflict === true); return }
+        const edited = Boolean(editing)
+        clearEditor()
+        toast.success(edited ? 'บันทึกการแก้ไขแล้ว' : 'สร้างแบบฝึกหัดแล้ว')
+      } catch { setError('ยังบันทึกแบบฝึกหัดไม่ได้ กรุณาลองอีกครั้ง') }
+    })
+  }
+  function togglePin(questionId: string) {
+    const pinned = !pins.has(questionId)
+    startPinTransition(async () => {
+      try {
+        const result = await pinAction({ libraryId: library.id, questionId, pinned })
+        if (!result.ok) { toast.error(result.error); return }
+        setPins(previous => {
+          const next = new Set(previous)
+          if (pinned) next.add(questionId)
+          else next.delete(questionId)
+          return next
+        })
+        toast.success(pinned ? 'ปักโจทย์ไว้ทบทวนแล้ว' : 'เอาปักหมุดออกแล้ว')
+      } catch { toast.error('ยังบันทึกการปักโจทย์ไม่ได้ กรุณาลองอีกครั้ง') }
+    })
+  }
   const hasFilters = Boolean(state.q || state.tags.length > 0)
   const tagLimitReached = state.tags.length >= PRACTICE_MAX_TAGS || state.ignoredTagCount > 0
 
@@ -78,7 +237,7 @@ export function PracticeLibraryView({
         </div>
       </header>
 
-      <Card
+      {!activeExercise && <Card
         edge="none"
         padding="none"
         className="flex flex-col gap-2 bg-transparent sm:rounded-2xl sm:border sm:border-border sm:bg-card sm:p-4"
@@ -87,6 +246,8 @@ export function PracticeLibraryView({
           method="get"
           className="grid grid-cols-[minmax(0,1fr)_44px] gap-2 md:grid-cols-[minmax(0,1fr)_minmax(12rem,0.55fr)_auto]"
         >
+          {Object.entries(searchHiddenFields).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
+          {state.reviewOnly && <input type="hidden" name="review" value="1" />}
           {state.tags.map(tag => <input key={tag} type="hidden" name="tag" value={tag} />)}
           <label className="col-span-2 flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground md:col-span-1">
             ค้นหาชื่อหรือเนื้อหาโจทย์
@@ -137,7 +298,7 @@ export function PracticeLibraryView({
                 key={tag}
                 variant="outline"
                 className="min-h-11 shrink-0"
-                render={<Link href={buildPracticeSearchHref(library.id, state, {
+                render={<Link href={libraryHrefBuilder(library.id, state, {
                   tags: state.tags.filter(value => value !== tag),
                   page: 1,
                 })} />}
@@ -149,30 +310,127 @@ export function PracticeLibraryView({
             ))}
           </div>
         )}
+      </Card>}
+
+      <section aria-labelledby="my-practice-exercises" className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 id="my-practice-exercises" className="flex items-center gap-2 text-base font-semibold">
+            <Layers className="size-5 text-primary" aria-hidden="true" />แบบฝึกหัดของฉัน
+          </h2>
+          {activeExercise && <Button variant="outline" className="min-h-11" render={<Link href={libraryHrefBuilder(library.id, state, { exerciseId: '', page: 1 })} />}>ดูโจทย์ทั้งหมด</Button>}
+        </div>
+        {!exercisesReady && <Alert><AlertDescription>ยังโหลดแบบฝึกหัดไม่ได้ กรุณาลองโหลดหน้าอีกครั้ง</AlertDescription></Alert>}
+        {exercisesReady && exercises.length === 0 && <p className="text-sm text-muted-foreground">ติ๊กเลือกโจทย์ด้านล่าง แล้วตั้งชื่อเพื่อสร้างแบบฝึกหัดของตัวเอง</p>}
+        {exercises.length > 0 && <div className="grid gap-3 sm:grid-cols-2">
+          {exercises.map(exercise => <Card key={exercise.id} padding="md" className={activeExercise?.id === exercise.id ? 'border-primary/50' : undefined}>
+            <Link href={libraryHrefBuilder(library.id, state, { exerciseId: exercise.id, reviewOnly: false, q: '', tags: [], page: 1 })}
+              aria-current={activeExercise?.id === exercise.id ? 'page' : undefined}
+              className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <div className="flex items-start justify-between gap-2">
+                <h3 className="line-clamp-2 text-sm font-semibold">{exercise.title}</h3>
+                <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">ตอบแล้ว {exercise.attemptedCount} จาก {exercise.questionIds.length} ข้อ</p>
+              <Progress className="mt-2" value={exercise.attemptedCount / exercise.questionIds.length * 100} aria-label={`ความคืบหน้า ${exercise.title}`} />
+            </Link>
+            <Button variant="ghost" className="mt-2 min-h-11" disabled={pending} onClick={() => void beginEdit(exercise)} aria-label={`แก้ไข ${exercise.title}`}>
+              <Pencil data-icon="inline-start" aria-hidden="true" />แก้ชื่อและโจทย์
+            </Button>
+          </Card>)}
+        </div>}
+        {exercises.length > 0 && <p className="text-xs text-muted-foreground">นับข้อที่กดตรวจคำตอบอย่างน้อยหนึ่งครั้ง รวมการตอบก่อนสร้างแบบฝึกหัด</p>}
+      </section>
+
+      <div className="flex flex-wrap items-center gap-2" aria-label="โจทย์ที่ปักไว้ทบทวน">
+        <Button variant={state.reviewOnly ? 'navigation' : 'outline'} className="min-h-11" disabled={!pinsReady}
+          render={<Link href={libraryHrefBuilder(library.id, state, { exerciseId: '', reviewOnly: !state.reviewOnly, page: 1 })} />}>
+          <Bookmark data-icon="inline-start" aria-hidden="true" />{state.reviewOnly ? 'กลับไปดูทุกข้อ' : `ดูข้อที่ปักไว้ (${pins.size})`}
+        </Button>
+        {!pinsReady && <span className="text-xs text-muted-foreground">ยังโหลดข้อที่ปักไว้ไม่ได้</span>}
+      </div>
+
+      <Card padding="md" className="flex flex-col gap-3">
+        {editing && <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="min-w-0 break-words text-sm font-semibold">กำลังแก้ไข: {editing.title}</h3>
+          <Button variant="outline" className="min-h-11" render={<Link href={libraryHrefBuilder(library.id, state, { exerciseId: '', reviewOnly: false, page: 1 })} />}>เพิ่มโจทย์จากคลัง</Button>
+        </div>}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm">
+            <input type="checkbox" className="size-5 accent-primary" disabled={!exercisesReady || pending || items.length === 0}
+              checked={items.length > 0 && items.every(item => selected[item.id] !== undefined)}
+              onChange={event => {
+                const next = { ...selected }
+                for (const item of items) {
+                  if (!event.target.checked) delete next[item.id]
+                  else if (Object.keys(next).length < PRACTICE_EXERCISE_MAX_QUESTIONS) next[item.id] = item.title
+                }
+                updateSelection(next)
+              }} />เลือกทุกข้อในหน้านี้
+          </label>
+          <div className="flex flex-wrap items-center gap-2">
+            <span role="status" className="text-sm text-muted-foreground">เลือกแล้ว {selectedIds.length} ข้อ</span>
+            {selectedIds.length > 0 && <Button variant="ghost" className="min-h-11" disabled={pending} onClick={() => updateSelection({})}>ล้างที่เลือก</Button>}
+            {!editing && <Button className="min-h-11" disabled={!exercisesReady || selectedIds.length === 0 || pending} onClick={() => setNaming(true)}>
+              <Plus data-icon="inline-start" aria-hidden="true" />สร้างแบบฝึกหัด
+            </Button>}
+          </div>
+        </div>
+        {selectedIds.length > 0 && <p className="text-xs text-muted-foreground">เลือกข้ามหน้าและตัวกรองได้ สูงสุด {PRACTICE_EXERCISE_MAX_QUESTIONS} ข้อ</p>}
+        {naming && <form onSubmit={saveExercise} className="flex flex-col gap-3">
+          <FieldGroup><Field data-invalid={Boolean(error)}>
+            <FieldLabel htmlFor="practice-exercise-name">ชื่อแบบฝึกหัด</FieldLabel>
+            <Input ref={editorRef} id="practice-exercise-name" value={title} maxLength={120} required autoFocus disabled={pending}
+              placeholder="เช่น ทบทวนกฎของนิวตัน" aria-invalid={Boolean(error)}
+              onChange={event => { setTitle(event.target.value); rememberEdit(editing, event.target.value); requestId.current = null; setError('') }} />
+          </Field></FieldGroup>
+          {editing && <div className="flex flex-col gap-2">
+            <p className="text-xs text-muted-foreground">ติ๊กเลือกเพื่อเพิ่มโจทย์ หรือเอาข้อออกด้านล่าง ต้องเหลืออย่างน้อย 1 ข้อ</p>
+            <ol className="flex max-h-60 flex-col gap-1 overflow-y-auto" aria-label="โจทย์ที่เลือกในแบบฝึกหัด">
+              {selectedIds.map(id => <li key={id} className="flex items-center justify-between gap-2">
+                <span className="min-w-0 truncate text-sm">{selected[id]}</span>
+                <Button type="button" variant="ghost" className="min-h-11 shrink-0" disabled={pending}
+                  aria-label={`เอา ${selected[id]} ออกจากแบบฝึกหัด`}
+                  onClick={() => { const next = { ...selected }; delete next[id]; updateSelection(next) }}>
+                  <Minus data-icon="inline-start" aria-hidden="true" />เอาออก
+                </Button>
+              </li>)}
+            </ol>
+          </div>}
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" className="min-h-11" disabled={pending || !title.trim() || selectedIds.length === 0}>{pending ? 'กำลังบันทึก…' : `${editing ? 'บันทึกการแก้ไข' : 'บันทึกแบบฝึกหัด'} ${selectedIds.length} ข้อ`}</Button>
+            <Button type="button" variant="outline" className="min-h-11" disabled={pending} onClick={() => editing ? void cancelEdit() : setNaming(false)}>{editing ? 'ยกเลิกการแก้ไข' : 'พักการตั้งชื่อ'}</Button>
+          </div>
+          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+          {conflict && <Button type="button" variant="outline" className="min-h-11" onClick={async () => {
+            if (await confirm({ title: 'โหลดข้อมูลล่าสุด?', description: 'การแก้ไขที่ยังไม่บันทึกจะถูกยกเลิก จากนั้นเปิดแก้ไขแบบฝึกหัดอีกครั้งได้', confirmLabel: 'โหลดข้อมูลล่าสุด', cancelLabel: 'กลับไปแก้ไข' })) {
+              clearEditor(); router.refresh()
+            }
+          }}>โหลดข้อมูลล่าสุด</Button>}
+        </form>}
       </Card>
 
       <div className="flex min-h-8 items-center justify-between gap-3 text-sm">
-        <p className="text-muted-foreground">พบ {total.toLocaleString('th-TH')} ข้อ</p>
-        {hasFilters && (
+        <p className="text-muted-foreground">{activeExercise ? `${activeExercise.title} · ` : ''}พบ {total.toLocaleString('th-TH')} ข้อ</p>
+        {hasFilters && !activeExercise && (
           <Button
             variant="link"
             size="sm"
             className="min-h-[44px]"
-            render={<Link href={buildPracticeSearchHref(library.id, state, { q: '', tags: [], page: 1 })} />}
+            render={<Link href={libraryHrefBuilder(library.id, state, { q: '', tags: [], page: 1 })} />}
           >
             ล้างตัวกรอง
           </Button>
         )}
       </div>
 
-      <Card className="overflow-hidden">
+      <SolutionLoaderProvider loader={solutionLoader ?? loadSolution}>
         {items.length === 0 ? (
           <Empty className="min-h-56 border-0">
             <EmptyHeader>
               <EmptyMedia variant="icon"><Search aria-hidden="true" /></EmptyMedia>
-              <EmptyTitle>{hasFilters ? 'ไม่พบโจทย์ตามตัวกรองนี้' : 'คลังนี้ยังไม่มีโจทย์'}</EmptyTitle>
+              <EmptyTitle>{state.reviewOnly ? 'ยังไม่มีโจทย์ที่ปักไว้ตามตัวกรองนี้' : hasFilters ? 'ไม่พบโจทย์ตามตัวกรองนี้' : 'คลังนี้ยังไม่มีโจทย์'}</EmptyTitle>
               <EmptyDescription>
-                {hasFilters
+                {state.reviewOnly ? 'กดปักไว้ทบทวนบนการ์ดโจทย์ แล้วกลับมาดูได้ที่นี่' : hasFilters
                   ? 'ลองลดจำนวนแท็กหรือเปลี่ยนคำค้น แล้วค้นหาอีกครั้ง'
                   : 'เมื่อครูเพิ่มโจทย์และเผยแพร่แล้ว รายการจะปรากฏตรงนี้'}
               </EmptyDescription>
@@ -182,7 +440,7 @@ export function PracticeLibraryView({
                 <Button
                   variant="outline"
                   className="min-h-[44px]"
-                  render={<Link href={buildPracticeSearchHref(library.id, state, { q: '', tags: [], page: 1 })} />}
+                  render={<Link href={libraryHrefBuilder(library.id, state, { q: '', tags: [], page: 1 })} />}
                 >
                   ล้างตัวกรอง
                 </Button>
@@ -190,84 +448,18 @@ export function PracticeLibraryView({
             )}
           </Empty>
         ) : (
-          <ol className="divide-y divide-border">
-            {items.map(item => {
-              const questionHref = buildPracticeQuestionHref(library.id, item.id, state)
-              return (
-                <li
-                  key={item.id}
-                  id={`practice-question-${item.id}`}
-                  className="scroll-mt-20"
-                >
-                  <Link
-                    href={questionHref}
-                    className="group flex min-h-[64px] items-center gap-2 overflow-hidden px-2 py-2 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 sm:gap-3 sm:px-3"
-                  >
-                    <span className="w-7 shrink-0 text-center text-sm tabular-nums text-muted-foreground sm:w-9">
-                      {item.position + 1}
-                    </span>
-                    <span className="flex min-w-0 flex-1 flex-col gap-1">
-                      <span className="flex min-w-0 items-center gap-2">
-                        <span className="truncate text-sm font-medium text-foreground group-hover:text-primary">
-                          {item.title}
-                        </span>
-                        <Badge variant="outline" className="hidden sm:inline-flex">
-                          {TYPE_LABEL[item.questionType] ?? item.questionType}
-                        </Badge>
-                      </span>
-                      <span className="flex min-w-0 items-center gap-1 overflow-hidden">
-                        {item.tags.slice(0, 3).map((tag, index) => (
-                          <Badge
-                            key={tag}
-                            variant="secondary"
-                            className={cn(
-                              'min-w-0 max-w-full',
-                              index === 0 && 'shrink',
-                              index > 0 && 'hidden sm:inline-flex',
-                            )}
-                          >
-                            <span className="truncate">{tag}</span>
-                          </Badge>
-                        ))}
-                        {item.tags.length > 1 && (
-                          <span className="shrink-0 text-xs text-muted-foreground sm:hidden">
-                            +{item.tags.length - 1}
-                          </span>
-                        )}
-                        {item.tags.length > 3 && (
-                          <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">
-                            +{item.tags.length - 3}
-                          </span>
-                        )}
-                      </span>
-                    </span>
-                    <Badge
-                      variant={item.attemptCount > 0 ? 'statusSuccess' : 'outline'}
-                      className="max-w-[64px] sm:hidden"
-                      aria-label={item.attemptCount > 0
-                        ? `ตอบแล้ว ${item.attemptCount.toLocaleString('th-TH')} ครั้ง`
-                        : 'ยังไม่เคยตอบ'}
-                    >
-                      <span className="truncate">
-                        {item.attemptCount > 0
-                          ? `×${item.attemptCount.toLocaleString('th-TH')}`
-                          : 'ใหม่'}
-                      </span>
-                    </Badge>
-                    <Badge
-                      variant={item.attemptCount > 0 ? 'statusSuccess' : 'outline'}
-                      className="hidden sm:inline-flex"
-                    >
-                      {item.attemptCount > 0 ? `ตอบแล้ว ${item.attemptCount} ครั้ง` : 'ยังไม่เคยตอบ'}
-                    </Badge>
-                    <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                  </Link>
-                </li>
-              )
-            })}
+          <ol className="flex flex-col gap-3" aria-label="รายการโจทย์ในคลังฝึก">
+            {items.map(item => <li key={item.id} id={`practice-question-${item.id}`} className="scroll-mt-20">
+              <PracticeQuestionCard item={item} href={questionHrefBuilder(library.id, item.id, state)}
+                selected={selected[item.id] !== undefined} onSelect={checked => choose(item, checked)}
+                pinned={pins.has(item.id)} onTogglePin={() => togglePin(item.id)} pinDisabled={!pinsReady || pinPending}
+                selectionDisabled={!exercisesReady || pending || (selectedIds.length >= PRACTICE_EXERCISE_MAX_QUESTIONS && selected[item.id] === undefined)} />
+            </li>)}
           </ol>
         )}
-      </Card>
+      </SolutionLoaderProvider>
+
+      {confirmation}
 
       {totalPages > 1 && (
         <nav className="flex items-center justify-center gap-1 sm:gap-2" aria-label="หน้ารายการโจทย์">
@@ -277,7 +469,7 @@ export function PracticeLibraryView({
             className="min-h-[44px]"
             disabled={state.page <= 1}
             render={state.page > 1
-              ? <Link href={buildPracticeSearchHref(library.id, state, { page: state.page - 1 })} />
+              ? <Link href={libraryHrefBuilder(library.id, state, { page: state.page - 1 })} />
               : undefined}
           >
             <ChevronLeft data-icon="inline-start" aria-hidden="true" />
@@ -292,7 +484,7 @@ export function PracticeLibraryView({
             className="min-h-[44px]"
             disabled={state.page >= totalPages}
             render={state.page < totalPages
-              ? <Link href={buildPracticeSearchHref(library.id, state, { page: state.page + 1 })} />
+              ? <Link href={libraryHrefBuilder(library.id, state, { page: state.page + 1 })} />
               : undefined}
           >
             ถัดไป

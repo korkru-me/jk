@@ -1,5 +1,17 @@
 # Security และ privacy guardrails
 
+## Prepared personal exercise update and pin authorization
+
+Update and pin actions reverify session, exact library/roster and signed access-code session. SQL rechecks those resource relations, exact exercise owner and all selected memberships. Updates serialize with FOR UPDATE and revision checks; stale payloads receive PT409 and are not written. Pins are private per actor/library/question, with no browser table or execute grants. Pinned search uses literal term matching and exact tag AND semantics with 24-row bounds. Local QA uses synthetic browser storage and PGlite only; no live schema or student data was changed.
+
+
+## Prepared student personal exercise access boundary
+
+The access assertion helper alone is service-only SECURITY DEFINER with an empty search_path, to share-lock protected library/roster rows without expanding direct UPDATE grants. Main creation/list/page RPCs remain SECURITY INVOKER.
+
+The server derives actor from a verified session and checks the signed library access-code session before service-only invoker RPCs. SQL rechecks active student, exact current roster, published library, active subject classroom and matching organization, holding share locks during creation. New table enables RLS and revokes PUBLIC/anon/authenticated privileges. RPC execution is service-only. Members are bounded, unique and belong to the exact library. A request UUID retries the same creation; conflicting owner/library/title/membership is rejected. Progress never stores or returns answers or correctness. Attached-solution reads require exact question membership and the library reveal setting.
+
+
 ## Pending classroom announcement acknowledgements
 
 The prepared acknowledgement migration uses service-only SECURITY INVOKER functions with `search_path = ''`; new tables enable RLS and revoke direct PUBLIC/anon/authenticated access. Server actions derive actor IDs from verified sessions and RPCs repeat student roster or owner/co-teacher admin/manage authorization against the exact post/classroom. The same post row lock serializes acknowledgement/resend; stale rounds fail, and no peer receipt identifiers enter student payloads. Automatic sighting data is not represented as explicit acknowledgement. This schema is not applied and its server flag defaults off; hosted Auth/Data API/cross-org and separate-connection race verification remain required after migration history is reconciled.

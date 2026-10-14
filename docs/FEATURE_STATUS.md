@@ -1,5 +1,38 @@
 # Feature status
 
+### รวมหน้าคลังฝึกนักเรียนเข้าพอร์ต 3000 — 14 ตุลาคม 2026 (local only)
+
+- แก้สาเหตุที่ผู้ใช้ยังเห็นแถวโจทย์เดิม: `localhost:3000` รัน `/Users/korkusonmasaen/Korkru/korkru` แต่การเปลี่ยนก่อนหน้านี้อยู่ worktree `korkru-student-practice-exercises` และ preview พอร์ต 3021; รอบนี้รวมการ์ด การเลือกหลายข้อ แบบฝึกหัดพร้อมความคืบหน้า การแก้ชื่อ/เพิ่ม–เอาออก และปักหมุดเข้า route จริง `/practice/[id]/library` ใน checkout ที่รัน 3000
+- ขณะ `next dev` เท่านั้น route ใช้ `PracticeLocalLibraryView`: ชื่อชุด/ID โจทย์/revision/หมุดอยู่ localStorage แยกตามบัญชีและคลัง ไม่มีการเรียก mutation ของชุด/หมุดบนฐานข้อมูล; อ่านเฉพาะ metadata โจทย์ที่ server ตรวจสิทธิ์และ access session แล้ว ความคืบหน้านับจาก attempt count เดิม ไม่มีข้อมูลคำตอบหรือคะแนนใน storage และมีข้อความบอกชัดว่าข้อมูลยังไม่ซิงก์ข้ามอุปกรณ์
+- Production build ไม่เปิด adapter นี้ การบันทึกข้ามอุปกรณ์ยังต้อง apply migrations และทดสอบ Staging ตามขั้นตอนเดิม; migration ledger ที่คืน remote-only มาใน worktree ถูกนำเข้า checkout นี้ด้วย ไม่มี history repair, schema apply, push หรือ deploy ในรอบนี้ ตามคำสั่งล่าสุดของเจ้าของ
+- ผ่าน TypeScript, semantic token lint, 259 test files / 3,344 tests และ production webpack build แยก cache; Next MCP ยืนยัน project path ของ 3000 ตรง checkout นี้ และไม่มี compilation/runtime errors. Browser fixture `?view=local-student` ใช้ adapter และ component เดียวกับ route จริง ตรวจสร้าง/แก้ชื่อ/เพิ่ม–เอาออก/คงหลัง reload/กรองและเอาหมุดออก/เฉลยแนบ/ลำดับสมาชิกผ่าน
+- ไม่อ้างว่า hosted Staging/Auth-to-DB persistence ผ่านแล้ว: ไม่ทำ QA writes บน Production และ browser session ที่ตรวจ route จริงรอบนี้เป็นแอดมินซึ่งถูกปฏิเสธด้วย 404 ตามสิทธิ์ จึงยังไม่ได้ตรวจรายการ 143 ข้อด้วยบัญชีนักเรียนใน browser session นี้ รายละเอียดส่งต่ออยู่ `docs/STUDENT_PRACTICE_LOCAL_INTEGRATION.md`
+
+
+## แก้แบบฝึกหัดส่วนตัวและปักโจทย์ไว้ทบทวน — 14 ตุลาคม 2026 (local review)
+
+- เจ้าของเปลี่ยนคำสั่งเป็น commit ในเครื่องและเปิดเว็บโลคอลก่อน จึงพัก hosted Staging UAT, schema application และ Production release; ไม่มี push/deploy หรือ database mutation ในรอบนี้
+- เพิ่มแก้ชื่อและเพิ่ม/เอาโจทย์ออกจากชุดเดิมผ่าน inline editor โดยใช้ selection ข้ามหน้า/ค้นหาและรายการสมาชิกที่เอาออกได้โดยตรง ร่างชื่อและรายการคงหลัง reload; ยกเลิกหรือเปลี่ยนไปแก้ชุดอื่นต้องยืนยันเมื่อมีร่าง
+- เพิ่มปักโจทย์รายข้อและดูเฉพาะที่ปักไว้ ปักหมุดเป็นส่วนตัวแยก actor/library/question ไม่มีผลกับประวัติการตอบหรือความคืบหน้าเดิม การเอาข้อออกจากชุดเปลี่ยนเฉพาะ denominator และ count ที่คำนวณ ไม่ลบ accepted checks
+- update RPC ล็อกแถวชุด ตรวจ owner/library/membership และ expected revision เพื่อกันการแก้ทับจากสองหน้าต่าง Retry payload เดิมไม่เพิ่ม revision; pin RPC ใช้ target boolean เพื่อให้ retry เป็น idempotent ทุก RPC service-only และตรวจ active roster/published library ซ้ำ
+- คืน `20261014072745_attempt_expiry_finalization.sql` จาก `supabase migration fetch` ใน temp directory หลังเทียบ SQL statements กับ committed source แล้วตรงกัน SHA-256 ของไฟล์ที่คืนคือ `f0066cc0966ed97714bac32e5f7383c6d67be569d8357378b5dbd565f523bb0b` ตรวจ history อ่านอย่างเดียวแล้วไม่มี remote-only เหลือ local-only ที่ตั้งใจยังไม่ apply: `20261014125654`, `20261014134748`, `20261014144828`
+- ห้องทดลองโลคอล `/exam-screen-lab/practice-library?view=student` ใช้ component จริงและ callbacks จำลอง เก็บชุด/ปักหมุดสังเคราะห์ใน localStorage ของ browser เพื่อ review หลัง refresh ได้ โดยไม่ใช้ฐานข้อมูล; ปุ่มดูตัวอย่างและลิงก์ชุดยังอยู่ในห้องทดลอง
+- TypeScript, token lint, full suite 258 files / 3,332 tests, production build และ Next MCP ผ่าน Browser local ตรวจแก้ชื่อ/add/remove, draft หลัง reload, save, pin/unpin/filter, และ 320px ไม่มี horizontal overflow; hosted Auth/Data API/server-action persistence และ separate-connection concurrency tests ยังไม่ได้ทำตามคำสั่งพัก release
+
+
+## Student practice cards and personal exercises - 14 October 2026 (source ready, not deployed)
+
+The access assertion helper alone is service-only SECURITY DEFINER with an empty search_path, to share-lock protected library/roster rows without expanding direct UPDATE grants. Main creation/list/page RPCs remain SECURITY INVOKER.
+
+- Student question list now uses cards matching the home page, with difficulty/type/subject/tags/stem excerpt and attempt count. Only preview (the existing practice question route) and explicitly attached solutions are available; solutions respect the library reveal setting. Teacher mutations are absent.
+- Students select multiple questions, including all on a page, retain selection across pagination/search in actor/library-scoped sessionStorage, name a personal exercise (1-120 characters), and save up to 500 unique library members atomically with idempotent request UUIDs.
+- Personal exercise cards appear above questions; opening a card filters to its ordered members with bounded pagination. Progress counts distinct questions checked at least once, including checks before grouping. It does not represent correctness or grades.
+- New service-only SECURITY INVOKER RPCs repeat active student/roster/exact published library/active subject classroom/org authorization; the server also verifies the signed access-code session. New table has RLS enabled and browser grants revoked. Classmates and teachers have no personal-exercise API access.
+- Validation: npx tsc --noEmit, lint:tokens, 258 test files / 3,322 tests, isolated production build, Next MCP compilation/runtime checks all passed. Browser synthetic QA verified bulk selection, naming/create, distinct progress display, selection after reload, attached solution with nested dismissal confirmation and restored focus, and 320px layout without horizontal overflow. Card-scoped WCAG A/AA audit has zero violations. Hosted Auth/Data API, actual server action persistence and separate-connection race tests remain unverified because schema was not applied.
+- Synthetic UI lab: /exam-screen-lab/practice-library?view=student; no database reads/writes.
+- Migration 20261014134748_student_practice_exercises.sql is prepared but NOT applied. Pre-change supabase migration list --linked against verified Staging dyuxkrzeveknqgtuzpbh found remote-only 20261014072745 and local-only 20261014125654. No schema push or ledger repair was attempted. Reconcile history before deployment; the existing library list still works without the new schema while group creation reports unavailable.
+
+
 ### รายการงานครูรวมคลังฝึกและกรอบงานที่เพิ่งมอบหมาย — 14 ตุลาคม 2026 (local source/preview)
 
 - ข้อความรองเหลือ “สร้างสำเร็จแล้ว” งานแต่ละรายการมีกรอบ Card แยกและไม่มีลูกศรด้านขวา กดได้ทั้งกรอบพร้อม focus ring สำหรับคีย์บอร์ด; คงการแสดงตามเวลาสร้างภายใน 72 ชั่วโมงและลิงก์เดิม

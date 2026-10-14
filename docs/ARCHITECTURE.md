@@ -1,5 +1,23 @@
 # Architecture
 
+### ตรวจชุดฝึกส่วนตัวใน checkout ที่รัน localhost — 14 ตุลาคม 2026
+
+`/practice/[id]/library` ใช้ `isLocalPracticeReviewEnabled` เฉพาะ `NODE_ENV=development` เพื่อให้ตรวจ UI ใน checkout หลักได้ก่อนลง schema ใหม่ `loadPracticeLibraryLocalSnapshot` เรียก RPC ค้นหาเดิมเป็นหน้า 24 ข้อใน batch ที่จำกัด ตรวจ actor/library/access session เดิม และส่งเฉพาะ display DTO ไม่มี answer key/solution payload ในรายการ ทั้ง snapshot รวมและ search matching IDs ช่วยให้เลือก/กรองหมุดข้ามหน้าได้โดยไม่ต้องเรียก RPC ของ schema ที่ยังไม่ apply
+
+`PracticeLocalLibraryView` ใช้ localStorage แยก user/library เก็บเฉพาะชื่อ/สมาชิก/revision/หมุด ใช้ strict schema และสมาชิกจาก snapshot ที่ตรวจสิทธิ์แล้ว; desired pin state/idempotent retry และ expected revision ป้องกันการทับร่างจากอีกแท็บเมื่อ storage ล่าสุดต่างกัน นับความคืบหน้าจาก metadata ปัจจุบัน, กรองร่วมกับคำค้น/แท็ก, คงลำดับในชุด และไม่เรียก server mutation ของชุด/หมุดใน dev mode ข้อมูล browser ไม่มีการย้ายไป cloud อัตโนมัติและแสดงข้อจำกัดนี้ใน UI. `NODE_ENV=production` ยังคง server/RPC path ที่ต้องผ่าน Staging integration ก่อนเผยแพร่
+
+## Local-first personal exercise editing and pins
+
+PracticeLibraryView persists edit draft identity/revision/title and selected questions in actor/library-scoped sessionStorage. It invokes separate create/update/pin actions; the server remains the authority for owner/membership/revision checks. The list DTO supplies member titles so removal works beyond the current page. The review URL flag persists through search, pagination and question return links and selects its own bounded RPC. The synthetic lab overrides actions and URL builders, persists only labelled sample groups/pins in browser localStorage, and stays isolated from Auth and database writes. Hosted rollout is deferred by the owner.
+
+
+## Student personal practice exercise boundary (prepared 14 October 2026)
+
+The access assertion helper alone is service-only SECURITY DEFINER with an empty search_path, to share-lock protected library/roster rows without expanding direct UPDATE grants. Main creation/list/page RPCs remain SECURITY INVOKER.
+
+PracticeLibraryView owns browser selection and an inline naming form over allowlisted question metadata. PracticeQuestionCard exposes student actions separately from teacher QuestionCard. Temporary selections are scoped to actor/library in sessionStorage; durable groups go through lib/actions/practice-exercises.ts, verified Auth/library/code sessions, and service-only invoker RPCs. loadPracticeExercises validates its allowlisted DTO. The optional exercise URL UUID selects the owned, paginated group-read RPC instead of global library search; question return links retain the group. SolutionLoaderProvider uses a student action that verifies exact question membership and reveal settings before returning only attached solution columns. No grading or persistent answer storage changes.
+
+
 อัปเดตล่าสุด: 12 ตุลาคม 2026
 
 เอกสารนี้อธิบายสถาปัตยกรรมที่พบใน repository ปัจจุบัน ไม่ใช่การรับรองว่าทุกส่วนถูก deploy หรือผ่านการทดสอบ production แล้ว
