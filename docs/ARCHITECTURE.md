@@ -347,3 +347,9 @@ npm run build
 - Subject classrooms derive CalendarEvent rows from the already authorized StudentAssignmentRow list through classroomCalendarEvents. The existing isCompleted gate drives both cards and their calendar; no cross-subject query is added to this path. Both subject and homeroom use the learning-stage sticky layout.
 - Student homeroom replaces the teacher aggregate/highest-score reduction with loadStudentLearningCalendar after verified Auth and exact room membership. Owner-scoped paginated memberships/submissions plus published enrolled-room links and groupOf feed the same buildStudentLearningData projection as the dashboard. Only calendar DTOs are returned; teacher homeroom aggregation is unchanged.
 - studentWorkSeverity shares the 48-hour deadline scale between calendar dots and card stripes. orderStudentClassroomWork stably partitions completed rows and whole completed groups, deciding group completion from the unfiltered list. Visibility/retry/scoring rules remain unchanged. See STUDENT_CLASSROOM_CALENDAR.md.
+
+## การเลื่อน shell ระหว่างทำข้อสอบ — 14 ตุลาคม 2026
+
+`useAppViewport` รักษาเอกสารไว้ที่จุดเริ่มต้นทั้งจาก visual viewport events และ window scroll ซึ่ง Chrome desktop อาจสร้างเมื่อโฟกัส input หรือใช้ scrollIntoView โดยไม่ส่ง visualViewport.scroll; main/คอลัมน์โจทย์ยังเลื่อนภายใน และ appShellHeight ยังไม่บังคับตำแหน่งระหว่าง pinch zoom MCQ radio อยู่ในแถวจริงเพื่อไม่ให้ตำแหน่งของ input ที่ซ่อนทำเอกสารหลุดจอ
+
+`ExamQuestionFrame` จัดหนึ่งพื้นผิวต่อข้อและใช้ container width เลือกการวางรูปข้างคำตอบ; `ExamQuestionNavigation` แยกสีคำตอบ ขอบข้อปัจจุบัน และไอคอนธง ทั้งสองเป็น presentation เท่านั้น ไม่เปลี่ยนคำตอบที่ serialize, autosave, authorization หรือ grading

@@ -35,7 +35,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import {
-  Flag, Eye, EyeOff, Maximize2, Minimize2, CheckCircle2, XCircle, Clock, AlertTriangle,
+  Eye, EyeOff, Maximize2, Minimize2, CheckCircle2, XCircle, Clock, AlertTriangle,
   Wifi, WifiOff, ShieldAlert, Maximize, MonitorSmartphone, CircleCheck, RotateCcw,
   Pencil, Calculator as CalculatorIcon, NotebookPen, Loader2, Paperclip, Trash2, ListChecks, X,
 } from 'lucide-react'
@@ -65,6 +65,9 @@ import type {
 } from '@/lib/exam-safe'
 import { Card } from '@/components/ui/card'
 import { ExamToolbarDock } from './exam-toolbar-dock'
+import { ExamQuestionFrame, ExamQuestionFlag } from './exam-question-frame'
+import { ExamQuestionNavigation, ExamQuestionNavigationLegend } from './exam-question-navigation'
+import { FieldSet, FieldLegend } from '@/components/ui/field'
 import { Textarea } from '@/components/ui/textarea'
 import { NativeSelect } from '@/components/ui/native-select'
 import { ExamWatermark } from './exam-watermark'
@@ -1181,73 +1184,23 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   const timerDanger   = secondsLeft !== null && secondsLeft < 60
   const showingSolution = previewResult !== null || Object.values(checked).some(feedback => feedback.revealed)
 
-  const navigationLegendItems = [
-    { cls: 'bg-primary', label: 'ข้อปัจจุบัน' },
-    { cls: 'border border-success/20 bg-success/10 dark:bg-success/15', label: 'ตอบแล้ว' },
-    ...(instantCheckOn ? [
-      { cls: 'bg-success', label: 'ตรวจแล้ว ถูก' },
-      { cls: 'border border-destructive/30 bg-destructive/15', label: 'ตรวจแล้ว ยังไม่ถูก' },
-    ] : []),
-    { cls: 'bg-flag', label: 'ปักธง' },
-    { cls: 'border border-border bg-muted', label: 'ยังไม่ตอบ' },
-  ]
+  const renderQuestionNavigationLegend = () => <ExamQuestionNavigationLegend instantCheck={instantCheckOn} />
 
-  const renderQuestionNavigationLegend = () => (
-    <div className="grid shrink-0 grid-cols-2 gap-x-3 gap-y-1.5">
-      {navigationLegendItems.map(item => (
-        <div key={item.label} className="flex min-w-0 items-center gap-2">
-          <div className={cn('h-3 w-3 shrink-0 rounded-sm', item.cls)} />
-          <span className="truncate text-[10px] text-muted-foreground">{item.label}</span>
-        </div>
-      ))}
-    </div>
+  const renderQuestionNavigation = (touchFriendly = false) => (
+    <ExamQuestionNavigation
+      touchFriendly={touchFriendly}
+      items={answers.map((answer, index) => ({
+        current: index >= pageStart && index < pageStart + perPage,
+        answered: hasAnswered(answer.id),
+        flagged: flagged.has(answer.id),
+        verdict: checked[answer.id]?.verdict,
+      }))}
+      onNavigate={index => {
+        navigateTo(index)
+        if (touchFriendly) setShowQuestionNavigator(false)
+      }}
+    />
   )
-
-  const renderQuestionNavigation = (touchFriendly = false) => {
-    const compactNumbers = !touchFriendly && answers.length > 12
-    return (
-      <div className={cn(
-        'grid gap-1.5 pointer-coarse:grid-cols-4',
-        touchFriendly || compactNumbers ? 'grid-cols-5' : 'grid-cols-4',
-      )}>
-        {answers.map((answer, i) => {
-          const isCurrent = i >= pageStart && i < pageStart + perPage
-          const isAnswered = hasAnswered(answer.id)
-          const isFlagged = flagged.has(answer.id)
-          const verdict = checked[answer.id]?.verdict
-          let tone = 'border border-border/60 bg-muted/50 text-foreground/75 hover:bg-muted'
-          if (isCurrent) tone = 'border border-primary bg-primary text-primary-foreground ring-2 ring-primary/15 hover:bg-primary/90'
-          else if (isFlagged) tone = 'border border-flag bg-flag text-flag-foreground hover:bg-flag/90'
-          else if (verdict === 'correct') tone = 'bg-success text-success-foreground'
-          else if (verdict === 'wrong' || verdict === 'partial') tone = 'border border-destructive/30 bg-destructive/15 text-destructive'
-          else if (isAnswered) tone = 'border border-success/25 bg-success/10 text-[color-mix(in_oklab,var(--success)_60%,var(--foreground))] hover:bg-success/15'
-
-          return (
-            <Button
-              key={answer.id}
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => {
-                navigateTo(i)
-                if (touchFriendly) setShowQuestionNavigator(false)
-              }}
-              aria-label={`ไปข้อ ${i + 1}${isCurrent ? ' · ข้อปัจจุบัน' : ''}${isAnswered ? ' · ตอบแล้ว' : ' · ยังไม่ตอบ'}${isFlagged ? ' · ปักธง' : ''}`}
-              aria-current={isCurrent ? 'page' : undefined}
-              className={cn(
-                'relative w-full rounded-lg font-semibold tabular-nums transition-colors motion-reduce:transition-none',
-                touchFriendly ? 'h-11 text-sm' : 'h-9 text-xs pointer-coarse:h-11',
-                tone,
-              )}
-            >
-              {i + 1}
-              {isFlagged && <Flag className="absolute right-0.5 top-0.5 size-2" aria-hidden="true" />}
-            </Button>
-          )
-        })}
-      </div>
-    )
-  }
 
   // The teacher chooses how many questions share a screen. `currentIndex`
   // stays a question index rather than becoming a page number: the นำทาง grid
@@ -1347,8 +1300,12 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
           const mainInlineBlank = current.questions.question_type === 'written'
             && countAnswerBlanks(currentQuestionText) > 0
 
+          const hasIllustration = (current.questions.image_urls?.length ?? 0) > 0
+            || (current.questions.question_type === 'file_upload'
+              && ((current.questions.extra_data as FileUploadConfig | null)?.attachment_urls?.length ?? 0) > 0)
+
           return (
-            <div
+            <ExamQuestionFrame
               key={current.id}
               id={`exam-q-${questionIndex}`}
               role="region"
@@ -1356,117 +1313,125 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
               aria-busy={checkingId === current.id}
               inert={checkingId === current.id ? true : undefined}
               tabIndex={-1}
-              className={cn('flex flex-col gap-3 rounded-2xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
-                focusMode ? 'scroll-mt-2' : 'scroll-mt-[calc(var(--exam-toolbar-height,3.25rem)+var(--exam-toolbar-scroll-inset,0px)+0.75rem)]')}
-            >
-            {/* Question card */}
-            <Card padding="lg" className="space-y-4">
-              <div className="flex items-center gap-2 flex-wrap">
-                {/* "ข้อ 3 / 5" would be a lie in a streak run: answers.length
-                    is only what has been handed out so far, and the งาน's
-                    length is not known to anybody yet. */}
-                <Badge variant="outline" className="font-mono text-xs">
-                  {streakOn ? `ข้อที่ ${questionIndex + 1}` : `ข้อ ${questionIndex + 1} / ${answers.length}`}
-                </Badge>
-                {sectionOwner.get(current.question_id)?.title && (
-                  <Badge variant="outline" className="text-xs">{sectionOwner.get(current.question_id)!.title}</Badge>
-                )}
-                {current.questions.question_type === 'mcq' && (
-                  <Badge variant="outline" className="text-xs">ปรนัย</Badge>
-                )}
-                {isFlagged && (
-                  <Badge className="text-xs bg-flag/15 text-flag dark:text-flag border-flag/30">
-                    🚩 ปักธงไว้
+              className={focusMode ? 'scroll-mt-2' : 'scroll-mt-[calc(var(--exam-toolbar-height,3.25rem)+var(--exam-toolbar-scroll-inset,0px)+0.5rem)]'}
+              header={
+                <>
+                  {/* "ข้อ 3 / 5" would be a lie in a streak run: answers.length
+                      is only what has been handed out so far, and the งาน's
+                      length is not known to anybody yet. */}
+                  <Badge variant="outline" className="font-mono text-xs">
+                    {streakOn ? `ข้อที่ ${questionIndex + 1}` : `ข้อ ${questionIndex + 1} / ${answers.length}`}
                   </Badge>
-                )}
-                <div className="ml-auto flex items-center gap-2">
-                  {/* Teacher-only, and the reason the preview is worth opening
-                      at all: a typo in a โจทย์ is easiest to see in the layout
-                      the student gets. Opens in a new tab so the preview — and
-                      whatever has been typed into it — is still there to come
-                      back to. */}
-                  {previewMode && current.canEditQuestion && (
-                    <a
-                      href={`/questions/${current.question_id}/edit`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border border-border text-muted-foreground transition-all hover:border-primary hover:text-primary"
-                    >
-                      <Pencil size={11} />
-                      แก้ไขโจทย์
-                    </a>
+                  {sectionOwner.get(current.question_id)?.title && (
+                    <Badge variant="outline" className="text-xs">{sectionOwner.get(current.question_id)!.title}</Badge>
                   )}
-                  {/* A flag marks a ข้อ to come back to. In a streak run the
-                      verdict is already counted and there is no coming back,
-                      so the button would only ever mislead. */}
-                  {!streakOn && (
-                  <button
-                    onClick={() => toggleFlag(current.id)}
-                    className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border transition-all ${
-                      isFlagged
-                        ? 'bg-flag/15 border-flag/30 text-flag dark:text-flag'
-                        : 'border-border text-muted-foreground hover:border-flag hover:text-flag'
-                    }`}
-                  >
-                    <Flag size={11} className={isFlagged ? 'fill-flag' : ''} />
-                    {isFlagged ? 'ยกเลิกธง' : 'ปักธง'}
-                  </button>
+                  {current.questions.question_type === 'mcq' && (
+                    <Badge variant="outline" className="text-xs">ปรนัย</Badge>
                   )}
-                </div>
-              </div>
-
-              {/* The lead-in of a ถูก-ผิด โจทย์ governs every statement under it,
-                  so it is read first — and it is not one of the things being
-                  judged, which is why it is not in `question_text`. */}
-              {current.questions.question_type === 'true_false'
-                && (current.questions.extra_data as TrueFalseConfig | SafeTrueFalseConfig | null)?.prompt && (
-                <QuestionText
-                  text={(current.questions.extra_data as TrueFalseConfig | SafeTrueFalseConfig).prompt as string}
-                />
-              )}
-
-              {current.questions.question_type !== 'fill_blank' && !mainInlineBlank && (
-                <QuestionText text={currentQuestionText} />
-              )}
-
-              {(current.questions.image_urls ?? []).length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {(current.questions.image_urls ?? []).map(url => (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img key={url} src={url} alt="รูปประกอบ" className="max-h-52 rounded-xl border object-contain" />
-                  ))}
-                </div>
-              )}
-
-              {current.questions.question_type === 'file_upload' && (
-                ((current.questions.extra_data as FileUploadConfig | null)?.attachment_urls ?? []).length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {((current.questions.extra_data as FileUploadConfig).attachment_urls ?? []).map(url => (
-                      /\.pdf(\?|$)/i.test(url) ? (
-                        <a key={url} href={url} target="_blank" rel="noopener noreferrer"
-                          className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl border bg-muted/40 hover:bg-muted transition-colors">
-                          📄 <span className="truncate max-w-[140px]">{decodeURIComponent(url.split('/').pop() ?? 'PDF')}</span>
-                        </a>
-                      ) : (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img key={url} src={url} alt="ไฟล์อ้างอิงโจทย์" className="max-h-52 rounded-xl border object-contain" />
-                      )
-                    ))}
+                  {isFlagged && (
+                    <Badge className="text-xs bg-flag/15 text-flag dark:text-flag border-flag/30">
+                      🚩 ปักธงไว้
+                    </Badge>
+                  )}
+                  <div className="ml-auto flex items-center gap-2">
+                    {/* Teacher-only, and the reason the preview is worth opening
+                        at all: a typo in a โจทย์ is easiest to see in the layout
+                        the student gets. Opens in a new tab so the preview — and
+                        whatever has been typed into it — is still there to come
+                        back to. */}
+                    {previewMode && current.canEditQuestion && (
+                      <a
+                        href={`/questions/${current.question_id}/edit`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border border-border text-muted-foreground transition-all hover:border-primary hover:text-primary"
+                      >
+                        <Pencil size={11} />
+                        แก้ไขโจทย์
+                      </a>
+                    )}
+                    {/* A flag marks a ข้อ to come back to. In a streak run the
+                        verdict is already counted and there is no coming back,
+                        so the button would only ever mislead. */}
+                    {!streakOn && (
+                      <ExamQuestionFlag flagged={isFlagged} onToggle={() => toggleFlag(current.id)} />
+                    )}
                   </div>
-                )
+                </>
+              }
+              stem={
+                <>
+                  {/* The lead-in of a ถูก-ผิด โจทย์ governs every statement under it,
+                      so it is read first — and it is not one of the things being
+                      judged, which is why it is not in `question_text`. */}
+                  {current.questions.question_type === 'true_false'
+                    && (current.questions.extra_data as TrueFalseConfig | SafeTrueFalseConfig | null)?.prompt && (
+                    <QuestionText
+                      text={(current.questions.extra_data as TrueFalseConfig | SafeTrueFalseConfig).prompt as string}
+                    />
+                  )}
+
+                  {current.questions.question_type !== 'fill_blank' && !mainInlineBlank
+                    && !(current.questions.question_type === 'true_false' && (
+                      ((current.questions.extra_data as SafeTrueFalseConfig | null)?.statements?.length ?? 0) > 0
+                      || (current.questions.extra_data as SafeTrueFalseConfig | null)?.answer_mode === 'select_matching'
+                    )) && (
+                    <QuestionText text={currentQuestionText} />
+                  )}
+                </>
+              }
+              illustration={hasIllustration && (
+                <>
+                  {(current.questions.image_urls ?? []).length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {(current.questions.image_urls ?? []).map(url => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img key={url} src={url} alt="รูปประกอบ" className="max-h-44 max-w-full rounded-md object-contain sm:max-h-48" />
+                      ))}
+                    </div>
+                  )}
+
+                  {current.questions.question_type === 'file_upload' && (
+                    ((current.questions.extra_data as FileUploadConfig | null)?.attachment_urls ?? []).length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {((current.questions.extra_data as FileUploadConfig).attachment_urls ?? []).map(url => (
+                          /\.pdf(\?|$)/i.test(url) ? (
+                            <a key={url} href={url} target="_blank" rel="noopener noreferrer"
+                              className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl border bg-muted/40 hover:bg-muted transition-colors">
+                              📄 <span className="truncate max-w-[140px]">{decodeURIComponent(url.split('/').pop() ?? 'PDF')}</span>
+                            </a>
+                          ) : (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img key={url} src={url} alt="ไฟล์อ้างอิงโจทย์" className="max-h-44 max-w-full rounded-md object-contain sm:max-h-48" />
+                          )
+                        ))}
+                      </div>
+                    )
+                  )}
+                </>
               )}
+              sideBySide={hasIllustration && current.questions.question_type === 'mcq'}
+              feedback={
+                <>
+                  {/* ตรวจคำตอบข้อนี้ — แบบฝึกหัดเท่านั้น */}
+                  {instantCheckOn && isInstantCheckable(current.questions.question_type) && (
+                    <InstantCheckPanel
+                      feedback={checked[current.id] ?? null}
+                      busy={checkingId === current.id}
+                      disabled={checkingId !== null && checkingId !== current.id}
+                      answered={hasAnswered(current.id)}
+                      onCheck={() => handleCheck(current.id)}
+                      onRetry={() => void handleRetry(current)}
+                      allowRetry={!streakOn}
+                      checkHint={streakOn
+                        ? 'ตรวจได้ครั้งเดียว ผลนับเข้าจำนวนข้อที่ถูกติดต่อกันทันที'
+                        : undefined}
+                    />
+                  )}
+                </>
+              }
+            >
 
-              {/* No "ค่าที่กำหนด" readout while sitting the exam. Every {name} in the
-                  question text is already replaced with the value this student drew,
-                  so the panel restated the same numbers underneath the question.
-                  Note this leaves a variable that the question text never mentions
-                  with nowhere to appear — write such a value into the text itself.
-                  The submission review still lists them, where a teacher marking an
-                  attempt has to see what that student was given. */}
-            </Card>
-
-            {/* Answer inputs */}
-            <Card padding="lg">
               {current.questions.question_type === 'matching' && current.questions.mcq_options ? (
                 <MatchingAnswerInput
                   prompts={current.questions.mcq_options}
@@ -1568,25 +1533,8 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                   localOnly={previewMode}
                 />
               )}
-            </Card>
 
-            {/* ตรวจคำตอบข้อนี้ — แบบฝึกหัดเท่านั้น */}
-            {instantCheckOn && isInstantCheckable(current.questions.question_type) && (
-              <InstantCheckPanel
-                feedback={checked[current.id] ?? null}
-                busy={checkingId === current.id}
-                disabled={checkingId !== null && checkingId !== current.id}
-                answered={hasAnswered(current.id)}
-                onCheck={() => handleCheck(current.id)}
-                onRetry={() => void handleRetry(current)}
-                allowRetry={!streakOn}
-                checkHint={streakOn
-                  ? 'ตรวจได้ครั้งเดียว ผลนับเข้าจำนวนข้อที่ถูกติดต่อกันทันที'
-                  : undefined}
-              />
-            )}
-
-            </div>
+            </ExamQuestionFrame>
           )
         })}
 
@@ -1810,7 +1758,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
 
       {/* ── Normal mode ────────────────────────────────────────────────────── */}
       {!focusMode && !previewResult && (
-        <div className="flex min-w-0 flex-col gap-3 [--exam-toolbar-height:3.25rem]" data-exam-normal-stage>
+        <div className="flex min-w-0 flex-col gap-2 [--exam-toolbar-height:3.25rem]" data-exam-normal-stage>
           {previewBanner(true)}
           <ExamToolbarDock>
             <ExamToolbar
@@ -2466,7 +2414,7 @@ function ExamToolbar({
   focusModeButtonRef: RefObject<HTMLButtonElement | null>
 }) {
   return (
-    <Card elevation="sm" radius="md" className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-1.5" data-exam-toolbar>
+    <Card edge="none" radius="sm" className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-2 py-1" data-exam-toolbar>
       {/* Status indicators */}
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
         <AutosaveStatus
@@ -2587,8 +2535,8 @@ function MCQInput({
   onToggleEliminate: (i: number) => void
 }) {
   return (
-    <div className="space-y-2">
-      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3">เลือกคำตอบ</p>
+    <FieldSet className="min-w-0 gap-1.5">
+      <FieldLegend variant="label" className="mb-1 text-xs text-muted-foreground">เลือกคำตอบ</FieldLegend>
       {options.map((opt, i) => {
         const value = mcqValue(opt, i)
         const isSelected  = selected === value
@@ -2596,43 +2544,41 @@ function MCQInput({
         return (
           <div
             key={i}
-            className={`flex items-center gap-2 rounded-xl border-2 transition-all ${
+            className={`flex items-center gap-1 rounded-md border transition-colors ${
               isEliminated
                 ? 'opacity-35 border-dashed border-border'
                 : isSelected
                 ? 'border-primary bg-primary/8 dark:bg-primary/10'
                 : 'border-border hover:border-primary/20 dark:hover:border-primary'
-            } focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50`}
+            } focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/50`}
           >
-            <label className="flex items-center gap-3 p-3 cursor-pointer flex-1 min-w-0">
-              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
-                isSelected ? 'border-primary bg-primary' : 'border-muted-foreground/40'
-              }`}>
-                {isSelected && <div className="w-2 h-2 rounded-full bg-card" />}
-              </div>
-              <span className="font-bold text-sm text-muted-foreground shrink-0 w-5">{CHOICE_LABELS[i]}</span>
-              <div className={`flex-1 min-w-0 flex items-center gap-2 ${isEliminated ? 'line-through text-muted-foreground' : ''}`}>
-                {opt.image_url && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={opt.image_url} alt="" loading="lazy" decoding="async" className="max-h-28 w-auto object-contain rounded border shrink-0" />
-                )}
-                {/* A picture-only option carries the choice letter as its text
-                    (the answer's identity is opt.text, so it can't be blank) —
-                    printing it here would just repeat the label beside it. */}
-                {opt.text !== CHOICE_LABELS[i] && <span className="text-sm min-w-0">{opt.text}</span>}
-              </div>
+            <label className="relative flex min-h-9 min-w-0 flex-1 cursor-pointer items-center gap-2 px-2 py-1.5 pointer-coarse:min-h-11">
               <input
                 type="radio"
-                className="sr-only"
+                className="size-4 shrink-0 accent-primary"
+                disabled={isEliminated}
                 name={`answer-${answerId}`}
                 value={value}
                 checked={isSelected}
                 onChange={() => !isEliminated && onSelect(value)}
               />
+              <span className="font-bold text-sm text-muted-foreground shrink-0 w-5">{CHOICE_LABELS[i]}</span>
+              <div className={`flex-1 min-w-0 flex flex-wrap items-center gap-2 ${isEliminated ? 'line-through text-muted-foreground' : ''}`}>
+                {opt.image_url && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={opt.image_url} alt="" loading="lazy" decoding="async" className="max-h-20 max-w-full w-auto object-contain rounded border shrink-0" />
+                )}
+                {/* A picture-only option carries the choice letter as its text
+                    (the answer's identity is opt.text, so it can't be blank) —
+                    printing it here would just repeat the label beside it. */}
+                {opt.text !== CHOICE_LABELS[i] && <span className="min-w-0 break-words text-sm">{opt.text}</span>}
+              </div>
+
             </label>
             <button
+              type="button"
               onClick={() => onToggleEliminate(i)}
-              className={`p-2 mr-2 rounded-lg transition-all shrink-0 ${
+              className={`p-1.5 mr-1 rounded-md transition-all shrink-0 pointer-coarse:min-h-11 pointer-coarse:min-w-11 ${
                 isEliminated ? 'text-destructive bg-destructive/10' : 'text-muted-foreground hover:text-destructive/80 hover:bg-muted'
               }`}
               title={isEliminated ? 'เรียกคืนตัวเลือก' : 'ตัดทิ้ง'}
@@ -2647,7 +2593,7 @@ function MCQInput({
           <EyeOff size={10} /> ตัดทิ้ง {eliminatedSet.size} ตัวเลือก · กด 👁 เพื่อเรียกคืน
         </p>
       )}
-    </div>
+    </FieldSet>
   )
 }
 
@@ -2712,7 +2658,7 @@ function WorkProofSlot({
   }
 
   return (
-    <div className="mt-2 rounded-xl border border-dashed border-border bg-muted/20 p-3">
+    <div className="mt-1 rounded-md border border-dashed border-border bg-muted/20 p-2">
       <div className="mb-2 flex items-center gap-2">
         <Paperclip className="size-3.5 text-primary" aria-hidden="true" />
         <p className="text-xs font-semibold">วิธีทำ{partCount > 1 ? ` · ${label}` : ''}</p>
@@ -3010,7 +2956,7 @@ function MultiPartAnswerInput({
   try { partValues = JSON.parse(rawValue || '[]') } catch { partValues = [] }
   while (partValues.length < activeParts.length) partValues.push('')
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col gap-2">
       {activeParts.map((part, i) => (
         <div key={part.id} className="space-y-1">
           <label className="text-sm font-medium">
@@ -3082,15 +3028,12 @@ function TrueFalseSelectMatching({ config, subStatements, mode, questionText, ra
   function updateExplanation(exp: string) {
     onChange(JSON.stringify({ answers, explanation: exp }))
   }
-  // ก) is the question's own statement: a multi-statement ถูก-ผิด keeps it in
-  // question_text rather than in `statements`, which start at ข). The exam also
-  // shows question_text above as the stem, so writing it into the list repeats
-  // it — but a row that reads just "ก)" with nothing beside it, between rows
-  // that do have text, reads as a statement that failed to load, and the
-  // student is left to guess that it means the sentence further up the page.
+  // question_text is statement ก), followed by the remaining statements.
+  // The shared prompt is rendered above; each judged statement appears here
+  // once, beside its answer control.
   const items: Array<{ text: string }> = [{ text: questionText }, ...subStatements]
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col gap-2">
       <p className="text-xs text-muted-foreground">{choiceListHint(questionText, target)}</p>
       <div className="space-y-2">
         {items.map((st, i) => (
@@ -3142,15 +3085,15 @@ function TrueFalseAnswerInput({ config, questionText, rawValue, onChange }: {
       mode === 'none' ? onChange(a) : onChange(JSON.stringify({ answer: a, explanation: exp }))
     }
     return (
-      <div className="space-y-3">
+      <div className="flex flex-col gap-2">
         <p className="text-sm font-medium">ข้อความนี้ถูกหรือผิด?</p>
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           {([
             { val: 'true',  label: '✓ ถูก', cls: 'border-success bg-success/10 text-success' },
             { val: 'false', label: '✗ ผิด', cls: 'border-destructive bg-destructive/10 text-destructive' },
           ] as const).map(({ val, label, cls }) => (
             <button key={val} type="button" onClick={() => update(val, explanation)}
-              className={`flex-1 py-3 rounded-xl border-2 font-semibold transition-colors ${
+              className={`min-h-9 flex-1 px-3 py-1.5 rounded-md border text-sm font-semibold pointer-coarse:min-h-11 transition-colors ${
                 tfAnswer === val ? cls : 'border-border text-muted-foreground hover:border-muted-foreground'
               }`}>
               {label}
@@ -3185,21 +3128,21 @@ function TrueFalseAnswerInput({ config, questionText, rawValue, onChange }: {
     onChange(JSON.stringify({ answers, explanation: exp }))
   }
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-2.5">
       <p className="text-sm font-medium">ข้อความแต่ละข้อถูกหรือผิด?</p>
       {([{ text: questionText }, ...subStatements] as Array<{ text: string }>).map((st, i) => (
-        <div key={i} className="space-y-1.5">
+        <div key={i} className="grid items-center gap-1.5 sm:grid-cols-[minmax(0,1fr)_10rem]">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-xs font-bold text-muted-foreground">{labels[i] ?? i + 1})</span>
             {st.text && <RichText text={st.text} className="text-sm" />}
           </div>
-          <div className="flex gap-3">
+          <div className="flex gap-2">
             {([
               { val: 'true',  label: '✓ ถูก', cls: 'border-success bg-success/10 text-success' },
               { val: 'false', label: '✗ ผิด', cls: 'border-destructive bg-destructive/10 text-destructive' },
             ] as const).map(({ val, label, cls }) => (
               <button key={val} type="button" onClick={() => updateAnswer(i, val)}
-                className={`flex-1 py-3 rounded-xl border-2 font-semibold transition-colors ${
+                className={`min-h-9 flex-1 px-3 py-1.5 rounded-md border text-sm font-semibold pointer-coarse:min-h-11 transition-colors ${
                   answers[i] === val ? cls : 'border-border text-muted-foreground hover:border-muted-foreground'
                 }`}>
                 {label}
@@ -3400,9 +3343,9 @@ function CompositeAnswerInput({ config, rawValue, onChange }: {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="flex flex-col gap-2.5">
       {parts.map((part, i) => (
-        <div key={part.id} className="space-y-2 pb-4 border-b last:border-b-0 last:pb-0">
+        <div key={part.id} className="flex flex-col gap-2 pb-2 border-b last:border-b-0 last:pb-0">
           <span className="text-xs font-bold text-muted-foreground">{labels[i] ?? i + 1})</span>
 
           {part.type === 'true_false' && Array.isArray(part.choices) && part.choices.length > 0 && (() => {
@@ -3698,10 +3641,10 @@ function EssayAnswerInput({ rawValue, onChange }: {
       <Textarea
         value={rawValue}
         onChange={event => onChange(event.target.value)}
-        rows={8}
+        rows={5}
         placeholder="พิมพ์คำตอบเป็นข้อความ..."
         aria-label="คำตอบเรียงความ"
-        className="min-h-48 resize-y leading-relaxed"
+        className="min-h-32 resize-y leading-relaxed"
       />
       <p className="text-right text-[10px] text-muted-foreground" aria-live="polite">
         {rawValue.length.toLocaleString('th-TH')} ตัวอักษร
