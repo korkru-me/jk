@@ -13,7 +13,8 @@ import { getHomeroomAggregate } from '@/lib/homeroom-data'
 import { selectOfficialAttempt, rescaleToDisplayMax } from '@/lib/scoring'
 import { isAttemptExpired } from '@/lib/grading'
 import { completionAttemptLimit, findPassingCompletion } from '@/lib/assignment-completion'
-import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
+import { fetchAllRows, fetchRowsInChunks } from '@/lib/supabase/fetch-all-rows'
+import { buildHomeroomClassmates, type HomeroomClassmateUser } from '@/lib/student-homeroom-classmates'
 import type { StudentNoteRow, StudentProfileRow } from './_components/homeroom-overview'
 import type { CalendarEvent } from '@/app/(app)/dashboard/_components/assignment-calendar'
 import { linkReachesGroup, type ClassroomGroup } from '@/lib/classroom-groups'
@@ -69,39 +70,41 @@ export default async function ClassroomDetailPage({
     if (!membership) notFound()
 
     // Homeroom rooms have no assignments of their own — a student sees a
-    // personal calendar/compliance view aggregated from their other
+    // personal calendar aggregated from their other
     // (subject) classrooms instead of an assignment list.
     if (c.classroom_type === 'homeroom') {
       const [
         { data: teacherProfile },
         { count: studentCount },
-        { data: classmateRows },
+        classmateResult,
         posts,
         { assignments, submissions },
       ] = await Promise.all([
         admin.from('users').select('full_name').eq('id', c.teacher_id).single(),
         admin.from('classroom_students').select('id', { count: 'exact', head: true }).eq('classroom_id', id),
-        admin
-          .from('classroom_students')
-          .select('student_id, users!inner(id, full_name)')
-          .eq('classroom_id', id)
-          .neq('student_id', authUser!.id),
+        fetchAllRows((from, to) => admin.from('classroom_students')
+          .select('student_id, users!classroom_students_student_id_fkey!inner(id, full_name, prefix, first_name, last_name)')
+          .eq('classroom_id', id).neq('student_id', authUser.id).order('student_id').range(from, to)
+          .returns<{ student_id: string; users: HomeroomClassmateUser }[]>()),
         getClassroomPosts(id),
         getHomeroomAggregate(admin, id, [authUser!.id]),
       ])
-      const classmates = (classmateRows ?? []).map((m: any) => ({ id: m.users.id as string, full_name: m.users.full_name as string }))
+      if (classmateResult.error) throw new Error('โหลดรายชื่อเพื่อนร่วมห้องไม่สำเร็จ')
+      // Membership was verified above. Read only numbers for this room's peers;
+      // no other student profile fields enter the student-facing projection.
+      const numbers = await fetchRowsInChunks(classmateResult.rows.map(row => row.student_id), ids =>
+        admin.from('student_profiles').select('student_id, class_number').in('student_id', ids)
+          .returns<{ student_id: string; class_number: number | null }[]>(),
+      )
+      if (numbers.error) throw new Error('โหลดเลขที่เพื่อนร่วมห้องไม่สำเร็จ')
+      const classmates = buildHomeroomClassmates(classmateResult.rows.map(row => row.users), numbers.rows, authUser.id)
 
-      const now = Date.now()
       const isDone = (status?: string) => status === 'submitted' || status === 'graded'
       const bestByAssignment = new Map<string, typeof submissions[number]>()
       for (const s of submissions) {
         const prev = bestByAssignment.get(s.assignment_id)
         if (!prev || (s.total_score ?? -1) > (prev.total_score ?? -1)) bestByAssignment.set(s.assignment_id, s)
       }
-      const dueAssignments = assignments.filter(a => !a.end_at || new Date(a.end_at).getTime() <= now)
-      const complianceSubmitted = dueAssignments.filter(a => isDone(bestByAssignment.get(a.id)?.status)).length
-      const complianceRate = dueAssignments.length > 0 ? Math.round((complianceSubmitted / dueAssignments.length) * 100) : null
-
       const calendarEvents: CalendarEvent[] = assignments
         .filter((a): a is typeof a & { end_at: string } => !!a.end_at)
         .map(a => ({
@@ -120,9 +123,6 @@ export default async function ClassroomDetailPage({
           studentCount={studentCount ?? 0}
           classmates={classmates}
           calendarEvents={calendarEvents}
-          complianceRate={complianceRate}
-          complianceSubmitted={complianceSubmitted}
-          complianceTotal={dueAssignments.length}
           posts={posts}
           backHref={backHrefFromSearchParams(sp, '/dashboard#classrooms')}
         />

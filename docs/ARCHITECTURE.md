@@ -324,3 +324,5 @@ npm run build
 - Local fixtures render the same popup and teacher acknowledgement panel with synthetic sessionStorage state and callbacks; no real Auth/database/notification writes occur. See STUDENT_ANNOUNCEMENT_ACKNOWLEDGEMENTS.md for rollout checks and the tests not yet run.
 
 - 14 ต.ค. 2026: student avatar editor บันทึก crop ผ่าน `lib/actions/avatar.ts` ใช้ verified Auth/บัญชี active, immutable owner path + compare-and-set users.avatar_url และ rollback; client รอ save ก่อนปิด ไม่ส่ง owner/URL จาก browser ส่วน summary/announcements ใช้ bounded region ที่ส่ง wheel ต่อให้ main เมื่อสุดกรอบ รายละเอียด `STUDENT_PROFILE_AVATARS.md`.
+
+- 14 ต.ค. 2026: นักเรียนใน homeroom ใช้โครง `student-learning-stage` ร่วมสำหรับคอลัมน์เนื้อหา/ปฏิทิน sticky และ notification alignment ประกาศอยู่ก่อน roster ที่มี bounded natural scroll; peer names/class number DTO สร้างหลัง exact membership guard ด้วย helper `student-homeroom-classmates` ไม่ใช้ compliance card แล้ว.

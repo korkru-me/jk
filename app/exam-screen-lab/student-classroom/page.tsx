@@ -6,7 +6,8 @@ import { composeDescription, EMPTY_META } from '@/app/(app)/classrooms/_componen
 import { ShellClient } from '@/components/layout/shell-client'
 import { Card } from '@/components/ui/card'
 import { isExamScreenLabEnabled } from '@/lib/exam-screen-lab-access'
-import type { Classroom } from '@/lib/types'
+import { buildHomeroomClassmates } from '@/lib/student-homeroom-classmates'
+import type { Classroom, ClassroomPost } from '@/lib/types'
 import type { AssignmentCategory } from '@/lib/assignment-categories'
 
 export const dynamic = 'force-dynamic'
@@ -48,18 +49,37 @@ export default async function StudentClassroomLabPage({ searchParams }: { search
   if (!isExamScreenLabEnabled(process.env)) notFound()
   const { scenario, work } = await searchParams
   const classroom = scenario === 'legacy' ? { ...ROOM, description: 'ห้องเรียนเดิมที่ยังไม่ได้เลือกสีปก' }
-    : scenario === 'homeroom' ? { ...ROOM, name: 'ม.4/1', classroom_type: 'homeroom' as const, description: composeDescription({ ...EMPTY_META, cover: 'green', coverPattern: 'social-studies', gradeLevel: 'ม.4/1', academicTerm: '1/2569' }) }
+    : scenario?.startsWith('homeroom') ? { ...ROOM, name: 'ม.4/1', classroom_type: 'homeroom' as const, description: composeDescription({ ...EMPTY_META, cover: 'green', coverPattern: 'social-studies', gradeLevel: 'ม.4/1', academicTerm: '1/2569' }) }
     : ROOM
   const assignments = scenario === 'empty' ? [] : ASSIGNMENTS
   const selected = assignments.find(a => a.id === work)
   const assignmentHrefs = Object.fromEntries(assignments.map(a => [a.id, `/exam-screen-lab/student-classroom?work=${encodeURIComponent(a.id)}#preview-work`]))
+  if (classroom.classroom_type === 'homeroom') {
+    const classmates = buildHomeroomClassmates(Array.from({ length: 62 }, (_, i) => ({
+      id: `lab-classmate-${i}`, full_name: '', prefix: i % 2 ? 'เด็กชาย' : 'เด็กหญิง',
+      first_name: i === 0 ? 'ชื่อยาวสำหรับทดสอบการแสดงรายชื่อ' : `นักเรียน${i + 1}`,
+      last_name: 'ตัวอย่าง',
+    })), Array.from({ length: 62 }, (_, i) => ({ student_id: `lab-classmate-${i}`, class_number: i < 60 ? (i * 17) % 60 + 1 : null })), USER.id)
+    const posts: ClassroomPost[] = Array.from({ length: 3 }, (_, i) => ({
+      id: `lab-homeroom-post-${i}`, classroom_id: classroom.id, author_id: 'lab-teacher',
+      body: i === 0 ? 'แจ้งนักเรียนเตรียมตัวสำหรับกิจกรรมห้องเรียนประจำสัปดาห์' : 'ประกาศจำลองจากครูที่ปรึกษาสำหรับตรวจการจัดวางและการเลื่อนหน้า',
+      pinned: i === 0, attachments: [], created_at: NOW, updated_at: NOW, edited_at: null,
+      users: { full_name: 'ครูที่ปรึกษาจำลอง' }, comments: [],
+    }))
+    return <ShellClient user={USER} initialUnreadCount={0} notificationsEnabled={false}>
+      <HomeroomStudentView classroom={classroom} teacherName="ครูที่ปรึกษาจำลอง" studentCount={scenario === 'homeroom-empty' ? 1 : classmates.length + 1}
+        classmates={scenario === 'homeroom-empty' ? [] : classmates}
+        calendarEvents={scenario === 'homeroom-empty' ? [] : [{ id: 'lab-homeroom-work', title: 'ใบงานทบทวน', classroomName: 'ฟิสิกส์ 1', endAt: '2026-10-14T16:00:00+07:00', done: false, submissionId: null }]}
+        posts={scenario === 'homeroom-empty' ? [] : posts} trackSeen={false} initialNow={NOW}
+        previewLabel="ตัวอย่างสำหรับตรวจหน้าตา · ห้องเรียน ประกาศ และเพื่อนร่วมชั้นจำลอง" backHref="/exam-screen-lab/student-dashboard#classrooms" />
+    </ShellClient>
+  }
   return (
     <ShellClient user={USER} initialUnreadCount={0} notificationsEnabled={false}>
       <div className="flex min-w-0 flex-col gap-3" data-student-classroom-lab>
         <p className="text-xs text-muted-foreground">ตัวอย่างสำหรับตรวจหน้าตา · ห้องเรียนและงานจำลอง</p>
         {selected && <Card id="preview-work" padding="md" className="flex scroll-mt-20 flex-col gap-2"><h2 className="font-semibold">{selected.title}</h2><p className="text-sm text-muted-foreground">เปิดการ์ดงานแล้ว · รายละเอียดจำลองสำหรับตรวจการกดทั้งกรอบ ไม่มีการเริ่มทำหรือส่งงานจริง</p><Link href="/exam-screen-lab/student-classroom" className="text-sm text-primary hover:underline">กลับรายการงาน</Link></Card>}
-        {classroom.classroom_type === 'homeroom' ? <HomeroomStudentView classroom={classroom} teacherName="ครูที่ปรึกษาจำลอง" studentCount={3} classmates={[]} calendarEvents={[]} complianceRate={null} complianceSubmitted={0} complianceTotal={0} posts={[]} trackSeen={false} backHref="/exam-screen-lab/student-dashboard#classrooms" />
-          : <StudentClassroomView classroom={classroom} teacherName="ครูผู้สอนจำลอง" studentCount={3} assignments={assignments} categories={scenario === 'empty' ? [] : CATEGORIES} posts={[]} trackSeen={false} backHref="/exam-screen-lab/student-dashboard#classrooms" assignmentHrefs={assignmentHrefs} initialNow={NOW} />}
+        <StudentClassroomView classroom={classroom} teacherName="ครูผู้สอนจำลอง" studentCount={3} assignments={assignments} categories={scenario === 'empty' ? [] : CATEGORIES} posts={[]} trackSeen={false} backHref="/exam-screen-lab/student-dashboard#classrooms" assignmentHrefs={assignmentHrefs} initialNow={NOW} />
       </div>
     </ShellClient>
   )

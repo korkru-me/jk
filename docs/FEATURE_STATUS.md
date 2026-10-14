@@ -1685,3 +1685,13 @@ Physical iPad UAT ของ candidate `r7` ยืนยันแล้วว่�
 - รูปโปรไฟล์เปลี่ยนจาก preview เป็น server save ของ crop PNG 512×512 ลง bucket แยกและ users.avatar_url หลังตรวจ Auth/บัญชี active; rollback เมื่อบันทึกไม่สำเร็จและคง draft, ไม่รับ owner/URL จาก client ไม่มีการใช้รูป/ข้อมูลนักเรียนจริงในการทดสอบ
 - งานที่เสร็จแสดงติ๊ก/กรอบเขียวและลิงก์ submission ในรายการรวม ยังคงเกณฑ์ผ่าน/ซ่อนคะแนนเดิม; ลบประวัติแยก กดปุ่มเรียงเดิมกลับทิศได้ และกรอบงาน/ประกาศใช้ wheel scroll chaining หัวต้อนรับใหญ่ขึ้น ป้ายผู้ดูข้อมูลเหลือตาและบทบาท
 - ดึง migration Staging ที่ขาด `20261009142610` กลับจาก CLI history โดยไม่รัน SQL เก่าซ้ำ; migration ใหม่รับทราบประกาศและ profile-avatars จัดไว้สำหรับ Staging ที่อนุญาต Production ไม่เปลี่ยน รายละเอียดใน `docs/STUDENT_PROFILE_AVATARS.md` และ `docs/STUDENT_ANNOUNCEMENT_ACKNOWLEDGEMENTS.md`
+
+
+### โฮมรูมฝั่งนักเรียน · 14 ตุลาคม 2026 รอบย่อหน้าและรายชื่อ
+
+- ลบกรอบ “ภาพรวมของฉัน” และการส่งค่า compliance ของนักเรียนเฉพาะเส้นทางนี้ ปฏิทินรวมกำหนดส่งทุกวิชาคงข้อมูลเดิม ย้ายเป็นคอลัมน์ขวา sticky ใน main scroll เหมือนพื้นที่เรียนรู้ของฉัน; ขอบขวาเนื้อหาก่อนปฏิทินอ้างอิงตำแหน่งกระดิ่งเดียวกัน บนจอเล็กเรียงคอลัมน์เดียว
+- ประกาศครูที่ปรึกษาอยู่ก่อนเพื่อนร่วมห้อง รายชื่ออยู่ใน Card จำกัดสูง `min(22rem,50dvh)` เรียงเลขที่เป็นตัวเลขจากน้อยไปมาก คนไม่ระบุเลขที่อยู่ท้าย แสดงเฉพาะคำนำหน้า/ชื่อ/สกุลและเลขที่ ไม่ใช้รูป อีเมล คะแนน หรือข้อมูลสุขภาพ รายชื่อไม่รวมตนเอง และ wheel ที่สุดขอบส่งต่อ main ตามธรรมชาติ
+- อ่าน roster แบบ pagination หลัง verified Auth/ตรวจสมาชิกห้องก่อนเท่านั้น จากนั้นอ่าน `student_profiles(student_id,class_number)` เฉพาะ UUID เพื่อนใน roster เป็น chunk ไม่มีการขยาย RLS/เปิดตาราง profile ให้นักเรียนอ่านตรง Projection `lib/student-homeroom-classmates.ts` ตัด field อื่นก่อนส่ง client
+- localhost `/exam-screen-lab/student-classroom?scenario=homeroom` มี 62 เพื่อน/ชื่อยาว/เลขที่ว่าง/ประกาศสังเคราะห์ และ `homeroom-empty` ไม่มีเพื่อนหรือประกาศ; ไม่เขียน seen/start/submit หรือข้อมูลบัญชีจริง ไม่มี migration/push/deploy จากงานนี้
+
+- ตรวจ TypeScript, token lint, webpack build และ 3,274 tests ผ่าน Chrome ที่ 320/390/1280/1600px ไม่ล้นแนวนอน, light/dark axe ไม่พบ violation, ห้องว่างถูกต้อง และ wheel ของ roster ที่สุดขอบบน/ล่างทำให้ main scroll ต่อจริง ปฏิทินคงตำแหน่งระหว่าง main scroll และขอบขวาคอลัมน์ตรงกระดิ่งทั้ง expanded/collapsed ตรวจ Staging แบบอ่านอย่างเดียวด้วย query ที่ไม่คืนข้อมูลนักเรียนและชื่อ FK จริง; ยังไม่ทดสอบ flow บัญชีจริง/อุปกรณ์สัมผัสจริง และไม่เขียนฐานข้อมูล
