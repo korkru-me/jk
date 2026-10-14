@@ -1,5 +1,12 @@
 # Architecture
 
+## Student personal practice exercise boundary (prepared 14 October 2026)
+
+The access assertion helper alone is service-only SECURITY DEFINER with an empty search_path, to share-lock protected library/roster rows without expanding direct UPDATE grants. Main creation/list/page RPCs remain SECURITY INVOKER.
+
+PracticeLibraryView owns browser selection and an inline naming form over allowlisted question metadata. PracticeQuestionCard exposes student actions separately from teacher QuestionCard. Temporary selections are scoped to actor/library in sessionStorage; durable groups go through lib/actions/practice-exercises.ts, verified Auth/library/code sessions, and service-only invoker RPCs. loadPracticeExercises validates its allowlisted DTO. The optional exercise URL UUID selects the owned, paginated group-read RPC instead of global library search; question return links retain the group. SolutionLoaderProvider uses a student action that verifies exact question membership and reveal settings before returning only attached solution columns. No grading or persistent answer storage changes.
+
+
 อัปเดตล่าสุด: 12 ตุลาคม 2026
 
 เอกสารนี้อธิบายสถาปัตยกรรมที่พบใน repository ปัจจุบัน ไม่ใช่การรับรองว่าทุกส่วนถูก deploy หรือผ่านการทดสอบ production แล้ว

@@ -1,5 +1,10 @@
 # Domain model และคำศัพท์
 
+## Student-created personal practice exercises
+
+A personal exercise groups existing questions in one accessible published practice library. It is private to its student and uses the practice domain, without an Assignment, Submission, grade or deadline. Opening the group filters the original questions; each still uses the original check flow. Progress is the count of distinct questions with accepted checks, including checks before group creation, not correct answers or mastery. Teachers and classmates cannot read the group names or members.
+
+
 อัปเดตล่าสุด: 26 กันยายน 2026
 
 ## บทบาทผู้ใช้

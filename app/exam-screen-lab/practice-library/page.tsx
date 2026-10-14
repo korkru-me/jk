@@ -1,3 +1,4 @@
+import { StudentLibraryLab } from './_components/student-library-lab'
 import { notFound } from 'next/navigation'
 import { PracticeLibraryForm } from '@/app/(app)/practice/_components/practice-library-form'
 import { PracticeWaitingRoom } from '@/components/practice/practice-waiting-room'
@@ -74,7 +75,12 @@ export default async function PracticeLibraryLabPage({ searchParams }: {
   if (!isExamScreenLabEnabled(process.env)) notFound()
   const { view } = await searchParams
 
-  if (view === 'waiting' || view === 'waiting-locked') {
+  if (view === 'student') return <main className="p-4 sm:p-6">
+    <p className="mb-4 text-xs text-muted-foreground">ห้องทดลองคลังฝึกนักเรียน · ข้อมูลจำลอง · ไม่อ่านหรือบันทึกฐานข้อมูล</p>
+    <StudentLibraryLab />
+  </main>
+
+  if (view === 'waiting'  || view === 'waiting-locked') {
     async function previewUnlock() {
       'use server'
     }

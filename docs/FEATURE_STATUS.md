@@ -1,5 +1,18 @@
 # Feature status
 
+## Student practice cards and personal exercises - 14 October 2026 (source ready, not deployed)
+
+The access assertion helper alone is service-only SECURITY DEFINER with an empty search_path, to share-lock protected library/roster rows without expanding direct UPDATE grants. Main creation/list/page RPCs remain SECURITY INVOKER.
+
+- Student question list now uses cards matching the home page, with difficulty/type/subject/tags/stem excerpt and attempt count. Only preview (the existing practice question route) and explicitly attached solutions are available; solutions respect the library reveal setting. Teacher mutations are absent.
+- Students select multiple questions, including all on a page, retain selection across pagination/search in actor/library-scoped sessionStorage, name a personal exercise (1-120 characters), and save up to 500 unique library members atomically with idempotent request UUIDs.
+- Personal exercise cards appear above questions; opening a card filters to its ordered members with bounded pagination. Progress counts distinct questions checked at least once, including checks before grouping. It does not represent correctness or grades.
+- New service-only SECURITY INVOKER RPCs repeat active student/roster/exact published library/active subject classroom/org authorization; the server also verifies the signed access-code session. New table has RLS enabled and browser grants revoked. Classmates and teachers have no personal-exercise API access.
+- Validation: npx tsc --noEmit, lint:tokens, 258 test files / 3,322 tests, isolated production build, Next MCP compilation/runtime checks all passed. Browser synthetic QA verified bulk selection, naming/create, distinct progress display, selection after reload, attached solution with nested dismissal confirmation and restored focus, and 320px layout without horizontal overflow. Card-scoped WCAG A/AA audit has zero violations. Hosted Auth/Data API, actual server action persistence and separate-connection race tests remain unverified because schema was not applied.
+- Synthetic UI lab: /exam-screen-lab/practice-library?view=student; no database reads/writes.
+- Migration 20261014134748_student_practice_exercises.sql is prepared but NOT applied. Pre-change supabase migration list --linked against verified Staging dyuxkrzeveknqgtuzpbh found remote-only 20261014072745 and local-only 20261014125654. No schema push or ledger repair was attempted. Reconcile history before deployment; the existing library list still works without the new schema while group creation reports unavailable.
+
+
 ### รายการงานครูรวมคลังฝึกและกรอบงานที่เพิ่งมอบหมาย — 14 ตุลาคม 2026 (local source/preview)
 
 - ข้อความรองเหลือ “สร้างสำเร็จแล้ว” งานแต่ละรายการมีกรอบ Card แยกและไม่มีลูกศรด้านขวา กดได้ทั้งกรอบพร้อม focus ring สำหรับคีย์บอร์ด; คงการแสดงตามเวลาสร้างภายใน 72 ชั่วโมงและลิงก์เดิม

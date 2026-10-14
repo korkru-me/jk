@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { PracticeAccessState } from '@/components/practice/practice-access-state'
 import { PracticeLibraryView } from '@/components/practice/practice-library-view'
+import { loadPracticeExercises } from '@/lib/practice-exercises.server'
 import { getAuthUser } from '@/lib/auth/server'
 import { isPracticeLibraryEnabled } from '@/lib/practice-question'
 import { loadPracticeLibrarySearch } from '@/lib/practice-question-access.server'
@@ -37,13 +38,23 @@ export default async function StudentPracticeLibraryQuestionsPage({
     redirect(buildPracticeSearchHref(id, state, { page: result.canonicalPage }))
   }
 
+  const groups = await loadPracticeExercises(user.id, id)
+  if (state.exerciseId && (!groups.ready || !groups.exercises.some(exercise => exercise.id === state.exerciseId))) {
+    if (!groups.ready) return <PracticeAccessState kind="unavailable" returnHref={`/practice/${id}/library`} />
+    notFound()
+  }
+
   return (
     <PracticeLibraryView
+      key={`${user.id}:${id}`}
       library={result.library}
       items={result.items}
       total={result.total}
       totalPages={result.totalPages}
       state={state}
+      storageOwnerId={user.id}
+      exercises={groups.ready ? groups.exercises : []}
+      exercisesReady={groups.ready}
     />
   )
 }

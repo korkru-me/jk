@@ -33,6 +33,8 @@ const categoryGuard = categoryMigration.slice(
   categoryMigration.indexOf('CREATE TRIGGER assignment_classrooms_category_same_classroom'),
 )
 
+const exerciseMigration = readFileSync(new URL('../supabase/migrations/20261014134748_student_practice_exercises.sql', import.meta.url), 'utf8')
+
 const ORG_A = '10000000-0000-4000-8000-000000000001'
 const ORG_B = '10000000-0000-4000-8000-000000000002'
 const OWNER_A = '20000000-0000-4000-8000-000000000001'
@@ -298,6 +300,7 @@ beforeAll(async () => {
   `)
   await db.exec(categoryGuard)
   await db.exec(layoutMigration)
+  await db.exec(exerciseMigration)
   // Supabase's service role already has broad table access; the fixture uses
   // explicit grants so this check exercises the trigger rather than ACLs.
   await db.exec('GRANT UPDATE (category_id) ON public.practice_libraries TO service_role')
@@ -1946,5 +1949,78 @@ describe('self-practice atomic authenticated mutations', () => {
       `, [LIBRARY, QUESTION_A1, QUESTION_A2, QUESTION_A3]))
         .rejects.toMatchObject({ code: '23514' })
     })
+  })
+})
+
+
+describe('private student practice exercises', () => {
+  const exerciseId = '80000000-0000-4000-8000-000000000001'
+  const create = (tx: Transaction, actor = STUDENT_A, ids = [QUESTION_A2, QUESTION_A1]) => tx.query(
+    'SELECT public.create_student_practice_exercise($1, $2, $3, $4, $5::uuid[])',
+    [actor, LIBRARY, exerciseId, ' ทบทวนนิวตัน ', ids],
+  )
+  it('creates atomically, retries without duplicates and preserves chosen order', async () => {
+    await as(service, async tx => {
+      await create(tx, STUDENT_ZERO)
+      await create(tx, STUDENT_ZERO)
+      const list = await tx.query<{ title: string; question_ids: string[]; attempted_count: number }>(
+        'SELECT * FROM public.list_student_practice_exercises($1, $2)', [STUDENT_ZERO, LIBRARY],
+      )
+      expect(list.rows).toHaveLength(1)
+      expect(list.rows[0].title).toBe('ทบทวนนิวตัน')
+      expect(list.rows[0].question_ids).toEqual([QUESTION_A2, QUESTION_A1])
+      expect(Number(list.rows[0].attempted_count)).toBe(0)
+      const page = await tx.query<{ question_id: string; position: number }>(
+        'SELECT * FROM public.get_student_practice_exercise_questions($1,$2,$3,24,0)', [STUDENT_ZERO, LIBRARY, exerciseId],
+      )
+      expect(page.rows.map(row => row.question_id)).toEqual([QUESTION_A2, QUESTION_A1])
+      expect(page.rows.map(row => row.position)).toEqual([0, 1])
+    })
+  })
+  it('counts distinct answered questions, including attempts before grouping', async () => {
+    await as(service, async tx => {
+      await recordAttempt(tx, STUDENT_A, QUESTION_A1, '90000000-0000-4000-8000-000000000001')
+      await recordAttempt(tx, STUDENT_A, QUESTION_A1, '90000000-0000-4000-8000-000000000002')
+      await create(tx)
+      const list = await tx.query<{ attempted_count: number }>(
+        'SELECT * FROM public.list_student_practice_exercises($1,$2)', [STUDENT_A, LIBRARY],
+      )
+      expect(Number(list.rows[0].attempted_count)).toBe(1)
+    })
+  })
+  it('isolates classmates and rejects exercise ID reuse by a different student', async () => {
+    await as(service, async tx => {
+      await create(tx)
+      const list = await tx.query('SELECT * FROM public.list_student_practice_exercises($1,$2)', [STUDENT_B, LIBRARY])
+      expect(list.rows).toHaveLength(0)
+    })
+    await expect(as(service, async tx => { await create(tx); await create(tx, STUDENT_B) })).rejects.toThrow(/conflict/)
+    await expect(as(service, async tx => {
+      await create(tx)
+      await tx.query('SELECT * FROM public.get_student_practice_exercise_questions($1,$2,$3,24,0)', [STUDENT_B, LIBRARY, exerciseId])
+    })).rejects.toThrow(/denied/)
+  })
+  it('rejects foreign questions, duplicate IDs and actors outside the exact roster', async () => {
+    await expect(as(service, tx => create(tx, STUDENT_A, [QUESTION_B]))).rejects.toThrow(/invalid/)
+    await expect(as(service, tx => create(tx, STUDENT_A, [QUESTION_A1, QUESTION_A1]))).rejects.toThrow(/invalid/)
+    for (const actor of [STUDENT_OTHER_ROOM, SUSPENDED_STUDENT, OWNER_A, CO_VIEW]) {
+      await expect(as(service, tx => create(tx, actor))).rejects.toThrow(/denied/)
+    }
+  })
+  it('denies reads/writes/RPC execution from the browser, including the owner', async () => {
+    for (const actor of [{ role: 'anon' } as const, user(STUDENT_A), user(STUDENT_B), user(OWNER_A)]) {
+      await expect(as(actor, tx => tx.query('SELECT * FROM public.student_practice_exercises'))).rejects.toThrow(/permission denied/)
+      await expect(as(actor, tx => create(tx))).rejects.toThrow(/permission denied/)
+    }
+  })
+  it('rejects closed libraries and removed roster members', async () => {
+    await expect(as(service, async tx => {
+      await tx.query("UPDATE public.practice_libraries SET status = 'closed' WHERE id = $1", [LIBRARY])
+      await create(tx)
+    })).rejects.toThrow(/denied/)
+    await expect(as(service, async tx => {
+      await tx.query('DELETE FROM public.classroom_students WHERE classroom_id = $1 AND student_id = $2', [ROOM_A, STUDENT_A])
+      await create(tx)
+    })).rejects.toThrow(/denied/)
   })
 })

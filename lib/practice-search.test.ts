@@ -82,3 +82,13 @@ describe('practice search URL contract', () => {
     expect(state.ignoredTagCount).toBe(3)
   })
 })
+
+
+it('keeps an exercise through question and paging links and validates untrusted IDs', () => {
+  const id = '80000000-0000-4000-8000-000000000001'
+  const state = parsePracticeSearchParams({ exercise: id, page: '2' })
+  expect(new URL(buildPracticeQuestionHref('library', 'question', state), 'https://test.invalid').searchParams.get('exercise')).toBe(id)
+  expect(new URL(buildPracticeSearchHref('library', state, { page: 3 }), 'https://test.invalid').searchParams.get('exercise')).toBe(id)
+  expect(buildPracticeSearchHref('library', state, { exerciseId: '', page: 1 })).toBe('/practice/library/library')
+  expect(parsePracticeSearchParams({ exercise: 'not-a-uuid' }).exerciseId).toBeUndefined()
+})

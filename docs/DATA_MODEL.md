@@ -1,5 +1,12 @@
 # Data model และ invariants
 
+## Prepared personal practice exercise schema
+
+The access assertion helper alone is service-only SECURITY DEFINER with an empty search_path, to share-lock protected library/roster rows without expanding direct UPDATE grants. Main creation/list/page RPCs remain SECURITY INVOKER.
+
+student_practice_exercises contains a client request UUID primary key, library/student foreign keys with cascade deletion, a 1-120 character title, 1-500 ordered unique question_ids, and database created_at. The create RPC validates every question against the exact published library, whose membership is already frozen. It stores no answers, verdicts, scores or feedback. RLS is enabled with no browser grants; service-only invoker RPCs repeat actor/roster/library authorization. The list RPC scopes by actor/library and aggregates distinct accepted question checks. The new migration is not applied; see FEATURE_STATUS before release.
+
+
 ## Pending: explicit classroom announcement receipts
 
 Migration `20261014053207_classroom_announcement_acknowledgements.sql` is prepared locally, not applied: `classroom_announcement_rounds` stores current round/reminded_at per post; `classroom_announcement_acknowledgements` stores the first explicit receipt per `(post_id, student_id, round_no)`. Both cascade from the existing post/user, enable RLS and permit service-only RPC access. Legacy `post_reads.seen_at` remains a separate sighting and is never backfilled as consent/acknowledgement. The server rollout flag stays off until migration parity and Staging verification pass.
