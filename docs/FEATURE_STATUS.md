@@ -5,6 +5,8 @@
 - เจ้าของเลือกภาพตัวอย่างที่เขาที่สามโค้งกางไปด้านซ้ายเหนือหู และอนุมัติปรับทุกจุดพร้อมเผยแพร่ Production
 - SVG ใหม่ trace จากภาพที่เลือก ใช้สีเดียวและคง theme token เดิม; header, landing/footer, หน้าบัญชี, watermark หน้ารอสอบ/แบบฝึกหัด, ลายปกห้องเรียน และไอคอน browser/Apple ใช้ geometry ใหม่ครบ พร้อม version URL กัน cache รูปเก่า
 - ตรวจ TypeScript, design-token lint, 50 tests ของ cover/waiting UI และ production webpack build ผ่าน; local Chrome ตรวจ header/หน้าบัญชี/หน้ารอ, mobile 390px ไม่ล้น และโลโก้โหมดมืดอ่านได้; Next MCP compilation/runtime ไม่พบ error และ React tree ใช้ BrandLogo/ClassroomCoverPattern เดิม · ไม่ทดสอบ Auth-to-DB หรือ mutation บน hosted site
+- Production ยังไม่เปลี่ยน: CLI deployment `dpl_ErSAd3Ed1eGsyxx5NzNBvRBTF2tx` ของ project `jk` ถูก Vercel BLOCKED เพราะ commit author ไม่มีสิทธิ์ create deployment; GitHub CLI ของ `korkru-me` รายงาน token invalid และ push ไม่สำเร็จ · candidate code `ae1e449` กับ upload exclusions `24c3fc8` อยู่ branch `codex/three-antler-logo` ใน checkout แยก รอเชื่อม GitHub ใหม่แล้ว push/เผยแพร่ผ่านทางที่มีสิทธิ์ ก่อนรายงาน success ต้องยืนยัน READY, alias `korkru.com` และ hash SVG/icons ตรงกับ candidate · ไม่เปลี่ยน author metadata หรือสิทธิ์เพื่อข้าม gate
+- `.vercelignore` กัน local dependencies/build caches/environment files จาก CLI uploads; source package 9.9 MB
 - เก็บภาพต้นฉบับและ legacy assets เดิมไว้สำหรับประวัติ ไม่แตะ schema, Auth, RLS, ข้อมูลนักเรียน หรือ migration
 
 ### คลังฝึกไม่มีคะแนน — Phase 1–7 พร้อมปล่อย Production หลัง Staging UAT (13 ตุลาคม 2026)
