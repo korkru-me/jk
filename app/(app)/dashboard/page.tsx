@@ -159,7 +159,8 @@ export default async function DashboardPage({ searchParams }: {
           .eq('status', 'published')
           .order('end_at', { ascending: true, nullsFirst: false }),
         supabase.from('classroom_posts')
-          .select('id, classroom_id, body, created_at, users(full_name), classrooms(name)')
+          // post_reads also links posts to users; explicitly choose the author.
+          .select('id, classroom_id, body, created_at, users!classroom_posts_author_id_fkey(full_name), classrooms(name)')
           .in('classroom_id', classroomIds)
           .order('created_at', { ascending: false }).limit(5),
         getStudentGroups(admin, user.id, classroomIds),
