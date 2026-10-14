@@ -18,7 +18,7 @@ import { waitingResumeId, type ExamWaitingSummary } from '@/lib/exam-waiting-roo
 /** Real entry/action/grading/snapshot code; external Auth/DB/native boundaries
  * are mocked. This is not hosted, RLS, transactional or native-SEB proof. */
 type Row = Record<string, unknown>
-type Result = { data: Row[] | null; error: { message: string } | null }
+type Result = { data: Row[] | null; error: { message: string; code?: string } | null }
 const A = '30000000-0000-4000-8000-000000000001'
 const S = '70000000-0000-4000-8000-000000000001'
 const Q = '60000000-0000-4000-8000-000000000001'
@@ -29,6 +29,7 @@ let writes: { table: string; operation: string; row: Row }[]
 let reads: string[]
 let readFailure: string | null
 let writeFailure: string | null
+let revisionColumnMissing = false
 
 class Query implements PromiseLike<Result> {
   private fields = ''
@@ -48,6 +49,7 @@ class Query implements PromiseLike<Result> {
   insert(rows: Row | Row[]) { this.rowsToInsert = Array.isArray(rows) ? rows : [rows]; return this }
   update(row: Row) { this.changes = row; return this }
   private result(): Result {
+    if (revisionColumnMissing && this.fields.includes('seb_config_revision')) return { data: null, error: { code: '42703', message: 'column submissions.seb_config_revision does not exist' } }
     if (readFailure === this.table && !this.rowsToInsert && !this.changes) return { data: null, error: { message: 'synthetic read failure' } }
     if (this.rowsToInsert) {
       if (writeFailure === this.table) return { data: null, error: { message: 'synthetic write failure' } }
@@ -95,6 +97,7 @@ async function summary() {
 }
 
 beforeEach(() => {
+  revisionColumnMissing = false
   vi.clearAllMocks()
   vi.useFakeTimers(); vi.setSystemTime(NOW)
   vi.stubGlobal('fetch', vi.fn(() => { throw new Error('Unexpected external network') }))
@@ -123,6 +126,19 @@ afterEach(() => { expect(fetch).not.toHaveBeenCalled(); vi.unstubAllGlobals(); v
 
 describe.each(['exam', 'exercise'])('question-free %s entry', type => {
   beforeEach(() => { db.assignments[0].type = type })
+  it('opens the waiting room against the legacy production schema without writes', async () => {
+    revisionColumnMissing = true
+    expect((await summary()).assignmentType).toBe(type)
+    noExamMutation()
+  })
+  it('retains the SEB gate when revision metadata is unavailable', async () => {
+    revisionColumnMissing = true
+    db.assignments[0].secure_browser_mode = 'seb_required'
+    m.access.mockResolvedValue({ mode: 'seb', assignmentConfigRevision: 1 })
+    expect(await readSubmissionEntry(A)).toHaveProperty('error', 'ข้อสอบนี้ยังไม่พร้อมให้เข้า กรุณาแจ้งครูผู้สอน')
+    noExamMutation()
+    expect(m.access).not.toHaveBeenCalled()
+  })
   it('GET/prefetch reads safe metadata without allocating, revealing questions or starting time', async () => {
     const first = await summary()
     vi.setSystemTime(NOW + 20 * 60_000)
@@ -224,6 +240,14 @@ describe.each(['exam', 'exercise'])('question-free %s entry', type => {
 
 describe.each(['exam', 'exercise'])('deliberate %s waiting-room POST', type => {
   beforeEach(() => { db.assignments[0].type = type })
+  it('starts and resumes browser work after the explicit click on the legacy schema', async () => {
+    revisionColumnMissing = true
+    await summary(); noExamMutation()
+    expect(await startExamFromWaiting(A, null, 'start')).toHaveProperty('submissionId', S)
+    expect(await startExamFromWaiting(A, S, 'resume')).toHaveProperty('submissionId', S)
+    expect(db.submissions).toHaveLength(1)
+    expect(db.submission_answers).toHaveLength(1)
+  })
   it('keeps the adjusted passing receipt on explicit start without allocating a retry', async () => {
     Object.assign(db.assignments[0], { passing_type: 'percent', passing_value: 70 })
     db.submissions = [attempt({ status: 'graded', total_score: 6, score_adjustment: 2, max_score: 10 })]

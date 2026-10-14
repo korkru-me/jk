@@ -1,4 +1,5 @@
 import 'server-only'
+import { readWithSubmissionRevision } from '@/lib/submission-revision-compatibility'
 
 import { getExamAccessSession } from '@/lib/exam-access-session'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -35,7 +36,7 @@ export interface WritableExamSubmission {
   status: string
   started_at: string
   assignment_id: string
-  seb_config_revision: number | null
+  seb_config_revision?: number | null
   exam_access_mode: string
   current_streak: number | null
   best_streak: number | null
@@ -74,13 +75,13 @@ export async function getWritableStudentAnswer(
   submissionAnswerId: string,
   studentId: string,
 ): Promise<WritableStudentAnswerResult> {
-  const { data } = await admin
+  const { data, revisionColumnAvailable } = await readWithSubmissionRevision<WritableExamAnswer>(includeRevision => admin
     .from('submission_answers')
     .select(`
       id, submission_id, student_answer, work_images, carried_over, check_count,
       questions(question_type, answer_parts),
       submissions(
-        id, student_id, status, started_at, assignment_id, seb_config_revision, exam_access_mode,
+        id, student_id, status, started_at, assignment_id, ${includeRevision ? 'seb_config_revision, ' : ''}exam_access_mode,
         current_streak, best_streak, streak_reached,
         assignments(
           id, duration_minutes, end_at, secure_browser_mode, android_exam_mode, type, mode,
@@ -90,7 +91,7 @@ export async function getWritableStudentAnswer(
       )
     `)
     .eq('id', submissionAnswerId)
-    .maybeSingle()
+    .maybeSingle())
   const answer = data as unknown as WritableExamAnswer | null
 
   if (!answer) return { error: 'ไม่พบคำตอบ' as const }
@@ -102,6 +103,9 @@ export async function getWritableStudentAnswer(
     ? submission.assignments[0]
     : submission.assignments
   const durationMinutes = assignment?.duration_minutes
+  if (assignment?.secure_browser_mode === 'seb_required' && !revisionColumnAvailable) {
+    return { error: 'ข้อสอบนี้ยังไม่พร้อมให้เข้า กรุณาแจ้งครูผู้สอน' as const }
+  }
   if (durationMinutes) {
     const deadline = new Date(submission.started_at).getTime() + durationMinutes * 60_000
     if (Date.now() > deadline) return { error: 'หมดเวลาทำข้อสอบแล้ว' as const }

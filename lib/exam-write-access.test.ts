@@ -84,6 +84,21 @@ function admin(answer: ReturnType<typeof answerRow>, extension: string | null = 
 }
 
 describe('writable exam answer boundary', () => {
+  it.each(['browser', 'seb_required'])('keeps the write boundary when the revision column is absent: %s', async mode => {
+    const row = answerRow()
+    row.submissions.assignments.secure_browser_mode = mode
+    row.submissions.exam_access_mode = mode === 'browser' ? 'browser' : 'seb'
+    const select = vi.fn((fields: string) => ({ eq: () => ({ maybeSingle: async () => (
+      fields.includes('seb_config_revision')
+        ? { data: null, error: { code: '42703', message: 'column submissions.seb_config_revision does not exist' } }
+        : { data: row, error: null }
+    ) }) }))
+    const result = await getWritableStudentAnswer({ from: () => ({ select }) } as never, row.id, STUDENT)
+    if (mode === 'browser') expect(result).toHaveProperty('answer.id', row.id)
+    else expect(result).toHaveProperty('error', 'ข้อสอบนี้ยังไม่พร้อมให้เข้า กรุณาแจ้งครูผู้สอน')
+    expect(select).toHaveBeenCalledTimes(2)
+    expect(mocks.getExamAccessSession).not.toHaveBeenCalled()
+  })
   beforeEach(() => {
     mocks.getExamAccessSession.mockReset()
     mocks.getExamAccessSession.mockResolvedValue({ mode: 'seb' })
