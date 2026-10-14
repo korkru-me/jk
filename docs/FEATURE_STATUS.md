@@ -1,5 +1,11 @@
 # Feature status
 
+### ไอคอนเว็บวงกลมขาวและ local branding — 14 ตุลาคม 2026
+
+- เจ้าของขอให้ icon ที่แท็บ Chrome เป็นกวางสามเขาสีม่วงขนาดใหญ่บนวงกลมขาวเต็ม canvas มี alpha โปร่งใสนอกวงกลม; `app/icon.png` และ Apple touch icon สร้างจาก SVG เดียวกันด้วย `scripts/build-brand-icons.mjs`
+- TypeScript ของ local checkout, design-token lint และ production webpack build ผ่าน; Next MCP local ไม่มี compilation/runtime error; browser header อ้าง SVG สามเขาและ Next metadata เปลี่ยน icon URL ใหม่แล้ว · hash ของ SVG/browser/Apple icons ที่ localhost:3000 ตรงกับไฟล์ใหม่ และ pixel inspection ยืนยันพื้นวงกลมขาว/mุมนอกวงกลม alpha 0 · ไม่ทดสอบ Auth-to-DB หรือเขียนข้อมูล hosted และไม่มี migration
+- โลโก้เว็บจริงรอบ PR #48 เสร็จแล้ว แต่ checkout ที่รัน localhost:3000 ยังไม่ได้รับไฟล์ใหม่; รอบนี้ sync เฉพาะไฟล์แบรนด์กลับโฟลเดอร์ local โดยรักษางาน practice/dashboard/student classroom ที่ยังไม่อยู่ Production
+
 ### โลโก้กวางสามเขา — 14 ตุลาคม 2026
 
 - เจ้าของเลือกภาพตัวอย่างที่เขาที่สามโค้งกางไปด้านซ้ายเหนือหู และอนุมัติปรับทุกจุดพร้อมเผยแพร่ Production
