@@ -63,6 +63,7 @@ function LabContent({ initialCoverPattern }: { initialCoverPattern: ClassroomCov
     <p>ห้องทดลองไอคอน · ข้อมูลสมมติ · ไม่อ่านหรือเขียน Supabase</p>
     <Card padding="lg" className="overflow-hidden">
       <TeacherDashboard
+        currentUserId={ROOM_ID}
         classroomsCount={5}
         questionsCount={890}
         setsCount={8}
@@ -75,7 +76,7 @@ function LabContent({ initialCoverPattern }: { initialCoverPattern: ClassroomCov
           { id: `${ROOM_ID}-5`, name: 'ดาราศาสตร์', classroom_type: 'subject', description: composeDescription({ ...EMPTY_META, cover: 'purple', coverPattern: 'korkru-deer', iconKey: 'astronomy', gradeLevel: 'ม.4', academicTerm: '1/2569' }), studentCount: 3, assignmentCount: 13 },
         ]}
         questionSets={[
-          { id: 'set-1', title: 'การเคลื่อนที่แบบโปรเจกไทล์', questionCount: 22 },
+          { id: 'set-1', title: 'การเคลื่อนที่แบบโปรเจกไทล์', questionCount: 22, sections: [{ id: 'section-1', title: 'แฟ้มย่อยจำลอง', question_ids: [] }] },
           { id: 'set-2', title: 'ทดสอบ', questionCount: 5 },
           { id: 'set-3', title: 'แบบฝึกหัดกลศาสตร์', questionCount: 18 },
         ]}

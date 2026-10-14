@@ -66,7 +66,7 @@ export default async function DashboardPage() {
         .limit(RECENT_LIMIT),
       supabase
         .from('question_sets')
-        .select('id, title, question_ids', { count: 'exact' })
+        .select('id, title, question_ids, sections', { count: 'exact' })
         .eq('created_by', user.id)
         .order('created_at', { ascending: false })
         .limit(RECENT_LIMIT),
@@ -101,6 +101,7 @@ export default async function DashboardPage() {
 
     return (
       <TeacherDashboard
+        currentUserId={user.id}
         classroomsCount={classrooms.length}
         questionsCount={questionsRes.count ?? 0}
         setsCount={setsRes.count ?? 0}
@@ -109,6 +110,7 @@ export default async function DashboardPage() {
         questionSets={setRows.map(set => ({
           id: set.id,
           title: set.title,
+          sections: set.sections,
           questionCount: ((set.question_ids ?? []) as string[])
             .filter(id => liveQuestionIds.has(id)).length,
         }))}

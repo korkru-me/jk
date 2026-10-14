@@ -21,7 +21,8 @@ import { Card } from '@/components/ui/card'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { TYPE_LABEL } from '@/lib/question-display'
-import type { Classroom } from '@/lib/types'
+import type { Classroom, QuestionSet } from '@/lib/types'
+import { QuestionSetCard } from '@/components/questions/question-set-card'
 import { ClassroomCard } from '@/app/(app)/classrooms/_components/classroom-card'
 
 /**
@@ -41,9 +42,9 @@ const CLASSROOM_ACCENT: Accent = {
 }
 
 const SET_ACCENT: Accent = {
-  chip: 'bg-tint-2/10 text-tint-2',
-  border: 'border-tint-2/25',
-  hover: 'hover:bg-tint-2/5',
+  chip: 'bg-primary/10 text-primary',
+  border: 'border-primary/25',
+  hover: 'hover:bg-primary/5',
 }
 
 const QUESTION_ACCENT: Accent = {
@@ -77,6 +78,7 @@ export interface DashboardQuestionSet {
   id: string
   title: string
   questionCount: number
+  sections?: QuestionSet['sections']
 }
 
 export interface DashboardQuestion {
@@ -86,6 +88,7 @@ export interface DashboardQuestion {
 }
 
 interface Props {
+  currentUserId: string
   classroomsCount: number
   questionsCount: number
   setsCount: number
@@ -96,6 +99,7 @@ interface Props {
 }
 
 export function TeacherDashboard({
+  currentUserId,
   classroomsCount,
   questionsCount,
   setsCount,
@@ -173,15 +177,20 @@ export function TeacherDashboard({
         emptyText="ยังไม่มีแฟ้มโจทย์"
         emptyAction={{ href: '/questions/sets/new', label: 'สร้างแฟ้มโจทย์แรก' }}
       >
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-3">
           {questionSets.map(set => (
-            <CompactResourceCard
+            <QuestionSetCard
               key={set.id}
-              href={`/questions/sets/${set.id}/edit`}
-              title={set.title}
-              meta={`${set.questionCount} ข้อ`}
-              icon={Layers}
-              accent={SET_ACCENT}
+              set={{
+                id: set.id,
+                title: set.title,
+                created_by: currentUserId,
+                sections: set.sections ?? [],
+                valid_question_count: set.questionCount,
+              }}
+              currentUserId={currentUserId}
+              backHref="/dashboard"
+              refreshAfterDelete
             />
           ))}
         </div>

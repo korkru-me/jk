@@ -29,6 +29,7 @@
 
 ## Visual language ที่มีอยู่
 
+- การ์ด “แฟ้มโจทย์ล่าสุด” บนหน้าหลักใช้ `QuestionSetCard` เดียวกับคลังแฟ้มโจทย์ รวมป้ายจำนวนข้อ/แฟ้มย่อยและแถวดาวน์โหลด/ลบ; ไม่แสดง drag handle เพราะหน้าหลักเรียงตามวันที่สร้าง ส่วนลิงก์แก้ไขต้องจำต้นทาง `/dashboard`
 - Primary ปัจจุบันอยู่ในโทน magenta/violet (preset `playful` — ตั้งไว้ที่ `app/layout.tsx`) ค่าเริ่มต้นของระบบยังเป็น indigo
 - Success ใช้ emerald/green, warning ใช้ amber, destructive ใช้ red
 - ใช้ rounded cards, borders และ spacing แบบค่อนข้างโปร่ง
