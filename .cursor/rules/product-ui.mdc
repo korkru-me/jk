@@ -14,3 +14,4 @@ alwaysApply: false
 - Keep forms keyboard-accessible with visible labels, useful errors, and pending states.
 - Respect responsive layouts, color contrast, and `prefers-reduced-motion`.
 - Use existing UI primitives and visual tokens before introducing one-off patterns.
+- Follow `.cursor/rules/vertical-space.mdc`: compact vertical layout is required by default for every UI change, with readable content and accessible controls preserved.

@@ -26,6 +26,8 @@ const example: PracticeExercise = {
 
 export function StudentLibraryLab({ localReview = false }: { localReview?: boolean }) {
   const params = useSearchParams()
+  const withShell = params.get('shell') === 'student'
+  const searchHiddenFields = { view: localReview ? 'local-student' : 'student', ...(withShell ? { shell: 'student' } : {}) }
   const state = parsePracticeSearchParams({ ...Object.fromEntries(params.entries()), tag: params.getAll('tag') })
   const [exercises, setExercises] = useState<PracticeExercise[]>([example])
   const [pins, setPins] = useState<string[]>([])
@@ -50,10 +52,11 @@ export function StudentLibraryLab({ localReview = false }: { localReview?: boole
   const libraryHrefBuilder: typeof buildPracticeSearchHref = (libraryId, search, patch) => {
     const query = new URL(buildPracticeSearchHref(libraryId, search, patch), 'http://localhost').searchParams
     query.set('view', localReview ? 'local-student' : 'student')
+    if (withShell) query.set('shell', 'student')
     return `/exam-screen-lab/practice-library?${query.toString()}`
   }
   const questionHrefBuilder: typeof buildPracticeQuestionHref = (_libraryId, questionId) =>
-    `/exam-screen-lab/practice-library?view=${localReview ? 'local-student' : 'student'}&preview=${questionId}`
+    `/exam-screen-lab/practice-library?view=${localReview ? 'local-student' : 'student'}&preview=${questionId}${withShell ? '&shell=student' : ''}`
   const active = exercises.find(group => group.id === state.exerciseId)
   const filtered = items.filter(item => (!active || active.questionIds.includes(item.id))
     && (!state.reviewOnly || pins.includes(item.id))
@@ -65,21 +68,21 @@ export function StudentLibraryLab({ localReview = false }: { localReview?: boole
     <h1 className="text-lg font-semibold">{preview.title}</h1>
     <p>{preview.excerpt}</p>
     <p className="text-xs text-muted-foreground">ตัวอย่างข้อมูลจำลอง ไม่มีการตรวจหรือบันทึกคำตอบ</p>
-    <Button variant="outline" className="min-h-11" render={<Link href={`/exam-screen-lab/practice-library?view=${localReview ? 'local-student' : 'student'}`} />}>กลับไปคลังฝึก</Button>
+    <Button variant="outline" className="min-h-11" render={<Link href={`/exam-screen-lab/practice-library?view=${localReview ? 'local-student' : 'student'}${withShell ? '&shell=student' : ''}`} />}>กลับไปคลังฝึก</Button>
   </Card>
   if (localReview) return <PracticeLocalLibraryView
     library={{ id: '00000000-0000-4000-8300-000000000001', classroomId: '00000000-0000-4000-8300-000000000002', title: 'ทดสอบคลังฝึกนะ', description: null, revealAnswerKey: true, requiresAccessCode: false, calculatorEnabled: true, scratchpadEnabled: true, shuffleOptions: true }}
     items={items} matchingIds={items.filter(item => practiceSearchTerms(state.q).every(term => `${item.title} ${item.excerpt}`.toLowerCase().includes(term.toLowerCase()))
       && state.tags.every(tag => item.tags.some(value => value.trim().toLowerCase() === tag.trim().toLowerCase()))).map(item => item.id)}
     state={state} storageOwnerId="synthetic-local-review"
-    libraryHrefBuilder={libraryHrefBuilder} questionHrefBuilder={questionHrefBuilder} searchHiddenFields={{ view: 'local-student' }}
+    libraryHrefBuilder={libraryHrefBuilder} questionHrefBuilder={questionHrefBuilder} searchHiddenFields={searchHiddenFields}
     solutionLoader={async () => ({ data: { title: items[0].title, parts: [{ id: ids[0], label: null, excerpt: null, text: '<p>ใช้ความสัมพันธ์ แรงดล = การเปลี่ยนแปลงโมเมนตัม</p>', files: [] }] } })}
   />
   return <PracticeLibraryView
     library={{ id: '00000000-0000-4000-8300-000000000001', classroomId: '00000000-0000-4000-8300-000000000002', title: 'ทดสอบคลังฝึกนะ', description: null, revealAnswerKey: true, requiresAccessCode: false, calculatorEnabled: true, scratchpadEnabled: true, shuffleOptions: true }}
     items={visible} total={visible.length} totalPages={1} state={state}
     storageOwnerId="synthetic-lab" exercises={exercises} exercisesReady={ready} pinsReady={ready} pinnedQuestionIds={pins}
-    libraryHrefBuilder={libraryHrefBuilder} questionHrefBuilder={questionHrefBuilder} searchHiddenFields={{ view: 'student' }}
+    libraryHrefBuilder={libraryHrefBuilder} questionHrefBuilder={questionHrefBuilder} searchHiddenFields={searchHiddenFields}
     createExerciseAction={async input => {
       const value = practiceExerciseSchema.parse(input)
       const next = exercises.some(group => group.id === value.id) ? exercises : [{ id: value.id, title: value.title, questionIds: value.questionIds,

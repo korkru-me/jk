@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { PracticeLibraryForm } from '@/app/(app)/practice/_components/practice-library-form'
 import { PracticeWaitingRoom } from '@/components/practice/practice-waiting-room'
 import { isExamScreenLabEnabled } from '@/lib/exam-screen-lab-access'
+import { ShellClient } from '@/components/layout/shell-client'
 import type { BankQuestion } from '@/lib/question-bank'
 import type { AssignmentQuestionSetOption } from '@/components/assignments/create-assignment-form'
 
@@ -70,15 +71,22 @@ const questionSets: AssignmentQuestionSetOption[] = [
 ]
 
 export default async function PracticeLibraryLabPage({ searchParams }: {
-  searchParams: Promise<{ view?: string }>
+  searchParams: Promise<{ view?: string; shell?: string }>
 }) {
   if (!isExamScreenLabEnabled(process.env)) notFound()
-  const { view } = await searchParams
+  const { view, shell } = await searchParams
 
-  if (view === 'student' || view === 'local-student') return <main className="p-4 sm:p-6">
-    <p className="mb-4 text-xs text-muted-foreground">ห้องทดลองคลังฝึกนักเรียน · ข้อมูลจำลอง · ไม่อ่านหรือบันทึกฐานข้อมูล</p>
-    <StudentLibraryLab localReview={view === 'local-student'} />
-  </main>
+  if (view === 'student' || view === 'local-student') {
+    const content = <>
+      <p className="mb-2 text-xs text-muted-foreground">ห้องทดลองคลังฝึกนักเรียน · ข้อมูลจำลอง · ไม่อ่านหรือบันทึกฐานข้อมูล</p>
+      <StudentLibraryLab localReview={view === 'local-student'} />
+    </>
+    if (shell === 'student') return <ShellClient
+      user={{ id: '00000000-0000-4000-8300-000000000099', email: 'student@example.invalid', full_name: 'นักเรียนตัวอย่าง', role: 'student' }}
+      initialUnreadCount={0} notificationsEnabled={false} practiceLibraryEnabled
+    >{content}</ShellClient>
+    return <main className="p-4 sm:p-6">{content}</main>
+  }
 
   if (view === 'waiting'  || view === 'waiting-locked') {
     async function previewUnlock() {

@@ -1,5 +1,13 @@
 # Student practice: local integration handoff
 
+## รอบต่อมา: ย่อพื้นที่และตั้งกฎถาวร
+
+เจ้าของให้ประหยัดพื้นที่แกน Y เป็นกฎทุกงานเว็บ และขอบซ้ายตรงแนวเนื้อหาข้างเมนู บันทึกใน AGENTS.md และ `.cursor/rules/vertical-space.mdc` (alwaysApply). คลังฝึกลด padding/gap/radius, รวม pin filter กับหัวข้อ, ย่อชุดฝึก/แถบเลือกและการ์ดโจทย์, รวม attempt status กับ metadata, และถอด mx-auto. Card ของชุด/ฟอร์มวัดจาก container width ที่เหลือจาก sidebar ไม่ใช้ viewport อย่างเดียว
+
+ข้อมูลจำลองวัดที่ 1280px: การ์ดโจทย์ 137→89px และแถบเลือก 93→69px; กลุ่มชุดฝึกที่ 699px 162→73px. Shell ขยาย/ย่อขอบรายการตรงขอบซ้ายเนื้อหา 336/125px. ตรวจ 320/1024px ไม่มี overflow ของหน้า/ข้อมูลความคืบหน้า, header pin แถวเดียวกับหัวข้อ, สร้างสามข้อ/ตอบแล้ว 1 จาก 3, ปุ่มแก้ไขเปิดฟอร์ม/ยกเลิก, ปัก/กรอง/เอาหมุดออกและคง shell ระหว่าง navigation ผ่าน. Fixture สำหรับเมนูจริง: `/exam-screen-lab/practice-library?view=local-student&shell=student`, ชื่อ/บัญชี/โจทย์สังเคราะห์และปิด notification polling
+
+ผ่าน TypeScript, token lint, webpack production build และ Next MCP. รอบนี้แก้เฉพาะ UI/fixture/rules/docs ไม่แก้ lib, schema, scoring หรือ server mutation จึงไม่รัน unit suite ซ้ำหลัง 3,344 tests ที่ผ่านใน integration รอบก่อน. ยังไม่ apply migration, push/deploy หรือทดสอบ hosted persistence ตามคำสั่ง local only
+
 อัปเดต 14 ตุลาคม 2026 · ผู้ใช้ให้ commit และตรวจ localhost ก่อน ยังไม่ push/deploy หรือเปลี่ยนฐานข้อมูลจริง
 
 ## Checkout และสาเหตุที่เห็นหน้าเดิม

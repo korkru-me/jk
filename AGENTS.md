@@ -6,6 +6,7 @@
 - Read `docs/ARCHITECTURE.md`, `docs/DOMAIN.md`, and `docs/DATA_MODEL.md` before changing application or database behavior.
 - Read `docs/SECURITY.md` before touching authentication, authorization, uploads, exports, student data, or Supabase.
 - Read `docs/DESIGN_SYSTEM.md` before changing user-facing UI or copy.
+- Follow `.cursor/rules/vertical-space.mdc` for every new or edited web UI: economical height is the owner's permanent preference.
 - Read `docs/WORD_IMPORT.md` before adding a question type, changing an existing one, or touching `lib/docx-import/` — it holds the per-type Word format spec, the decisions behind the import, and what a `.docx` provably cannot carry.
 - For matching files, also follow `.cursor/rules/typescript-react.mdc`, `.cursor/rules/supabase-security.mdc`, `.cursor/rules/product-ui.mdc`, and `.cursor/rules/overlay-dismissal.mdc`.
 - Before any test that touches a deployed site or external service, follow `.cursor/rules/staging-testing.mdc`.
@@ -18,6 +19,7 @@
 - Finish the MVP in this order: question bank, classrooms, assignments/exams, grading, then homeroom.
 - Surveys, education research, and paid-plan enforcement are later phases unless the user explicitly reprioritizes them.
 - Explanations and product copy are Thai; filenames, code, database identifiers, and standard technical terms remain English.
+- ทุกงานเว็บต้องใช้พื้นที่แกน Y ให้ประหยัดที่สุดเท่าที่อ่านง่าย กดสะดวก และสวยงาม: ลด padding/gap/กรอบสูงที่เกินจำเป็น จัดหัวข้อกับปุ่มที่เกี่ยวข้องในแถวเดียวเมื่อมีพื้นที่ และเริ่มกรอบที่แนวซ้ายของเนื้อหาข้างเมนูตามหน้าอื่น ๆ โดยไม่ต้องรอให้เจ้าของบอกซ้ำ
 
 ## Non-negotiable guardrails
 
