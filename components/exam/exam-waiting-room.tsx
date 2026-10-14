@@ -1,5 +1,6 @@
 'use client'
 
+import { BRAND_MARK_HEIGHT, BRAND_MARK_URL, BRAND_MARK_WIDTH } from '@/components/brand-mark-data'
 import Image from 'next/image'
 import {
   CalendarClock,
@@ -92,11 +93,11 @@ export function ExamWaitingRoom({ summary, busy, error, code, onCodeChange, onSt
   return (
     <Card padding="lg" className="assignment-waiting-stage relative isolate flex w-full max-w-5xl flex-col gap-4 overflow-hidden">
       <Image
-        src="/brand/deer-mark.svg"
+        src={BRAND_MARK_URL}
         alt=""
         aria-hidden="true"
-        width={585}
-        height={1045}
+        width={BRAND_MARK_WIDTH}
+        height={BRAND_MARK_HEIGHT}
         loading="eager"
         className="pointer-events-none absolute right-8 top-5 -z-10 hidden h-72 w-auto opacity-5 md:block dark:brightness-0 dark:invert"
       />

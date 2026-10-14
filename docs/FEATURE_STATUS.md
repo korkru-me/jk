@@ -24,6 +24,21 @@
 - local fixture `/exam-screen-lab/student-dashboard` มีสถานะปกติ/ว่าง/12 งานในวันเดียว/กุมภาพันธ์ปีอธิกสุรทิน ใช้ข้อมูลสังเคราะห์เท่านั้น; ตรวจ 320/390/768/1280px, hover และ Tab, สลับวัน/เดือน/ปี/กลับวันนี้, ปิด popup ภายนอก/Escape/คืน focus, scroll ในรายละเอียด, วันกำหนดส่ง 00:30 น. ของไทยและ 29 กุมภาพันธ์ · axe ไม่มี violation ในหน้าและปฏิทินที่ขยาย (บาง mobile scroll/ขอบ focus มี contrast incomplete จึงตรวจภาพแยก)
 - TypeScript, design-token lint และ webpack production build ผ่าน; Next MCP compilation/runtime และ browser console ไม่มี error · ไม่รัน unit suite เพราะไม่แก้ `lib/`, ไม่ทดสอบบัญชี/ฐานข้อมูลจริง, ไม่มี migration; เจ้าของขอ commit ในเครื่องและดู localhost เท่านั้น ยังไม่ push หรือเผยแพร่ Production
 
+### ไอคอนเว็บวงกลมขาวและ local branding — 14 ตุลาคม 2026
+
+- เจ้าของขอให้ icon ที่แท็บ Chrome เป็นกวางสามเขาสีม่วงขนาดใหญ่บนวงกลมขาวเต็ม canvas มี alpha โปร่งใสนอกวงกลม; `app/icon.png` และ Apple touch icon สร้างจาก SVG เดียวกันด้วย `scripts/build-brand-icons.mjs`
+- โลโก้เว็บจริงรอบ PR #48 เสร็จแล้ว แต่ checkout ที่รัน localhost:3000 ยังไม่ได้รับไฟล์ใหม่; รอบนี้ sync เฉพาะไฟล์แบรนด์กลับโฟลเดอร์ local โดยรักษางาน practice/dashboard/student classroom ที่ยังไม่อยู่ Production
+
+### โลโก้กวางสามเขา — 14 ตุลาคม 2026
+
+- เจ้าของเลือกภาพตัวอย่างที่เขาที่สามโค้งกางไปด้านซ้ายเหนือหู และอนุมัติปรับทุกจุดพร้อมเผยแพร่ Production
+- SVG ใหม่ trace จากภาพที่เลือก ใช้สีเดียวและคง theme token เดิม; header, landing/footer, หน้าบัญชี, watermark หน้ารอสอบ/แบบฝึกหัด, ลายปกห้องเรียน และไอคอน browser/Apple ใช้ geometry ใหม่ครบ พร้อม version URL กัน cache รูปเก่า
+- ตรวจ TypeScript, design-token lint, 50 tests ของ cover/waiting UI และ production webpack build ผ่าน; local Chrome ตรวจ header/หน้าบัญชี/หน้ารอ, mobile 390px ไม่ล้น และโลโก้โหมดมืดอ่านได้; Next MCP compilation/runtime ไม่พบ error และ React tree ใช้ BrandLogo/ClassroomCoverPattern เดิม · ไม่ทดสอบ Auth-to-DB หรือ mutation บน hosted site
+- เผยแพร่ผ่าน GitHub/Vercel project `jk` ตามการอนุมัติของเจ้าของ โดยแยก branch `codex/three-antler-logo` จาก Production base `9adb8b3` เพื่อกันงาน practice/dashboard ที่ยังไม่เผยแพร่ออกจาก release · ก่อนรายงาน success ต้องยืนยัน READY, alias `korkru.com` และ hash SVG/icons ตรงกับ candidate · การลอง CLI ก่อนเชื่อม GitHub ใหม่ (`dpl_ErSAd3Ed1eGsyxx5NzNBvRBTF2tx`) ถูก BLOCKED เพราะ author permission และ push ล้มเหลวจาก token invalid; เจ้าของยืนยัน GitHub CLI ใหม่แล้ว 14 ตุลาคม 2026 ไม่เปลี่ยน author metadata หรือสิทธิ์เพื่อข้าม gate
+- `.vercelignore` กัน local dependencies/build caches/environment files จาก CLI uploads; source package 9.9 MB
+- เก็บภาพต้นฉบับและ legacy assets เดิมไว้สำหรับประวัติ ไม่แตะ schema, Auth, RLS, ข้อมูลนักเรียน หรือ migration
+
+
 ### การ์ดห้องเรียนของนักเรียนและช่องเข้าร่วมห้องแบบย่อ — 14 ตุลาคม 2026
 
 - **UI-117** — `/classrooms` ของนักเรียนใช้ `ClassroomCard` ร่วมกับครู จึงแสดงสี ลายปก ไอคอน ระดับชั้น ภาคเรียน และกรอบโฮมรูมจาก metadata เดียวกัน; ส่วนท้ายของนักเรียนแสดงงานรอทำ/ครูที่ปรึกษาและทางเข้าห้อง ส่วนครูคงจำนวนคน/งานและคำสั่งจัดการเดิม แยก section โฮมรูม/วิชาและไม่สร้างหัวข้อว่าง
