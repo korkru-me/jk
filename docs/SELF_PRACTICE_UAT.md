@@ -114,3 +114,11 @@
 - Authenticated Staging gate passed eight synthetic roles, two rooms with 1,000 questions each, persisted settings, previous-editor compatibility, denied view-only permissions, search/pagination, append idempotency, and progress isolation. Cleanup passed. Latest measured search returned 24 of 500 exact tag-AND matches, 5,824 bytes in 162.26ms.
 - Production was updated only after that gate. Isolated post-apply dry-run is up-to-date and database lint at error level passed. All creator/editor function definition hashes, signatures, security modes and fixed search paths match the tested Staging database; all five settings columns exist. Production verification was read-only; no synthetic accounts or practice rows were created there.
 - The final integrated source passed TypeScript, token lint, 242 Vitest files / 3,221 tests, and webpack production build. Local practice signing uses a separate untracked key. Website deployment/alias verification is the remaining rollout step.
+
+### Verified release outcome - 14 October 2026
+
+- PR #50 was merged to `master` as `a74e0a0c6e187838f8d65c088e8111f93f5d5a4a`. Vercel Production deployment `dpl_7nXx2u5vjW77hRbSkSzaYACAYpT8` is READY and owns both `korkru.com` and `www.korkru.com`.
+- Read-only smoke verified HTTP 200 for the public home and login pages. The deer SVG and browser icon hashes match the checked-out source and localhost:3000. The local runtime reported no compilation, configuration, or session errors immediately after synchronization.
+- The primary local checkout and remote `master` were both at `a74e0a0` with zero differing commits/files; its existing local-work branch pointer was pushed to the already published commit. Subsequent in-progress settings/avatar work from another task is not part of this tested release and was preserved without staging or deployment.
+- All three practice migrations are installed in Production and Staging. The current creator and both draft-editor signatures exist, all five settings columns exist, Production definition hashes match the authenticated Staging gate, database lint passed, and the isolated post-apply dry-run is up-to-date. No Production QA writes were performed.
+- This post-release note changes documentation only; application code remains identical to the deployed master commit.
