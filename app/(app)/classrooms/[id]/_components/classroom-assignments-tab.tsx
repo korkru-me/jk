@@ -82,6 +82,8 @@ import { groupPreset } from '@/app/(app)/classrooms/_components/group-colors'
 import { AssignmentCategoryManager } from './assignment-category-manager'
 import { ClassroomPracticeLibraries } from '@/components/practice/classroom-practice-libraries'
 import type { ClassroomPracticeLibrariesResult } from '@/lib/classroom-practice-libraries'
+import { ClassroomRecentWork } from '@/components/assignments/classroom-recent-work'
+import type { RecentClassroomWorkResult } from '@/lib/classroom-recent-work'
 
 export interface ClassroomAssignmentRow {
   id: string
@@ -333,6 +335,7 @@ interface Props {
   submissions: ClassroomAssignmentSubmissionRow[]
   studentCount: number
   practiceLibraries?: ClassroomPracticeLibrariesResult | null
+  recentWork?: RecentClassroomWorkResult | null
   /** The students each กลุ่มย่อย-only งาน was handed to, keyed by assignment id. */
   audienceByAssignment?: Map<string, Set<string>>
   groupNameById?: Map<string, string>
@@ -359,6 +362,7 @@ export function ClassroomAssignmentsTab({
   onReorderAssignments,
   onSetAssignmentCategory,
   practiceLibraries,
+  recentWork,
 }: Props) {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const [categories, setCategories] = useState(initialCategories)
@@ -574,6 +578,8 @@ export function ClassroomAssignmentsTab({
           <AssignmentCreationMenu classroomId={classroomId} size="sm" />
         </div>
       </div>
+
+      {recentWork && <ClassroomRecentWork result={recentWork} />}
 
       {practiceLibraries && <ClassroomPracticeLibraries result={practiceLibraries} canManage />}
 
