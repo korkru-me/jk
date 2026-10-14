@@ -303,6 +303,10 @@ npm run build
 - Server reads are scoped to the verified student's own roster rows and submissions; published work uses enrolled `assignment_classrooms` links and existing group reach rules. The pure `buildStudentLearningData` projection shares the summary page's official-attempt, display-score, passing and visibility helpers across pending badges, work rows and calendar events. It removes hidden score values from presentation props and derives classroom themes from reachable classroom IDs. History remains per attempt; done totals remain per assignment.
 - The synthetic, environment-gated `/exam-screen-lab/student-dashboard` renders the same projection/components without database access. Joining or leaving a classroom revalidates `/dashboard` as well as the classroom list. No schema change is involved.
 
+## Teacher classroom work presentation
+
+`ClassroomAssignmentsTab` merges allowlisted practice summaries with assignment rows using namespaced `practice:<uuid>` UI keys. Both share category surfaces and DnD; practice rows keep their own settings/progress/lifecycle routes. Session-RLS category updates and the service-only `reorder_classroom_work` RPC persist practice presentation metadata without touching grading or activity. The loader retries the old projection on missing layout columns and disables practice grouping/mixed dragging until the additive migration is installed.
+
 ## Student classroom presentation
 
 - Subject and homeroom student views share `StudentClassroomHeader`, using the teacher's saved cover preset, icon and pattern metadata. The student return link uses the existing validated `back` helper and falls back to the classroom anchor on the combined learning home.

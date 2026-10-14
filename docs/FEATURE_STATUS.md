@@ -1,5 +1,13 @@
 # Feature status
 
+### รายการงานครูรวมคลังฝึกและกรอบงานที่เพิ่งมอบหมาย — 14 ตุลาคม 2026 (local source/preview)
+
+- ข้อความรองเหลือ “สร้างสำเร็จแล้ว” งานแต่ละรายการมีกรอบ Card แยกและไม่มีลูกศรด้านขวา กดได้ทั้งกรอบพร้อม focus ring สำหรับคีย์บอร์ด; คงการแสดงตามเวลาสร้างภายใน 72 ชั่วโมงและลิงก์เดิม
+- ย้ายตัวกรองประเภทงาน ปุ่มจัดการกลุ่มงานและมอบหมายงานใหม่ลงใต้กรอบล่าสุด รวมคลังฝึกเข้า Card กลุ่มเดียวกับข้อสอบและแบบฝึกหัด เพิ่มตัวกรองคลังฝึกเฉพาะรายการครู; คลังฝึกยังไม่มีคะแนน ใช้ลิงก์ตั้งค่า/ความคืบหน้าและเมนู lifecycle เดิม
+- เตรียม migration `20261014125654_classroom_practice_work_layout.sql` เพิ่ม category_id/display_order พร้อม FK/trigger ห้องเดียวกันและ service-only SECURITY INVOKER RPC บันทึกลำดับรวมแบบ atomic ตรวจ actor/ห้อง/รายการทั้งหมดซ้ำ; การย้ายกลุ่มใช้ session RLS เดิม ไม่มีการเพิ่ม practice ลง AssignmentType หรือข้อมูลคะแนน
+- TypeScript, token lint, 257 test files / 3,314 tests และ production webpack build ผ่าน; browser fixture ตรวจตัวกรองทั้งสี่แบบ ย้ายคลังฝึกผ่าน Select และเรียงร่วมกับแบบฝึกหัดด้วยคีย์บอร์ด, จอ 320px ไม่ล้นและ desktop axe 0 violations/0 incomplete ไม่มี compilation/runtime errors. Mobile axe 0 violations มี contrast incomplete จึงตรวจภาพร่วมด้วย
+- ยังไม่ apply migration ใหม่หรือ deploy: Staging มี `20261014072745_attempt_expiry_finalization` ของ checkout งานอื่น ซึ่งยังไม่อยู่ใน checkout นี้ ขณะที่ Production มี migrations สำหรับ Staging/local ที่ยังไม่ apply; ไม่แก้ history หรือ push migration ทั้งชุดเพื่อข้าม gap คลังฝึกยังอ่านและแสดงได้ด้วย schema เดิม แต่การจัดกลุ่ม/ลากลำดับคลังฝึกยังปิดจนลง migration นี้
+
 ### หน้าข้อสอบกระชับและแก้หน้าขาวจากการโฟกัสคำตอบ — 14 ตุลาคม 2026
 
 - เปลี่ยน MCQ จาก radio แบบ `sr-only` ที่มีตำแหน่ง absolute นอกตัวเลือก เป็น native radio ที่อยู่ในแถวคำตอบจริง และให้ `useAppViewport` ฟัง `window.scroll` เพิ่มจาก visual viewport เพื่อคืนเอกสารไปจุดเริ่มต้นโดยให้ main/คอลัมน์โจทย์เลื่อนเอง; การ pinch zoom ยังปล่อยให้เลื่อนตามเดิม และการเผยช่องกรอกเมื่อ viewport ย่อไม่ทำกับ radio/checkbox/ปุ่ม/ช่องที่ไม่มีแป้นพิมพ์

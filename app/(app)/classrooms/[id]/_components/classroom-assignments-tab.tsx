@@ -4,6 +4,9 @@ import { useEffect, useId, useMemo, useState, useTransition, type ReactNode } fr
 import Link from 'next/link'
 import {
   CheckCircle2,
+  BookOpenCheck,
+  BarChart3,
+  Pencil,
   ClipboardCheck,
   Clock,
   Copy,
@@ -45,6 +48,7 @@ import { toast } from 'sonner'
 import { TYPE_CFG } from '@/lib/assignment-display'
 import { setAssignmentCategory } from '@/lib/actions/assignment-categories'
 import { reorderAssignmentDisplayOrder } from '@/lib/actions/classrooms'
+import { reorderClassroomWork, setPracticeLibraryCategory } from '@/lib/actions/classroom-work'
 import { assignmentCopyHref } from '@/lib/assignment-creation'
 import {
   moveVisibleAssignmentAfter,
@@ -80,8 +84,9 @@ import {
 } from '@/components/ui/select'
 import { groupPreset } from '@/app/(app)/classrooms/_components/group-colors'
 import { AssignmentCategoryManager } from './assignment-category-manager'
-import { ClassroomPracticeLibraries } from '@/components/practice/classroom-practice-libraries'
-import type { ClassroomPracticeLibrariesResult } from '@/lib/classroom-practice-libraries'
+import { PracticeLibraryListActions } from '@/app/(app)/practice/_components/practice-library-list-actions'
+import type { ClassroomPracticeLibrariesResult, ClassroomPracticeLibraryItem } from '@/lib/classroom-practice-libraries'
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { ClassroomRecentWork } from '@/components/assignments/classroom-recent-work'
 import type { RecentClassroomWorkResult } from '@/lib/classroom-recent-work'
 
@@ -119,6 +124,18 @@ export interface ClassroomAssignmentSubmissionRow {
 }
 
 type TypeFilter = AssignmentTypeFilterValue
+
+type ClassroomWorkRow = (ClassroomAssignmentRow & { kind: 'assignment' }) | (
+  ClassroomPracticeLibraryItem & {
+    kind: 'practice'
+    type: 'practice'
+    libraryId: string
+    category_id: string | null
+    display_order: number | null
+  }
+)
+const PRACTICE_TYPE_CFG = { label: 'คลังฝึก', bg: 'bg-primary/10', text: 'text-primary', icon: BookOpenCheck }
+const workTypeConfig = (type: string) => type === 'practice' ? PRACTICE_TYPE_CFG : TYPE_CFG[type] ?? TYPE_CFG.exam
 
 const STATUS_CFG = {
   draft: {
@@ -164,7 +181,7 @@ function SortableAssignmentRow({
   disabled: boolean
   freezeLayout: boolean
   tone: string
-  status: ReturnType<typeof statusConfig>
+  status: Omit<ReturnType<typeof statusConfig>, 'description'> & { description: string }
   children: ReactNode
 }) {
   const {
@@ -364,10 +381,18 @@ export function ClassroomAssignmentsTab({
   practiceLibraries,
   recentWork,
 }: Props) {
+  const workItems = useMemo<ClassroomWorkRow[]>(() => [
+    ...assignments.map(assignment => ({ ...assignment, kind: 'assignment' as const })),
+    ...(practiceLibraries?.items ?? []).map(library => ({
+      ...library, id: `practice:${library.id}`, libraryId: library.id,
+      kind: 'practice' as const, type: 'practice' as const,
+      category_id: library.categoryId ?? null, display_order: library.displayOrder ?? null,
+    })),
+  ], [assignments, practiceLibraries?.items])
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const [categories, setCategories] = useState(initialCategories)
   const [categoryByAssignment, setCategoryByAssignment] = useState<Record<string, string | null>>(
-    () => Object.fromEntries(assignments.map(assignment => [
+    () => Object.fromEntries(workItems.map(assignment => [
       assignment.id,
       normalizeAssignmentCategoryId(assignment.category_id, initialCategories),
     ])),
@@ -377,7 +402,7 @@ export function ClassroomAssignmentsTab({
   const [draggingAssignmentId, setDraggingAssignmentId] = useState<string | null>(null)
   const [dragTargetCategoryId, setDragTargetCategoryId] = useState<string | null | undefined>(undefined)
   const defaultAssignmentIds = useMemo(
-    () => assignments
+    () => workItems
       .map((assignment, index) => ({ assignment, index }))
       .sort((a, b) => (
         (a.assignment.display_order ?? Number.MAX_SAFE_INTEGER)
@@ -385,7 +410,7 @@ export function ClassroomAssignmentsTab({
         || a.index - b.index
       ))
       .map(({ assignment }) => assignment.id),
-    [assignments],
+    [workItems],
   )
   const [assignmentOrder, setAssignmentOrder] = useState(defaultAssignmentIds)
   const dndId = useId()
@@ -399,18 +424,26 @@ export function ClassroomAssignmentsTab({
     setAssignmentOrder(current => reconcileAssignmentOrder(current, defaultAssignmentIds))
   }, [defaultAssignmentIds])
 
+  useEffect(() => {
+    setCategoryByAssignment(current => Object.fromEntries(workItems.map(work => [
+      work.id,
+      Object.hasOwn(current, work.id) ? current[work.id] : normalizeAssignmentCategoryId(work.category_id, initialCategories),
+    ])))
+  }, [workItems, initialCategories])
+
   const categoryItems = useMemo(() => assignmentCategorySelectItems(categories), [categories])
 
   const rows = useMemo(() => {
-    const byId = new Map(assignments.map(assignment => [assignment.id, assignment]))
+    const byId = new Map(workItems.map(assignment => [assignment.id, assignment]))
     return reconcileAssignmentOrder(assignmentOrder, defaultAssignmentIds)
       .flatMap(id => byId.get(id) ?? [])
       .map(assignment => ({
         ...assignment,
         category_id: normalizeAssignmentCategoryId(categoryByAssignment[assignment.id], categories),
       }))
-  }, [assignmentOrder, assignments, categories, categoryByAssignment, defaultAssignmentIds])
+  }, [assignmentOrder, workItems, categories, categoryByAssignment, defaultAssignmentIds])
   const filtered = rows.filter(assignment => typeFilter === 'all' || assignment.type === typeFilter)
+  const layoutBlocked = (practiceLibraries?.items.length ?? 0) > 0 && practiceLibraries?.layoutAvailable === false
   const sections = groupAssignmentsByCategory(filtered, categories, true)
   const assignmentCounts = useMemo(() => {
     const counts = new Map<string, number>()
@@ -424,9 +457,7 @@ export function ClassroomAssignmentsTab({
     if (value === null) return
     const categoryId = value === UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE ? null : value
     startTransition(async () => {
-      const result = onSetAssignmentCategory
-        ? await onSetAssignmentCategory(assignmentId, categoryId)
-        : await setAssignmentCategory(classroomId, assignmentId, categoryId)
+      const result = await persistCategory(assignmentId, categoryId)
       if (!result.ok) {
         toast.error(result.error)
         return
@@ -434,6 +465,13 @@ export function ClassroomAssignmentsTab({
       setCategoryByAssignment(current => ({ ...current, [assignmentId]: categoryId }))
       toast.success(categoryId ? 'ย้ายงานเข้ากลุ่มแล้ว' : 'ย้ายงานไปยังไม่จัดกลุ่มแล้ว')
     })
+  }
+
+  function persistCategory(workId: string, categoryId: string | null) {
+    if (onSetAssignmentCategory) return onSetAssignmentCategory(workId, categoryId)
+    return workId.startsWith('practice:')
+      ? setPracticeLibraryCategory(classroomId, workId.slice(9), categoryId)
+      : setAssignmentCategory(classroomId, workId, categoryId)
   }
 
   function handleCategoriesChange(nextCategories: AssignmentCategory[]) {
@@ -452,7 +490,9 @@ export function ClassroomAssignmentsTab({
     startOrderTransition(async () => {
       const result = onReorderAssignments
         ? await onReorderAssignments(nextOrder)
-        : await reorderAssignmentDisplayOrder(classroomId, nextOrder)
+        : practiceLibraries && practiceLibraries.layoutAvailable !== false && !practiceLibraries.error
+          ? await reorderClassroomWork(classroomId, nextOrder)
+          : await reorderAssignmentDisplayOrder(classroomId, nextOrder.filter(id => !id.startsWith('practice:')))
       if (!result?.error) return
       toast.error(result.error)
       setAssignmentOrder(current => (
@@ -519,9 +559,7 @@ export function ClassroomAssignmentsTab({
 
     setCategoryByAssignment(current => ({ ...current, [assignmentId]: targetCategoryId }))
     startTransition(async () => {
-      const result = onSetAssignmentCategory
-        ? await onSetAssignmentCategory(assignmentId, targetCategoryId)
-        : await setAssignmentCategory(classroomId, assignmentId, targetCategoryId)
+      const result = await persistCategory(assignmentId, targetCategoryId)
       if (result.ok) {
         const categoryName = targetCategoryId
           ? categories.find(category => category.id === targetCategoryId)?.name
@@ -545,10 +583,27 @@ export function ClassroomAssignmentsTab({
       : 'ยังไม่จัดกลุ่ม'
   }
 
+  function categoryPicker(work: ClassroomWorkRow) {
+    return <Select
+      items={categoryItems}
+      value={work.category_id ?? UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE}
+      onValueChange={value => moveToCategory(work.id, value)}
+      disabled={isPending || isOrderPending || (work.kind === 'practice' && layoutBlocked)}
+    >
+      <SelectTrigger size="sm" className="w-40 max-w-full" aria-label={`กลุ่มของ ${work.title}`}>
+        <Folder />
+        <SelectValue>{value => categoryItems.find(item => item.value === value)?.label ?? 'ยังไม่จัดกลุ่ม'}</SelectValue>
+      </SelectTrigger>
+      <SelectContent align="end"><SelectGroup>
+        {categoryItems.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
+      </SelectGroup></SelectContent>
+    </Select>
+  }
+
   const assignmentById = new Map(rows.map(assignment => [assignment.id, assignment]))
   const draggingAssignment = draggingAssignmentId ? assignmentById.get(draggingAssignmentId) ?? null : null
   const draggingTypeCfg = draggingAssignment
-    ? TYPE_CFG[draggingAssignment.type] ?? TYPE_CFG.exam
+    ? workTypeConfig(draggingAssignment.type)
     : TYPE_CFG.exam
   const DraggingTypeIcon = draggingTypeCfg.icon
   const dragTargetName = dragTargetCategoryId === undefined ? null : categoryName(dragTargetCategoryId)
@@ -564,9 +619,11 @@ export function ClassroomAssignmentsTab({
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <AssignmentTypeFilter value={typeFilter} onValueChange={setTypeFilter} />
+    <div className="flex min-w-0 flex-col gap-3" data-classroom-work-list>
+      {recentWork && <ClassroomRecentWork result={recentWork} />}
+
+      <div className="flex flex-wrap items-center gap-2" data-classroom-work-toolbar>
+        <AssignmentTypeFilter value={typeFilter} onValueChange={setTypeFilter} includePractice={!!practiceLibraries} />
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <AssignmentCategoryManager
@@ -579,9 +636,7 @@ export function ClassroomAssignmentsTab({
         </div>
       </div>
 
-      {recentWork && <ClassroomRecentWork result={recentWork} />}
-
-      {practiceLibraries && <ClassroomPracticeLibraries result={practiceLibraries} canManage />}
+      {practiceLibraries?.error && <Alert variant="destructive"><AlertTitle>แสดงคลังฝึกไม่สำเร็จ</AlertTitle><AlertDescription>{practiceLibraries.error}</AlertDescription></Alert>}
 
       {filtered.length > 0 && (
         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -593,7 +648,7 @@ export function ClassroomAssignmentsTab({
 
       {filtered.length === 0 && categories.length === 0 ? (
         <Card edge="ring" className="py-12 text-center text-sm text-muted-foreground">
-          {assignments.length === 0 ? 'ยังไม่มีงานที่มอบหมายให้ห้องนี้' : 'ไม่พบงานที่ตรงกับตัวกรอง'}
+          {workItems.length === 0 ? 'ยังไม่มีงานที่มอบหมายให้ห้องนี้' : 'ไม่พบงานที่ตรงกับตัวกรอง'}
         </Card>
       ) : (
         <DndContext
@@ -630,7 +685,7 @@ export function ClassroomAssignmentsTab({
                   <AssignmentCategoryCard
                     category={section.category}
                     assignmentCount={section.assignments.length}
-                    showHeader={categories.length > 0}
+                    showHeader
                     isDropTarget={
                       draggingAssignmentId !== null
                       && dragTargetCategoryId !== undefined
@@ -639,8 +694,49 @@ export function ClassroomAssignmentsTab({
                   >
                   {section.assignments.map(assignment => {
                     const statusCfg = statusConfig(assignment.status)
-                    const typeCfg = TYPE_CFG[assignment.type] ?? TYPE_CFG.exam
+                    const typeCfg = workTypeConfig(assignment.type)
                     const TypeIcon = typeCfg.icon
+                    if (assignment.kind === 'practice') {
+                      const practiceStatus = {
+                        ...statusCfg,
+                        description: assignment.status === 'published'
+                          ? 'นักเรียนในห้องสามารถเปิดคลังฝึกและฝึกซ้ำได้'
+                          : assignment.status === 'closed' ? 'ปิดคลังฝึกแล้ว นักเรียนจึงเข้าใช้คลังนี้ไม่ได้' : 'ยังไม่แสดงคลังฝึกให้นักเรียนเห็นจนกว่าจะเผยแพร่',
+                      }
+                      return <SortableAssignmentRow key={assignment.id}
+                        assignmentId={assignment.id} categoryId={assignment.category_id} title={assignment.title}
+                        disabled={isOrderPending || isPending || layoutBlocked} freezeLayout={!sortingWithinCategory}
+                        tone={statusCfg.row} status={practiceStatus}
+                      >
+                        <div className="flex flex-col gap-3 px-2" data-classroom-practice-row>
+                          <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
+                            <Link href={`/practice/${assignment.libraryId}/edit`} className="flex min-w-0 flex-1 items-center gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                              <div className={cn('flex size-8 shrink-0 items-center justify-center rounded-lg', typeCfg.bg)}>
+                                <TypeIcon className={cn('size-4', typeCfg.text)} aria-hidden="true" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="line-clamp-2 text-sm font-medium leading-snug" title={assignment.title}>{assignment.title}</p>
+                                <p className="mt-0.5 text-xs text-muted-foreground">{assignment.questionCount} ข้อ · ฝึกซ้ำได้ · ไม่มีคะแนน</p>
+                              </div>
+                            </Link>
+                            <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
+                              {categoryPicker(assignment)}
+                              <Badge variant="secondary">คลังฝึก</Badge>
+                              <Badge variant={statusCfg.badge}>{statusCfg.label}</Badge>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1 rounded-xl bg-muted/40 p-1 md:justify-end">
+                            <Button variant="ghost" size="sm" render={<Link href={`/practice/${assignment.libraryId}/progress`} />}>
+                              <BarChart3 data-icon="inline-start" /> ดูความคืบหน้า
+                            </Button>
+                            <Button variant="ghost" size="sm" render={<Link href={`/practice/${assignment.libraryId}/edit`} />}>
+                              <Pencil data-icon="inline-start" /> แก้ไขการตั้งค่า
+                            </Button>
+                            <PracticeLibraryListActions id={assignment.libraryId} title={assignment.title} status={assignment.status} canManage />
+                          </div>
+                        </div>
+                      </SortableAssignmentRow>
+                    }
                     const passingThreshold = formatPassingThreshold(assignment.passing_type, assignment.passing_value)
                     const audience = audienceByAssignment?.get(assignment.id) ?? null
                     const stats = computeAssignmentProgress(assignment, submissions, audience)
@@ -656,7 +752,7 @@ export function ClassroomAssignmentsTab({
                         assignmentId={assignment.id}
                         categoryId={assignment.category_id ?? null}
                         title={assignment.title}
-                        disabled={isOrderPending || isPending}
+                        disabled={isOrderPending || isPending || layoutBlocked}
                         freezeLayout={!sortingWithinCategory}
                         tone={statusCfg.row}
                         status={statusCfg}
@@ -724,26 +820,7 @@ export function ClassroomAssignmentsTab({
                           </Link>
 
                           <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
-                            <Select
-                              items={categoryItems}
-                              value={assignment.category_id ?? UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE}
-                              onValueChange={value => moveToCategory(assignment.id, value)}
-                              disabled={isPending}
-                            >
-                              <SelectTrigger size="sm" className="w-40 max-w-full" aria-label={`กลุ่มของ ${assignment.title}`}>
-                                <Folder />
-                                <SelectValue>
-                                  {value => categoryItems.find(item => item.value === value)?.label ?? 'ยังไม่จัดกลุ่ม'}
-                                </SelectValue>
-                              </SelectTrigger>
-                              <SelectContent align="end">
-                                <SelectGroup>
-                                  {categoryItems.map(item => (
-                                    <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
-                                  ))}
-                                </SelectGroup>
-                              </SelectContent>
-                            </Select>
+                            {categoryPicker(assignment)}
                             <span className={cn('whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium', typeCfg.bg, typeCfg.text)}>
                               {typeCfg.label}
                             </span>

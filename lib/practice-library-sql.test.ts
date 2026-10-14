@@ -22,6 +22,16 @@ const compatibilityMigration = readFileSync(
   new URL('../supabase/migrations/20261014043342_practice_draft_backward_compatibility.sql', import.meta.url),
   'utf8',
 )
+const layoutMigration = readFileSync(
+  new URL('../supabase/migrations/20261014125654_classroom_practice_work_layout.sql', import.meta.url), 'utf8',
+)
+const categoryMigration = readFileSync(
+  new URL('../supabase/migrations/20260928234553_classroom_assignment_categories.sql', import.meta.url), 'utf8',
+)
+const categoryGuard = categoryMigration.slice(
+  categoryMigration.indexOf('CREATE FUNCTION public.enforce_assignment_category_classroom()'),
+  categoryMigration.indexOf('CREATE TRIGGER assignment_classrooms_category_same_classroom'),
+)
 
 const ORG_A = '10000000-0000-4000-8000-000000000001'
 const ORG_B = '10000000-0000-4000-8000-000000000002'
@@ -47,6 +57,9 @@ const QUESTION_PUBLIC = '40000000-0000-4000-8000-000000000006'
 const LIBRARY = '50000000-0000-4000-8000-000000000001'
 const LIBRARY_DELETE = '50000000-0000-4000-8000-000000000002'
 const PERFORMANCE_LIBRARY = '50000000-0000-4000-8000-000000000003'
+const CATEGORY_A = '60000000-0000-4000-8000-000000000001'
+const CATEGORY_B = '60000000-0000-4000-8000-000000000002'
+const ASSIGNMENT_A = '70000000-0000-4000-8000-000000000001'
 
 let db: PGlite
 
@@ -268,6 +281,26 @@ beforeAll(async () => {
   await db.exec(multiClassroomMigration)
   await db.exec(settingsMigration)
   await db.exec(compatibilityMigration)
+  await db.exec(`
+    CREATE TABLE public.classroom_assignment_categories (
+      id uuid PRIMARY KEY, classroom_id uuid NOT NULL REFERENCES public.classrooms(id) ON DELETE CASCADE
+    );
+    CREATE TABLE public.assignment_classrooms (
+      assignment_id uuid NOT NULL, classroom_id uuid NOT NULL REFERENCES public.classrooms(id) ON DELETE CASCADE,
+      display_order integer, PRIMARY KEY (assignment_id, classroom_id)
+    );
+    INSERT INTO public.classroom_assignment_categories VALUES ('${CATEGORY_A}', '${ROOM_A}'), ('${CATEGORY_B}', '${ROOM_B}');
+    INSERT INTO public.assignment_classrooms VALUES ('${ASSIGNMENT_A}', '${ROOM_A}', 1);
+    GRANT SELECT ON public.classroom_assignment_categories TO authenticated, service_role;
+    GRANT SELECT, UPDATE ON public.assignment_classrooms TO service_role;
+    GRANT SELECT, UPDATE ON public.classrooms TO service_role;
+    GRANT SELECT ON public.users, public.classroom_co_teachers TO service_role;
+  `)
+  await db.exec(categoryGuard)
+  await db.exec(layoutMigration)
+  // Supabase's service role already has broad table access; the fixture uses
+  // explicit grants so this check exercises the trigger rather than ACLs.
+  await db.exec('GRANT UPDATE (category_id) ON public.practice_libraries TO service_role')
   await as(user(OWNER_A), async tx => {
     await tx.query(
       `INSERT INTO public.practice_libraries
@@ -289,6 +322,53 @@ beforeAll(async () => {
 }, 60_000)
 
 afterAll(async () => { await db?.close() })
+
+describe('practice work grouping and mixed order', () => {
+  it('groups published practice within its own classroom without changing activity or creation time', async () => {
+    await as(user(OWNER_A), async tx => {
+      const before = (await tx.query<{ created_at: Date }>('SELECT created_at FROM practice_libraries WHERE id=$1', [LIBRARY])).rows[0]
+      await tx.query('UPDATE practice_libraries SET category_id=$1 WHERE id=$2', [CATEGORY_A, LIBRARY])
+      const after = (await tx.query<{ category_id: string; created_at: Date; status: string }>('SELECT category_id, created_at, status FROM practice_libraries WHERE id=$1', [LIBRARY])).rows[0]
+      expect(after.category_id).toBe(CATEGORY_A)
+      expect(after.created_at).toEqual(before.created_at)
+      expect(after.status).toBe('published')
+    })
+  })
+
+  it('rejects a category from a different classroom even for service writes', async () => {
+    await expect(as(service, tx => tx.query('UPDATE practice_libraries SET category_id=$1 WHERE id=$2', [CATEGORY_B, LIBRARY]))).rejects.toMatchObject({ code: '23514' })
+  })
+
+  it('returns practice to ungrouped when a category is deleted', async () => {
+    await db.transaction(async tx => {
+      await tx.query('UPDATE practice_libraries SET category_id=$1 WHERE id=$2', [CATEGORY_A, LIBRARY])
+      await tx.query('DELETE FROM classroom_assignment_categories WHERE id=$1', [CATEGORY_A])
+      expect((await tx.query<{ category_id: string | null }>('SELECT category_id FROM practice_libraries WHERE id=$1', [LIBRARY])).rows[0].category_id).toBeNull()
+      await tx.rollback()
+    })
+  })
+
+  it.each([OWNER_A, CO_MANAGE])('persists interleaved order atomically for an authorized actor %s', async actor => {
+    await as(service, async tx => {
+      await tx.query('SELECT reorder_classroom_work($1,$2,$3)', [actor, ROOM_A, [`practice:${LIBRARY}`, ASSIGNMENT_A]])
+      expect((await tx.query<{ display_order: number }>('SELECT display_order FROM practice_libraries WHERE id=$1', [LIBRARY])).rows[0].display_order).toBe(1)
+      expect((await tx.query<{ display_order: number }>('SELECT display_order FROM assignment_classrooms WHERE assignment_id=$1', [ASSIGNMENT_A])).rows[0].display_order).toBe(2)
+    })
+  })
+
+  it.each([CO_VIEW, OWNER_B, STUDENT_A])('denies ordering for unauthorized actor %s', async actor => {
+    await expect(as(service, tx => tx.query('SELECT reorder_classroom_work($1,$2,$3)', [actor, ROOM_A, [ASSIGNMENT_A, `practice:${LIBRARY}`]]))).rejects.toMatchObject({ code: '42501' })
+  })
+
+  it.each([{ role: 'anon' } as const, user(OWNER_A)])('does not expose the order RPC to browser roles %s', async actor => {
+    await expect(as(actor, tx => tx.query('SELECT reorder_classroom_work($1,$2,$3)', [OWNER_A, ROOM_A, [ASSIGNMENT_A, `practice:${LIBRARY}`]]))).rejects.toMatchObject({ code: '42501' })
+  })
+
+  it.each([[ASSIGNMENT_A], [ASSIGNMENT_A, ASSIGNMENT_A], [ASSIGNMENT_A, `practice:${LIBRARY}`, QUESTION_B]].map(ids => ({ ids })))('rejects stale, duplicate or foreign work without a partial write $ids', async ({ ids }) => {
+    await expect(as(service, tx => tx.query('SELECT reorder_classroom_work($1,$2,$3)', [OWNER_A, ROOM_A, ids]))).rejects.toMatchObject({ code: '22023' })
+    expect((await db.query<{ display_order: number }>('SELECT display_order FROM assignment_classrooms WHERE assignment_id=$1', [ASSIGNMENT_A])).rows[0].display_order).toBe(1)
+  })
+})
 
 describe('self-practice migration privacy contract', () => {
   it('creates exactly five durable attempt fields and no grading payload', async () => {

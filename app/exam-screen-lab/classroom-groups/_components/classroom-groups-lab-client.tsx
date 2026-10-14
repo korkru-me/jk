@@ -155,10 +155,12 @@ export function ClassroomGroupsLabClient({
   scenario,
   fail,
   overviewOnly = false,
+  workOnly = false,
 }: {
   scenario: GroupsLabScenario
   fail: boolean
   overviewOnly?: boolean
+  workOnly?: boolean
 }) {
   const seed = useMemo(() => initial(scenario), [scenario])
   const [state, setState] = useState<GroupState>(seed.state)
@@ -278,6 +280,40 @@ export function ClassroomGroupsLabClient({
     </section>
   )
 
+  const workFixture = (
+    <ClassroomAssignmentsTab
+      classroomId={CLASSROOM_ID}
+      assignments={[...LAB_ASSIGNMENTS, { ...LAB_ASSIGNMENTS[1], id: '00000000-0000-4000-b000-000000000004', title: 'ข้อสอบกลางภาคจำลอง', type: 'exam', category_id: CATEGORY_ONE_ID, display_order: 4 }]}
+      categories={LAB_CATEGORIES}
+      submissions={[]}
+      studentCount={32}
+      pendingReviewByAssignment={{}}
+      practiceLibraries={{ error: null, layoutAvailable: true, items: [
+        { id: '00000000-0000-4000-a000-000000000001', title: 'คลังฝึกทบทวนแรงและการเคลื่อนที่', status: 'published', questionCount: 24, categoryId: CATEGORY_ONE_ID, displayOrder: 2 },
+        { id: '00000000-0000-4000-a000-000000000002', title: 'คลังฝึกฉบับร่าง ชื่อยาวสำหรับตรวจรายการรวมบนมือถือ', status: 'draft', questionCount: 8, categoryId: null, displayOrder: null },
+      ] }}
+      recentWork={{ asOf: '2026-10-14T12:00:00.000Z', error: null, items: [
+        { id: '00000000-0000-4000-a000-000000000001', title: 'คลังฝึกทบทวนแรงและการเคลื่อนที่', type: 'practice', status: 'published', createdAt: '2026-10-14T12:00:00.000Z' },
+      ] }}
+      onReorderAssignments={async () => {
+        await wait()
+        return fail
+          ? { error: '(ห้องทดลอง) บันทึกลำดับไม่สำเร็จ — รายการควรย้อนกลับเป็นแบบเดิม' }
+          : {}
+      }}
+      onSetAssignmentCategory={async () => {
+        await wait()
+        return fail
+          ? { ok: false, error: '(ห้องทดลอง) ย้ายกลุ่มไม่สำเร็จ — งานควรกลับไปอยู่กลุ่มเดิม' }
+          : { ok: true }
+      }}
+    />
+  )
+
+  if (workOnly) {
+    return <div className="mx-auto w-full min-w-0 max-w-7xl p-4 sm:p-6">{workFixture}</div>
+  }
+
   if (overviewOnly) {
     return <div className="mx-auto max-w-5xl p-4 sm:p-6">{overviewFixture}</div>
   }
@@ -355,26 +391,7 @@ export function ClassroomGroupsLabClient({
             มีครบทั้งฉบับร่าง เผยแพร่แล้ว และปิดแล้ว · ลำดับที่ลากอยู่ในหน่วยความจำของแท็บนี้
           </p>
         </div>
-        <ClassroomAssignmentsTab
-          classroomId={CLASSROOM_ID}
-          assignments={LAB_ASSIGNMENTS}
-          categories={LAB_CATEGORIES}
-          submissions={[]}
-          studentCount={32}
-          pendingReviewByAssignment={{}}
-          onReorderAssignments={async () => {
-            await wait()
-            return fail
-              ? { error: '(ห้องทดลอง) บันทึกลำดับไม่สำเร็จ — รายการควรย้อนกลับเป็นแบบเดิม' }
-              : {}
-          }}
-          onSetAssignmentCategory={async () => {
-            await wait()
-            return fail
-              ? { ok: false, error: '(ห้องทดลอง) ย้ายกลุ่มไม่สำเร็จ — งานควรกลับไปอยู่กลุ่มเดิม' }
-              : { ok: true }
-          }}
-        />
+        {workFixture}
       </section>
 
       <div className="max-w-2xl">

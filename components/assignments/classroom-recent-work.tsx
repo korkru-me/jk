@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { ArrowRight, CircleCheck } from 'lucide-react'
+import { CircleCheck } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { formatThaiDateTime } from '@/lib/thai-time'
@@ -36,7 +36,7 @@ export function ClassroomRecentWork({ result }: { result: RecentClassroomWorkRes
           <CircleCheck className="mt-0.5 size-5 shrink-0 text-success" aria-hidden="true" />
           <div>
             <h2 id="recent-classroom-work-heading" className="font-semibold">งานที่เพิ่งมอบหมาย</h2>
-            <p className="text-xs text-muted-foreground">สร้างสำเร็จแล้ว · แสดงงานที่คุณสร้างในช่วง 3 วันที่ผ่านมา</p>
+            <p className="text-xs text-muted-foreground">สร้างสำเร็จแล้ว</p>
           </div>
         </div>
         {result.error ? <p role="alert" className="text-sm text-destructive">{result.error}</p> : (
@@ -44,13 +44,12 @@ export function ClassroomRecentWork({ result }: { result: RecentClassroomWorkRes
             {items.map(item => (
               <li key={`${item.type}:${item.id}`}>
                 <Link href={item.type === 'practice' ? `/practice/${item.id}/edit` : `/assignments/${item.id}`}
-                  className="flex min-h-11 min-w-0 items-center gap-2 rounded-lg px-2 py-2 outline-none hover:bg-success/10 focus-visible:ring-2 focus-visible:ring-ring">
-                  <div className="min-w-0 flex-1">
+                  className="group block h-full min-h-11 min-w-0 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  <Card radius="sm" padding="sm" className="h-full min-w-0 border-success/30 transition-colors group-hover:bg-success/10">
                     <p className="break-words text-sm font-semibold">{item.title}</p>
                     <p className="mt-1 text-xs text-muted-foreground">{TYPE_LABELS[item.type]} · {formatThaiDateTime(item.createdAt)}</p>
                     <Badge className="mt-1" variant={item.status === 'published' ? 'statusSuccess' : 'secondary'}>{item.status === 'published' ? 'เผยแพร่แล้ว' : 'บันทึกร่างแล้ว'}</Badge>
-                  </div>
-                  <ArrowRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  </Card>
                 </Link>
               </li>
             ))}
