@@ -1695,3 +1695,13 @@ Physical iPad UAT ของ candidate `r7` ยืนยันแล้วว่�
 - localhost `/exam-screen-lab/student-classroom?scenario=homeroom` มี 62 เพื่อน/ชื่อยาว/เลขที่ว่าง/ประกาศสังเคราะห์ และ `homeroom-empty` ไม่มีเพื่อนหรือประกาศ; ไม่เขียน seen/start/submit หรือข้อมูลบัญชีจริง ไม่มี migration/push/deploy จากงานนี้
 
 - ตรวจ TypeScript, token lint, webpack build และ 3,274 tests ผ่าน Chrome ที่ 320/390/1280/1600px ไม่ล้นแนวนอน, light/dark axe ไม่พบ violation, ห้องว่างถูกต้อง และ wheel ของ roster ที่สุดขอบบน/ล่างทำให้ main scroll ต่อจริง ปฏิทินคงตำแหน่งระหว่าง main scroll และขอบขวาคอลัมน์ตรงกระดิ่งทั้ง expanded/collapsed ตรวจ Staging แบบอ่านอย่างเดียวด้วย query ที่ไม่คืนข้อมูลนักเรียนและชื่อ FK จริง; ยังไม่ทดสอบ flow บัญชีจริง/อุปกรณ์สัมผัสจริง และไม่เขียนฐานข้อมูล
+
+### เครื่องมือระหว่างทำข้อสอบ/แบบฝึกหัดและแผงนำทาง — 14 ตุลาคม 2026 (local preview)
+
+- `ExamToolbarDock` ทำให้กระดาษทด เครื่องคิดเลข โฟกัส และสถานะเดิมติดด้านบนใน main scroll; Card ลด padding/ขนาดปุ่มบนเมาส์และยังมีเป้าสัมผัสอย่างน้อย 44px ใช้ ResizeObserver วัดแถบและ padding ของ scrollport เพื่อไม่ให้แถบบังโจทย์หลังเลือกเลขข้อหรือเมื่อข้อความสถานะขึ้นหลายบรรทัด
+- แผงขวารวมเวลา/จำนวนข้อที่ตอบ/ความคืบหน้าใน Card เดียว และรวมเลขข้อ คำอธิบายสถานะ จำนวนปักธง สลับแท็บ และส่งคำตอบในอีก Card กรอบสูงตามเนื้อหาจนถึงความสูงจำกัด เลขข้อเลื่อนภายในเมื่อพื้นที่ไม่พอ ไม่ยืดช่องว่างตามหน้าจอ; ใช้สี semantic และ timer ที่ไม่ประกาศทุกวินาทีให้ screen reader
+- การเปลี่ยนเป็น UI ใหม่ไม่เปลี่ยน hooks เวลา/บันทึก/คุมสอบ หรือเงื่อนไขตรวจและส่งคำตอบ เครื่องมือยังขึ้นตาม config และโหมดถูกติดต่อกันยังไม่มี bulk navigation/submit/เปอร์เซ็นต์จากจำนวนข้อสมมติ
+- Lab เดิมยังใช้ previewMode และข้อมูลสังเคราะห์ เพิ่ม `?timed=1` สำหรับเวลา 60 นาที, `&type=exercise` และ `&shell=1` สำหรับกรอบแอปจริง ไม่มีการสร้าง attempt หรือเขียนคำตอบ/รูป/ฐานข้อมูล
+- TypeScript, token lint, webpack build และ unit suite 252 ไฟล์ / 3,281 เคสผ่าน Browser ตรวจ 320/390/1024/1280/1600px, shell เปิด/พับเมนู, จอสูง 600px, โหมดโฟกัส, เปิดเครื่องมือหลังเลื่อน, เปลี่ยนข้อโดยหัวโจทย์ไม่ถูกบัง, ตอบ/ปักธง/จำนวนตอบ และ guard ต้องแนบวิธีทำก่อนส่ง ผ่านการจำลอง touch 320/390px; stress CSS grid ด้วยปุ่มสังเคราะห์ 112 ปุ่มยังเลื่อนเลขข้อและเห็นปุ่มส่งได้
+- Axe เฉพาะ toolbar/แผงขวาไม่พบ violation/incomplete ทั้ง light/dark; full-page audit ยังพบ watermark contrast และไม่มี h1 ซึ่งเป็นส่วนเดิมนอกขอบเขตนี้ Next MCP compile/runtime ไม่มี error และตรวจ React tree ของ ExamClient/ExamToolbarDock/ExamToolbar แล้ว ไม่ทดสอบการส่งงานจริงบน Auth/Production, SEB native หรืออุปกรณ์สัมผัสจริง
+- ตามคำสั่งเจ้าของเก็บ source เป็น local commit และแสดง localhost เท่านั้น งานนี้ไม่ push/deploy และไม่มี migration หรือการแก้ฐานข้อมูล

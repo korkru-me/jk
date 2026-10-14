@@ -64,6 +64,7 @@ import type {
   SafeTrueFalseStatement,
 } from '@/lib/exam-safe'
 import { Card } from '@/components/ui/card'
+import { ExamToolbarDock } from './exam-toolbar-dock'
 import { Textarea } from '@/components/ui/textarea'
 import { NativeSelect } from '@/components/ui/native-select'
 import { ExamWatermark } from './exam-watermark'
@@ -1171,7 +1172,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   const answeredCount = answers.filter(a => hasAnswered(a.id)).length
   const flaggedCount  = flagged.size
   const unanswered    = answers.length - answeredCount
-  const progress      = Math.round((answeredCount / answers.length) * 100)
+  const progress      = answers.length ? Math.round((answeredCount / answers.length) * 100) : 0
   const timerUrgent   = secondsLeft !== null && secondsLeft < 300
   const timerDanger   = secondsLeft !== null && secondsLeft < 60
 
@@ -1183,11 +1184,11 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
       { cls: 'border border-destructive/30 bg-destructive/15', label: 'ตรวจแล้ว ยังไม่ถูก' },
     ] : []),
     { cls: 'bg-flag', label: 'ปักธง' },
-    { cls: 'bg-muted', label: 'ยังไม่ตอบ' },
+    { cls: 'border border-border bg-muted', label: 'ยังไม่ตอบ' },
   ]
 
   const renderQuestionNavigationLegend = () => (
-    <div className="grid shrink-0 grid-cols-2 gap-x-3 gap-y-1.5 px-1">
+    <div className="grid shrink-0 grid-cols-2 gap-x-3 gap-y-1.5">
       {navigationLegendItems.map(item => (
         <div key={item.label} className="flex min-w-0 items-center gap-2">
           <div className={cn('h-3 w-3 shrink-0 rounded-sm', item.cls)} />
@@ -1201,7 +1202,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
     const compactNumbers = !touchFriendly && answers.length > 12
     return (
       <div className={cn(
-        'grid gap-1.5',
+        'grid gap-1.5 pointer-coarse:grid-cols-4',
         touchFriendly || compactNumbers ? 'grid-cols-5' : 'grid-cols-4',
       )}>
         {answers.map((answer, i) => {
@@ -1209,12 +1210,12 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
           const isAnswered = hasAnswered(answer.id)
           const isFlagged = flagged.has(answer.id)
           const verdict = checked[answer.id]?.verdict
-          let tone = 'bg-muted text-foreground/70'
-          if (isCurrent) tone = 'z-10 scale-105 bg-primary text-primary-foreground shadow-md shadow-primary/40'
-          else if (isFlagged) tone = 'bg-flag text-white'
+          let tone = 'border border-border/60 bg-muted/50 text-foreground/75 hover:bg-muted'
+          if (isCurrent) tone = 'border border-primary bg-primary text-primary-foreground ring-2 ring-primary/15 hover:bg-primary/90'
+          else if (isFlagged) tone = 'border border-flag bg-flag text-flag-foreground hover:bg-flag/90'
           else if (verdict === 'correct') tone = 'bg-success text-success-foreground'
           else if (verdict === 'wrong' || verdict === 'partial') tone = 'border border-destructive/30 bg-destructive/15 text-destructive'
-          else if (isAnswered) tone = 'border border-success/20 bg-success/10 text-success dark:bg-success/15'
+          else if (isAnswered) tone = 'border border-success/25 bg-success/10 text-[color-mix(in_oklab,var(--success)_60%,var(--foreground))] hover:bg-success/15'
 
           return (
             <Button
@@ -1226,19 +1227,16 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                 navigateTo(i)
                 if (touchFriendly) setShowQuestionNavigator(false)
               }}
-              aria-label={`ไปข้อ ${i + 1}`}
+              aria-label={`ไปข้อ ${i + 1}${isCurrent ? ' · ข้อปัจจุบัน' : ''}${isAnswered ? ' · ตอบแล้ว' : ' · ยังไม่ตอบ'}${isFlagged ? ' · ปักธง' : ''}`}
               aria-current={isCurrent ? 'page' : undefined}
               className={cn(
-                'rounded-lg font-bold transition-all hover:scale-105',
-                touchFriendly
-                  ? 'h-11 w-11 text-sm'
-                  : compactNumbers
-                    ? 'h-8 w-8 text-xs'
-                    : 'h-10 w-10 text-sm pointer-coarse:h-11 pointer-coarse:w-11',
+                'relative w-full rounded-lg font-semibold tabular-nums transition-colors motion-reduce:transition-none',
+                touchFriendly ? 'h-11 text-sm' : 'h-9 text-xs pointer-coarse:h-11',
                 tone,
               )}
             >
               {i + 1}
+              {isFlagged && <Flag className="absolute right-0.5 top-0.5 size-2" aria-hidden="true" />}
             </Button>
           )
         })}
@@ -1353,7 +1351,8 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
               aria-busy={checkingId === current.id}
               inert={checkingId === current.id ? true : undefined}
               tabIndex={-1}
-              className="flex flex-col gap-3 rounded-2xl scroll-mt-2 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+              className={cn('flex flex-col gap-3 rounded-2xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+                focusMode ? 'scroll-mt-2' : 'scroll-mt-[calc(var(--exam-toolbar-height,3.25rem)+var(--exam-toolbar-scroll-inset,0px)+0.75rem)]')}
             >
             {/* Question card */}
             <Card padding="lg" className="space-y-4">
@@ -1672,110 +1671,63 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
         )}
       </div>
 
-      {/* RIGHT: Nav panel */}
-      <div
-        data-exam-desktop-navigation
-        className={`hidden min-h-0 shrink-0 flex-col gap-3 lg:flex ${
-          focusMode
+      {/* RIGHT: timer/progress and a bounded question navigator. */}
+      {(!streakOn || secondsLeft !== null || tabSwitchCount > 0) && (
+        <aside aria-label="สถานะและนำทางข้อ" data-exam-desktop-navigation
+          className={cn('hidden min-h-0 shrink-0 flex-col gap-3 lg:flex', focusMode
             ? 'h-full w-60'
-            : 'sticky top-3 h-[calc(100dvh-14.5rem)] w-56 self-start overflow-hidden'
-        }`}
-      >
-
-        {/* Timer */}
-        {secondsLeft !== null && (
-          <div className={`rounded-2xl border p-4 text-center transition-colors ${
-            timerDanger
-              ? 'border-destructive bg-destructive/10 animate-pulse'
-              : timerUrgent
-              ? 'border-flag bg-flag/8'
-              : 'bg-card'
-          }`}>
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">เวลาที่เหลือ</p>
-            <p className={`text-3xl font-black font-mono ${
-              timerDanger ? 'text-destructive' :
-              timerUrgent ? 'text-flag dark:text-flag' : 'text-foreground'
-            }`}>
-              {formatTime(secondsLeft)}
-            </p>
-            {timerUrgent && (
-              <p className="text-[10px] text-flag mt-1 flex items-center justify-center gap-1">
-                <AlertTriangle size={9} /> เหลือน้อยแล้ว
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Progress — replaced by the streak meter under the ข้อ in a streak
-            run, where "3/12" would be a share of a total the งาน has not
-            settled on. */}
-        {!streakOn && (
-        <Card padding="md" className="space-y-2">
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>คืบหน้า</span>
-            <span className="font-semibold text-foreground">{answeredCount}/{answers.length}</span>
-          </div>
-          <div className="h-2 bg-muted rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-blue-500 to-blue-400 rounded-full transition-all duration-500"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-          <div className="flex gap-2 text-[10px] text-muted-foreground pt-0.5">
-            {flaggedCount > 0 && (
-              <span className="flex items-center gap-0.5 text-flag">
-                <Flag size={9} className="fill-flag" /> {flaggedCount}
-              </span>
-            )}
-            <span className="ml-auto">
-              <AutosaveStatus
-                saving={saving}
-                isOnline={isOnline}
-                pendingSync={pendingCount}
-                onRetryPending={syncPendingAnswers}
-                compact
-              />
-            </span>
-          </div>
-        </Card>
-        )}
-
-        {/* Nav grid — a streak run has nowhere to jump to: every earlier ข้อ
-            is closed and the next one is not drawn until this one is judged. */}
-        {!streakOn && (
-        <Card padding="md" className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3">นำทางข้อ</p>
-          {renderQuestionNavigation()}
-        </Card>
-        )}
-
-        {!streakOn && renderQuestionNavigationLegend()}
-
-        <div className="flex shrink-0 flex-col gap-2">
-          {/* Anti-cheat counter */}
-          {tabSwitchCount > 0 && (
-            <div className="flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2">
-              <ShieldAlert size={14} className="shrink-0 text-destructive" />
-              <div>
-                <p className="text-[10px] font-bold text-destructive">สลับแท็บ {tabSwitchCount} ครั้ง</p>
-                <p className="text-[9px] text-muted-foreground">ระบบตรวจพบแล้ว</p>
-              </div>
-            </div>
+            : 'sticky top-[calc(var(--exam-toolbar-height,3.25rem)+0.75rem)] max-h-[max(16rem,calc(100dvh-var(--exam-toolbar-height,3.25rem)-8rem))] w-60 self-start')}>
+          {(secondsLeft !== null || !streakOn) && (
+            <Card className="shrink-0 overflow-hidden" data-exam-status-card>
+              {secondsLeft !== null && (
+                <div className={cn('flex items-center justify-between gap-3 px-3 py-3',
+                  timerDanger ? 'bg-destructive/8' : timerUrgent ? 'bg-flag/8' : 'bg-primary/5')}>
+                  <div className="flex items-center gap-2">
+                    <Clock className={cn('size-4', timerDanger ? 'text-destructive' : timerUrgent ? 'text-flag' : 'text-primary')} aria-hidden="true" />
+                    <div className="flex flex-col gap-0.5">
+                      <p className="text-xs font-medium text-foreground/75">เวลาที่เหลือ</p>
+                      {timerUrgent && <p className={cn('text-[10px] font-semibold', timerDanger ? 'text-destructive' : 'text-[color-mix(in_oklab,var(--flag)_60%,var(--foreground))]')}>ใกล้หมดเวลา</p>}
+                    </div>
+                  </div>
+                  <p className={cn('font-mono text-2xl font-bold tabular-nums', timerDanger ? 'text-destructive' : timerUrgent ? 'text-[color-mix(in_oklab,var(--flag)_60%,var(--foreground))]' : 'text-foreground')}
+                    role="timer" aria-live="off" aria-label={`เวลาที่เหลือ ${formatTime(secondsLeft)}`}>{formatTime(secondsLeft)}</p>
+                </div>
+              )}
+              {!streakOn && (
+                <div className={cn('flex flex-col gap-2 px-3 py-3', secondsLeft !== null && 'border-t')}>
+                  <div className="flex items-center justify-between gap-2 text-xs">
+                    <span className="text-muted-foreground">ตอบแล้ว <strong className="font-semibold text-foreground">{answeredCount}/{answers.length}</strong></span>
+                    <span className="font-semibold tabular-nums text-primary">{progress}%</span>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label="จำนวนข้อที่ตอบแล้ว" aria-valuemin={0} aria-valuemax={answers.length || 1} aria-valuenow={answeredCount}>
+                    <div className="h-full rounded-full bg-primary transition-[width] duration-300 motion-reduce:transition-none" style={{ width: `${progress}%` }} />
+                  </div>
+                  <div className="flex justify-end text-[10px]"><AutosaveStatus saving={saving} isOnline={isOnline} pendingSync={pendingCount} onRetryPending={syncPendingAnswers} compact /></div>
+                </div>
+              )}
+            </Card>
           )}
-
-          {/* A streak run has no bulk ส่งคำตอบ: the attempt ends when the run
-              does, and its controls live under the ข้อ itself. */}
           {!streakOn && (
-            <Button
-              onClick={openSubmitDialog}
-              disabled={submitting}
-              className="w-full border-0 bg-success text-success-foreground hover:bg-success/90"
-            >
-              {submitting ? 'กำลังส่ง...' : 'ส่งคำตอบ ✓'}
-            </Button>
+            <Card className="flex min-h-0 flex-col overflow-hidden" data-exam-navigation-card>
+              <div className="flex shrink-0 items-center justify-between gap-2 border-b px-3 py-2.5">
+                <h2 className="flex items-center gap-1.5 text-xs font-semibold"><ListChecks className="size-3.5 text-primary" aria-hidden="true" />นำทางข้อ</h2>
+                <span className="text-[10px] text-muted-foreground">{flaggedCount > 0 ? `ปักธง ${flaggedCount}` : `${answers.length} ข้อ`}</span>
+              </div>
+              <div className="min-h-0 overflow-y-auto overscroll-contain p-3 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring" tabIndex={0} role="region" aria-label="เลือกข้อที่ต้องการทำ" data-exam-navigation-scroll>
+                {renderQuestionNavigation()}
+              </div>
+              <div className="shrink-0 border-t px-3 py-2.5">{renderQuestionNavigationLegend()}</div>
+              <div className="flex shrink-0 flex-col gap-2 border-t bg-muted/20 p-3">
+                {tabSwitchCount > 0 && <p className="flex items-center gap-1.5 text-[11px] font-semibold text-destructive"><ShieldAlert className="size-3.5 shrink-0" aria-hidden="true" />สลับแท็บ {tabSwitchCount} ครั้ง</p>}
+                <Button size="sm" onClick={openSubmitDialog} disabled={submitting} className="w-full border-0 bg-success text-success-foreground hover:bg-success/90 pointer-coarse:min-h-11">
+                  {submitting ? 'กำลังส่ง...' : 'ส่งคำตอบ ✓'}
+                </Button>
+              </div>
+            </Card>
           )}
-        </div>
-      </div>
+          {streakOn && tabSwitchCount > 0 && <Card padding="sm" className="shrink-0 border-destructive/30 bg-destructive/5"><p className="flex items-center gap-1.5 text-xs text-destructive"><ShieldAlert className="size-3.5" aria-hidden="true" />สลับแท็บ {tabSwitchCount} ครั้ง</p></Card>}
+        </aside>
+      )}
     </div>
   )
 
@@ -1852,36 +1804,30 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
 
       {/* ── Normal mode ────────────────────────────────────────────────────── */}
       {!focusMode && !previewResult && (
-        <div className="flex flex-col gap-3">
+        <div className="flex min-w-0 flex-col gap-3 [--exam-toolbar-height:3.25rem]" data-exam-normal-stage>
           {previewBanner(true)}
-          {/* Toolbar */}
-          <ExamToolbar
-            saving={saving}
-            isOnline={isOnline}
-            pendingSync={pendingCount}
-            onRetryPending={syncPendingAnswers}
-            tabSwitchCount={tabSwitchCount}
-            config={config}
-            proctorStatus={proctorStatus}
-            proctorActiveConnectionCount={proctorActiveConnectionCount}
-            calculatorOpen={showCalculator}
-            onToggleCalculator={toggleCalculator}
-            scratchpadOpen={showScratchpad}
-            onToggleScratchpad={toggleScratchpad}
-            onFocusMode={() => setFocusMode(true)}
-            timeLabel={secondsLeft === null ? null : formatTime(secondsLeft)}
-            timerUrgent={timerUrgent}
-            timerDanger={timerDanger}
-            onOpenNavigator={() => setShowQuestionNavigator(true)}
-            focusModeButtonRef={focusModeTriggerRef}
-          />
-          {/* Progress bar */}
-          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-700"
-              style={{ width: `${progress}%` }}
+          <ExamToolbarDock>
+            <ExamToolbar
+              saving={saving}
+              isOnline={isOnline}
+              pendingSync={pendingCount}
+              onRetryPending={syncPendingAnswers}
+              tabSwitchCount={tabSwitchCount}
+              config={config}
+              proctorStatus={proctorStatus}
+              proctorActiveConnectionCount={proctorActiveConnectionCount}
+              calculatorOpen={showCalculator}
+              onToggleCalculator={toggleCalculator}
+              scratchpadOpen={showScratchpad}
+              onToggleScratchpad={toggleScratchpad}
+              onFocusMode={() => setFocusMode(true)}
+              timeLabel={secondsLeft === null ? null : formatTime(secondsLeft)}
+              timerUrgent={timerUrgent}
+              timerDanger={timerDanger}
+              onOpenNavigator={() => setShowQuestionNavigator(true)}
+              focusModeButtonRef={focusModeTriggerRef}
             />
-          </div>
+          </ExamToolbarDock>
           <div className="flex-1">{examBody}</div>
         </div>
       )}
@@ -1892,12 +1838,12 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
           {previewBanner(false)}
           {/* Focus header */}
           <div className="shrink-0 border-b bg-card">
-            <div className="flex items-center gap-2 px-3 py-2 sm:gap-4 sm:px-6 sm:py-3">
+            <div className="flex items-center gap-2 px-3 py-1.5 sm:gap-3 sm:px-4 sm:py-2">
               <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest shrink-0">
+                <span className="sr-only shrink-0 text-[10px] font-bold text-muted-foreground min-[400px]:not-sr-only">
                   โหมดโฟกัส
                 </span>
-                <span className="h-3 w-px bg-border shrink-0" />
+                <span className="hidden h-3 w-px shrink-0 bg-border min-[400px]:block" />
                 <p className="hidden truncate text-sm font-medium min-[430px]:block">
                   {perPage === 1
                     ? (pageAnswers[0]?.questions.title || 'ชุดข้อสอบ')
@@ -1915,14 +1861,14 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                 )}
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex shrink-0 items-center gap-1">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={() => setShowQuestionNavigator(true)}
                   aria-label="ดูทุกข้อ"
-                  className="h-10 min-w-10 px-2 lg:hidden"
+                  className="h-8 min-w-8 px-2 lg:hidden pointer-coarse:h-11 pointer-coarse:min-w-11"
                 >
                   <ListChecks />
                 </Button>
@@ -1934,7 +1880,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                     onClick={toggleScratchpad}
                     aria-pressed={showScratchpad}
                     aria-label="กระดาษทด"
-                    className="size-11 px-0 sm:size-auto sm:px-2.5"
+                    className="h-8 min-w-8 px-2 text-xs pointer-coarse:h-11 pointer-coarse:min-w-11"
                   >
                     <NotebookPen /> <span className="hidden sm:inline">กระดาษทด</span>
                   </Button>
@@ -1947,7 +1893,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                     onClick={toggleCalculator}
                     aria-pressed={showCalculator}
                     aria-label="เครื่องคิดเลข"
-                    className="size-11 px-0 sm:size-auto sm:px-2.5"
+                    className="h-8 min-w-8 px-2 text-xs pointer-coarse:h-11 pointer-coarse:min-w-11"
                   >
                     <CalculatorIcon /> <span className="hidden sm:inline">เครื่องคิดเลข</span>
                   </Button>
@@ -1959,7 +1905,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                   size="sm"
                   onClick={() => setFocusMode(false)}
                   aria-label="ออกจากโหมดโฟกัส"
-                  className="size-11 px-0 sm:size-auto sm:px-2.5"
+                  className="h-8 min-w-8 px-2 text-xs pointer-coarse:h-11 pointer-coarse:min-w-11"
                 >
                   <Minimize2 /> <span className="hidden sm:inline">ออก</span>
                 </Button>
@@ -1968,7 +1914,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
             {/* Progress bar */}
             <div className="h-1 bg-muted">
               <div
-                className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-700"
+                className="h-full bg-primary transition-[width] duration-300 motion-reduce:transition-none"
                 style={{ width: `${progress}%` }}
               />
             </div>
@@ -2541,9 +2487,9 @@ function ExamToolbar({
   focusModeButtonRef: RefObject<HTMLButtonElement | null>
 }) {
   return (
-    <Card className="px-4 py-2.5 flex items-center gap-2 flex-wrap">
+    <Card elevation="sm" radius="md" className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-1.5" data-exam-toolbar>
       {/* Status indicators */}
-      <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs">
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
         <AutosaveStatus
           saving={saving}
           isOnline={isOnline}
@@ -2586,14 +2532,14 @@ function ExamToolbar({
         )}
       </div>
 
-      <div className="ml-auto flex items-center gap-1.5">
+      <div className="ml-auto flex shrink-0 items-center gap-1 rounded-lg bg-muted/40 p-0.5">
         <Button
           type="button"
           variant="outline"
           size="sm"
           onClick={onOpenNavigator}
           aria-label="ดูทุกข้อ"
-          className="h-10 min-w-10 px-2 lg:hidden pointer-coarse:h-11 pointer-coarse:min-w-11"
+          className="h-8 min-w-8 px-2 lg:hidden pointer-coarse:h-11 pointer-coarse:min-w-11"
         >
           <ListChecks />
         </Button>
@@ -2605,7 +2551,7 @@ function ExamToolbar({
             onClick={onToggleScratchpad}
             aria-label="กระดาษทด"
             aria-pressed={scratchpadOpen}
-            className="h-10 min-w-10 px-2 pointer-coarse:h-11 pointer-coarse:min-w-11"
+            className="h-8 min-w-8 px-2 text-xs pointer-coarse:h-11 pointer-coarse:min-w-11"
           >
             <NotebookPen />
             <span className="hidden sm:inline">กระดาษทด</span>
@@ -2619,7 +2565,7 @@ function ExamToolbar({
             onClick={onToggleCalculator}
             aria-label="เครื่องคิดเลข"
             aria-pressed={calculatorOpen}
-            className="h-10 min-w-10 px-2 pointer-coarse:h-11 pointer-coarse:min-w-11"
+            className="h-8 min-w-8 px-2 text-xs pointer-coarse:h-11 pointer-coarse:min-w-11"
           >
             <CalculatorIcon />
             <span className="hidden sm:inline">เครื่องคิดเลข</span>
@@ -2632,7 +2578,7 @@ function ExamToolbar({
           size="sm"
           onClick={onFocusMode}
           aria-label="โฟกัส"
-          className="h-10 min-w-10 px-2 pointer-coarse:h-11 pointer-coarse:min-w-11"
+          className="h-8 min-w-8 px-2 text-xs pointer-coarse:h-11 pointer-coarse:min-w-11"
         >
           <Maximize2 />
           <span className="hidden sm:inline">โฟกัส</span>

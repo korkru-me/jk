@@ -326,3 +326,9 @@ npm run build
 - 14 ต.ค. 2026: student avatar editor บันทึก crop ผ่าน `lib/actions/avatar.ts` ใช้ verified Auth/บัญชี active, immutable owner path + compare-and-set users.avatar_url และ rollback; client รอ save ก่อนปิด ไม่ส่ง owner/URL จาก browser ส่วน summary/announcements ใช้ bounded region ที่ส่ง wheel ต่อให้ main เมื่อสุดกรอบ รายละเอียด `STUDENT_PROFILE_AVATARS.md`.
 
 - 14 ต.ค. 2026: นักเรียนใน homeroom ใช้โครง `student-learning-stage` ร่วมสำหรับคอลัมน์เนื้อหา/ปฏิทิน sticky และ notification alignment ประกาศอยู่ก่อน roster ที่มี bounded natural scroll; peer names/class number DTO สร้างหลัง exact membership guard ด้วย helper `student-homeroom-classmates` ไม่ใช้ compliance card แล้ว.
+
+## Exam toolbar and navigation presentation
+
+- `components/exam/exam-toolbar-dock.tsx` pins the normal exam/exercise toolbar inside the app's main scrollport. Its ResizeObserver writes CSS variables for the actual toolbar height and scrollport top padding, without a React state update or scroll listener. Question scroll margins include both so existing focus/scrollIntoView navigation does not hide the question beneath the dock.
+- `ExamClient` renders a compact timer/progress Card and a content-sized, height-bounded navigation Card. Only the number grid shrinks/scrolls; legends and submit remain visible. Focus mode keeps its existing independent question scroller and header. Streak mode retains its absence of bulk navigation/submission and a total-based progress meter.
+- This is presentation only: timer/auto-save/proctor hooks, answer state, checking/submit guards, tool configuration gates and overlay ownership remain on their existing paths. Synthetic lab options `timed=1`, `type=exercise`, and `shell=1` exercise this UI without Auth, database writes or real attempts. Native SEB and real submission lifecycle verification belong to their separate work; no schema rollout is needed here.
