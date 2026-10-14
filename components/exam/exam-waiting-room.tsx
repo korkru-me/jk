@@ -32,13 +32,14 @@ interface Props {
   onStart: () => void
   onReload: () => void
   previewMode?: boolean
+  secondsLeft?: number | null
   returnHref?: string
 }
 
 /** Uses the repository's Card API (intentionally no header/footer slots).
  * It contains metadata only, never an ExamClient/countdown or question input. */
 export function ExamWaitingRoom({ summary, busy, error, code, onCodeChange, onStart, onReload,
-  previewMode = false, returnHref = '/assignments' }: Props) {
+  previewMode = false, returnHref = '/assignments', secondsLeft = null }: Props) {
   const active = summary.activeSubmissionId !== null
   const exercise = summary.assignmentType === 'exercise'
   const task = exercise ? 'แบบฝึกหัด' : 'ข้อสอบ'
@@ -110,6 +111,11 @@ export function ExamWaitingRoom({ summary, busy, error, code, onCodeChange, onSt
       </header>
       <Separator />
       <section aria-label={`ข้อมูลก่อนเข้า${room}`} className="flex flex-col gap-3">
+        {active && secondsLeft !== null && <Card radius="sm" edge="none" padding="md" className="flex flex-col gap-1 bg-primary/10">
+          <p className="text-sm font-medium">เวลาที่เหลือในรอบเดิม</p>
+          <p role="timer" aria-live="off" className="text-3xl font-semibold tabular-nums">{Math.floor(secondsLeft / 60).toString().padStart(2, '0')}:{(secondsLeft % 60).toString().padStart(2, '0')}</p>
+          <p className="text-sm text-muted-foreground">เวลายังเดินต่อ แม้อยู่หน้ารอหรืออินเทอร์เน็ตหลุด</p>
+        </Card>}
         <div className="grid gap-x-6 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
           {facts.map(({ icon: Icon, text }) => (
             <p key={text} className="flex items-start gap-2 text-sm text-muted-foreground">
@@ -120,6 +126,7 @@ export function ExamWaitingRoom({ summary, busy, error, code, onCodeChange, onSt
         </div>
         <Card role="status" radius="sm" edge="none" padding="sm" className="bg-muted/60 text-sm font-medium">
           {summary.completedSubmissionId ? `ทำ${task}ครบตามเงื่อนไขแล้ว สามารถดูผลรอบเดิมได้`
+            : summary.finishedSubmissionId ? 'รอบเดิมส่งแล้ว สามารถดูผลได้ การเริ่มรอบใหม่จะใช้สิทธิ์ครั้งถัดไป'
             : summary.expired ? 'รอบเดิมหมดเวลาทำแล้ว กดตรวจสอบเพื่อยืนยันผลรอบเดิม โดยยังไม่เริ่มรอบใหม่'
               : active ? summary.durationMinutes == null ? `รอบนี้เริ่มทำ${task}แล้ว การกลับเข้าหน้านี้จะทำต่อในรอบเดิม ไม่เปิดรอบใหม่`
                 : `รอบนี้เริ่มทำ${task}แล้ว เวลายังเดินต่อจากเวลาเริ่มเดิม การกลับเข้าหน้านี้ไม่เริ่มเวลาใหม่`
@@ -153,6 +160,7 @@ export function ExamWaitingRoom({ summary, busy, error, code, onCodeChange, onSt
         <ul className="grid list-disc gap-x-8 gap-y-2 pl-5 text-sm text-muted-foreground md:grid-cols-2">
           <li>อ่านคำชี้แจงและเตรียมอุปกรณ์ให้พร้อม แล้วจึงกดเข้า{room}</li>
           <li>{summary.completedSubmissionId ? `รอบเดิมสิ้นสุดแล้ว การดูผลไม่เริ่ม${round}ใหม่`
+            : summary.finishedSubmissionId ? 'รอบเดิมสิ้นสุดแล้ว เลือกดูผลหรือกดเริ่มรอบใหม่ตามสิทธิ์ที่เหลือ'
             : summary.expired ? 'รอบเดิมหมดเวลาแล้ว การตรวจสอบผลยืนยันเฉพาะรอบเดิม ไม่เริ่มรอบใหม่'
               : active ? summary.durationMinutes == null ? 'ทำต่อในรอบเดิมโดยไม่ใช้สิทธิ์รอบใหม่ แต่ยังต้องส่งภายในเวลาปิดรับ หากครูกำหนดไว้'
                 : 'ทำต่อในรอบเดิมและใช้เวลาเริ่มเดิม เวลายังเดินระหว่างที่อยู่หน้ารอ'
@@ -181,12 +189,14 @@ export function ExamWaitingRoom({ summary, busy, error, code, onCodeChange, onSt
         <footer className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
           {summary.completedSubmissionId
             ? <a className={buttonVariants({ className: actionClassName })} href={`/submissions/${summary.completedSubmissionId}`}>ดูผล{round}เดิม</a>
-            : <Button type="submit" variant={workTypeConfig(exercise ? 'exercise' : 'exam').variant} className={actionClassName} disabled={busy || Boolean(summary.blockedReason) || (summary.requiresAccessCode && !code.trim())}>
+            : <>
+              {summary.finishedSubmissionId && <a className={buttonVariants({ className: actionClassName })} href={`/submissions/${summary.finishedSubmissionId}`}>ดูผล{round}เดิม</a>}
+              <Button type="submit" variant={summary.finishedSubmissionId ? 'outline' : workTypeConfig(exercise ? 'exercise' : 'exam').variant} className={actionClassName} disabled={busy || Boolean(summary.blockedReason) || (summary.requiresAccessCode && !code.trim())}>
               {busy ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <LogIn data-icon="inline-start" />}
               {busy ? previewMode ? 'กำลังเปิดตัวอย่าง…' : `กำลังตรวจสอบ${round}…`
-                : previewMode ? `เข้า${room}ตัวอย่าง` : summary.expired ? `ตรวจสอบผล${round}เดิม` : active ? `กลับเข้า${room}รอบเดิม`
+                : previewMode ? `เข้า${room}ตัวอย่าง` : summary.finishedSubmissionId ? 'เริ่มรอบใหม่' : summary.expired ? `ตรวจสอบผล${round}เดิม` : active ? 'ทำต่อ'
                 : summary.durationMinutes == null ? `เข้า${room}และเริ่มทำ${task}` : `เข้า${room}และเริ่มจับเวลา`}
-            </Button>}
+            </Button></>}
           {(error || summary.blockedReason) && <Button type="button" variant="outline" className={actionClassName} disabled={busy} onClick={onReload}>โหลดหน้ารอ{exercise ? 'ทำแบบฝึกหัด' : 'สอบ'}ใหม่</Button>}
           <a className={buttonVariants({ variant: 'outline', className: actionClassName })} href={returnHref}>{previewMode ? `กลับไปรายละเอียด${task}` : 'กลับไปงานที่ได้รับ'}</a>
         </footer>

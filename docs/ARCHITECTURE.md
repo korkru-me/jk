@@ -1,5 +1,7 @@
 # Architecture
 
+Timed rounds (14 October 2026) have two steps: database cron/write triggers freeze the round at its effective cutoff without a browser, then the existing TypeScript evaluator processes frozen answers. Service-only claim/commit RPCs serialize answer writes, manual submission, automatic closure and duplicate grading through a submission row lock/revision fence; grade publication is atomic. A secret-authenticated POST worker is dispatched by pg_net/Vault once per minute; exact-owned browser recovery is an idempotent fallback. GET/prefetch still does not start or grade an attempt. Migration `20261014072745` and worker configuration are required before rollout; Production is unchanged by local implementation.
+
 ## Practice management workspace — 15 October 2026 (local only)
 
 The exact-manager `/practice/[id]/edit` route now renders overview by default, `?tab=settings` for the existing editor, and `?tab=progress` for roster data. `student`, `q`, and `page` select one authorized student's detail. Legacy `/progress` and `/progress/[studentId]` URLs redirect to this workspace, preserving search/page; the destination repeats authentication, feature gate and exact-library manage authorization. Sidebar registration uses the existing shell context, with no centered max-width wrapper or extra sidebar column.

@@ -1,5 +1,7 @@
 # Security และ privacy guardrails
 
+Timed closure (`20261014072745`, rollout pending): SECURITY INVOKER RPCs use `search_path = ''` and revoke PUBLIC/anon/authenticated execution. Student actions derive identity from verified Auth, constrain the owned row, and SQL checks ownership/server expiry before forced closure. Answer/working triggers lock the same submission as closure; late writes fail between cron ticks. Grade publication is atomic and duplicate requests preserve completed/teacher grades. Global processing requires a constant-time comparison of a separate environment-specific worker secret. Vault dispatch credentials are used only by postgres cron, not exposed to browsers or worker/service-role callers. Responses contain aggregate outcomes, not student IDs, answers or keys; Staging credentials must never be reused in Production.
+
 ## Reset numeric variants safely — 15 October 2026
 
 Explicit client reset/reload POSTs reauthorize the exact active answer through getWritableStudentAnswer (owner/status/expiry/deadline/native session). No GET or prefetch mutation. Numeric values and answer key change together with old-map equality plus exact row count; stale autosave payloads are bound to the visible numeric map and rejected before update. Returned student data contains only public values, never the newly computed key. Preview grading remains teacher-only. Submitted/carried/checked-streak history stays immutable; no timer reset or permission expansion. No migration or external database write was made for this change.

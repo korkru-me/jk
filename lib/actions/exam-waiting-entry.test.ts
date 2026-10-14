@@ -114,7 +114,23 @@ beforeEach(() => {
     exam_proctor_connections: [], exam_proctor_sessions: [],
   }
   m.client.mockResolvedValue({ auth: { getUser: async () => ({ data: { user: { id: USER } } }) } })
-  m.admin.mockReturnValue({ from: (table: string) => new Query(table) })
+  m.admin.mockReturnValue({ from: (table: string) => new Query(table), rpc: async (name: string, args: Row) => {
+    const row = db.submissions.find(s => s.id === args.p_submission_id && s.student_id === args.p_student_id)
+    if (!row) return { data: null, error: { code: '42501' } }
+    if (writeFailure === 'submissions') return { data: null, error: { message: 'synthetic write failure' } }
+    if (row.status !== 'in_progress') return { data: { completed: true, total_score: row.total_score }, error: null }
+    if (name === 'claim_submission_close') {
+      row.closed_at = new Date(NOW).toISOString()
+      writes.push({ table: 'submissions', operation: 'update', row: { closed_at: row.closed_at } })
+      return { data: { completed: false }, error: null }
+    }
+    if (name === 'commit_submission_grade') {
+      Object.assign(row, { status: 'submitted', total_score: 0, submitted_at: row.closed_at })
+      writes.push({ table: 'submissions', operation: 'update', row: { status: 'submitted' } })
+      return { data: { total_score: 0 }, error: null }
+    }
+    throw new Error('unexpected RPC')
+  } })
   m.membership.mockResolvedValue(true)
   m.access.mockResolvedValue(null)
   m.release.mockResolvedValue({ releaseId: 'synthetic-release', revision: 1 })
@@ -142,10 +158,10 @@ describe.each(['exam', 'exercise'])('question-free %s entry', type => {
   it('GET/prefetch reads safe metadata without allocating, revealing questions or starting time', async () => {
     const first = await summary()
     vi.setSystemTime(NOW + 20 * 60_000)
-    expect(await summary()).toEqual(first)
+    expect(await summary()).toEqual({ ...first, serverNow: new Date(NOW + 20 * 60_000).toISOString() })
     expect(Object.keys(first).sort()).toEqual(['title', 'description', 'durationMinutes', 'questionCount', 'endAt',
       'accessMode', 'requiresAccessCode', 'previousSubmissionId', 'activeSubmissionId', 'completedSubmissionId',
-      'expired', 'startedAt', 'blockedReason', 'assignmentType', ...(type === 'exercise' ? ['exerciseDetails'] : [])].sort())
+      'expired', 'startedAt', 'blockedReason', 'assignmentType', 'expiresAt', 'serverNow', 'closeReason', 'finishedSubmissionId', ...(type === 'exercise' ? ['exerciseDetails'] : [])].sort())
     expect(first.assignmentType).toBe(type)
     expect(JSON.stringify(first)).not.toMatch(/must-not-serialize|question_ids|correct_answer|private_secret|access_code|total_score/)
     expect(first.startedAt).toBeNull(); expect(db.submissions).toEqual([])
@@ -177,6 +193,7 @@ describe.each(['exam', 'exercise'])('question-free %s entry', type => {
     expect((await summary()).completedSubmissionId).toBe(S)
     db.submissions[0].attempt_number = 1
     expect((await summary()).completedSubmissionId).toBeNull()
+    expect((await summary()).finishedSubmissionId).toBe(S)
     noExamMutation()
   })
   it('recognizes an older passing threshold run without exposing scores', async () => {
@@ -203,7 +220,7 @@ describe.each(['exam', 'exercise'])('question-free %s entry', type => {
     db.assignments[0].end_at = new Date(NOW - 60_000).toISOString()
     db.submissions = [attempt()]
     const view = await summary()
-    expect(view.blockedReason).toContain('หมดเวลา'); expect(waitingResumeId(view, S)).toBeNull()
+    expect(view.expired).toBe(true); expect(view.blockedReason).toBeNull(); expect(waitingResumeId(view, S)).toBeNull()
     noExamMutation()
   })
   it('respects an individual deadline extension', async () => {
@@ -291,8 +308,9 @@ describe.each(['exam', 'exercise'])('deliberate %s waiting-room POST', type => {
     expect(db.submissions[0].status).toBe('in_progress')
     writeFailure = null; writes = []; reads = []
     db.assignments[0].end_at = new Date(NOW - 60_000).toISOString()
-    expect(await startExamFromWaiting(A, S, 'recover')).toEqual({ error: 'หมดเวลาส่งแล้ว' })
-    noExamMutation()
+    expect(await startExamFromWaiting(A, S, 'recover')).toEqual({ submissionId: S, alreadySubmitted: true })
+    expect(db.submissions).toHaveLength(1)
+    expect(db.submissions[0].status).toBe('submitted')
   })
   it('rejects unknown assignment types without mutation', async () => {
     db.assignments[0].type = 'unknown'

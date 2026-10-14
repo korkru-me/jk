@@ -23,7 +23,9 @@ import { resolveAnswerAutosaveStatus } from '@/lib/exam-autosave-policy'
 import { hasStudentAnswer } from '@/lib/student-answer-state'
 import { useTabSwitchGuard } from '@/hooks/use-tab-switch-guard'
 import { useFullscreenGuard } from '@/hooks/use-fullscreen-guard'
-import { useExamTimer } from '@/hooks/use-exam-timer'
+import { useAttemptClock } from '@/hooks/use-attempt-clock'
+import { attemptExpiresAt } from '@/lib/attempt-expiry'
+import { ExpiredAttemptStatus } from '@/components/exam/expired-attempt-status'
 import { useOnlineStatus } from '@/hooks/use-online-status'
 import { useExamProctor } from '@/hooks/use-exam-proctor'
 import { WorkImageUpload } from './work-image-upload'
@@ -203,6 +205,8 @@ interface Props {
   initialWorkArtifacts?: StudentWorkArtifactView[]
   durationMinutes: number | null
   startedAt: string
+  expiresAt?: string | null
+  serverNow?: string
   config: ExamConfig
   /** แฟ้มย่อย snapshotted onto the assignment, already filtered by the server to
    *  what this assignment contains. Empty/omitted = plain numbered list. */
@@ -284,7 +288,9 @@ function requiredWorkImageCount(a: AnswerRow, config: ExamConfig): number {
   return parts && parts.length > 0 ? parts.length : 1
 }
 
-export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkArtifacts = [], durationMinutes, startedAt, config, sections = [], questionsPerPage = 1, streak, previewMode = false, previewReturnHref, previewEditWarning }: Props) {
+export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkArtifacts = [], durationMinutes, startedAt, expiresAt, serverNow, config, sections = [], questionsPerPage = 1, streak, previewMode = false, previewReturnHref, previewEditWarning }: Props) {
+  const router = useRouter()
+  const [expired, setExpired] = useState(false)
   // ── Core state ──────────────────────────────────────────────────────────────
   const {
     localAnswers, localAnswersRef, localMathInputModes, localMathInputModesRef,
@@ -498,7 +504,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
     shouldDetectTabSwitch(config.assignmentType, previewMode),
   )
   const { status: proctorStatus, activeConnectionCount: proctorActiveConnectionCount } = useExamProctor({
-    enabled: config.proctoringEnabled && !previewMode,
+    enabled: config.proctoringEnabled && !previewMode && !expired,
     submissionId,
     blockClipboard: config.blockClipboard,
   })
@@ -520,7 +526,17 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   })
 
   // ── Countdown timer ─────────────────────────────────────────────────────────
-  const secondsLeft = useExamTimer(durationMinutes, startedAt, () => handleSubmit())
+  const secondsLeft = useAttemptClock(expiresAt ?? attemptExpiresAt(startedAt, durationMinutes, null), serverNow,
+    () => { if (previewMode) void handleSubmit(); else setExpired(true) })
+  useEffect(() => {
+    if (expiresAt && serverNow && Date.parse(expiresAt) > Date.parse(serverNow)) setExpired(false)
+  }, [expiresAt, serverNow])
+  useEffect(() => {
+    if (previewMode || expired) return
+    const refreshClock = () => { if (navigator.onLine && document.visibilityState === 'visible') router.refresh() }
+    window.addEventListener('online', refreshClock); document.addEventListener('visibilitychange', refreshClock)
+    return () => { window.removeEventListener('online', refreshClock); document.removeEventListener('visibilitychange', refreshClock) }
+  }, [previewMode, expired, router])
 
   // ── Teacher preview: warm the grading module ────────────────────────────────
   // previewMode grades in the browser through gradeAnswer and lays the ตรวจ
@@ -562,7 +578,6 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   // Seeded from the server and then moved by what checkAnswer reports, so the
   // meter follows the count the server actually stored rather than a guess
   // made from the verdict on screen.
-  const router = useRouter()
   const [streakState, setStreakState] = useState<StreakView | undefined>(streak)
   const [streakEnd, setStreakEnd] = useState<Exclude<StreakEnding, null> | null>(null)
   const [drawingNext, setDrawingNext] = useState(false)
@@ -1096,7 +1111,13 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
       setSubmitting(false)
       return
     }
-    const result = await submitSubmission(submissionId)
+    let result: Awaited<ReturnType<typeof submitSubmission>>
+    try { result = await submitSubmission(submissionId) }
+    catch {
+      toast.error('ยังยืนยันการส่งไม่ได้ กรุณาตรวจอินเทอร์เน็ตแล้วลองส่งอีกครั้ง ระบบจะใช้รอบเดิม')
+      setSubmitting(false)
+      return
+    }
     if (result?.error) {
       toast.error(result.error)
       setSubmitting(false)
@@ -1691,6 +1712,8 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   )
 
   // ── Render ────────────────────────────────────────────────────────────────────
+
+  if (expired && !previewMode) return <ExpiredAttemptStatus submissionId={submissionId} onTimeChanged={() => router.refresh()} />
 
   return (
     <>

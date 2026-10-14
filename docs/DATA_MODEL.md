@@ -1,5 +1,7 @@
 # Data model และ invariants
 
+Timed closure (`20261014072745`, rollout pending): `submissions.closed_at` freezes student answers/working; `close_reason` is `manual|time_limit|close_time`, `answer_revision` fences manual evidence validation, and `missing_work_evidence` flags incomplete required working at automatic closure. A closed round may remain `in_progress` while waiting for evaluation, without a published `total_score`; the atomic grade commit sets `submitted_at = closed_at` and `status = submitted`. Repeated commits cannot overwrite completed or teacher grades. Grading scales and late-colour policy remain the existing policy.
+
 ## Numeric variant transition — 15 ตุลาคม 2026
 
 ไม่มีคอลัมน์หรือ migration ใหม่: transition ใช้ submission_answers.random_values/correct_answer เดิม เปลี่ยนพร้อม student_answer=null และ math_input_modes={} เฉพาะ active authorized row ที่ old numeric map ยังตรง ไม่แก้ question_id/order/option_order/max_score/submission.started_at ส่วน completed submissions, carried-over answers และ checked streak history ไม่เปลี่ยน ค่า check_count เป็นจำนวนตรวจสะสม ไม่ล้างเพราะเปลี่ยน variant

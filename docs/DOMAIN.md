@@ -1,5 +1,7 @@
 # Domain model และคำศัพท์
 
+Timed exams/exercises (approved 14 October 2026) continue the same round and clock after disconnecting or leaving the page. The cutoff is the earlier timer/hard close, including individual extensions; the on-time due date is distinct. At cutoff the round stops accepting answers even offline, closes automatically, and is graded from answers accepted by the server before closure. Missing required working is flagged for teacher consideration and does not keep an expired round open. Waiting/recovery does not consume another attempt; a new attempt remains deliberate and follows existing quota/completion rules.
+
 ## การแก้ชุดฝึกและปักโจทย์ส่วนตัว
 
 นักเรียนแก้ชื่อและสมาชิกของชุดที่ตนเป็นเจ้าของได้โดยต้องเหลืออย่างน้อยหนึ่งข้อ ความคืบหน้าคำนวณใหม่จากสมาชิกปัจจุบัน แต่การเอาข้อออกไม่ลบประวัติการลองตอบ โจทย์ที่ปักไว้ทบทวนเป็นความสัมพันธ์ส่วนตัวกับคลังเดิม ไม่ผูกกับชุดใดชุดหนึ่งและไม่เปลี่ยนผลการตอบ
