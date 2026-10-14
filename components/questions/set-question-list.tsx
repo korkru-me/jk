@@ -48,7 +48,6 @@ const PER_PAGE = 24
 function mergeData(a: QuestionCardData, b: QuestionCardData): QuestionCardData {
   return {
     details: { ...a.details, ...b.details },
-    stats: { ...a.stats, ...b.stats },
     duplicateCounts: { ...a.duplicateCounts, ...b.duplicateCounts },
     subQuestionCounts: { ...a.subQuestionCounts, ...b.subQuestionCounts },
     setMemberships: { ...a.setMemberships, ...b.setMemberships },
@@ -90,7 +89,7 @@ interface Props {
  * row height answers both. Reading and fixing โจทย์ — which is why this list
  * grew the คลังโจทย์ card at all, so a teacher can narrow a คลัง of hundreds
  * down to one แฟ้ม and work inside it — wants everything a โจทย์ is: its
- * badges, its wording, its item analysis, and the whole toolbox beside it.
+ * badges, its wording, and the whole toolbox beside it.
  * Ordering wants the opposite. The numbers here are what students see on the
  * paper, and dragging ข้อ 80 up to ข้อ 3 past card after card is unusable, so
  * that view keeps the one-line rows it always had.
@@ -353,7 +352,7 @@ export function SetQuestionList({
                 onPreview={() => void openPreview(id)}
                 onToggleFlag={() => toggleFlag(id)}
                 myTeams={myTeams}
-                stats={cardData.stats[id]}
+
                 detailsLoaded={settledIds.has(id)}
                 allTags={allTags}
                 duplicateCount={cardData.duplicateCounts[id] ?? 0}
@@ -419,7 +418,7 @@ export function SetQuestionList({
         <PreviewModal
           question={previewQ}
           isFlagged={flaggedIds.has(previewQ.id)}
-          stats={cardData.stats[previewQ.id]}
+
           onClose={() => setPreviewQ(null)}
           onToggleFlag={() => toggleFlag(previewQ.id)}
         />

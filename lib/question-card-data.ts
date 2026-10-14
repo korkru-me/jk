@@ -1,6 +1,5 @@
 import type { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
-import { computeQuestionStats, type GradedAnswerRow, type QuestionStats } from '@/lib/question-stats'
 import { hasSolution, type SolutionColumns } from '@/lib/question-solution'
 import type { CountablePlacement } from '@/lib/question-sub-counts'
 import type { QuestionSetRef } from '@/components/questions/question-set-badges'
@@ -26,7 +25,6 @@ export interface QuestionCardDetail {
 /** Everything the reads below add up to, for one screenful of cards. */
 export interface QuestionCardData {
   details: Record<string, QuestionCardDetail>
-  stats: Record<string, QuestionStats>
   duplicateCounts: Record<string, number>
   subQuestionCounts: Record<string, number>
   setMemberships: Record<string, QuestionSetRef[]>
@@ -35,7 +33,7 @@ export interface QuestionCardData {
 }
 
 export const EMPTY_CARD_DATA: QuestionCardData = {
-  details: {}, stats: {}, duplicateCounts: {}, subQuestionCounts: {}, setMemberships: {},
+  details: {}, duplicateCounts: {}, subQuestionCounts: {}, setMemberships: {},
   solutionPresence: {},
 }
 
@@ -47,109 +45,6 @@ export const EMPTY_CARD_DATA: QuestionCardData = {
  * of queries the moment its editor opens.
  */
 export const CARD_DATA_MAX_IDS = 60
-
-/**
- * Item-analysis stats for the listed questions.
- *
- * RLS on submission_answers already limits this to attempts on assignments the
- * signed-in teacher created, which is the scope we want: "how has this question
- * performed in my classes". Only submitted/graded attempts count — an
- * in-progress one has no meaningful score yet.
- */
-
-// PostgREST puts an `.in(...)` list in the URL, so asking about every question
-// at once stops working as a bank grows — a thousand ids is a ~45 KB query
-// string, which the server rejects outright (400) and the stats silently
-// vanish from the page. Asking in slices keeps each URL small.
-const STATS_ID_BATCH = 200
-
-const STATS_SELECT =
-  'question_id, score, max_score, submissions!inner(assignment_id, total_score, status, submitted_at, created_at)'
-
-/** One PostgREST row from the stats select, before it is narrowed to a GradedAnswerRow. */
-type StatsRow = {
-  question_id: string
-  score: number | null
-  max_score: number | null
-  submissions?: {
-    assignment_id?: string | null
-    total_score?: number | null
-    submitted_at?: string | null
-    created_at?: string | null
-  } | null
-}
-
-const toGradedRow = (row: StatsRow): GradedAnswerRow => ({
-  question_id: row.question_id,
-  score: Number(row.score ?? 0),
-  max_score: Number(row.max_score ?? 0),
-  submission_total: Number(row.submissions?.total_score ?? 0),
-  assignment_id: row.submissions?.assignment_id ?? '',
-  // An attempt that was graded but never formally submitted still has a
-  // created_at, and "last used" should not skip it.
-  submitted_at: row.submissions?.submitted_at ?? row.submissions?.created_at ?? null,
-})
-
-/**
- * Item-analysis stats for the listed questions.
- *
- * RLS on submission_answers already limits this to attempts on assignments the
- * signed-in teacher created, which is the scope we want: "how has this question
- * performed in my classes". Only submitted/graded attempts count — an
- * in-progress one has no meaningful score yet.
- *
- * `'all'` asks for every graded answer in that scope instead of naming
- * questions. Ordering the bank by item analysis needs the stats for the whole
- * คลัง, and naming 883 questions in slices would send five long URLs to fetch
- * the very same rows RLS would have handed over anyway.
- *
- * Either way the reads page through `fetchAllRows`: PostgREST caps a response
- * at 1,000 rows, and a class set can pass that in a single slice — which would
- * not fail, it would just quietly compute p from part of the evidence.
- */
-export async function fetchQuestionStats(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  questionIds: string[] | 'all',
-): Promise<Record<string, QuestionStats>> {
-  if (questionIds !== 'all' && questionIds.length === 0) return {}
-
-  const batches: (string[] | 'all')[] = []
-  if (questionIds === 'all') {
-    batches.push('all')
-  } else {
-    for (let i = 0; i < questionIds.length; i += STATS_ID_BATCH) {
-      batches.push(questionIds.slice(i, i + STATS_ID_BATCH))
-    }
-  }
-
-  const results = await Promise.all(batches.map(batch =>
-    fetchAllRows<StatsRow>((from, to) => {
-      let query = supabase
-        .from('submission_answers')
-        .select(STATS_SELECT)
-        .in('submissions.status', ['submitted', 'graded'])
-        // A row a wrong-only retry carried forward is a copy of an answer an
-        // earlier attempt already contributed here. Counting it again would
-        // weight one student's answer twice in this question's difficulty.
-        .eq('carried_over', false)
-      if (batch !== 'all') query = query.in('question_id', batch)
-      return query.order('id', { ascending: true }).range(from, to) as unknown as
-        PromiseLike<{ data: StatsRow[] | null; error: unknown }>
-    })
-  ))
-
-  const rows: GradedAnswerRow[] = []
-  for (const { rows: batchRows, error } of results) {
-    if (error) {
-      // One failed slice costs its questions their stats, not the whole page.
-      console.error('[question-card-data] stats query failed:', error)
-      continue
-    }
-    for (const row of batchRows) rows.push(toGradedRow(row))
-  }
-
-  return Object.fromEntries(computeQuestionStats(rows))
-}
 
 /** Fingerprints per `in(...)` round in the duplicate pass — keeps the URL short. */
 const DUPLICATE_ID_CHUNK = 100

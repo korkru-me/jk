@@ -64,7 +64,7 @@ export function DashboardQuestionList({
           onPreview={() => void openPreview(question.id)}
           onToggleFlag={() => toggleFlag(question.id)}
           myTeams={myTeams}
-          stats={cardData.stats[question.id]}
+
           detailsLoaded={!!cardData.details[question.id]}
           allTags={allTags}
           duplicateCount={cardData.duplicateCounts[question.id] ?? 0}
@@ -80,7 +80,7 @@ export function DashboardQuestionList({
           isFlagged={flaggedIds.has(previewQuestion.id)}
           onClose={() => setPreviewQuestion(null)}
           onToggleFlag={() => toggleFlag(previewQuestion.id)}
-          stats={cardData.stats[previewQuestion.id]}
+
         />
       )}
     </div>

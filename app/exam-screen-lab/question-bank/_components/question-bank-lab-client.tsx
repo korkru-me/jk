@@ -248,7 +248,7 @@ export function QuestionBankLabClient({ failLoads }: { failLoads: boolean }) {
       <SolutionLoaderProvider loader={failLoads ? LOADERS.fail : LOADERS.ok}>
         <QuestionBankClient
           questions={OWN}
-          stats={{}}
+
           teamQuestions={TEAM}
           hasTeamOrg
           hasMultipleTeams={false}

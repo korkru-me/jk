@@ -15,8 +15,7 @@ import type { UnfiledQuestion } from '../page'
  *
  * Deliberately a **reader's** copy of that card, not the card itself. The
  * คลังโจทย์ version carries the whole toolbox — แก้ไข, ลบ, ทำสำเนา, แชร์,
- * รายงานปัญหา, สวิตช์บังคับแนบรูปวิธีทำ — and a strip of item analysis under a
- * divider. None of that is what this page is for: here a teacher is deciding
+ * รายงานปัญหา and other management controls. Here a teacher is deciding
  * which แฟ้ม a โจทย์ belongs in, and every other control is a way to lose that
  * train of thought (or the โจทย์). So the card keeps what identifies a โจทย์ —
  * the badges, the title, a line of its wording — and offers only the actions
@@ -62,7 +61,7 @@ export function LibraryQuestionCard({
         selected ? 'ring-primary/50' : 'hover:ring-primary/30',
       )}
     >
-      <div className="flex items-start gap-3 p-4">
+      <div className="flex items-start gap-2 p-3">
         {/* Ticking is the whole reason several โจทย์ can be filed at once, so it
             sits where the eye starts rather than behind a menu. */}
         <input
@@ -75,7 +74,7 @@ export function LibraryQuestionCard({
         />
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 flex-wrap mb-2">
+          <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
             {isGroup && (
               <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">📚 หลายขั้นตอน</span>
             )}
