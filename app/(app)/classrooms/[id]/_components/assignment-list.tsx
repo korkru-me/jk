@@ -124,6 +124,7 @@ function StudentAssignmentCard({ assignment: a, cover, now, href }: { assignment
   const state = studentAssignmentCardState(a, now)
   const completed = isCompleted(a)
   const severity = studentWorkSeverity(a.end_at, completed, now)
+  const needsAttention = severity === 'soon' || severity === 'overdue'
   const due = dueInfo(a.end_at, now)
   const type = TYPE_CFG[a.type] ?? TYPE_CFG.exam
   const TypeIcon = type.icon
@@ -140,7 +141,11 @@ function StudentAssignmentCard({ assignment: a, cover, now, href }: { assignment
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <div className="flex min-w-0 items-start gap-2">
             <p className="min-w-0 flex-1 text-sm font-semibold leading-snug line-clamp-2">{a.title}</p>
-            {completed ? <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[color-mix(in_oklab,var(--success)_60%,var(--foreground))]" aria-hidden="true" data-work-completed /> : <ArrowRight className="mt-0.5 size-3.5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden="true" />}
+            {needsAttention ? (
+              <Badge variant={severity === 'overdue' ? 'statusDestructive' : 'statusWarning'} className={cn('size-7 rounded-full border-2 p-0 motion-safe:animate-pulse motion-reduce:animate-none [&>svg]:size-5!', severity === 'overdue' ? 'bg-destructive text-background' : 'bg-warning/20 text-foreground')} aria-hidden="true" data-work-deadline-alert={severity}>
+                <CircleAlert strokeWidth={2.5} />
+              </Badge>
+            ) : completed ? <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[color-mix(in_oklab,var(--success)_60%,var(--foreground))]" aria-hidden="true" data-work-completed /> : <ArrowRight className="mt-0.5 size-3.5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden="true" />}
           </div>
           <div className={cn('flex flex-wrap items-center gap-x-2 gap-y-1 text-xs', completed ? 'text-foreground/75' : 'text-muted-foreground')}>
             <span className={cn('font-medium', cover?.textMuted ?? 'text-foreground/75')}>{type.label}</span>
@@ -152,9 +157,7 @@ function StudentAssignmentCard({ assignment: a, cover, now, href }: { assignment
           <div className="flex flex-wrap items-center gap-1.5">
             {completed ? <Badge variant="statusSuccess"><CheckCircle2 aria-hidden="true" />ส่งแล้ว</Badge> : state.statusLabel && <Badge variant={state.statusVariant}>{state.statusLabel}</Badge>}
             {!completed && <Badge variant={due.variant} title={a.end_at ? formatThaiDateTime(a.end_at) : undefined}>
-              {severity === 'soon' || severity === 'overdue'
-                ? <CircleAlert aria-hidden="true" data-work-deadline-alert={severity} />
-                : <Clock aria-hidden="true" />}{due.label}
+              <Clock aria-hidden="true" />{due.label}
             </Badge>}
             {state.score && <span className="text-xs font-semibold">{a.has_in_progress ? 'คะแนนเดิม ' : ''}{state.score.total}/{state.score.max}</span>}
             {state.finished && state.canShowScore && !state.score && <span className={cn('text-xs', completed ? 'text-foreground/75' : 'text-muted-foreground')}>รอครูตรวจ</span>}

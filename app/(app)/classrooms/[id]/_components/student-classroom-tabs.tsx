@@ -69,23 +69,23 @@ export function StudentClassroomTabs({ assignments, categories, classroomDescrip
       else url.searchParams.set('tab', value)
       window.history.pushState(null, '', `${url.pathname}${url.search}${url.hash}`)
     }} className="min-w-0 gap-3" data-student-classroom-tabs>
-      <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-1 gap-y-1 @min-[34rem]/subject:gap-x-3">
+      <div className="flex min-w-0 items-center">
         <Link href={backHref} aria-label="ห้องเรียนของฉัน" title="ห้องเรียนของฉัน" className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground @min-[34rem]/subject:min-w-0">
           <ChevronLeft className="size-4" aria-hidden="true" /><span className="hidden @min-[34rem]/subject:inline">ห้องเรียนของฉัน</span>
         </Link>
-        <TabsList aria-label="หน้าห้องเรียน" className="max-w-full p-0 group-data-horizontal/tabs:h-auto">
-          <TabsTrigger value="overview" className="min-h-[44px] px-1.5 @min-[34rem]/subject:px-3">ภาพรวม</TabsTrigger>
-          <TabsTrigger value="assignments" className="min-h-[44px] px-1.5 @min-[34rem]/subject:px-3" aria-label={alertCount ? `งานที่มอบหมาย · มีงานใกล้กำหนดหรือเลยกำหนด ${alertCount} งาน` : 'งานที่มอบหมาย'}>
-            งานที่มอบหมาย
-            {alertCount > 0 && <Badge variant="statusDestructive" className="min-w-5 px-1.5 tabular-nums" aria-hidden="true" data-classroom-work-alert-count>{alertCount}</Badge>}
-          </TabsTrigger>
-        </TabsList>
       </div>
-      {/* One panel/list instance keeps the student's filters when switching views. */}
-      <TabsContent value={tab} className="min-w-0">
-        <div className="grid items-start gap-4 @min-[46rem]/subject:grid-cols-[minmax(0,1fr)_14rem] @min-[64rem]/subject:grid-cols-[minmax(0,1fr)_16rem]" data-student-subject-grid>
-          <div className="flex min-w-0 flex-col gap-4" data-student-subject-content>
-            {header}
+      <div className="grid items-start gap-4 @min-[46rem]/subject:grid-cols-[minmax(0,1fr)_14rem] @min-[64rem]/subject:grid-cols-[minmax(0,1fr)_16rem]" data-student-subject-grid>
+        <div className="flex min-w-0 flex-col gap-3" data-student-subject-content>
+          {header}
+          <TabsList aria-label="หน้าห้องเรียน" className="max-w-full self-start p-0 group-data-horizontal/tabs:h-auto">
+            <TabsTrigger value="overview" className="min-h-[44px] px-1.5 @min-[34rem]/subject:px-3">ภาพรวม</TabsTrigger>
+            <TabsTrigger value="assignments" className="min-h-[44px] px-1.5 @min-[34rem]/subject:px-3" aria-label={alertCount ? `งานที่มอบหมาย · มีงานใกล้กำหนดหรือเลยกำหนด ${alertCount} งาน` : 'งานที่มอบหมาย'}>
+              งานที่มอบหมาย
+              {alertCount > 0 && <Badge variant="statusDestructive" className="min-w-5 px-1.5 tabular-nums" aria-hidden="true" data-classroom-work-alert-count>{alertCount}</Badge>}
+            </TabsTrigger>
+          </TabsList>
+          {/* One panel/list instance keeps the student's filters when switching views. */}
+          <TabsContent value={tab} className="flex min-w-0 flex-col gap-4">
             {tab === 'overview' && announcements}
             {practiceLibraries}
             <section aria-labelledby="classroom-work-heading" className="flex min-w-0 flex-col gap-2.5">
@@ -97,12 +97,12 @@ export function StudentClassroomTabs({ assignments, categories, classroomDescrip
                 </Card>
               ) : <AssignmentList assignments={assignments} categories={categories} classroomDescription={classroomDescription} assignmentHrefs={assignmentHrefs} now={now} />}
             </section>
-          </div>
-          <aside aria-label={`ปฏิทินงาน ${classroomName}`} className="min-w-0 self-start @min-[46rem]/subject:sticky @min-[46rem]/subject:top-0" data-sticky-subject-calendar>
-            {calendar}
-          </aside>
+          </TabsContent>
         </div>
-      </TabsContent>
+        <aside aria-label={`ปฏิทินงาน ${classroomName}`} className="min-w-0 self-start @min-[46rem]/subject:sticky @min-[46rem]/subject:top-0" data-sticky-subject-calendar>
+          {calendar}
+        </aside>
+      </div>
     </Tabs>
   )
 }

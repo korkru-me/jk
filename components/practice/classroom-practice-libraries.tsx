@@ -27,8 +27,8 @@ export function ClassroomPracticeLibraries({
     <section aria-labelledby="classroom-practice-heading" className="@container flex min-w-0 flex-col gap-2.5" data-classroom-practice-libraries>
       <div className="flex flex-wrap items-center gap-2">
         <h2 id="classroom-practice-heading" className="font-semibold">คลังฝึก</h2>
-        <Badge variant="outline">ไม่มีคะแนน</Badge>
-        {!result.error && <span className="text-xs text-muted-foreground">{result.items.length} คลัง</span>}
+        {!studentView && <Badge variant="outline">ไม่มีคะแนน</Badge>}
+        {!studentView && !result.error && <span className="text-xs text-muted-foreground">{result.items.length} คลัง</span>}
       </div>
       {result.error ? (
         <Alert variant="destructive">
