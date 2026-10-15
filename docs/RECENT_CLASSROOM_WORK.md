@@ -6,6 +6,10 @@ Successful practice creation (draft or publish) and settings save return to the 
 
 Above practice libraries, the teacher sees “งานที่เพิ่งมอบหมาย” with their own recently created exercise, exam and practice metadata. Drafts carry an accurate draft label. The 72-hour window uses immutable creation time; edits do not renew it. Each item expires separately, including while the page remains open. Empty sections are omitted. Existing work remains in its normal list after the confirmation expires.
 
+The confirmation subtitle is “สร้างสำเร็จแล้ว”. Each work item has its own bordered Card, with the whole card retaining its existing link and keyboard focus indicator. Right-pointing arrows and the explanatory three-day subtitle are removed; the 72-hour visibility rule stays the same.
+
+The teacher's type filters and create/category actions sit below this confirmation. Practice libraries share the assignment-category cards with exercises and exams, using practice-specific settings/progress actions and a no-score label. Their category/order metadata and atomic mixed reorder depend on `20261014125654_classroom_practice_work_layout.sql`; the loader falls back to the old metadata projection before that migration is installed. Practice grouping and mixed dragging are disabled during that compatibility window.
+
 ## Data and concurrent work
 
 No migration, new grants, scoring change or Production-data mutation is needed. The authorized teacher route supplies this room's linked assignment IDs; session-client reads additionally enforce RLS and filter the authenticated creator. The safe DTO includes only ID/title/type/status/creation time. Student and view-only routes never load this confirmation. Failed recent reads show an error separately from the regular work lists.

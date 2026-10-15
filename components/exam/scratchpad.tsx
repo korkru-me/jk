@@ -125,7 +125,7 @@ function attachmentStatusLabel(state: StudentAttachmentState): string | null {
  */
 export default function Scratchpad({
   open,
-  scope,
+  scope: requestedScope,
   targetLabel,
   persistenceEnabled,
   artifactPartKey,
@@ -139,6 +139,7 @@ export default function Scratchpad({
   onAttachmentStateChange,
   onClose,
 }: ScratchpadProps) {
+  const scope = useMemo(() => requestedScope, [requestedScope.ownerId, requestedScope.submissionId, requestedScope.answerId, requestedScope.partKey])
   const { resolvedTheme } = useTheme()
   const [confirm, confirmDialog] = useConfirm()
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null)
@@ -149,7 +150,7 @@ export default function Scratchpad({
   const previewAttachedSceneRef = useRef<ScratchpadScene | null>(null)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve())
-  const mountedRef = useRef(true)
+  const mountedRef = useRef(false)
   // A mounted editor is not allowed to write until its existing IndexedDB
   // record has finished loading and passed policy validation. This also keeps
   // an early close/unmount from replacing a real draft with the blank fallback.
@@ -206,83 +207,97 @@ export default function Scratchpad({
     return () => media.removeEventListener('change', update)
   }, [])
 
-  const initialData = useMemo(async () => {
-    // Excalidraw accepts a Promise here. Always cross a microtask boundary so
-    // preview mode cannot synchronously publish state to ExamClient while this
-    // child is still rendering.
-    await Promise.resolve()
-    let scene = emptyScratchpadScene()
-    persistenceBlockedRef.current = persistenceEnabled
-    if (mountedRef.current) setReadOnlyMessage(null)
-    if (persistenceEnabled) {
-      try {
-        await purgeExpiredScratchpads()
-        const stored = await readScratchpadDraft(scope)
-        if (stored.status === 'ready') {
-          scene = stored.scene
-          revisionRef.current = stored.revision
-          persistenceBlockedRef.current = false
-          if (mountedRef.current) {
-            setStatus(stored.revision.savedRevision < stored.revision.editRevision
-              ? 'dirty_local'
-              : scratchpadHasMeaningfulDraft(scene) || stored.revision.editRevision > 0
-                ? 'saved_local'
-                : 'empty')
-            setRecoveryState(stored.revision.recovery.state)
-            publishAttachmentState(scratchpadAttachmentState({
-              artifact: artifactRef.current,
-              metadata: stored.revision,
-            }))
+  // Create the promise during render; start IndexedDB reads only after commit.
+  // Lazy/Suspense renders may be abandoned before a component mounts.
+  const initialDataRequest = useMemo(() => {
+    type InitialScene = { elements: readonly OrderedExcalidrawElement[]; appState: Partial<AppState>; files: BinaryFiles; scrollToContent: boolean }
+    let resolve!: (scene: InitialScene) => void
+    const promise = new Promise<InitialScene>(done => { resolve = done })
+    return { promise, resolve }
+  }, [persistenceEnabled, scope])
+  const initialData = initialDataRequest.promise
+  useEffect(() => {
+    let active = true
+    void (async () => {
+      await Promise.resolve()
+      if (!active) return
+      let scene = emptyScratchpadScene()
+      persistenceBlockedRef.current = persistenceEnabled
+      if (active && mountedRef.current) setReadOnlyMessage(null)
+      if (persistenceEnabled) {
+        try {
+          await purgeExpiredScratchpads()
+          const stored = await readScratchpadDraft(scope)
+          if (!active) return
+          if (stored.status === 'ready') {
+            scene = stored.scene
+            revisionRef.current = stored.revision
+            persistenceBlockedRef.current = false
+            if (active && mountedRef.current) {
+              setStatus(stored.revision.savedRevision < stored.revision.editRevision
+                ? 'dirty_local'
+                : scratchpadHasMeaningfulDraft(scene) || stored.revision.editRevision > 0
+                  ? 'saved_local'
+                  : 'empty')
+              setRecoveryState(stored.revision.recovery.state)
+              publishAttachmentState(scratchpadAttachmentState({
+                artifact: artifactRef.current,
+                metadata: stored.revision,
+              }))
+            }
+          } else if (stored.status === 'missing') {
+            revisionRef.current = initialScratchpadRevision(scene)
+            persistenceBlockedRef.current = false
+            if (active && mountedRef.current) {
+              setStatus('empty')
+              setRecoveryState('none')
+              publishAttachmentState(artifactRef.current ? 'attached_unverified' : 'not_attached')
+            }
+          } else {
+            persistenceBlockedRef.current = true
+            if (active && mountedRef.current) {
+              const unsupported = stored.status === 'unsupported'
+              setStatus(unsupported ? 'unsupported_read_only' : 'load_failed')
+              publishAttachmentState(artifactRef.current ? 'attached_unverified' : 'not_attached')
+              setReadOnlyMessage(unsupported
+                ? 'กระดาษทดฉบับเดิมมีข้อมูลที่เวอร์ชันนี้ยังไม่รองรับ จึงเปิดแบบดูอย่างเดียวและเก็บข้อมูลเดิมไว้ในเครื่อง'
+                : 'เปิดกระดาษทดฉบับเดิมไม่ได้ จึงหยุดการบันทึกไว้ก่อน ข้อมูลเดิมยังเก็บอยู่ในเครื่อง')
+            }
           }
-        } else if (stored.status === 'missing') {
-          revisionRef.current = initialScratchpadRevision(scene)
-          persistenceBlockedRef.current = false
-          if (mountedRef.current) {
-            setStatus('empty')
-            setRecoveryState('none')
-            publishAttachmentState(artifactRef.current ? 'attached_unverified' : 'not_attached')
-          }
-        } else {
+        } catch {
+          if (!active) return
           persistenceBlockedRef.current = true
-          if (mountedRef.current) {
-            const unsupported = stored.status === 'unsupported'
-            setStatus(unsupported ? 'unsupported_read_only' : 'load_failed')
+          if (active && mountedRef.current) {
+            setStatus('load_failed')
             publishAttachmentState(artifactRef.current ? 'attached_unverified' : 'not_attached')
-            setReadOnlyMessage(unsupported
-              ? 'กระดาษทดฉบับเดิมมีข้อมูลที่เวอร์ชันนี้ยังไม่รองรับ จึงเปิดแบบดูอย่างเดียวและเก็บข้อมูลเดิมไว้ในเครื่อง'
-              : 'เปิดกระดาษทดฉบับเดิมไม่ได้ จึงหยุดการบันทึกไว้ก่อน ข้อมูลเดิมยังเก็บอยู่ในเครื่อง')
+            setReadOnlyMessage('เปิดกระดาษทดฉบับเดิมไม่ได้ จึงหยุดการบันทึกไว้ก่อน ข้อมูลเดิมยังเก็บอยู่ในเครื่อง')
           }
         }
-      } catch {
-        persistenceBlockedRef.current = true
-        if (mountedRef.current) {
-          setStatus('load_failed')
+      } else {
+        revisionRef.current = initialScratchpadRevision(scene)
+        persistenceBlockedRef.current = false
+        if (active && mountedRef.current) {
+          setStatus('empty')
+          setRecoveryState('none')
           publishAttachmentState(artifactRef.current ? 'attached_unverified' : 'not_attached')
-          setReadOnlyMessage('เปิดกระดาษทดฉบับเดิมไม่ได้ จึงหยุดการบันทึกไว้ก่อน ข้อมูลเดิมยังเก็บอยู่ในเครื่อง')
         }
       }
-    } else {
-      revisionRef.current = initialScratchpadRevision(scene)
-      persistenceBlockedRef.current = false
-      if (mountedRef.current) {
-        setStatus('empty')
-        setRecoveryState('none')
-        publishAttachmentState(artifactRef.current ? 'attached_unverified' : 'not_attached')
-      }
-    }
-    sceneRef.current = scene
-    if (mountedRef.current) setBackground(scene.background)
-    return {
-      elements: scene.elements as readonly OrderedExcalidrawElement[],
-      appState: {
-        ...DRAWING_DEFAULT_ITEM_STATE,
-        ...scene.appState,
-        viewBackgroundColor: TRANSPARENT_CANVAS,
-      } as Partial<AppState>,
-      files: scene.files as BinaryFiles,
-      scrollToContent: false,
-    }
-  }, [persistenceEnabled, publishAttachmentState, scope])
+      if (!active) return
+      sceneRef.current = scene
+      if (active && mountedRef.current) setBackground(scene.background)
+      initialDataRequest.resolve({
+        elements: scene.elements as readonly OrderedExcalidrawElement[],
+        appState: {
+          ...DRAWING_DEFAULT_ITEM_STATE,
+          ...scene.appState,
+          viewBackgroundColor: TRANSPARENT_CANVAS,
+        } as Partial<AppState>,
+        files: scene.files as BinaryFiles,
+        scrollToContent: false,
+      })
+    })()
+    return () => { active = false }
+  }, [initialDataRequest, persistenceEnabled, publishAttachmentState, scope])
 
   const writeDraft = useCallback((
     scene: ScratchpadScene,

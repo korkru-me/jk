@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { lazy, Suspense, useState, useTransition } from 'react'
+import { lazy, Suspense, useState, useTransition, useEffect, useImperativeHandle, useRef, type Ref } from 'react'
 import {
   ArrowLeft,
   Calculator,
@@ -18,7 +18,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { RichText } from '@/components/ui/rich-text'
-import { Separator } from '@/components/ui/separator'
+import { ExamQuestionFrame, ExamQuestionFlag } from '@/components/exam/exam-question-frame'
+import { PRACTICE_FLAG_DESCRIPTION, type PracticeRunAnswerAction } from '@/lib/practice-run'
 import { checkPracticeAnswer } from '@/lib/actions/practice-answers'
 import type { SafeExamAnswer } from '@/lib/exam-safe'
 import type { PracticeFeedback } from '@/lib/practice-question'
@@ -27,11 +28,18 @@ import type { MathInputModes } from '@/lib/math/input-mode'
 import type { MathInputMode } from '@/lib/types'
 import { DEFAULT_FINGER_INPUT_MODE, type FingerInputMode } from '@/lib/drawing-board-input'
 import { cn } from '@/lib/utils'
+import { hasStudentAnswer } from '@/lib/student-answer-state'
+
+export interface PracticeQuestionHandle {
+  check: () => Promise<PracticeFeedback['verdict'] | null>
+}
 
 const ScientificCalculator = lazy(() => import('@/components/exam/scientific-calculator'))
 const Scratchpad = lazy(() => import('@/components/exam/scratchpad'))
 
 interface PracticeQuestionRunnerProps {
+  ref?: Ref<PracticeQuestionHandle>
+  disabled?: boolean
   libraryId: string
   libraryTitle: string
   question: SafeExamAnswer
@@ -41,6 +49,16 @@ interface PracticeQuestionRunnerProps {
   storageOwnerId: string
   calculatorEnabled: boolean
   scratchpadEnabled: boolean
+  embedded?: boolean
+  questionNumber?: number
+  flagged?: boolean
+  onToggleFlag?: () => void
+  onProgress?: (questionId: string, answered: boolean, verdict?: PracticeFeedback['verdict']) => void
+  onReload?: () => void
+  checkAction?: PracticeRunAnswerAction
+  frameClassName?: string
+  frameHeaderClassName?: string
+  calculatorResult?: { questionId: string; value: string; nonce: number }
 }
 
 type RetryEnvelope = {
@@ -171,6 +189,8 @@ function FeedbackPanel({ feedback }: { feedback: PracticeFeedback }) {
 }
 
 export function PracticeQuestionRunner({
+  ref,
+  disabled = false,
   libraryId,
   libraryTitle,
   question: originalQuestion,
@@ -180,6 +200,16 @@ export function PracticeQuestionRunner({
   storageOwnerId,
   calculatorEnabled,
   scratchpadEnabled,
+  embedded = false,
+  questionNumber,
+  flagged = false,
+  onToggleFlag,
+  onProgress,
+  onReload,
+  checkAction = checkPracticeAnswer,
+  frameClassName,
+  frameHeaderClassName,
+  calculatorResult,
 }: PracticeQuestionRunnerProps) {
   const router = useRouter()
   const [answer, setAnswer] = useState('')
@@ -194,8 +224,16 @@ export function PracticeQuestionRunner({
   const [scratchpadLoaded, setScratchpadLoaded] = useState(false)
   const [showScratchpad, setShowScratchpad] = useState(false)
   const [fingerInputMode, setFingerInputMode] = useState<FingerInputMode>(DEFAULT_FINGER_INPUT_MODE)
-  const [pending, startTransition] = useTransition()
+  const [refreshing, startTransition] = useTransition()
+  const [checking, setChecking] = useState(false)
+  const checkingRef = useRef(false)
+  const pending = checking || refreshing || disabled
   const question = renderedQuestion(originalQuestion)
+  useEffect(() => {
+    if (calculatorResult?.questionId === originalQuestion.question_id) changeAnswer(calculatorResult.value)
+  }, [calculatorResult?.nonce])
+  useEffect(() => { onProgress?.(question.question_id, hasStudentAnswer(answer), feedback?.verdict) }, [answer, feedback?.verdict, question.question_id, onProgress])
+  useImperativeHandle(ref, () => ({ check: async () => feedback?.verdict ?? await check() }))
   const embedsQuestionText = question.questions.question_type === 'true_false'
     || question.questions.question_type === 'fill_blank'
     || (question.questions.question_type === 'written'
@@ -215,7 +253,10 @@ export function PracticeQuestionRunner({
     setRetry(null)
   }
 
-  function check() {
+  async function check(): Promise<PracticeFeedback['verdict'] | null> {
+    if (checkingRef.current || refreshing || refreshRequired) return null
+    checkingRef.current = true
+    setChecking(true)
     const mathInputModesKey = JSON.stringify(mathInputModes)
     const envelope = retry?.answer === answer && retry.mathInputModesKey === mathInputModesKey
       ? retry
@@ -227,30 +268,33 @@ export function PracticeQuestionRunner({
         }
     setRetry(envelope)
     setError(null)
-    startTransition(async () => {
-      try {
-        const result = await checkPracticeAnswer({
-          libraryId,
-          questionId: question.question_id,
-          idempotencyKey: envelope.idempotencyKey,
-          variantReceipt,
-          answer: envelope.answer,
-          mathInputModes: envelope.mathInputModes,
-        })
-        if (!result.ok) {
-          setError(result.error)
-          if (result.refreshRequired) setRefreshRequired(true)
-          if (result.retryable === false) setRetry(null)
-          return
-        }
-        setFeedback(result.feedback)
-        setRetry(null)
-      } catch {
-        // Keep the same UUID for a retry: the server may have completed the
-        // metadata insert even when the response was interrupted.
-        setError('การเชื่อมต่อสะดุด กรุณากดตรวจคำตอบอีกครั้ง')
+    try {
+      const result = await checkAction({
+        libraryId,
+        questionId: question.question_id,
+        idempotencyKey: envelope.idempotencyKey,
+        variantReceipt,
+        answer: envelope.answer,
+        mathInputModes: envelope.mathInputModes,
+      })
+      if (!result.ok) {
+        setError(result.error)
+        if (result.refreshRequired) setRefreshRequired(true)
+        if (result.retryable === false) setRetry(null)
+        return null
       }
-    })
+      setFeedback(result.feedback)
+      setRetry(null)
+      return result.feedback.verdict
+    } catch {
+      // Keep the same UUID for a retry: the server may have completed the
+      // metadata insert even when the response was interrupted.
+      setError('การเชื่อมต่อสะดุด กรุณากดตรวจคำตอบอีกครั้ง')
+      return null
+    } finally {
+      checkingRef.current = false
+      setChecking(false)
+    }
   }
 
   function tryAgain() {
@@ -260,13 +304,14 @@ export function PracticeQuestionRunner({
     setError(null)
     setRetry(null)
     if (changesOnRefresh || refreshRequired) {
-      startTransition(() => router.refresh())
+      if (onReload) onReload()
+      else startTransition(() => router.refresh())
     }
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-4">
-      <header className="flex min-h-[64px] items-center gap-3">
+    <div className={embedded ? "flex min-w-0 flex-col gap-2" : "flex w-full flex-col gap-3"}>
+      {!embedded && <header className="flex min-h-[64px] items-center gap-3">
         <Button
           variant="ghost"
           size="icon"
@@ -280,15 +325,11 @@ export function PracticeQuestionRunner({
           <p className="truncate text-xs text-muted-foreground">{libraryTitle}</p>
           <div className="flex min-w-0 items-center gap-2">
             <h1 className="min-w-0 flex-1 truncate text-lg font-semibold text-foreground">{question.questions.title}</h1>
-            <Badge role="status" variant="secondary" aria-label="แบบฝึกเอง ไม่มีคะแนน">
-              <span className="sm:hidden">ไม่มีคะแนน</span>
-              <span className="hidden sm:inline">ฝึกเอง · ไม่มีคะแนน</span>
-            </Badge>
           </div>
         </div>
-      </header>
+      </header>}
 
-      {(calculatorEnabled || scratchpadEnabled) && (
+      {!embedded && (calculatorEnabled || scratchpadEnabled) && (
         <div className="flex flex-wrap items-center gap-2" aria-label="เครื่องมือช่วยทำโจทย์">
           {calculatorEnabled && (
             <Button
@@ -321,49 +362,31 @@ export function PracticeQuestionRunner({
         </div>
       )}
 
-      <Card className="overflow-hidden">
-        <section className="flex flex-col gap-4 p-4 sm:p-5">
-          {!embedsQuestionText && (
-            <RichText text={question.questions.question_text} className="text-base leading-relaxed" blocks />
-          )}
-          <QuestionImages urls={question.questions.image_urls} />
-        </section>
-        <Separator />
-        <section className="flex flex-col gap-4 p-4 sm:p-5">
-          <PracticeAnswerInput
-            question={question}
-            value={answer}
-            onChange={changeAnswer}
-            mathInputModes={mathInputModes}
-            onMathInputModeChange={changeMathInputMode}
-            disabled={pending}
-          />
+      <ExamQuestionFrame className={frameClassName} headerClassName={frameHeaderClassName}
+        header={<>
+          {questionNumber !== undefined && <Badge variant="outline">ข้อ {questionNumber}</Badge>}
+          <h2 title={question.questions.title} className="line-clamp-2 min-w-0 flex-1 text-sm font-semibold">{question.questions.title}</h2>
+          {onToggleFlag && <ExamQuestionFlag flagged={flagged} onToggle={onToggleFlag} description={PRACTICE_FLAG_DESCRIPTION} />}
+        </>}
+        stem={!embedsQuestionText ? <RichText text={question.questions.question_text} className="text-base leading-relaxed" blocks /> : null}
+        illustration={question.questions.image_urls?.length ? <QuestionImages urls={question.questions.image_urls} /> : undefined}
+        sideBySide={question.questions.question_type === 'mcq'}
+        feedback={feedback ? <FeedbackPanel feedback={feedback} /> : undefined}
+      >
+        <div className="flex flex-col gap-2">
+          <PracticeAnswerInput question={question} value={answer} onChange={changeAnswer} mathInputModes={mathInputModes} onMathInputModeChange={changeMathInputMode} disabled={pending} />
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" onClick={check} disabled={pending || refreshRequired} className="min-h-[44px]">
-              {pending ? (
-                <LoaderCircle className="animate-spin" data-icon="inline-start" aria-hidden="true" />
-              ) : (
-                <CheckCircle2 data-icon="inline-start" aria-hidden="true" />
-              )}
-              {pending ? 'กำลังตรวจ…' : 'ตรวจคำตอบ'}
+            <Button type="button" size="sm" onClick={() => void check()} disabled={pending || refreshRequired} className="pointer-coarse:min-h-11">
+              {checking ? <LoaderCircle className="animate-spin" data-icon="inline-start" aria-hidden="true" /> : <CheckCircle2 data-icon="inline-start" aria-hidden="true" />}
+              {checking ? 'กำลังตรวจ…' : 'ตรวจคำตอบ'}
             </Button>
-            {(feedback || error) && (
-              <Button type="button" variant="outline" onClick={tryAgain} disabled={pending} className="min-h-[44px]">
-                <RotateCcw data-icon="inline-start" aria-hidden="true" />
-                {refreshRequired ? 'โหลดโจทย์ใหม่' : changesOnRefresh ? 'สุ่มโจทย์ใหม่' : 'ลองอีกครั้ง'}
-              </Button>
-            )}
-            <p className="text-xs text-muted-foreground">ระบบบันทึกเฉพาะว่าตรวจข้อนี้แล้ว ไม่เก็บคำตอบ ผลถูกผิด หรือคะแนน</p>
+            {(feedback || error) && <Button type="button" size="sm" variant="outline" onClick={tryAgain} disabled={pending} className="pointer-coarse:min-h-11">
+              <RotateCcw data-icon="inline-start" aria-hidden="true" />{refreshRequired ? 'โหลดโจทย์ใหม่' : 'ทำใหม่'}
+            </Button>}
           </div>
-        </section>
-        {feedback && (
-          <>
-            <Separator />
-            <div className="p-4 sm:p-5"><FeedbackPanel feedback={feedback} /></div>
-          </>
-        )}
-      </Card>
+        </div>
+      </ExamQuestionFrame>
 
       {calculatorLoaded && (
         <Suspense fallback={showCalculator ? (

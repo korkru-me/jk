@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { parseQuestionSetDescription } from '@/lib/question-set-theme'
 import { getAuthUser } from '@/lib/auth/server'
 import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
@@ -118,7 +119,7 @@ export default async function NewResearchProjectPage() {
     return [{
       id: set.id,
       title: set.title,
-      description: set.description,
+      description: parseQuestionSetDescription(set.description).description,
       question_ids: validIds,
       sections: filterSectionsToQuestions(parseSections(set.sections), validIds),
     }]

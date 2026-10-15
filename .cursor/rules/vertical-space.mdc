@@ -1,0 +1,19 @@
+---
+description: Make every web UI economical in vertical space while preserving beauty, readability, and usability
+alwaysApply: true
+---
+
+# ประหยัดพื้นที่แกน Y เป็นค่าเริ่มต้น
+
+- Apply this owner's preference to every new or edited web UI. Plan vertical density before implementation; do not wait for the owner to request compacting each page.
+- Use only the height needed for content. Avoid oversized cards, repeated helper rows, large empty areas, unnecessary min-height, and generous stacked padding/gaps.
+- Prefer 8–12px vertical card padding and 8–12px between related blocks as a starting point; increase only when the content needs it. Keep the visual hierarchy clear through typography, alignment, borders, and restrained color.
+- Put headings, filters, counts, and related actions on the same row when space allows. Stack only when needed for narrow screens, readable content, or a usable control.
+- Base responsive density on available content/container width when a sidebar or split pane reduces it; viewport width alone must not force crowded columns.
+- Keep selection/create toolbars compact. Put name inputs and actions on one row on wider screens; expand details/editors only while they are used.
+- Show concise excerpts in question/list cards and provide access to the full content. Keep status with metadata rather than creating another full row for it.
+- Preserve readable type, visible labels/errors, focus indicators, keyboard access, and at least 44px touch targets for interactive controls. Compact spacing must not cause overlap, clipped controls, or horizontal overflow.
+- Align content with the app shell's normal left content edge beside the sidebar; do not add a centered max-width gutter unless the page needs it or the owner asks for it.
+- For material layout changes, inspect desktop and narrow-screen rendering and compare the affected blocks' rendered heights before/after. Prefer the smallest clear, attractive, usable layout; report the result honestly.
+
+Example: place “แบบฝึกหัดของฉัน” and “ดูข้อที่ปักไว้” on one header row, use a compact selection toolbar, and put question status beside its metadata instead of under the excerpt.

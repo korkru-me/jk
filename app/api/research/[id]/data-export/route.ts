@@ -9,7 +9,7 @@ import {
 } from '@/lib/education-research-export'
 import { parseEducationResearchExportRequest } from '@/lib/education-research-export-request'
 import { selectResearchAnalysisData } from '@/lib/education-research-statistics'
-import { encodeRfc5987Filename } from '@/lib/exam-proctor-report'
+import { encodeRfc5987Filename } from '@/lib/download-filename'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'

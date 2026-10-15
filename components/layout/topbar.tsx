@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { BrandLogo } from '@/components/brand-logo'
 import { useTheme } from 'next-themes'
-import { Menu, Moon, Sun } from 'lucide-react'
+import { Bell, Menu, Moon, Sun } from 'lucide-react'
 import { IconButton } from '@/components/ui/icon-button'
 import { cn } from '@/lib/utils'
 import { logout } from '@/lib/actions/auth'
@@ -66,7 +66,8 @@ export function Topbar({ user, initialUnreadCount, onMenuToggle, sidebarCollapse
       <div className="flex items-center gap-1 sm:gap-3">
         {/* Notifications */}
         <span data-notification-anchor className="flex size-9 shrink-0 items-center justify-center">
-          {notificationsEnabled && <NotificationsBell initialUnreadCount={initialUnreadCount} />}
+          {notificationsEnabled ? <NotificationsBell initialUnreadCount={initialUnreadCount} />
+            : <Bell className="size-4 text-muted-foreground" aria-hidden="true" />}
         </span>
 
         {/* Dark / Light toggle switch */}

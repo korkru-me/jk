@@ -36,6 +36,8 @@ import { completionAttemptLimit, findPassingCompletion } from '@/lib/assignment-
 import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
 import { exerciseWaitingDetails, type ExamWaitingSummary } from '@/lib/exam-waiting-room'
 import { readWithSubmissionRevision } from '@/lib/submission-revision-compatibility'
+import { parseRandomValues, sameRandomValues } from '@/lib/math/fresh-random-values'
+import { drawsRandomValues } from '@/lib/math/shared-random'
 
 type EntrySubmissionRow = Pick<Submission, 'id' | 'status' | 'attempt_number' | 'started_at' | 'exam_access_mode'> & { seb_config_revision?: number | null }
 type StreakSubmissionRow = Pick<Submission, 'id' | 'student_id' | 'status' | 'started_at' | 'assignment_id' | 'exam_access_mode' | 'current_streak' | 'best_streak' | 'streak_reached'> & { seb_config_revision?: number | null; assignments: unknown }
@@ -387,11 +389,12 @@ async function submissionEntry(
 
     if (!previous || previous.length === 0) return { error: 'ไม่พบคำตอบของครั้งก่อน' }
 
-    const split = buildRetryAttempt(
+    let split: ReturnType<typeof buildRetryAttempt>
+    try { split = buildRetryAttempt(
       assignment,
       questions as Question[],
       previous as unknown as PreviousAttemptAnswer[],
-    )
+    ) } catch { return { error: 'ยังสุ่มตัวเลขชุดใหม่ไม่ได้ กรุณาแจ้งครูผู้สอนตรวจช่วงค่าตัวแปร' } }
     // Nothing to come back for: either every question already earned full
     // marks, or the only shortfalls are still waiting on the teacher. Send the
     // student to their results instead of opening an attempt with no questions.
@@ -416,7 +419,14 @@ async function submissionEntry(
     }
     skeletons = []
   } else {
-    skeletons = buildAssignmentAttempt(assignment, questions as Question[])
+    let previousValues: Record<string, Record<string, number>> = {}
+    if (existing) {
+      const { data: previous, error } = await admin.from('submission_answers').select('question_id, random_values').eq('submission_id', existing.id)
+      if (error || !previous) return { error: 'ยังอ่านชุดตัวเลขครั้งก่อนไม่สำเร็จ กรุณาลองใหม่' }
+      previousValues = Object.fromEntries(previous.map(row => [row.question_id, row.random_values ?? {}]))
+    }
+    try { skeletons = buildAssignmentAttempt(assignment, questions as Question[], previousValues) }
+    catch { return { error: 'ยังสุ่มตัวเลขชุดใหม่ไม่ได้ กรุณาแจ้งครูผู้สอนตรวจช่วงค่าตัวแปร' } }
     if (assignment.random_question_count && skeletons.length < assignment.random_question_count) {
       return { error: 'ข้อสอบในคลังเหลือไม่ครบตามจำนวนที่ตั้งไว้ กรุณาแจ้งครูผู้สอน' }
     }
@@ -581,6 +591,7 @@ export async function saveAnswer(
   submissionAnswerId: string,
   studentAnswer: string,
   mathInputModes?: unknown,
+  expectedRandomValues?: unknown,
 ) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -593,6 +604,11 @@ export async function saveAnswer(
 
   const writable = await getWritableStudentAnswer(admin, submissionAnswerId, user.id)
   if ('error' in writable) return { error: writable.error }
+  const currentValues = writable.answer.random_values ?? {}
+  const expectedValues = expectedRandomValues === undefined ? undefined : parseRandomValues(expectedRandomValues)
+  if (expectedValues === null || (expectedValues && !sameRandomValues(expectedValues, currentValues)) || (Object.keys(currentValues).length > 0 && !expectedValues)) {
+    return { error: 'ตัวเลขโจทย์เปลี่ยนแล้ว กรุณาโหลดโจทย์ล่าสุดก่อนตอบใหม่', variantChanged: true as const }
+  }
 
   let persistedAnswer = studentAnswer
   if (writable.question?.question_type === 'file_upload') {
@@ -616,16 +632,18 @@ export async function saveAnswer(
     persistedAnswer = JSON.stringify(files)
   }
 
-  const { error } = await admin
+  const { error, count } = await admin
     .from('submission_answers')
     .update({
       student_answer: persistedAnswer,
       ...(parsedModes ? { math_input_modes: parsedModes } : {}),
-    })
+    }, { count: 'exact' })
     .eq('id', submissionAnswerId)
     .eq('submission_id', writable.submission.id)
+    .eq('random_values', JSON.stringify(currentValues))
 
   if (error) return { error: error.message }
+  if (count !== 1) return { error: 'ตัวเลขโจทย์เปลี่ยนแล้ว กรุณาโหลดโจทย์ล่าสุดก่อนตอบใหม่', variantChanged: true as const }
   return { success: true }
 }
 
@@ -860,11 +878,11 @@ export async function checkAnswer(submissionAnswerId: string) {
 }
 
 /**
- * Start the next try after an ordinary exercise revealed the answer key.
- * Random-number questions receive a fresh frozen value set and answer key;
- * every other question is intentionally left untouched.
+ * Explicitly start a new numeric try, or refresh an active online attempt.
+ * Values and answer key are replaced together; completed history is immutable.
  */
-export async function rerollCheckedRandomAnswer(submissionAnswerId: string) {
+export async function rerollCheckedRandomAnswer(submissionAnswerId: string, reason: 'retry' | 'refresh' = 'retry', expectedRandomValues?: unknown) {
+  if (reason !== 'retry' && reason !== 'refresh') return { error: 'คำสั่งสุ่มโจทย์ไม่ถูกต้อง' }
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
@@ -875,17 +893,18 @@ export async function rerollCheckedRandomAnswer(submissionAnswerId: string) {
   const assignment = writable.assignment
   if (
     assignment?.mode !== 'online'
-    || assignment.type !== 'exercise'
-    || assignment.instant_check !== true
-    || assignment.instant_check_answer_key !== true
-    || assignment.completion_rule === 'streak'
+    || (assignment.type !== 'exercise' && assignment.type !== 'exam')
   ) {
-    return { error: 'งานนี้ไม่ได้เปิดให้สุ่มโจทย์ใหม่หลังดูคำตอบ' }
+    return { error: 'งานนี้ไม่เปิดให้ทำโจทย์ออนไลน์' }
   }
   if (writable.answer.carried_over) {
+    if (reason === 'refresh') return { success: true as const, rerolled: false as const }
     return { error: 'ข้อนี้ยกคะแนนมาจากครั้งก่อน ไม่ต้องทำใหม่' }
   }
-  if (Number(writable.answer.check_count ?? 0) < 1) {
+  if (assignment.completion_rule === 'streak' && Number(writable.answer.check_count ?? 0) > 0) {
+    return reason === 'refresh' ? { success: true as const, rerolled: false as const } : { error: 'ข้อนี้นับผลในรอบฝึกแล้ว กรุณาทำข้อต่อไป' }
+  }
+  if (reason === 'retry' && Number(writable.answer.check_count ?? 0) < 1) {
     return { error: 'กรุณากดตรวจคำตอบก่อนทำใหม่' }
   }
 
@@ -903,20 +922,24 @@ export async function rerollCheckedRandomAnswer(submissionAnswerId: string) {
   const question = (Array.isArray(row.questions) ? row.questions[0] : row.questions) as Question | null
   if (!question) return { error: 'ไม่พบโจทย์' }
   const previousRandomValues = (row.random_values ?? {}) as Record<string, number>
+  const expected = expectedRandomValues === undefined ? previousRandomValues : parseRandomValues(expectedRandomValues)
+  if (!expected || !sameRandomValues(expected, previousRandomValues)) return { error: 'โจทย์เปลี่ยนจากอีกหน้าต่าง กรุณาโหลดหน้าล่าสุด' }
   const next = buildFreshRandomQuestion(question, previousRandomValues)
-  if (!next) return { success: true as const, rerolled: false as const }
+  if (!next) return drawsRandomValues(question) ? { error: 'ยังสุ่มตัวเลขชุดที่แตกต่างไม่ได้ กรุณาลองอีกครั้งหรือตรวจช่วงค่าตัวแปร' } : { success: true as const, rerolled: false as const }
 
-  const { error } = await admin
+  const { error, count } = await admin
     .from('submission_answers')
     .update({
       random_values: next.random_values,
       correct_answer: next.correct_answer,
       student_answer: null,
       math_input_modes: {},
-    })
+    }, { count: 'exact' })
     .eq('id', submissionAnswerId)
     .eq('submission_id', writable.submission.id)
+    .eq('random_values', JSON.stringify(previousRandomValues))
   if (error) return { error: 'สุ่มตัวเลขชุดใหม่ไม่สำเร็จ กรุณาลองใหม่' }
+  if (count !== 1) return { error: 'โจทย์เปลี่ยนจากอีกหน้าต่าง กรุณาโหลดหน้าล่าสุด' }
 
   // The values are already visible in the question text; the new answer key
   // remains server-only until the next authorized check.
@@ -1028,7 +1051,7 @@ export async function drawNextStreakQuestion(
 
   const { data: existing } = await admin
     .from('submission_answers')
-    .select('id, question_id, order_index, check_count, carried_over, max_score')
+    .select('id, question_id, order_index, check_count, carried_over, max_score, random_values')
     .eq('submission_id', submission.id)
     .order('order_index')
 
@@ -1088,16 +1111,22 @@ export async function drawNextStreakQuestion(
   }
 
   const question = questionsById.get(nextId as string) as Question
-  const skeleton = buildAttemptQuestion(question, {
+  let skeleton = buildAttemptQuestion(question, {
     // Appended after every row already handed out, including any carried from
     // a previous attempt, so order_index stays the sequence the student saw.
     orderIndex: rows.length,
     shuffleOptions: assignment.shuffle_options === true,
     pointOverride: assignment.question_points?.[question.id],
-    // A ข้อ the pool hands out again comes back with the same numbers when the
-    // งาน shares them — the same rule as a retry.
+    // First delivery may share the teacher's seed. A recycled numeric question
+    // below deliberately gets fresh values for this next try.
     sharedRandomSeed: assignment.shared_random_seed,
   })
+  const previousDraw = [...rows].reverse().find(row => row.question_id === question.id)
+  if (previousDraw && drawsRandomValues(question)) {
+    const fresh = buildFreshRandomQuestion(question, previousDraw.random_values ?? {})
+    if (!fresh) return { error: 'ยังสุ่มตัวเลขชุดที่แตกต่างไม่ได้ กรุณาแจ้งครูผู้สอน' }
+    skeleton = { ...skeleton, random_values: fresh.random_values, correct_answer: fresh.correct_answer }
+  }
 
   const { data: inserted, error: insertError } = await admin
     .from('submission_answers')

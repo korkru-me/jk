@@ -1,5 +1,29 @@
 # Security และ privacy guardrails
 
+## Reset numeric variants safely — 15 October 2026
+
+Explicit client reset/reload POSTs reauthorize the exact active answer through getWritableStudentAnswer (owner/status/expiry/deadline/native session). No GET or prefetch mutation. Numeric values and answer key change together with old-map equality plus exact row count; stale autosave payloads are bound to the visible numeric map and rejected before update. Returned student data contains only public values, never the newly computed key. Preview grading remains teacher-only. Submitted/carried/checked-streak history stays immutable; no timer reset or permission expansion. No migration or external database write was made for this change.
+
+## Request-local practice snapshot reads — 15 October 2026
+
+The optimized development snapshot reuses only the first page's verified actor/library/roster result inside that one call. Its private reader cannot be called by the browser, and every page still uses the actor/library-scoped RPC that repeats current resource authorization. A denied later page or inconsistent totals/IDs rejects the whole snapshot. Public searches and new requests reauthorize independently; no persistent or cross-request authorization cache is introduced. Routes still verify Auth/feature flag and the signed library access-code session before rendering any snapshot; DTOs contain display metadata only. No schema, RLS, RPC grants or grading behavior changed
+
+## Prepared personal exercise update and pin authorization
+
+Update and pin actions reverify session, exact library/roster and signed access-code session. SQL rechecks those resource relations, exact exercise owner and all selected memberships. Updates serialize with FOR UPDATE and revision checks; stale payloads receive PT409 and are not written. Pins are private per actor/library/question, with no browser table or execute grants. Pinned search uses literal term matching and exact tag AND semantics with 24-row bounds. Local QA uses synthetic browser storage and PGlite only; no live schema or student data was changed.
+
+
+## Prepared student personal exercise access boundary
+
+The access assertion helper alone is service-only SECURITY DEFINER with an empty search_path, to share-lock protected library/roster rows without expanding direct UPDATE grants. Main creation/list/page RPCs remain SECURITY INVOKER.
+
+The server derives actor from a verified session and checks the signed library access-code session before service-only invoker RPCs. SQL rechecks active student, exact current roster, published library, active subject classroom and matching organization, holding share locks during creation. New table enables RLS and revokes PUBLIC/anon/authenticated privileges. RPC execution is service-only. Members are bounded, unique and belong to the exact library. A request UUID retries the same creation; conflicting owner/library/title/membership is rejected. Progress never stores or returns answers or correctness. Attached-solution reads require exact question membership and the library reveal setting.
+
+
+## Pending classroom announcement acknowledgements
+
+The prepared acknowledgement migration uses service-only SECURITY INVOKER functions with `search_path = ''`; new tables enable RLS and revoke direct PUBLIC/anon/authenticated access. Server actions derive actor IDs from verified sessions and RPCs repeat student roster or owner/co-teacher admin/manage authorization against the exact post/classroom. The same post row lock serializes acknowledgement/resend; stale rounds fail, and no peer receipt identifiers enter student payloads. Automatic sighting data is not represented as explicit acknowledgement. This schema is not applied and its server flag defaults off; hosted Auth/Data API/cross-org and separate-connection race verification remain required after migration history is reconciled.
+
 อัปเดตล่าสุด: 7 ตุลาคม 2026
 
 KorKru จัดการข้อมูลนักเรียนและอาจเกี่ยวข้องกับผู้เยาว์ ความปลอดภัยและความเป็นส่วนตัวเป็นเงื่อนไขของความถูกต้อง ไม่ใช่งานเก็บรายละเอียดภายหลัง
@@ -40,7 +64,7 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 - ตรวจผู้ใช้ด้วย session ก่อน แล้วตรวจ ownership/membership/permission อย่างชัดเจน
 - จำกัด query ด้วย resource ID และ tenant ที่ตรวจแล้ว
 - อย่าใช้ admin client เพียงเพื่อทำให้ query ที่ติด RLS “ผ่าน”
-- **หน้าที่รับ resource ID จาก URL ต้องปฏิเสธทุกบทบาทก่อน query ด้วย admin** ไม่ใช่เฉพาะนักเรียน — `role = teacher|admin` บอกแค่ว่าเป็นครู ไม่ได้บอกว่าเป็นครูของห้องนี้ · หน้า `/classrooms/[id]` เคยตรวจ roster เฉพาะฝั่งนักเรียน ครูคนใดก็ได้ที่รู้ UUID ของห้องจึงได้แถว `classrooms` ทั้งแถว (รวม `class_code` ที่ใช้เข้าห้อง) รายชื่อ + อีเมลนักเรียน รายชื่อ + อีเมลครูร่วม และ **token ลิงก์เชิญครูร่วมที่ยังใช้ได้** (ซึ่งเอาไปกดรับเป็นครูร่วมของห้องนั้นได้) ส่วนคะแนน งานที่ส่ง และ `student_profiles` ไม่รั่วเพราะผูกกับ `canManage` และประกาศอ่านผ่าน RLS แก้ 27 ก.ย. 2026 ให้ตอบ 404 เมื่อไม่ใช่ `classrooms.teacher_id` และไม่มีแถวใน `classroom_co_teachers` · super admin (`super_admins`) ไม่ได้รับยกเว้นในหน้านี้ เพราะ server action ของห้องเรียน (`canManageClassroom`, `canManageAssignment`, co-teacher, บันทึกโฮมรูม) ไม่มีตัวไหนรับ super admin และยังไม่มี audit ของการเปิดดูห้องครูคนอื่น ถ้าต้องเปิดให้ platform support ดูห้องได้ ให้ทำเป็นเส้นทางแยกที่บันทึก audit · `/classrooms/[id]/report` ตรวจ owner/co-teacher `admin|manage` ถูกต้องอยู่แล้ว
+- **หน้าที่รับ resource ID จาก URL ต้องปฏิเสธทุกบทบาทก่อน query ด้วย admin** ไม่ใช่เฉพาะนักเรียน — `role = teacher|admin` บอกแค่ว่าเป็นครู ไม่ได้บอกว่าเป็นครูของห้องนี้ · หน้า `/classrooms/[id]` เคยตรวจ roster เฉพาะฝั่งนักเรียน ครูคนใดก็ได้ที่รู้ UUID ของห้องจึงได้แถว `classrooms` ทั้งแถว (รวม `class_code` ที่ใช้เข้าห้อง) รายชื่อ + อีเมลนักเรียน รายชื่อ + อีเมลครูร่วม และ **token ลิงก์เชิญครูร่วมที่ยังใช้ได้** (ซึ่งเอาไปกดรับเป็นครูร่วมของห้องนั้นได้) ส่วนคะแนน งานที่ส่ง และ `student_profiles` ไม่รั่วเพราะผูกกับ `canManage` และประกาศอ่านผ่าน RLS แก้ 27 ก.ย. 2026 ให้ตอบ 404 เมื่อไม่ใช่ `classrooms.teacher_id` และไม่มีแถวใน `classroom_co_teachers` · super admin (`super_admins`) ไม่ได้รับยกเว้นในหน้านี้ เพราะ server action ของห้องเรียน (`canManageClassroom`, `canManageAssignment`, co-teacher, บันทึกโฮมรูม) ไม่มีตัวไหนรับ super admin และยังไม่มี audit ของการเปิดดูห้องครูคนอื่น ถ้าต้องเปิดให้ platform support ดูห้องได้ ให้ทำเป็นเส้นทางแยกที่บันทึก audit
 
 ## RLS และ multi-tenancy
 
@@ -74,6 +98,8 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 
 ## คลังฝึกไม่มีคะแนน
 
+- สรุปงานนักเรียนใช้ catalog loader ภายใต้ session/RLS เดิมหลัง Auth/student-role/feature-flag check. Allowlist มีเพียง library ID/title, classroom ID/name, จำนวนโจทย์ และเวลาสร้าง/เผยแพร่; projection ใช้ metadata ของห้องที่อยู่ใน roster และยัง active subject เท่านั้น. ไม่อ่าน/ส่ง attempt, answer, correctness, score หรือ access code และไม่ใช้สถานะฝึกเป็น completed/grade/calendar event. ไม่มี admin read หรือ RLS grant ใหม่สำหรับส่วนนี้
+
 - `practice_libraries`, `practice_library_questions` และ `practice_answer_attempts` เป็น security boundary แยกจาก assignment/submission; ห้ามใช้การซ่อนคะแนนใน UI แทนการแยก schema และห้ามเขียน accepted-check เข้า gradebook, analytics, homeroom score หรือ question statistics
 - server-only `PRACTICE_LIBRARY_ENABLED` คุมเพียงการเปิด route/navigation ค่า false ต้องตอบ 404/ซ่อนทางเข้า แต่ค่า true ไม่ให้สิทธิ์เพิ่ม ทุก page, Server Action และ RPC ต้องตรวจ session, role, exact organization, classroom relation และ resource ID ใหม่
 - owner และ co-teacher `admin/manage` จัดการคลังและอ่าน roster progress ได้ ครูร่วม `view` อ่านได้เฉพาะ metadata library และต้องถูกปฏิเสธเมื่อเปิด progress URL/RPC โดยตรง นักเรียนต้องอยู่ใน roster ของ exact classroom และ library ต้อง `published`
@@ -86,7 +112,7 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 
 ## Grading integrity
 
-- random values และ correct answer ต้องตรึงต่อ attempt
+- random values และ correct answer ต้องตรงกันตลอดหนึ่งชุดตัวเลข เปลี่ยนพร้อมกันเฉพาะ explicit reset/refresh ที่ตรวจสิทธิ์แล้ว; ลำดับข้อ/ตัวเลือกและประวัติที่ส่งแล้วตรึงต่อ attempt
 - server ต้องบังคับเวลา attempts และ access code ไม่พึ่ง client
 - หน้ารอของ exam/exercise ส่งเฉพาะ allowlisted metadata หลังตรวจ Auth/assignment roster/native session ไม่ส่ง assignment row, access-code value, question/answer content หรือ student score; GET/prefetch ไม่ allocate/grade/draw `startAssignmentFromWaiting` ตรวจทุก gate ใหม่ ไม่ถือว่า UI/previous receipt/query เป็น authorization และ teacher preview ต้องตรวจ `canManageAssignment` ทั้ง waiting และ answer-bearing route (12 ตุลาคม 2026)
 - ประกาศจากครูในหน้ารอใช้ `assignments.description` แบบ rich text: create/update Server Action sanitize ก่อนเขียนและทุก render sanitize ซ้ำ อนุญาตรูปเฉพาะ HTTPS public URL ของ bucket `question-images` บน `NEXT_PUBLIC_SUPABASE_URL` ปัจจุบัน ตัด script/event/style/external/data/signed URL ออก; upload ใช้ session browser และ Storage RLS บังคับโฟลเดอร์ `{auth.uid()}` เดิม ไม่ใช้ service-role upload
@@ -104,7 +130,7 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 - **เฉลยที่ไม่ให้ดู ต้องไม่ถูกส่งไปที่ browser เลย ไม่ใช่ส่งไปแล้วซ่อน** — นักเรียนที่เปิด DevTools อ่าน network response, React props, RSC payload, `localStorage` และ bundle ได้ทั้งหมด การซ่อนด้วย CSS, `hidden`, conditional render, การไม่ผูก state หรือการ obfuscate ไม่ใช่การปกป้อง ถ้าค่าอยู่ใน payload ถือว่านักเรียนอ่านได้แล้ว
 - เกณฑ์ตัดสินคือ **serialize หรือไม่** ไม่ใช่ render หรือไม่: ฟิลด์เฉลยต้องหายไปจาก object ที่ server ส่งกลับ (conditional spread/omit) ไม่ใช่ส่งเป็นค่าว่าง `null` หรือ flag ให้ client ตัดสินใจเอง — ดู `buildAnswerFeedback` ที่ไม่ใส่คีย์ `correct` ของแต่ละแถวเมื่อ `instant_check_answer_key` ปิด และไม่มีเฉลยวิธีทำใน response เลยไม่ว่าตั้งอะไร พร้อมเทสต์ที่ยืนยันด้วย `JSON.stringify` ของ response
 - การตัดสินถูก/ผิดทุกครั้งต้องเกิดที่ server จาก `submission_answers.correct_answer` ที่ตรึงไว้ **ห้ามส่งเฉลยลงไปให้ browser เทียบเอง** แม้จะเทียบแล้วส่งผลกลับขึ้นมาก็ตาม — ผลที่ client คำนวณหรือรายงานขึ้นมาห้ามถูกเชื่อ และห้ามใช้เขียนคะแนน สถานะ หรือตัวนับใด ๆ
-- การสุ่มตัวเลขชุดใหม่หลังเปิดคำตอบทำผ่าน `rerollCheckedRandomAnswer` เท่านั้น: ตรวจสิทธิ์เขียน attempt และยืนยันจากฐานว่าเป็นแบบฝึกหัดออนไลน์ เปิดตรวจ เปิด answer key ตรวจมาแล้วอย่างน้อยหนึ่งครั้ง และไม่ใช่ streak/carried row ก่อนเขียน `random_values` กับ `correct_answer` ใหม่ · response ส่งกลับเฉพาะค่าตัวเลขที่ต้องแสดง ห้ามส่ง answer key ชุดใหม่
+- การเปลี่ยนตัวเลขใน active online exam/exercise ทำผ่าน `rerollCheckedRandomAnswer`: retry ต้องตรวจแล้ว ส่วน refresh เปลี่ยนข้อที่ยังไม่ตรวจได้ด้วย ไม่ขึ้นกับการเปิด answer key; ตรวจสิทธิ์เขียน/เวลา/native session ทุกครั้ง ข้อยกคะแนนและ streak ที่นับแล้วไม่เปลี่ยน ก่อน update ใช้ expected old numeric map และ exact row count · response ส่งกลับเฉพาะค่าตัวเลขที่ต้องแสดง ห้ามส่ง answer key ชุดใหม่
 - ตัวนับที่เป็นเงื่อนไขจบงาน (`submissions.current_streak` / `best_streak` / `streak_reached`) เขียนได้จาก verdict ที่ server ตัดสินเองเท่านั้น ถ้ารับจาก browser ได้ นักเรียนจบงานจาก console ได้
 - `correct_answer` เข้า Client Component ได้เฉพาะ `previewMode` ของครู ซึ่งครูเป็นเจ้าของเฉลยนั้นอยู่แล้ว เส้นทางนักเรียน (`getExamTakingData` → `toSafeExamAnswer`) ห้ามใส่ฟิลด์นี้ และ `SafeExamAnswer` ต้องไม่มีฟิลด์นี้อยู่ใน type
 - นักเรียนอ่าน answer snapshot/คำตอบที่ถูกได้หลังส่งเมื่อ `show_results` เป็น `immediate` หรือ `after_due` ที่พ้นกำหนดแล้วเท่านั้น; `score_only` ห้ามอ่านคำตอบรายข้อและ `never` ห้ามอ่านคะแนนด้วย
@@ -114,7 +140,7 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 - Fullscreen, tab visibility, copy/paste และ screenshot deterrence เป็นเพียงสัญญาณ/แรงเสียดทาน ไม่ใช่ security boundary และห้ามใช้แทนการปกป้องเฉลยฝั่ง server
 - ลายน้ำข้อสอบแสดงเฉพาะชื่อเจ้าของ attempt, UUID ส่วนสั้น และเวลาปัจจุบันเพื่อให้ภาพที่ส่งต่อระบุที่มาได้ง่ายขึ้น ไม่ใช่การป้องกัน screenshot; ห้ามใส่อีเมล เบอร์โทร ข้อมูลอ่อนไหว หรือ answer content ลงในลายน้ำ
 - ข้อมูลคุมสอบต้องเก็บเท่าที่จำเป็น: ชนิด browser event, เวลา, presence/counter, foreign keys และ UUID สุ่มต่อแท็บสำหรับ heartbeat lease เท่านั้น ห้ามเพิ่ม IP, user-agent, device fingerprint, ภาพหน้าจอ กล้อง ไมโครโฟน เนื้อหาคำตอบ หรือ keystroke โดยไม่มีการออกแบบวัตถุประสงค์ consent retention และสิทธิ์ใหม่
-- ข้อมูลคุมสอบระดับ attempt ลบอัตโนมัติหลังไม่มี heartbeat 90 วันด้วย job รายวัน; การล้างก่อนกำหนดต้องตรวจ owner/co-teacher `admin/manage`/super admin ซ้ำใน service-role-only RPC, ปฏิเสธเมื่อยังมี session สด และห้ามลบ submission, คำตอบ หรือคะแนนร่วมไปด้วย
+- หลักฐานคุมสอบตามนโยบายใหม่คงอยู่กับ assignment และลบตาม parent cascade เดิม ไม่มีการล้างแยกหรือรายงานดาวน์โหลด ผู้ใช้อนุญาตให้ apply เฉพาะ migration `20261015132234` และตรวจ metadata แบบอ่านอย่างเดียวแล้ว jobs/RPC อายุ 90 วันถูกถอดออกจริง รายการ local-only อื่น 20 รายการยังไม่ถูก apply สิทธิ์อ่าน exact owner/manage co-teacher/super-admin และ session RLS คงเดิม อายุ session/lease/SEB check-in/Android approval ยังตรวจตามเดิม การคงหลักฐานไม่ยืดสิทธิ์เข้าสอบ
 - เหตุการณ์เปิดหลายหน้าจอต้องคำนวณฝั่งฐานข้อมูลจาก lease ที่ยังสด ไม่เชื่อ counter/event จาก client และเป็นเพียงสัญญาณให้ครูพิจารณา การ reload ปกติต้องนำ id เดิมกลับมาใช้เพื่อลด false positive
 - นักเรียนห้ามเขียนตาราง proctor โดยตรง; Server Action ต้องตรวจ exact submission owner + `in_progress` ก่อนใช้ service role และครูอ่านได้เฉพาะ assignment ที่ตนจัดการ ข้อมูลเหล่านี้เป็นหลักฐานประกอบการพิจารณา ไม่ใช่การตัดสินทุจริตอัตโนมัติ
 - การรับทราบ event ต้องตรวจ exact event ผ่าน RLS แล้วใช้ service-role-only RPC ที่ตรวจ owner/co-teacher `admin/manage`/super admin ซ้ำ; authenticated role ไม่มี `UPDATE`, evidence fields มี immutable trigger และเงื่อนไข `acknowledged_at IS NULL` ทำให้ครูคนแรกชนะโดยไม่เขียนทับ audit เดิม การลบบัญชีผู้รับทราบล้างเฉพาะ actor id แต่คงเวลาไว้
@@ -143,10 +169,7 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 - ระวัง orphan files เมื่อแก้หรือลบ resource
 - Export ต้องตรวจผู้ขอและข้อมูลทุกแถวก่อนสร้างไฟล์
 - PDF/CSV/รูปที่ส่งออกอาจมีข้อมูลส่วนบุคคล ต้องไม่ใช้ public URL ถ้าไม่จำเป็น
-- CSV รายงานคุมสอบต้องตรวจสิทธิ์ผู้จัดการ assignment ซ้ำและ re-query ตามตัวกรองจากฐานข้อมูล ห้ามเชื่อรายการ event หรือชื่อที่ browser ส่งกลับมา เส้นทางส่งออกตรึงขอบเขต event ใหม่ด้วย ID สูงสุดจาก query แรกและปฏิเสธเมื่อจำนวนที่อ่านไม่ตรงกัน ทุก event-derived attempt/student pair ต้องยืนยันกับ retained session ผ่าน RLS ก่อน admin lookup แต่กลไกนี้ไม่ใช่ transactional snapshot ของ acknowledgement ทุกช่อง จำกัดสูงสุด 10,000 แถว, 2,000 attempts และ payload UTF-8 สูงสุด 4 MiB หากเกินเพดานใดต้องปฏิเสธทั้งคำขอโดยไม่ truncate เงียบ ๆ หรือส่งไฟล์บางส่วน Request body ต้องเป็น `application/json` และอ่านแบบ stream ไม่เกิน 4 KiB จริงโดยไม่เชื่อ `Content-Length` เพียงอย่างเดียว ส่วน CSV ต้องป้องกัน spreadsheet formula injection สำหรับ `=`, `+`, `-`, `@`, รูป full-width และสูตรหลังตัวคั่น comma/semicolon/tab หรือ control character
 - การตอบไฟล์รายงานใช้ `Cache-Control: private, no-store`, `Content-Disposition: attachment` และ `X-Content-Type-Options: nosniff`; ห้ามบันทึกไฟล์ลง public storage หรือ application log และห้ามเรียกว่า tamper-proof/certified evidence เพราะ CSV เป็นสำเนาข้อมูลแบบมีขอบเขตที่ผู้รับแก้ไขต่อได้
-- ชื่อนักเรียนที่หน้า/CSV รายงานคุมสอบเป็น display value แบบจำกัด 160 Unicode code points และเติม `…` เมื่อยาวเกิน เพื่อไม่ให้ข้อความ profile หนึ่งค่าถูกขยายซ้ำจนกินหน่วยความจำระหว่างส่งออก; CSV มีรหัสอ้างอิง event แบบตัวเลขไว้ตรวจย้อนกับข้อมูลในระบบ แต่ไม่ส่ง student/submission/organization UUID
-- Retention 90 วันและปุ่มล้างข้อมูลคุมสอบมีผลเฉพาะข้อมูลใน KorKru ไม่สามารถตามลบไฟล์ที่ดาวน์โหลดแล้ว หน้ารายงานต้องเตือนว่าไฟล์มีชื่อและพฤติกรรมของนักเรียน ผู้ดาวน์โหลดต้องจำกัดผู้เข้าถึง ส่งต่อเท่าที่จำเป็น และลบสำเนาเมื่อหมดวัตถุประสงค์
 - ผลวิจัยระดับบุคคลและแท็บข้อมูลที่ใช้ต้องตรวจสิทธิ์จัดการโครงการก่อน query; pagination/filtering ทำฝั่ง server และไม่ส่ง roster ทั้งโครงการเข้า Client Component เมื่อผู้ใช้ดูเพียงหน้าปัจจุบัน
 - Excel ข้อมูลวิจัยรายบุคคลรับเฉพาะ `POST application/json` แบบ allowlist และ stream ไม่เกิน 1 KiB ตรวจ manage permission ก่อนอ่านทุกแถว จำกัด 2,000 คน และตอบด้วย `private, no-store`, attachment, `nosniff` และ same-origin resource policy; สร้างในหน่วยความจำโดยไม่ใช้ public Storage แบบไม่ระบุตัวตนห้าม query/ใส่ชื่อ รหัสนักเรียน UUID หรือเลขที่ในห้องและต้องสุ่มลำดับใหม่ ส่วนแบบมีตัวตนเปิดเฉพาะเมื่อครูเลือกเอง ทั้งสองแบบเตือนว่าไฟล์ที่ดาวน์โหลดต้องจำกัดผู้เข้าถึงและลบเมื่อหมดความจำเป็น
 - audit การส่งออกวิจัยเก็บเฉพาะ project/org, actor, โหมด, รูปแบบ, จำนวนแถว, เวลา และเวลาแก้คะแนนล่าสุด ไม่มีชื่อ รหัส คะแนน ชื่อไฟล์ หรือ binary; authenticated role อ่านได้ตาม manage RLS แต่เขียนไม่ได้ การ insert ทำหลังสร้าง workbook สำเร็จผ่าน service-role-only RPC ที่ตรวจสิทธิ์ actor กับ exact project ซ้ำ และหากบันทึก audit ล้มเหลว route ต้องไม่ส่งไฟล์
@@ -218,3 +241,16 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 - ตรวจ privacy notice, consent และการจัดการข้อมูลผู้เยาว์กับผู้เชี่ยวชาญที่เกี่ยวข้อง
 
 เอกสารนี้เป็น engineering guardrail ไม่ใช่คำรับรองทางกฎหมาย
+
+- รูปโปรไฟล์ถาวร (14 ต.ค. 2026): server verified Auth + users.status active ก่อน admin upload/update, decoded PNG square 512px ไม่เกิน 2 MiB, re-encode strip metadata, owner UUID/immutable file UUID; compare-and-set ป้องกัน concurrent overwrite/cleanup และลบเฉพาะ avatar URL ที่เป็น bucket/namespace เจ้าของตรงตัว. Public bucket ใช้เพื่อรูปแสดงตัวตนเท่านั้น restrictive policy ปิด browser metadata/read/write แม้มี broad permissive policy; ไม่เก็บสุขภาพ/ผู้ปกครอง/เอกสารใน bucket นี้. ดู `STUDENT_PROFILE_AVATARS.md`.
+
+- โฮมรูมฝั่งนักเรียน (14 ต.ค. 2026): หลัง verified Auth และ roster membership guard อ่านชื่อเต็มกับ `student_profiles.class_number` ของ UUID เพื่อนในห้องนั้นเท่านั้น เพื่อแสดงรายชื่อเรียงเลขที่ตามคำขอเจ้าของ ไม่เปิด direct profile RLS หรือส่ง profile record; ชื่อ/เลขที่เป็นข้อยกเว้นที่เห็นใน roster ร่วม ส่วน school/สุขภาพ/ครอบครัว/ผู้ปกครอง/คะแนนยังไม่ส่งให้เพื่อน.
+
+## Solution attribution overlay — 14 October 2026
+
+- Required solution identity is read with the service client only after verified Auth plus exact ownership/management checks. The DTO excludes email, guardians, health/contact fields, peers and answers. No browser-provided owner is accepted. Existing release/visibility checks remain authoritative; failed identity lookup does not return unwatermarked solution bodies.
+- The name/code/class/number/date overlay is mandatory for released exam/exercise keys even if optional taking watermark is disabled. Authorized teacher result review has an explicit teacher-view label. No new access or RLS/storage changes are made.
+- This is a visible attribution aid; screenshots can be cropped/edited and browser rendering altered. It is not proof of who shared content. Existing external PDF links have no physical watermark; the inline reader is pending the owner's decision. No production data, migration or hosted deployment changed in this task.
+
+
+- Student classroom calendars (14 October 2026): subject events derive only from the membership/group-authorized work list. The student homeroom calendar loader runs after verified Auth/exact homeroom membership, restricts memberships/submissions to that student and published assignment links to enrolled room IDs, then applies the dashboard group-reach projection. It returns no peer attempts or hidden scores. No RLS, schema, storage or Production change is made; Staging verification used zero-row reads only.

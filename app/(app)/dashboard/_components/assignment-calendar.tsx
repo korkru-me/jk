@@ -11,6 +11,8 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { WorkStatusLegend } from '@/components/student/work-status-legend'
+import { studentWorkSeverity, STUDENT_WORK_STATUS_LABEL } from '@/lib/student-work-status'
 
 export interface CalendarEvent {
   id: string
@@ -19,12 +21,12 @@ export interface CalendarEvent {
   endAt: string
   done: boolean
   submissionId: string | null
+  /** Read-only labs and classroom cards can keep their own navigation target. */
+  href?: string
 }
 
 type DayEvent = { event: CalendarEvent; severity: Severity }
-const SEVERITY_LABEL: Record<Severity, string> = {
-  overdue: 'เลยกำหนดส่งแล้ว', soon: 'ใกล้ครบกำหนด', later: 'ยังไม่ถึงกำหนด', done: 'ส่งแล้ว',
-}
+const SEVERITY_LABEL = STUDENT_WORK_STATUS_LABEL
 const STATUS_VARIANT = {
   overdue: 'statusDestructive', soon: 'statusWarning', later: 'secondary', done: 'statusSuccess',
 } as const
@@ -33,9 +35,7 @@ function dateKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 function severityOf(event: CalendarEvent, now: number): Severity {
-  if (event.done) return 'done'
-  const diff = new Date(event.endAt).getTime() - now
-  return diff < 0 ? 'overdue' : diff < 2 * 86400000 ? 'soon' : 'later'
+  return studentWorkSeverity(event.endAt, event.done, now)
 }
 function EventDetails({ entries }: { entries: DayEvent[] }) {
   if (entries.length === 0) return <p className="text-xs text-muted-foreground">ไม่มีงานกำหนดส่งวันนี้</p>
@@ -51,7 +51,7 @@ function EventDetails({ entries }: { entries: DayEvent[] }) {
               <span className="text-xs text-muted-foreground">ส่ง {formatThaiDateTime(event.endAt, { hour: '2-digit', minute: '2-digit' })} น.</span>
               <Badge variant={STATUS_VARIANT[severity]}>{SEVERITY_LABEL[severity]}</Badge>
               {(!event.done || event.submissionId) && (
-                <Link href={event.done ? `/submissions/${event.submissionId}` : `/assignments/${event.id}/take`} className={buttonVariants({ size: 'xs', variant: 'outline' })}>
+                <Link href={event.href ?? (event.done ? `/submissions/${event.submissionId}` : `/assignments/${event.id}/take`)} className={buttonVariants({ size: 'xs', variant: 'outline' })}>
                   {event.done ? 'ดูผล' : 'ทำงาน'}
                 </Link>
               )}
@@ -63,7 +63,7 @@ function EventDetails({ entries }: { entries: DayEvent[] }) {
   )
 }
 
-export function AssignmentCalendar({ events, initialNow }: { events: CalendarEvent[]; initialNow?: string }) {
+export function AssignmentCalendar({ events, initialNow, scopeLabel }: { events: CalendarEvent[]; initialNow?: string; scopeLabel?: string }) {
   const today = useMemo(() => new Date(`${thaiDateStamp(initialNow ?? Date.now())}T12:00:00`), [initialNow])
   const [viewDate, setViewDate] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1))
   const [expanded, setExpanded] = useState(false)
@@ -165,19 +165,21 @@ export function AssignmentCalendar({ events, initialNow }: { events: CalendarEve
 
   return (
     <Dialog open={expanded} onOpenChange={open => { setExpanded(open); setPreviewDay(null) }}>
-      <Card padding="sm" className="flex w-full max-w-[14rem] flex-col gap-1" data-assignment-calendar>
+      <Card padding="sm" className="flex w-full min-w-0 flex-col gap-1" data-assignment-calendar>
         <div className="flex items-center justify-between gap-2">
           <h2 className="flex items-center gap-1.5 text-xs font-semibold"><CalendarDays className="size-3.5 text-primary" aria-hidden="true" /> ปฏิทินส่งงาน</h2>
           <DialogTrigger render={<Button type="button" variant="ghost" size="icon-xs" aria-label="ขยายปฏิทินทั้งเดือน" />}><Maximize2 /></DialogTrigger>
         </div>
         {monthNavigation()}
         {compactGrid('mini')}
+        {scopeLabel && <p className="text-[10px] text-muted-foreground" data-calendar-scope>{scopeLabel} · {events.length} งานมีกำหนดส่ง</p>}
+        <WorkStatusLegend compact />
       </Card>
       {/* This read-only expansion has no draft or edits to discard. */}
       <DialogContent className="flex flex-col gap-3 overflow-hidden sm:max-w-5xl" data-expanded-calendar>
         <DialogHeader className="shrink-0 pr-8">
           <DialogTitle>ปฏิทินกำหนดส่งงาน</DialogTitle>
-          <DialogDescription>งานของแต่ละห้องวิชาและเวลาที่ต้องส่งในเดือนนี้</DialogDescription>
+          <DialogDescription>{scopeLabel ?? 'งานของแต่ละห้องวิชา'} และเวลาที่ต้องส่งในเดือนนี้</DialogDescription>
         </DialogHeader>
         <div className="shrink-0">{monthNavigation(true)}</div>
         <div className="min-h-0 overflow-y-auto outline-none focus-visible:ring-2 focus-visible:ring-ring" tabIndex={0} role="region" aria-label="รายละเอียดงานในปฏิทิน">
@@ -215,11 +217,7 @@ export function AssignmentCalendar({ events, initialNow }: { events: CalendarEve
           </div>
           {!monthHasEvents && <p className="py-4 text-center text-sm text-muted-foreground">ไม่มีงานกำหนดส่งในเดือนนี้</p>}
         </div>
-        <div className="flex shrink-0 flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
-          {(['overdue', 'soon', 'later', 'done'] as Severity[]).map(severity => (
-            <span key={severity} className="flex items-center gap-1"><span className={cn('size-1.5 rounded-full', SEVERITY_DOT[severity])} aria-hidden="true" />{SEVERITY_LABEL[severity]}</span>
-          ))}
-        </div>
+        <WorkStatusLegend />
       </DialogContent>
     </Dialog>
   )

@@ -7,6 +7,8 @@ import { createClient } from '@/lib/supabase/server'
 import { toSafeExamAnswer, type SafeExamAnswer } from '@/lib/exam-safe'
 import { getExamAccessSession } from '@/lib/exam-access-session'
 import { MATH_WORK_BUCKET, type StudentWorkArtifactView } from '@/lib/math-work'
+import { loadStudentSolutionWatermark } from '@/lib/solution-watermark-server'
+import type { SolutionWatermarkData } from '@/lib/solution-watermark'
 
 type TakingSubmissionRow = Pick<Submission, 'id' | 'started_at' | 'assignment_id' | 'student_id' | 'status' | 'exam_access_mode' | 'current_streak' | 'best_streak' | 'streak_reached'> & {
   seb_config_revision?: number | null
@@ -41,6 +43,7 @@ export interface ExamTakingData {
     exam_access_mode: 'browser' | 'seb' | 'android_monitored'
     secure_browser_verified: boolean
     watermark_text: string | null
+    solution_watermark: SolutionWatermarkData
     questions_per_page: number
     instant_check: boolean
     instant_check_answer_key: boolean
@@ -96,6 +99,11 @@ export async function getExamTakingData(submissionId: string): Promise<ExamTakin
       )
     : null
   if (assignment.secure_browser_mode === 'seb_required' && !examAccess) return null
+
+  // Required for any released answer key, independent of the optional exam
+  // overlay. Ownership and the native session have already been checked.
+  const solutionWatermark = await loadStudentSolutionWatermark(admin, user.id)
+  if (!solutionWatermark) return null
 
   const { data: answerRows } = await admin
     .from('submission_answers')
@@ -179,6 +187,7 @@ export async function getExamTakingData(submissionId: string): Promise<ExamTakin
       exam_access_mode: examAccess?.mode ?? 'browser',
       secure_browser_verified: examAccess?.mode === 'seb',
       watermark_text: watermarkText,
+      solution_watermark: solutionWatermark,
       // A row saved before the setting existed reads as the original layout.
       questions_per_page: Math.max(1, Number(assignment.questions_per_page ?? 1)),
       // Re-derived here rather than trusted from the column alone: the ปุ่มตรวจ

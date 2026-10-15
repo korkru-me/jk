@@ -5,25 +5,30 @@ import { rescaleToDisplayMax, selectOfficialAttempt } from '@/lib/scoring'
 import { canStudentReviewAnswers, canStudentViewScore } from '@/lib/result-visibility'
 import type { StudentClassroom } from '../../classrooms/_components/student-view'
 import type { CalendarEvent } from './assignment-calendar'
+import type { StudentPracticeLibraryListItem } from '../../practice/_lib/student-landing-contract'
 
 type WorkSettings = Pick<Assignment,
   'id' | 'classroom_id' | 'title' | 'type' | 'end_at' | 'duration_minutes' |
   'passing_type' | 'passing_value' | 'score_strategy' | 'display_max_score' | 'show_results'
 >
-export type LearningAssignment = WorkSettings & { assignment_classrooms: AssignmentLinkReach[] }
+export type LearningAssignment = WorkSettings & { created_at?: string; assignment_classrooms: AssignmentLinkReach[] }
 export type LearningSubmission = Pick<Submission,
   'id' | 'assignment_id' | 'total_score' | 'max_score' | 'score_adjustment' |
   'status' | 'attempt_number' | 'created_at'
 > & { assignments: (WorkSettings & { classrooms: { name: string } | null }) | null }
 
 export type StudentWorkItem = {
+  type?: Assignment['type']
   id: string
   title: string
   classroom: Pick<StudentClassroom, 'id' | 'name' | 'description'> | null
   otherClassroomNames: string[]
   endAt: string | null
+  assignedAt: string | null
   durationMinutes: number | null
   inProgress: boolean
+  completed: boolean
+  submissionId: string | null
   hasPreviousAttempt: boolean
   previousScore: { total: number | null; max: number } | null
 }
@@ -35,10 +40,25 @@ export type StudentWorkHistory = {
   score: { total: number | null; max: number } | null
   reviewLabel: string
 }
+export type StudentPracticeWorkItem = {
+  kind: 'practice'
+  id: string
+  title: string
+  classroom: Pick<StudentClassroom, 'id' | 'name' | 'description'>
+  otherClassroomNames: string[]
+  endAt: null
+  assignedAt: string | null
+  completed: false
+  questionCount: number
+}
+export type StudentSummaryItem = ({ kind: 'assignment' } & StudentWorkItem) | StudentPracticeWorkItem
 export type StudentLearningData = {
   classrooms: StudentClassroom[]
   pendingCountMap: Record<string, number>
   pendingWork: StudentWorkItem[]
+  completedWork: StudentWorkItem[]
+  practiceWork: StudentPracticeWorkItem[]
+  practiceError: string | null
   urgentCount: number
   doneCount: number
   history: StudentWorkHistory[]
@@ -48,10 +68,12 @@ export type StudentLearningData = {
 /** Server-side projection: one completion rule for cards, summary and calendar.
  * Input rows must already be scoped to the authenticated student's memberships
  * and own submissions. Hidden scores are removed before rendering any props. */
-export function buildStudentLearningData({ classrooms, assignments, submissions, groupOf = new Map(), now = Date.now() }: {
+export function buildStudentLearningData({ classrooms, assignments, submissions, practiceLibraries = [], practiceError = null, groupOf = new Map(), now = Date.now() }: {
   classrooms: StudentClassroom[]
   assignments: LearningAssignment[]
   submissions: LearningSubmission[]
+  practiceLibraries?: StudentPracticeLibraryListItem[]
+  practiceError?: string | null
   groupOf?: ReadonlyMap<string, string>
   now?: number
 }): StudentLearningData {
@@ -92,22 +114,35 @@ export function buildStudentLearningData({ classrooms, assignments, submissions,
     )
   }
   const pendingCountMap: Record<string, number> = {}
-  const pendingWork = visibleAssignments.filter(a => !doneIds.has(a.id)).map(a => {
+  const work = visibleAssignments.map(a => {
     const rooms = roomsFor(a)
-    for (const room of rooms) pendingCountMap[room.id] = (pendingCountMap[room.id] ?? 0) + 1
+    if (!doneIds.has(a.id)) for (const room of rooms) pendingCountMap[room.id] = (pendingCountMap[room.id] ?? 0) + 1
     const previous = officialByAssignment.get(a.id)
     return {
-      id: a.id, title: a.title, classroom: rooms[0] ?? null,
+      id: a.id, title: a.title, type: a.type, classroom: rooms[0] ?? null,
       otherClassroomNames: rooms.slice(1).map(c => c.name),
-      endAt: a.end_at, durationMinutes: a.duration_minutes,
-      inProgress: inProgressIds.has(a.id), hasPreviousAttempt: !!previous,
+      endAt: a.end_at, assignedAt: a.created_at ?? null, durationMinutes: a.duration_minutes,
+      inProgress: !doneIds.has(a.id) && inProgressIds.has(a.id), completed: doneIds.has(a.id), submissionId: previous?.id ?? null, hasPreviousAttempt: !!previous,
       previousScore: previous && canStudentViewScore(previous.assignments?.show_results, previous.assignments?.end_at, now)
         ? { total: previous.total_score, max: previous.max_score } : null,
     }
   }).sort((a, b) => (a.endAt ? Date.parse(a.endAt) : Infinity) - (b.endAt ? Date.parse(b.endAt) : Infinity))
 
+  const pendingWork = work.filter(item => !item.completed)
+  const completedWork = work.filter(item => item.completed)
+  const practiceWork: StudentPracticeWorkItem[] = [...new Map(practiceLibraries.map(library => [library.id, library])).values()].flatMap(library => {
+    const classroom = classroomById.get(library.classroomId)
+    if (!classroom || classroom.status !== 'active' || classroom.classroom_type !== 'subject') return []
+    return [{
+      kind: 'practice', id: library.id, title: library.title,
+      classroom: { id: classroom.id, name: classroom.name, description: classroom.description },
+      otherClassroomNames: [], endAt: null, assignedAt: library.publishedAt ?? library.createdAt,
+      completed: false, questionCount: library.questionCount,
+    }]
+  })
+
   return {
-    classrooms: classrooms.filter(c => c.status === 'active'), pendingCountMap, pendingWork,
+    classrooms: classrooms.filter(c => c.status === 'active'), pendingCountMap, pendingWork, completedWork, practiceWork, practiceError,
     urgentCount: pendingWork.filter(a => a.endAt && Date.parse(a.endAt) - now <= 3 * 86400000).length,
     doneCount: doneIds.size,
     calendarEvents: visibleAssignments.filter(a => a.end_at).map(a => ({

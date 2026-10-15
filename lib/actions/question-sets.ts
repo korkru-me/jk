@@ -12,10 +12,16 @@ import {
 } from '@/lib/question-set-sections'
 import { fileQuestionsIntoSets } from '@/lib/question-set-filing'
 import type { QuestionSet, Visibility } from '@/lib/types'
+import {
+  composeQuestionSetDescription, isQuestionSetTheme, parseQuestionSetDescription,
+  questionSetTheme, randomQuestionSetTheme,
+} from '@/lib/question-set-theme'
 
 export interface QuestionSetData {
   title: string
   description: string
+  /** Empty means automatic; omitted by older callers to preserve the saved colour. */
+  theme?: string
   question_ids: string[]
   /** แฟ้มย่อย inside the set. Normalized server-side against question_ids, so a
    *  client that sends stale or invented ids can't corrupt the set. */
@@ -63,6 +69,7 @@ export async function getQuestionSetShareOrgIds(setId: string): Promise<string[]
 }
 
 export async function createQuestionSet(data: QuestionSetData) {
+  if (data.theme !== undefined && data.theme !== '' && !isQuestionSetTheme(data.theme)) return { error: 'ธีมสีไม่ถูกต้อง' }
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
@@ -80,7 +87,8 @@ export async function createQuestionSet(data: QuestionSetData) {
       created_by: user.id,
       visibility: data.visibility,
       title: data.title.trim(),
-      description: data.description.trim() || null,
+      description: composeQuestionSetDescription(data.description,
+        isQuestionSetTheme(data.theme) ? data.theme : parseQuestionSetDescription(data.description).theme ?? randomQuestionSetTheme()),
       question_ids: normalized.question_ids,
       sections: normalized.sections,
       tags: data.tags ?? [],
@@ -96,6 +104,7 @@ export async function createQuestionSet(data: QuestionSetData) {
   }
 
   revalidatePath('/questions/sets')
+  revalidatePath('/dashboard')
   return { id: set.id as string }
 }
 
@@ -121,6 +130,7 @@ export async function updateQuestionSet(id: string, data: QuestionSetData) {
 
 /** The write both of the above share. Not an action — module-private. */
 async function writeQuestionSet(id: string, data: QuestionSetData) {
+  if (data.theme !== undefined && data.theme !== '' && !isQuestionSetTheme(data.theme)) return { error: 'ธีมสีไม่ถูกต้อง' }
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
@@ -131,13 +141,23 @@ async function writeQuestionSet(id: string, data: QuestionSetData) {
 
   const normalized = normalizeSetSections(data.sections ?? [], data.question_ids)
 
+  // Compatibility with older callers that do not send a theme. Modern editors
+  // always send the resolved colour, so autosave never rerolls it.
+  let theme = isQuestionSetTheme(data.theme) ? data.theme : randomQuestionSetTheme()
+  if (data.theme === undefined) {
+    const { data: existing, error } = await supabase.from('question_sets')
+      .select('description').eq('id', id).eq('created_by', user.id).single()
+    if (error || !existing) return { error: 'ไม่พบแฟ้มโจทย์หรือไม่มีสิทธิ์แก้ไข' }
+    theme = questionSetTheme(id, existing.description)
+  }
+
   const { error } = await supabase
     .from('question_sets')
     .update({
       org_id: orgResult.orgId,
       visibility: data.visibility,
       title: data.title.trim(),
-      description: data.description.trim() || null,
+      description: composeQuestionSetDescription(data.description, theme),
       question_ids: normalized.question_ids,
       sections: normalized.sections,
       ...(data.tags ? { tags: data.tags } : {}),
@@ -152,6 +172,7 @@ async function writeQuestionSet(id: string, data: QuestionSetData) {
   await syncQuestionSetShares(supabase, id, extraShares)
 
   revalidatePath('/questions/sets')
+  revalidatePath('/dashboard')
   revalidatePath(`/questions/sets/${id}/edit`)
   return { ok: true as const }
 }

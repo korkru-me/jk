@@ -1,11 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { Eye, Sparkles } from 'lucide-react'
+import { PanelsTopLeft, Sparkles } from 'lucide-react'
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
-import { IconButton } from '@/components/ui/icon-button'
+import { Button } from '@/components/ui/button'
 import { QuestionPreviewContent } from '@/components/questions/question-preview'
 import type { SampleQuestion } from '../_data/sample-questions'
 
@@ -33,20 +33,25 @@ export function SamplePreview({
 
   return (
     <>
-      <IconButton
+      <Button
+        type="button"
+        variant="ghost"
         size="sm"
-        label={`ดูตัวอย่างโจทย์${typeTitle}`}
+        aria-label={`ดูตัวอย่างโจทย์${typeTitle}`}
+        aria-haspopup="dialog"
+        aria-expanded={open}
         onClick={() => setOpen(true)}
-        className="opacity-70 hover:opacity-100"
+        className="min-h-11"
       >
-        <Eye />
-      </IconButton>
+        <PanelsTopLeft data-icon="inline-start" />
+        ดูตัวอย่าง
+      </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Eye className="w-4 h-4" /> มุมมองนักเรียน · {typeTitle}
+              <PanelsTopLeft aria-hidden className="size-4" /> มุมมองนักเรียน · {typeTitle}
             </DialogTitle>
             <DialogDescription className="sr-only">
               ตัวอย่างโจทย์ประเภท{typeTitle} แสดงด้วยหน้าตาเดียวกับที่นักเรียนเห็นตอนทำข้อสอบ

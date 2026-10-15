@@ -26,7 +26,7 @@ describe('practice waiting room', () => {
     expect(html).toContain('หน้ารอเข้าคลังฝึก')
     expect(html).toContain('128 ข้อ')
     expect(html).toContain('ไม่เก็บคำตอบ ผลถูกผิด หรือคะแนน')
-    expect(html).toContain('ไม่สร้างรอบทำงาน ไม่จำกัดเวลา และไม่มีการส่งงาน')
+    expect(html).toContain('ส่งคำตอบเพื่อดูสรุปผลการฝึกได้')
     expect(html).toContain('href="/practice/library-1/library"')
     expect(html).not.toContain('<input')
   })

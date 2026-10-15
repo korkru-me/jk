@@ -3,7 +3,7 @@ import 'server-only'
 import type { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import {
-  fetchAllRows,
+  fetchAllRows, fetchRowsInChunks,
 } from '@/lib/supabase/fetch-all-rows'
 import { withQuestionPoints, type BankQuestion } from '@/lib/question-bank'
 import {
@@ -252,6 +252,31 @@ export async function loadPracticeEditorQuestions(
       ...rows.filter(row => row.created_by === userId).map(row => row.id),
     ])],
     error: managed.error,
+  }
+}
+
+/** Source management is checked by the caller; new references still require ordinary question RLS. */
+export async function loadPracticeCopyQuestions(
+  supabase: SupabaseServerClient,
+  userId: string,
+  sourceIds: string[],
+  initialBank?: Awaited<ReturnType<typeof loadSupportedPracticeBankQuestions>>,
+) {
+  const bank = initialBank ?? await loadSupportedPracticeBankQuestions(supabase, userId)
+  if (bank.error) return { ...bank, missingIds: sourceIds, unsupportedIds: [] as string[] }
+  const byId = new Map(bank.questions.map(question => [question.id, question]))
+  const unread = sourceIds.filter(id => !byId.has(id))
+  const extra = await fetchRowsInChunks<PracticeBankRow, string>(unread, ids => supabase
+    .from('questions').select(PRACTICE_BANK_FIELDS).in('id', ids)
+    .eq('is_research_snapshot', false).neq('visibility', 'pending'))
+  if (extra.error) return { questions: bank.questions, missingIds: unread, unsupportedIds: [] as string[], error: 'โหลดโจทย์ต้นฉบับไม่สำเร็จ กรุณาโหลดหน้าใหม่' }
+  const found = new Set([...byId.keys(), ...extra.rows.map(question => question.id)])
+  for (const row of extra.rows) if (isSupportedPracticeQuestion(row)) byId.set(row.id, safePracticeBankQuestion(row))
+  return {
+    questions: [...byId.values()],
+    missingIds: sourceIds.filter(id => !found.has(id)),
+    unsupportedIds: extra.rows.filter(row => !isSupportedPracticeQuestion(row)).map(row => row.id),
+    error: null,
   }
 }
 

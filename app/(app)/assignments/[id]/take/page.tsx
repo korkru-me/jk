@@ -121,6 +121,7 @@ export default async function TakeExamPage({
     isFullscreenEnforced: assignment.fullscreen_required && !assignment.secure_browser_verified,
     blockClipboard: assignment.block_clipboard,
     watermarkText: assignment.watermark_text,
+    solutionWatermark: assignment.solution_watermark,
     isWorkImageEnforced: assignment.require_work_image ?? false,
     // แบบฝึกหัด: ตรวจทีละข้อระหว่างทำได้ ไม่ต้องรอกดส่งตอนจบเหมือนข้อสอบ
     instantCheck: assignment.instant_check,

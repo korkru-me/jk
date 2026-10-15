@@ -22,6 +22,7 @@ export function ClassroomCoverThemePicker({
   allowAuto?: boolean
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState(false)
   const selectedPreset = COVER_PRESETS.find(preset => preset.id === value)
   const activePreset = selectedPreset ?? COVER_PRESETS[0]
@@ -44,6 +45,7 @@ export function ClassroomCoverThemePicker({
   function choose(value: string) {
     onValueChange(value)
     setOpen(false)
+    triggerRef.current?.focus()
   }
 
   return (
@@ -51,6 +53,7 @@ export function ClassroomCoverThemePicker({
       <Label className="text-sm font-medium">ธีมสี</Label>
       <Collapsible open={open} onOpenChange={setOpen} disabled={disabled}>
         <CollapsibleTrigger
+          ref={triggerRef}
           render={<Button type="button" variant="outline" disabled={disabled} className="h-10 w-full justify-start gap-3" />}
           aria-label={`ธีมสี: ${selectedLabel}`}
         >
@@ -81,7 +84,7 @@ export function ClassroomCoverThemePicker({
                   value="auto"
                   title="สีอัตโนมัติ"
                   aria-label="สีอัตโนมัติ"
-                  className="size-8 rounded-full p-0 hover:bg-transparent aria-pressed:bg-transparent data-[state=on]:bg-transparent"
+                  className="size-8 rounded-full p-0 hover:bg-transparent aria-pressed:bg-transparent data-[state=on]:bg-transparent [@media(pointer:coarse)]:min-h-[44px] [@media(pointer:coarse)]:min-w-[44px]"
                 >
                   <span className={cn(
                     'flex size-8 items-center justify-center rounded-full bg-muted text-muted-foreground transition-transform group-hover/toggle:scale-105',
@@ -97,7 +100,7 @@ export function ClassroomCoverThemePicker({
                   value={preset.id}
                   title={preset.label}
                   aria-label={preset.label}
-                  className="size-8 rounded-full p-0 hover:bg-transparent aria-pressed:bg-transparent data-[state=on]:bg-transparent"
+                  className="size-8 rounded-full p-0 hover:bg-transparent aria-pressed:bg-transparent data-[state=on]:bg-transparent [@media(pointer:coarse)]:min-h-[44px] [@media(pointer:coarse)]:min-w-[44px]"
                 >
                   <span className={cn(
                     'size-8 rounded-full transition-transform group-hover/toggle:scale-105',

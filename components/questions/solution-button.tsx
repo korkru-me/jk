@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Lightbulb, LightbulbOff } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { preloadSolutionParts, SolutionViewerDialog } from './solution-viewer-dialog'
 
@@ -19,6 +20,7 @@ interface Props {
   /** Whether this teacher may edit the โจทย์ — only then does the grey button
    *  point them at where a เฉลย is attached. */
   canAttach?: boolean
+  confirmDismissal?: boolean
 }
 
 /**
@@ -27,7 +29,7 @@ interface Props {
  * teacher can see down the list which โจทย์ still need a เฉลย without opening
  * any of them. The grey one says so in words as well as colour.
  */
-export function SolutionButton({ questionId, questionTitle, hasSolution, size = 'sm', canAttach = true }: Props) {
+export function SolutionButton({ questionId, questionTitle, hasSolution, size = 'sm', canAttach = true, confirmDismissal = false }: Props) {
   const [open, setOpen] = useState(false)
   // Kept mounted after the first press, so closing can animate out.
   const [opened, setOpened] = useState(false)
@@ -62,7 +64,7 @@ export function SolutionButton({ questionId, questionTitle, hasSolution, size = 
         // among it) is fetched on the way to the click.
         onPointerEnter={preloadSolutionParts}
         onFocus={preloadSolutionParts}
-        className="bg-warning/10 text-[color-mix(in_oklab,var(--warning)_60%,var(--foreground))] hover:bg-warning/20"
+        className={cn('bg-warning/10 text-[color-mix(in_oklab,var(--warning)_60%,var(--foreground))] hover:bg-warning/20', confirmDismissal && 'pointer-coarse:min-h-11')}
       >
         <Lightbulb aria-hidden="true" /> ดูเฉลย
       </Button>
@@ -72,6 +74,7 @@ export function SolutionButton({ questionId, questionTitle, hasSolution, size = 
           questionTitle={questionTitle}
           open={open}
           onOpenChange={setOpen}
+          confirmDismissal={confirmDismissal}
         />
       )}
     </>

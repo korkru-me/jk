@@ -22,11 +22,13 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import type { PracticeStudentProgressSummary } from '@/lib/practice-progress'
+import { buildPracticeProgressHref } from '@/lib/practice-progress'
 
 interface PracticeProgressDashboardProps {
   libraryId: string
   totalQuestionCount: number
   rows: readonly PracticeStudentProgressSummary[]
+  hrefBase?: string
 }
 
 function matchesStudent(row: PracticeStudentProgressSummary, query: string): boolean {
@@ -40,6 +42,7 @@ export function PracticeProgressDashboard({
   libraryId,
   totalQuestionCount,
   rows,
+  hrefBase,
 }: PracticeProgressDashboardProps) {
   const [query, setQuery] = useState('')
   const filteredRows = useMemo(
@@ -49,25 +52,13 @@ export function PracticeProgressDashboard({
   const activeStudentCount = rows.filter(row => row.total_attempt_count > 0).length
 
   return (
-    <div className="flex flex-col gap-3">
-      <Card padding="none">
-        <dl className="grid min-h-16 grid-cols-3 divide-x divide-border">
-          <div className="flex min-w-0 flex-col justify-center px-3 py-2">
-            <dt className="truncate text-xs text-muted-foreground">นักเรียน</dt>
-            <dd className="font-semibold tabular-nums">{rows.length} คน</dd>
-          </div>
-          <div className="flex min-w-0 flex-col justify-center px-3 py-2">
-            <dt className="truncate text-xs text-muted-foreground">เคยลองตอบ</dt>
-            <dd className="font-semibold tabular-nums">{activeStudentCount} คน</dd>
-          </div>
-          <div className="flex min-w-0 flex-col justify-center px-3 py-2">
-            <dt className="truncate text-xs text-muted-foreground">โจทย์ในคลัง</dt>
-            <dd className="font-semibold tabular-nums">{totalQuestionCount} ข้อ</dd>
-          </div>
-        </dl>
-      </Card>
-
-      <Field className="max-w-md gap-1.5">
+    <Card padding="none" className="flex min-w-0 flex-col overflow-hidden" data-practice-progress-dashboard>
+      <div className="flex min-w-0 flex-col gap-2 border-b p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="flex items-center gap-2 text-sm font-semibold"><UsersRound className="size-4" aria-hidden="true" />ข้อมูลการฝึกฝน</h2>
+          <span className="text-xs text-muted-foreground">ฝึกแล้ว {activeStudentCount}/{rows.length} คน</span>
+        </div>
+      <Field className="gap-1.5">
         <FieldLabel htmlFor="practice-student-search" className="sr-only">
           ค้นหานักเรียน
         </FieldLabel>
@@ -80,15 +71,14 @@ export function PracticeProgressDashboard({
             id="practice-student-search"
             value={query}
             onChange={event => setQuery(event.target.value)}
-            placeholder="ค้นหาชื่อหรือเลขประจำตัว"
+            placeholder="ค้นหาชื่อหรือเลขที่"
             className="h-11 pl-9"
           />
         </div>
       </Field>
-
-      <Card padding="none" className="overflow-hidden">
+      </div>
         {rows.length === 0 ? (
-          <Empty className="min-h-52 border-0">
+          <Empty className="border-0 py-4">
             <EmptyHeader>
               <EmptyMedia variant="icon"><UsersRound aria-hidden="true" /></EmptyMedia>
               <EmptyTitle>ยังไม่มีนักเรียนในห้อง</EmptyTitle>
@@ -96,28 +86,28 @@ export function PracticeProgressDashboard({
             </EmptyHeader>
           </Empty>
         ) : filteredRows.length === 0 ? (
-          <Empty className="min-h-40 border-0">
+          <Empty className="border-0 py-4">
             <EmptyHeader>
               <EmptyTitle>ไม่พบนักเรียนที่ค้นหา</EmptyTitle>
-              <EmptyDescription>ลองใช้ชื่อหรือเลขประจำตัวที่สั้นลง</EmptyDescription>
+              <EmptyDescription>ลองใช้ชื่อหรือเลขที่อื่น</EmptyDescription>
             </EmptyHeader>
           </Empty>
         ) : (
+          <div className="max-h-[28rem] overflow-y-auto overscroll-contain">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 bg-card">
               <TableRow>
                 <TableHead>นักเรียน</TableHead>
-                <TableHead className="text-right">ข้อที่เคยตอบ</TableHead>
-                <TableHead className="text-right">ตอบทั้งหมด</TableHead>
+                <TableHead className="text-right">ข้อที่ฝึก</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredRows.map(row => (
                 <TableRow key={row.student_id} className="h-12">
-                  <TableCell className="min-w-44 whitespace-normal">
+                  <TableCell className="w-full min-w-0 whitespace-normal">
                     <Link
-                      href={`/practice/${libraryId}/progress/${row.student_id}`}
-                      className="flex min-h-11 flex-col justify-center font-medium text-foreground outline-none hover:text-primary focus-visible:rounded-md focus-visible:ring-3 focus-visible:ring-ring/50"
+                      href={buildPracticeProgressHref(libraryId, row.student_id, { q: '', page: 1 }, 1, hrefBase)}
+                      className="flex min-h-11 flex-col justify-center break-words font-medium text-foreground outline-none hover:text-primary focus-visible:rounded-md focus-visible:ring-3 focus-visible:ring-ring/50"
                     >
                       <span>{row.display_name}</span>
                       {row.class_number !== null && (
@@ -129,16 +119,14 @@ export function PracticeProgressDashboard({
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {row.attempted_question_count}/{totalQuestionCount}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {row.total_attempt_count} ครั้ง
+                    <span className="mt-0.5 block whitespace-nowrap text-xs text-muted-foreground">{row.total_attempt_count} รอบ</span>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
+          </div>
         )}
-      </Card>
-    </div>
+    </Card>
   )
 }

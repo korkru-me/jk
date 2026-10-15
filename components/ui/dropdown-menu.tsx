@@ -80,7 +80,7 @@ function DropdownMenuItem({
   ...props
 }: MenuPrimitive.Item.Props & {
   inset?: boolean
-  variant?: "default" | "destructive" | "primary"
+  variant?: "default" | "destructive" | "primary" | "workExercise" | "workExam" | "workPractice"
 }) {
   return (
     <MenuPrimitive.Item
@@ -89,6 +89,9 @@ function DropdownMenuItem({
       data-variant={variant}
       className={cn(
         "group/dropdown-menu-item relative flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none data-[variant=default]:focus:bg-accent data-[variant=default]:focus:text-accent-foreground data-[variant=default]:focus:**:text-accent-foreground data-inset:pl-7 data-[variant=primary]:hover:bg-primary/10 data-[variant=primary]:hover:text-primary data-[variant=primary]:hover:**:text-primary data-[variant=primary]:focus:bg-primary/10 data-[variant=primary]:focus:text-primary data-[variant=primary]:focus:**:text-primary data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-[variant=destructive]:*:[svg]:text-destructive",
+        variant === "workExercise" && "bg-work-exercise/5 text-work-exercise hover:bg-work-exercise/15 focus:bg-work-exercise/15",
+        variant === "workExam" && "bg-work-exam/5 text-work-exam hover:bg-work-exam/15 focus:bg-work-exam/15",
+        variant === "workPractice" && "bg-work-practice/5 text-work-practice hover:bg-work-practice/15 focus:bg-work-practice/15",
         className
       )}
       {...props}

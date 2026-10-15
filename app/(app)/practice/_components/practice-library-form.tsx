@@ -1,5 +1,7 @@
 'use client'
 
+import { AssignmentReuseDetails } from '@/components/assignments/assignment-reuse-details'
+import { WorkTypeBadge } from '@/components/assignments/work-type'
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
@@ -59,6 +61,7 @@ import {
   type PracticeLibraryStatus,
 } from '../_lib/teacher-contract'
 import { PracticeBulkTagEditor } from './practice-bulk-tag-editor'
+import { usePracticeManagementFormState } from '@/components/practice/practice-management-shell'
 
 const CREATE_STEPS = ['รายละเอียดและโจทย์', 'ตั้งค่า', 'ตรวจสอบและสร้าง']
 
@@ -85,16 +88,25 @@ interface InitialPracticeLibrary {
   shuffleOptions: boolean
 }
 
+export type PracticeLibraryCopyPreset = Pick<InitialPracticeLibrary,
+  'title' | 'description' | 'questionIds' | 'revealAnswerKey' | 'accessCode'
+  | 'calculatorEnabled' | 'scratchpadEnabled' | 'shuffleQuestions' | 'shuffleOptions'
+> & { sourceTitle: string }
+
 interface PracticeLibraryFormProps {
   classrooms: PracticeClassroomOption[]
   questions: BankQuestion[]
   questionSets?: AssignmentQuestionSetOption[]
   initialClassroomId?: string
   initialLibrary?: InitialPracticeLibrary
+  copyPreset?: PracticeLibraryCopyPreset
   missingQuestionIds?: string[]
   unsupportedQuestionIds?: string[]
   loadingWarning?: string | null
   editableQuestionIds?: string[]
+  embedded?: boolean
+  /** Guarded local previews can capture creation without external writes. */
+  actions?: { createPracticeLibrary: typeof createPracticeLibrary; updatePracticeLibrary?: typeof updatePracticeLibrary; deletePracticeLibrary?: typeof deletePracticeLibrary; onSaved?: (id: string) => void }
 }
 
 function statusBadgeVariant(status: PracticeLibraryStatus) {
@@ -109,11 +121,15 @@ export function PracticeLibraryForm({
   questionSets = [],
   initialClassroomId,
   initialLibrary,
+  copyPreset,
   missingQuestionIds = [],
   unsupportedQuestionIds = [],
   loadingWarning,
   editableQuestionIds = [],
+  embedded = false,
+  actions,
 }: PracticeLibraryFormProps) {
+  const initialValues = initialLibrary ?? copyPreset
   const previewLibraryId = initialLibrary?.id
   const loadPracticePreview = useCallback(
     (ids: readonly string[]) => previewLibraryId
@@ -124,8 +140,8 @@ export function PracticeLibraryForm({
   const router = useRouter()
   const [confirm, confirmDialog] = useConfirm()
   const [isPending, startTransition] = useTransition()
-  const [title, setTitle] = useState(initialLibrary?.title ?? '')
-  const [description, setDescription] = useState(initialLibrary?.description ?? '')
+  const [title, setTitle] = useState(initialValues?.title ?? '')
+  const [description, setDescription] = useState(initialValues?.description ?? '')
   const contextualPrimaryClassroomId = !initialLibrary
     && classrooms.some(classroom => classroom.id === initialClassroomId)
     ? initialClassroomId
@@ -135,43 +151,43 @@ export function PracticeLibraryForm({
     if (contextualPrimaryClassroomId) return [contextualPrimaryClassroomId]
     return classrooms[0] ? [classrooms[0].id] : []
   })
-  const [selectedIds, setSelectedIds] = useState<string[]>(initialLibrary?.questionIds ?? [])
+  const [selectedIds, setSelectedIds] = useState<string[]>(initialValues?.questionIds ?? [])
   const [revealAnswerKey, setRevealAnswerKey] = useState(
-    initialLibrary?.revealAnswerKey ?? NEW_PRACTICE_LIBRARY_DEFAULTS.revealAnswerKey,
+    initialValues?.revealAnswerKey ?? NEW_PRACTICE_LIBRARY_DEFAULTS.revealAnswerKey,
   )
-  const [accessCodeEnabled, setAccessCodeEnabled] = useState(Boolean(initialLibrary?.accessCode))
-  const [accessCode, setAccessCode] = useState(initialLibrary?.accessCode ?? '')
+  const [accessCodeEnabled, setAccessCodeEnabled] = useState(Boolean(initialValues?.accessCode))
+  const [accessCode, setAccessCode] = useState(initialValues?.accessCode ?? '')
   const [calculatorEnabled, setCalculatorEnabled] = useState(
-    initialLibrary?.calculatorEnabled ?? NEW_PRACTICE_LIBRARY_DEFAULTS.calculatorEnabled,
+    initialValues?.calculatorEnabled ?? NEW_PRACTICE_LIBRARY_DEFAULTS.calculatorEnabled,
   )
   const [scratchpadEnabled, setScratchpadEnabled] = useState(
-    initialLibrary?.scratchpadEnabled ?? NEW_PRACTICE_LIBRARY_DEFAULTS.scratchpadEnabled,
+    initialValues?.scratchpadEnabled ?? NEW_PRACTICE_LIBRARY_DEFAULTS.scratchpadEnabled,
   )
   const [shuffleQuestions, setShuffleQuestions] = useState(
-    initialLibrary?.shuffleQuestions ?? NEW_PRACTICE_LIBRARY_DEFAULTS.shuffleQuestions,
+    initialValues?.shuffleQuestions ?? NEW_PRACTICE_LIBRARY_DEFAULTS.shuffleQuestions,
   )
   const [shuffleOptions, setShuffleOptions] = useState(
-    initialLibrary?.shuffleOptions ?? NEW_PRACTICE_LIBRARY_DEFAULTS.shuffleOptions,
+    initialValues?.shuffleOptions ?? NEW_PRACTICE_LIBRARY_DEFAULTS.shuffleOptions,
   )
   const [search, setSearch] = useState('')
   const [difficulty, setDifficulty] = useState('all')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
   const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify({
-    title: initialLibrary?.title ?? '',
-    description: initialLibrary?.description ?? '',
+    title: initialValues?.title ?? '',
+    description: initialValues?.description ?? '',
     classroomIds: initialLibrary ? [initialLibrary.classroomId] : classroomIds,
-    selectedIds: initialLibrary?.questionIds ?? [],
-    revealAnswerKey: initialLibrary?.revealAnswerKey
+    selectedIds: initialValues?.questionIds ?? [],
+    revealAnswerKey: initialValues?.revealAnswerKey
       ?? NEW_PRACTICE_LIBRARY_DEFAULTS.revealAnswerKey,
-    accessCodeEnabled: Boolean(initialLibrary?.accessCode),
-    accessCode: initialLibrary?.accessCode ?? '',
-    calculatorEnabled: initialLibrary?.calculatorEnabled
+    accessCodeEnabled: Boolean(initialValues?.accessCode),
+    accessCode: initialValues?.accessCode ?? '',
+    calculatorEnabled: initialValues?.calculatorEnabled
       ?? NEW_PRACTICE_LIBRARY_DEFAULTS.calculatorEnabled,
-    scratchpadEnabled: initialLibrary?.scratchpadEnabled
+    scratchpadEnabled: initialValues?.scratchpadEnabled
       ?? NEW_PRACTICE_LIBRARY_DEFAULTS.scratchpadEnabled,
-    shuffleQuestions: initialLibrary?.shuffleQuestions
+    shuffleQuestions: initialValues?.shuffleQuestions
       ?? NEW_PRACTICE_LIBRARY_DEFAULTS.shuffleQuestions,
-    shuffleOptions: initialLibrary?.shuffleOptions
+    shuffleOptions: initialValues?.shuffleOptions
       ?? NEW_PRACTICE_LIBRARY_DEFAULTS.shuffleOptions,
   }))
   const [confirmingDelete, setConfirmingDelete] = useState(false)
@@ -198,8 +214,14 @@ export function PracticeLibraryForm({
     shuffleOptions,
   })
   const isDirty = currentSnapshot !== savedSnapshot
+  const setManagementDirty = usePracticeManagementFormState()
+  useEffect(() => {
+    if (!embedded || !setManagementDirty) return
+    setManagementDirty(isDirty || isPending)
+    return () => setManagementDirty(false)
+  }, [embedded, isDirty, isPending, setManagementDirty])
   const membershipFrozen = initialLibrary?.status !== undefined && initialLibrary.status !== 'draft'
-  const initialQuestionIds = initialLibrary?.questionIds ?? []
+  const initialQuestionIds = initialValues?.questionIds ?? []
   const membershipDirty = Boolean(initialLibrary) && (
     selectedIds.length !== initialQuestionIds.length
     || selectedIds.some((id, index) => id !== initialQuestionIds[index])
@@ -365,7 +387,7 @@ export function PracticeLibraryForm({
     setFieldErrors({})
     startTransition(async () => {
       const result = initialLibrary
-        ? await updatePracticeLibrary({
+        ? await (actions?.updatePracticeLibrary ?? updatePracticeLibrary)({
             libraryId: initialLibrary.id,
             title,
             description,
@@ -377,7 +399,7 @@ export function PracticeLibraryForm({
             shuffleQuestions,
             shuffleOptions,
           })
-        : await createPracticeLibrary({
+        : await (actions?.createPracticeLibrary ?? createPracticeLibrary)({
             title,
             description,
             classroomIds,
@@ -398,9 +420,11 @@ export function PracticeLibraryForm({
       }
 
       setSavedSnapshot(currentSnapshot)
-      allowNavigationRef.current = true
       toast.success(initialLibrary ? 'บันทึกคลังฝึกแล้ว'
         : intent === 'publish' ? 'สร้างและเผยแพร่คลังฝึกแล้ว' : 'บันทึกร่างคลังฝึกแล้ว')
+      if (actions?.onSaved) { actions.onSaved(result.id); return }
+      if (embedded) { router.refresh(); return }
+      allowNavigationRef.current = true
       const returnClassroomId = initialLibrary?.classroomId ?? contextualPrimaryClassroomId ?? classroomIds[0]
       router.push(returnClassroomId ? classroomNavigationPath(returnClassroomId, 'assignments') : '/practice')
     })
@@ -423,13 +447,13 @@ export function PracticeLibraryForm({
 
   async function leaveForm() {
     if (!await confirmDiscardChanges()) return
-    router.push('/practice')
+    router.push(embedded && initialLibrary ? `/practice/${initialLibrary.id}/edit` : '/practice')
   }
 
   function runDelete() {
     if (!initialLibrary) return
     startTransition(async () => {
-      const result = await deletePracticeLibrary({ libraryId: initialLibrary.id })
+      const result = await (actions?.deletePracticeLibrary ?? deletePracticeLibrary)({ libraryId: initialLibrary.id })
       if (!result.ok) {
         toast.error(result.error)
         return
@@ -440,14 +464,14 @@ export function PracticeLibraryForm({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-4">
-      <ClassroomWorkHeader
+    <div className={cn('flex w-full min-w-0 flex-col gap-3', !embedded && 'mx-auto max-w-6xl')}>
+      {!embedded && <ClassroomWorkHeader
         kind="practice"
-        title={initialLibrary ? title || 'คลังฝึก' : 'สร้างคลังฝึก'}
+        title={initialLibrary ? title || 'คลังฝึก' : copyPreset ? 'ทำสำเนาคลังฝึก' : 'สร้างคลังฝึก'}
         classroom={classrooms.find(room => room.id === (initialLibrary?.classroomId ?? contextualPrimaryClassroomId ?? classroomIds[0]))}
         badges={<>
           {initialLibrary && <span className="font-medium">ตั้งค่าคลังฝึก</span>}
-          <Badge variant="outline">ไม่มีคะแนน</Badge>
+          <WorkTypeBadge type="practice" /><Badge variant="outline">ไม่มีคะแนน</Badge>
           {initialLibrary && <Badge variant={statusBadgeVariant(initialLibrary.status)}>{PRACTICE_LIBRARY_STATUS_LABELS[initialLibrary.status]}</Badge>}
         </>}
         actions={initialLibrary && (
@@ -481,7 +505,12 @@ export function PracticeLibraryForm({
         )}
         details={initialLibrary ? [{ label: 'โจทย์', value: `${selectedIds.length} ข้อ` }] : []}
         note="ครูเห็นเฉพาะข้อที่เคยตอบและจำนวนครั้ง ไม่เห็นคำตอบหรือผลถูกผิด"
-      />
+      />}
+
+      {copyPreset && <Card padding="md" className="flex flex-col gap-2">
+        <p className="text-sm font-semibold">นำข้อมูลจาก “{copyPreset.sourceTitle}” มาเตรียมสร้างคลังฝึกใหม่</p>
+        <AssignmentReuseDetails kind="practice" />
+      </Card>}
 
       {!initialLibrary && (
         <nav className="flex items-start" aria-label="ขั้นตอนการสร้างคลังฝึก">
@@ -612,7 +641,9 @@ export function PracticeLibraryForm({
               <p className="min-w-0 flex-1 text-warning-foreground">
                 {loadingWarning
                   ?? (selectedMissingIds.length > 0
-                    ? `แสดงรายละเอียดโจทย์เดิมไม่ได้ ${selectedMissingIds.length} ข้อ`
+                    ? copyPreset
+                      ? `มีโจทย์ ${selectedMissingIds.length} ข้อที่ไม่พบหรือคุณไม่มีสิทธิ์นำไปใช้ในคลังใหม่`
+                      : `แสดงรายละเอียดโจทย์เดิมไม่ได้ ${selectedMissingIds.length} ข้อ`
                     : `มีโจทย์เดิมที่ตรวจอัตโนมัติไม่ได้ ${selectedUnsupportedIds.length} ข้อ`)}
                 {membershipFrozen
                   ? ' รายการถูกตรึงแล้ว กรุณาตรวจโจทย์ต้นฉบับก่อนเปิดให้นักเรียนใช้ต่อ'
@@ -668,7 +699,7 @@ export function PracticeLibraryForm({
                       <QuestionPicker
                         questions={questions}
                         selectedIds={selectedIds}
-                        baselineIds={initialLibrary?.questionIds ?? []}
+                        baselineIds={initialValues?.questionIds ?? []}
                         onToggle={toggleQuestion}
                         search={search}
                         onSearchChange={setSearch}
@@ -925,6 +956,7 @@ export function PracticeLibraryForm({
             {!initialLibrary && step < CREATE_STEPS.length - 1 ? (
               <Button
                 key={`practice-next-${step}`}
+                variant="workPractice"
                 type="button"
                 className="min-h-11"
                 onClick={event => {
@@ -944,8 +976,8 @@ export function PracticeLibraryForm({
                   key="practice-save-draft"
                   className="min-h-11"
                   type="submit"
-                  variant={initialLibrary ? 'default' : 'outline'}
-                  disabled={isPending || !isDirty || !title.trim() || classroomIds.length === 0 || hasDraftQuestionBlock}
+                  variant={initialLibrary ? 'workPractice' : 'outline'}
+                  disabled={isPending || (!isDirty && !copyPreset) || !title.trim() || classroomIds.length === 0 || hasDraftQuestionBlock}
                 >
                   <Save data-icon="inline-start" />
                   {isPending ? 'กำลังบันทึก...' : initialLibrary ? 'บันทึก' : 'บันทึกร่าง'}
@@ -954,6 +986,7 @@ export function PracticeLibraryForm({
                   <Button
                     type="button"
                     className="min-h-11"
+                    variant="workPractice"
                     onClick={() => runSave('publish')}
                     disabled={isPending || !canAdvanceDetails}
                   >

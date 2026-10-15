@@ -18,6 +18,8 @@ import {
   practiceTotalPages,
   type PracticeSearchState,
 } from '@/lib/practice-search'
+import { questionExcerpt } from '@/lib/question-display'
+import { hasSolution } from '@/lib/question-solution'
 import type { Question, QuestionType } from '@/lib/types'
 import { createHash, timingSafeEqual } from 'node:crypto'
 
@@ -50,6 +52,10 @@ export interface PracticeQuestionListItem {
   tags: string[]
   position: number
   attemptCount: number
+  excerpt?: string
+  difficulty?: string
+  subject?: string | null
+  hasSolution?: boolean
 }
 
 export interface PracticeQuestionSearchResult {
@@ -249,8 +255,21 @@ export async function loadPracticeLibrarySearch(
   const access = await readStudentLibraryAccess(admin, actorId, libraryId)
   if (access.status !== 'ready') return access
 
+  return readPracticeLibrarySearchPage(admin, actorId, libraryId, state, access.library)
+}
+
+/** One authorized request may read several bounded RPC pages; each RPC rechecks access. */
+async function readPracticeLibrarySearchPage(
+  admin: AdminClient, actorId: string, libraryId: string, state: PracticeSearchState,
+  library: StudentPracticeLibrary,
+): Promise<PracticeQuestionSearchAccess> {
   try {
-    const readPage = (page: number) => admin.rpc(PRACTICE_STORAGE.searchQuestionsRpc, {
+    const readPage = (page: number) => state.exerciseId
+      ? admin.rpc('get_student_practice_exercise_questions', {
+          p_actor_id: actorId, p_library_id: libraryId, p_exercise_id: state.exerciseId,
+          p_limit: PRACTICE_PAGE_SIZE, p_offset: (page - 1) * PRACTICE_PAGE_SIZE,
+        })
+      : admin.rpc(state.reviewOnly ? 'search_student_practice_review_questions' : PRACTICE_STORAGE.searchQuestionsRpc, {
         p_actor_id: actorId,
         p_library_id: libraryId,
         p_terms: practiceSearchTerms(state.q),
@@ -304,11 +323,28 @@ export async function loadPracticeLibrarySearch(
         attemptCount,
       })
     }
+    // Only display metadata for IDs returned by the authorized exact-library RPC.
+    // Never pass full question rows or attached solutions to the client list.
+    if (items.length > 0) {
+      const metadata = await admin.from('questions')
+        .select('id, question_text, difficulty, subject, solution_text, solution_image_urls')
+        .in('id', items.map(item => item.id))
+      if (metadata.error) return { status: 'unavailable' }
+      const byId = new Map((metadata.data ?? []).map(row => [row.id, row]))
+      for (const item of items) {
+        const row = byId.get(item.id)
+        if (!row) return { status: 'unavailable' }
+        item.excerpt = questionExcerpt(row.question_text).slice(0, 280)
+        item.difficulty = row.difficulty
+        item.subject = row.subject
+        item.hasSolution = library.revealAnswerKey && hasSolution(row)
+      }
+    }
     const totalPages = practiceTotalPages(total)
     const canonicalPage = Math.min(state.page, totalPages)
     return {
       status: 'ready',
-      library: access.library,
+      library,
       items,
       total,
       totalPages,
@@ -411,4 +447,29 @@ export async function loadPracticeQuestionForStudent(
   } catch {
     return { status: 'unavailable' }
   }
+}
+
+
+/** Development review only: authorized display metadata, never full question rows. */
+export async function loadPracticeLibraryLocalSnapshot(
+  actorId: string, libraryId: string, state: PracticeSearchState,
+): Promise<({ status: 'ready'; library: StudentPracticeLibrary; items: PracticeQuestionListItem[] })
+  | Exclude<PracticeQuestionSearchAccess, PracticeQuestionSearchResult>> {
+  if (process.env.NODE_ENV !== 'development') return { status: 'unavailable' }
+  const search = { ...state, page: 1, exerciseId: undefined, reviewOnly: undefined }
+  const first = await loadPracticeLibrarySearch(actorId, libraryId, search)
+  if (first.status !== 'ready') return first
+  const admin = createPracticeAdmin()
+  if (!admin) return { status: 'unavailable' }
+  const items = [...first.items]
+  for (let page = 2; page <= first.totalPages; page += 8) {
+    const results = await Promise.all(Array.from({ length: Math.min(8, first.totalPages - page + 1) }, (_, index) =>
+      readPracticeLibrarySearchPage(admin, actorId, libraryId, { ...search, page: page + index }, first.library)))
+    for (const result of results) {
+      if (result.status !== 'ready' || result.total !== first.total) return { status: 'unavailable' }
+      items.push(...result.items)
+    }
+  }
+  if (items.length !== first.total || new Set(items.map(item => item.id)).size !== items.length) return { status: 'unavailable' }
+  return { status: 'ready', library: first.library, items }
 }

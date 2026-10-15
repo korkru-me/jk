@@ -30,15 +30,12 @@ export default async function ClassroomsPage({
   const isTeacher = profile?.role === 'teacher' || profile?.role === 'admin'
 
   if (isTeacher) {
-    const [activeRes, trashedRes] = await Promise.all([
-      admin
-        .from('classrooms')
-        .select('id, org_id, teacher_id, name, description, class_code, status, classroom_type, pinned_at, display_order, deleted_at, created_at, updated_at, classroom_students(count), assignment_classrooms(count)')
-        .eq('teacher_id', authUser.id)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false }),
-      admin.from('classrooms').select('id', { count: 'exact', head: true }).eq('teacher_id', authUser.id).eq('status', 'deleted'),
-    ])
+    const activeRes = await admin
+      .from('classrooms')
+      .select('id, org_id, teacher_id, name, description, class_code, status, classroom_type, pinned_at, display_order, deleted_at, created_at, updated_at, classroom_students(count), assignment_classrooms(count)')
+      .eq('teacher_id', authUser.id)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
 
     const rawClassrooms = (activeRes.data ?? []) as unknown as ClassroomListRow[]
     const studentCountMap: Record<string, number> = {}
@@ -70,7 +67,6 @@ export default async function ClassroomsPage({
         assignmentCountMap={assignmentCountMap}
         totalStudents={Object.values(studentCountMap).reduce((a, b) => a + b, 0)}
         totalAssignments={Object.values(assignmentCountMap).reduce((a, b) => a + b, 0)}
-        trashedCount={trashedRes.count ?? 0}
       />
     )
   }

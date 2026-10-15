@@ -3,6 +3,7 @@ import { TeachingModeClient, type TeachingQuestionView } from '@/components/assi
 import { ShellClient } from '@/components/layout/shell-client'
 import { isExamScreenLabEnabled } from '@/lib/exam-screen-lab-access'
 import { buildExamScreenQaQuestions } from '../_lib/fixture'
+import { buildAttemptQuestion } from '@/lib/assignment-attempt'
 
 export const metadata = { title: 'ห้องทดลองกระดานสอน — KorKru' }
 export const dynamic = 'force-dynamic'
@@ -14,13 +15,15 @@ export const dynamic = 'force-dynamic'
  * save/image commands remain untouched. Production receives a 404 before the
  * synthetic question is built.
  */
-export default function DrawingBoardLabPage() {
+export default async function DrawingBoardLabPage({ searchParams }: { searchParams: Promise<{ random?: string }> }) {
   if (!isExamScreenLabEnabled(process.env)) notFound()
-  const source = buildExamScreenQaQuestions()[0]
+  const random = (await searchParams).random === '1'
+  const source = buildExamScreenQaQuestions(random)[0]
+  const attempt = random ? buildAttemptQuestion(source, { orderIndex: 0, shuffleOptions: false }) : null
   const question: TeachingQuestionView = {
     ...source,
-    randomValues: {},
-    correctAnswer: '42',
+    randomValues: attempt?.random_values ?? {},
+    correctAnswer: attempt?.correct_answer ?? '42',
   }
 
   return (

@@ -51,6 +51,7 @@ export interface WritableExamAnswer {
   work_images: unknown
   carried_over: boolean | null
   check_count: number | null
+  random_values?: Record<string, number>
   questions: Relation<WritableExamQuestion>
   submissions: Relation<WritableExamSubmission>
 }
@@ -78,7 +79,7 @@ export async function getWritableStudentAnswer(
   const { data, revisionColumnAvailable } = await readWithSubmissionRevision<WritableExamAnswer>(includeRevision => admin
     .from('submission_answers')
     .select(`
-      id, submission_id, student_answer, work_images, carried_over, check_count,
+      id, submission_id, student_answer, work_images, carried_over, check_count, random_values,
       questions(question_type, answer_parts),
       submissions(
         id, student_id, status, started_at, assignment_id, ${includeRevision ? 'seb_config_revision, ' : ''}exam_access_mode,

@@ -7,11 +7,18 @@ const mark = fileURLToPath(new URL('../public/brand/deer-mark.svg', import.meta.
 const source = await readFile(mark, 'utf8')
 
 for (const [filename, size] of [['icon.png', 512], ['apple-icon.png', 180]]) {
-  const input = filename === 'icon.png'
-    ? Buffer.from(source.replace(/fill="[^"]*"/g, 'fill="#000000"'))
+  const isBrowserIcon = filename === 'icon.png'
+  // Pad the tight source viewBox so the added outline cannot clip the antler tips.
+  // Apply this only to the tab icon; shared logo geometry and Apple artwork stay intact.
+  const input = isBrowserIcon
+    ? Buffer.from(source
+      .replace(/viewBox="[^"]*"/, 'viewBox="134 198 757 1048"')
+      .replace(/fill="[^"]*"/g, 'fill="#000000"')
+      .replace('<path ', '<path stroke="#000000" stroke-width="16" stroke-linejoin="round" '))
     : mark
+  const contentSize = Math.round(size * (isBrowserIcon ? 0.96 : 0.86))
   const content = await sharp(input)
-    .resize({ width: Math.round(size * 0.86), height: Math.round(size * 0.86), fit: 'inside' })
+    .resize({ width: contentSize, height: contentSize, fit: 'inside' })
     .png()
     .toBuffer()
 

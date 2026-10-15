@@ -1,5 +1,6 @@
 'use client'
 
+import { workTypeConfig } from '@/lib/assignment-display'
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -205,7 +206,8 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
   const [streakRecycle, setStreakRecycle] = useState(a.streak_recycle_pool !== false)
   const [passingEnabled, setPassingEnabled] = useState(a.passing_type != null && a.passing_value != null)
   const [passingType, setPassingType] = useState<'score' | 'percent'>(a.passing_type ?? 'percent')
-  const [passingValue, setPassingValue] = useState(a.passing_value != null ? String(a.passing_value) : '')
+  const [passingValue, setPassingValue] = useState(a.passing_value != null
+    ? String(a.passing_value) : passingType === 'percent' ? '70' : '7')
   const accessCodeInvalid = accessCodeEnabled && !accessCode.trim()
 
   // ── The question set ────────────────────────────────────────────────────
@@ -759,7 +761,6 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
                 value={passingValue}
                 onFocus={() => chooseCompletion('threshold')}
                 onChange={event => setPassingValue(event.target.value)}
-                placeholder={passingType === 'percent' ? '70' : '7'}
                 disabled={!canEditCompletion}
                 aria-label="ค่าเกณฑ์ผ่าน"
                 className={completionRuleInputClassName}
@@ -1183,7 +1184,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
       )}
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row">
-        <Button type="submit" disabled={isPending} className="w-full sm:w-auto">
+        <Button type="submit" variant={workTypeConfig(a.type).variant} disabled={isPending} className="w-full sm:w-auto">
           {isPending ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข'}
         </Button>
         <Button type="button" variant="outline" onClick={() => router.back()} className="w-full sm:w-auto">

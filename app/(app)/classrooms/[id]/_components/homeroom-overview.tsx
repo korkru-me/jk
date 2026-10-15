@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import {
   CheckCircle2, CircleDashed, MinusCircle, XCircle, AlertTriangle,
-  MessageSquare, Trash2, ChevronDown, ChevronUp, Printer, IdCard, Info,
+  MessageSquare, Trash2, ChevronDown, ChevronUp, IdCard, Info,
 } from 'lucide-react'
 import { computePassed } from '@/lib/grading'
 import { selectOfficialAttempt } from '@/lib/scoring'
@@ -138,7 +138,7 @@ function StudentNotesPanel({
       ) : (
         <div className="space-y-2">
           {notes.map(n => (
-            <Card radius="sm" edge="ring" className="flex items-start justify-between gap-2 px-3 py-2" key={n.id}>
+            <Card data-classroom-panel radius="sm" edge="ring" className="flex items-start justify-between gap-2 px-3 py-2" key={n.id}>
               <div className="min-w-0">
                 <p className="text-sm text-foreground whitespace-pre-wrap break-words">{n.body}</p>
                 <p className="text-[10px] text-muted-foreground mt-1">{n.author_name} · {formatDateTime(n.created_at)}</p>
@@ -227,18 +227,8 @@ export function HomeroomOverview({ classroomId, students, assignments, submissio
 
   return (
     <div className="space-y-5">
-      <div className="flex justify-end">
-        <Link
-          href={`/classrooms/${classroomId}/report`}
-          target="_blank"
-          className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-muted-foreground px-3 py-1.5 rounded-lg hover:bg-muted border border-border transition-colors"
-        >
-          <Printer className="w-3.5 h-3.5" /> พิมพ์รายงานผู้ปกครอง
-        </Link>
-      </div>
-
       {assignments.length === 0 ? (
-        <Card edge="ring" className="py-10 text-center text-sm text-muted-foreground">
+        <Card data-classroom-panel edge="ring" className="py-10 text-center text-sm text-muted-foreground">
           ยังไม่มีการบ้านจากห้องเรียนวิชาของนักเรียนกลุ่มนี้
         </Card>
       ) : (
@@ -246,9 +236,9 @@ export function HomeroomOverview({ classroomId, students, assignments, submissio
           <HomeroomCalendar events={calendarEvents} />
 
           {/* Matrix */}
-          <Card edge="ring" className="overflow-x-auto">
+          <Card data-classroom-panel edge="ring" className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
-              <thead>
+              <thead data-classroom-table-header>
                 <tr className="border-b border-border">
                   <th className="sticky left-0 bg-card text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide min-w-[180px]">
                     นักเรียน
@@ -316,7 +306,7 @@ export function HomeroomOverview({ classroomId, students, assignments, submissio
       )}
 
       {/* Compliance + private notes */}
-      <Card edge="ring" padding="md">
+      <Card data-classroom-panel edge="ring" padding="md">
         <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
           <AlertTriangle className="w-3.5 h-3.5" /> ความรับผิดชอบในการส่งงาน, ข้อมูลส่วนตัว และบันทึกครูที่ปรึกษา
         </div>

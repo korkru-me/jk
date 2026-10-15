@@ -6,11 +6,14 @@ export interface ClassroomPracticeLibraryItem {
   title: string
   status: PracticeLibraryStatus
   questionCount: number
+  categoryId?: string | null
+  displayOrder?: number | null
 }
 
 export interface ClassroomPracticeLibrariesResult {
   items: ClassroomPracticeLibraryItem[]
   error: string | null
+  layoutAvailable?: boolean
 }
 
 export function classroomPracticeLibraryItem(input: ClassroomPracticeLibraryItem): ClassroomPracticeLibraryItem {
@@ -21,5 +24,7 @@ export function classroomPracticeLibraryItem(input: ClassroomPracticeLibraryItem
     questionCount: Number.isFinite(input.questionCount)
       ? Math.max(0, Math.trunc(input.questionCount))
       : 0,
+    ...(input.categoryId !== undefined ? { categoryId: input.categoryId } : {}),
+    ...(input.displayOrder !== undefined ? { displayOrder: input.displayOrder } : {}),
   }
 }

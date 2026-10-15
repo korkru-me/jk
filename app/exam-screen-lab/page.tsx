@@ -15,13 +15,13 @@ export const dynamic = 'force-dynamic'
 export default async function ExamScreenLabPage({
   searchParams,
 }: {
-  searchParams: Promise<{ perPage?: string | string[]; streak?: string | string[]; at?: string | string[] }>
+  searchParams: Promise<{ perPage?: string | string[]; streak?: string | string[]; at?: string | string[]; timed?: string | string[]; type?: string | string[]; shell?: string | string[]; watermark?: string | string[]; random?: string }>
 }) {
   if (!isExamScreenLabEnabled(process.env)) notFound()
 
   const params = await searchParams
   const rawPerPage = Array.isArray(params.perPage) ? params.perPage[0] : params.perPage
-  const questionsPerPage = rawPerPage === '3' ? 3 : 1
+  const questionsPerPage = rawPerPage === '5' ? 5 : rawPerPage === '3' ? 3 : 1
 
   // ?streak=1 draws the "ถูกติดต่อกัน" chrome over the same fixture, and ?at=N
   // sets where the run currently stands so each state of the meter can be
@@ -44,10 +44,16 @@ export default async function ExamScreenLabPage({
 
   return (
     <ExamScreenLabClient
-      fixture={buildExamScreenQaFixture()}
+      fixture={buildExamScreenQaFixture(params.random === '1')}
       submissionId={`qa-preview-${randomUUID()}`}
       questionsPerPage={questionsPerPage}
       streak={streak}
+      durationMinutes={params.timed === '1' ? 60 : null}
+      startedAt={new Date().toISOString()}
+      assignmentType={params.type === 'exercise' ? 'exercise' : 'exam'}
+      shell={params.shell === '1'}
+      optionalWatermark={params.watermark !== 'off'}
+      requireWorkImage={params.random !== '1'}
     />
   )
 }

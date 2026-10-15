@@ -1072,6 +1072,8 @@ export interface ClassroomPost {
   edited_at: string | null
   users: { full_name: string } | null
   comments: PostComment[]
+  /** Teacher-only projection; automatic post_reads are never acknowledgements. */
+  acknowledgementStatus?: import('./classroom-announcement-acknowledgements').AnnouncementAcknowledgementStatus
 }
 
 export interface PostComment {

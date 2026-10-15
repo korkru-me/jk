@@ -73,7 +73,7 @@ export function ClassroomCard({
         <div className={cn('pointer-events-none relative z-10 min-w-0 flex-1', (isSelecting || dragHandle) && 'ml-10')}>
           <div className="flex min-w-0 items-center gap-2">
             <ClassroomIcon iconKey={meta.iconKey} className="size-5 shrink-0" />
-            <p className="truncate text-base font-bold leading-tight">
+            <p title={classroom.name} className={cn('min-w-0 font-bold leading-tight', studentSummary ? 'text-sm line-clamp-2' : 'truncate text-base')}>
               {classroom.name}
             </p>
             {isHomeroom && <Badge variant="statusWarning" className="shrink-0">HOMEROOM</Badge>}

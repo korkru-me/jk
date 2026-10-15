@@ -6,6 +6,7 @@ import { buildStudentLearningData, type LearningAssignment, type LearningSubmiss
 import type { StudentClassroom } from '@/app/(app)/classrooms/_components/student-view'
 import { ShellClient } from '@/components/layout/shell-client'
 import { isExamScreenLabEnabled } from '@/lib/exam-screen-lab-access'
+import { studentPracticeLibraryListItem } from '@/app/(app)/practice/_lib/student-landing-contract'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'พื้นที่เรียนรู้ของฉัน · ตัวอย่าง — KorKru' }
@@ -51,10 +52,11 @@ export default async function StudentDashboardLabPage({ searchParams }: {
     })),
   ] : EVENTS
   const classrooms = scenario === 'empty' ? [] : scenario === 'busy' ? CLASSROOMS : CLASSROOMS.slice(0, 3)
-  const assignments: LearningAssignment[] = events.map(event => {
+  const assignments: LearningAssignment[] = events.map((event, index) => {
     const room = classrooms.find(c => c.name === event.classroomName) ?? CLASSROOMS[2]
     return {
       id: event.id, classroom_id: room.id, title: event.title, end_at: event.endAt,
+      created_at: `2026-10-${String(Math.max(1, 14 - index)).padStart(2, '0')}T09:00:00+07:00`,
       type: 'exercise', duration_minutes: event.id === 'calendar-physics' ? 30 : null,
       passing_type: 'percent', passing_value: 60, score_strategy: 'best', display_max_score: null,
       show_results: event.id === 'calendar-thai' ? 'never' : 'immediate',
@@ -64,6 +66,7 @@ export default async function StudentDashboardLabPage({ searchParams }: {
   if (scenario !== 'empty' && scenario !== 'leap') assignments.push({
     ...assignments[1], id: 'work-without-deadline', title: 'ทบทวนบทเรียน · ไม่มีกำหนดส่ง', end_at: null,
   })
+  if (scenario === 'practice-only') assignments.length = 0
   const submissions: LearningSubmission[] = assignments.flatMap(a => {
     if (scenario !== 'completed' && !['calendar-done', 'calendar-thai', 'calendar-physics'].includes(a.id)) return []
     const room = CLASSROOMS.find(c => c.id === a.classroom_id)!
@@ -74,17 +77,28 @@ export default async function StudentDashboardLabPage({ searchParams }: {
       created_at: '2026-10-13T16:00:00+07:00',
     }]
   })
-  const data = buildStudentLearningData({ classrooms, assignments, submissions, now: Date.parse(calendarNow) })
+  const practiceLibraries = scenario === 'empty' || scenario === 'practice-error' ? [] : [
+    studentPracticeLibraryListItem({
+      id: '91000000-0000-4000-8000-000000000001', title: 'แรงและการเคลื่อนที่ · ฝึกฟิสิกส์',
+      classroomId: CLASSROOMS[2].id, classroomName: CLASSROOMS[2].name, questionCount: 143,
+      publishedAt: '2026-10-14T09:00:00+07:00', createdAt: '2026-10-01T09:00:00+07:00',
+    }),
+    studentPracticeLibraryListItem({
+      id: '91000000-0000-4000-8000-000000000002', title: 'สมการและกราฟ · ฝึกคณิตศาสตร์',
+      classroomId: CLASSROOMS[1].id, classroomName: CLASSROOMS[1].name, questionCount: 48,
+      publishedAt: '2026-10-12T09:00:00+07:00', createdAt: '2026-10-10T09:00:00+07:00',
+    }),
+  ]
+  const data = buildStudentLearningData({ classrooms, assignments, submissions, practiceLibraries,
+    practiceError: scenario === 'practice-error' ? 'โหลดคลังฝึกไม่สำเร็จ' : null, now: Date.parse(calendarNow) })
 
   return (
     <ShellClient user={USER} initialUnreadCount={0} notificationsEnabled={false}>
-      <div className="flex flex-col gap-3">
-        <p className="text-xs text-muted-foreground">ตัวอย่างสำหรับตรวจหน้าตา · ข้อมูลนักเรียนและงานจำลอง</p>
-        <StudentDashboard user={USER} data={data} calendarNow={calendarNow} initialJoinCode={join} joinAction={previewJoinClassroom}
+        <StudentDashboard user={{ ...USER, full_name: scenario === 'long-name' ? 'เด็กหญิงก่อการเรียนรู้ นามสกุลสำหรับตรวจชื่อยาวในพื้นที่เรียนรู้ของฉัน' : USER.full_name }} data={data} calendarNow={calendarNow} initialJoinCode={join} joinAction={previewJoinClassroom}
+          previewLabel="ตัวอย่างสำหรับตรวจหน้าตา · ข้อมูลนักเรียนและงานจำลอง"
           backHref="/exam-screen-lab/student-dashboard#classrooms"
-          recentPosts={scenario === 'empty' ? [] : [{ id: 'lab-post', classroom_id: 'lab-room-1', body: 'อย่าลืมทบทวนเรื่องแรงและการเคลื่อนที่ก่อนเรียนครั้งถัดไปนะครับ', created_at: calendarNow, users: { full_name: 'ครูจำลอง' }, classrooms: { name: 'ฟิสิกส์ ม.4' } }]}
+          recentPosts={scenario === 'empty' ? [] : CLASSROOMS.slice(0, 3).map(c => ({ id: `post-${c.id}`, classroom_id: c.id, body: 'อย่าลืมทบทวนเรื่องแรงและการเคลื่อนที่ก่อนเรียนครั้งถัดไปนะครับ', created_at: calendarNow, users: { full_name: 'ครูจำลอง' }, classrooms: { name: c.name } }))}
         />
-      </div>
     </ShellClient>
   )
 }
