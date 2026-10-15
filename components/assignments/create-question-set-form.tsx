@@ -39,6 +39,12 @@ import type { QuestionSet, Visibility } from '@/lib/types'
 import { Card } from '@/components/ui/card'
 import { createLatestSaveQueue } from '@/lib/latest-save-queue'
 import type { getQuestionPreviewDetails } from '@/lib/actions/question-previews'
+import { ClassroomCoverThemePicker } from '@/components/classrooms/classroom-cover-theme-picker'
+import { cn } from '@/lib/utils'
+import {
+  isQuestionSetTheme, parseQuestionSetDescription, questionSetTheme, questionSetThemeStyle,
+  randomQuestionSetTheme, SET_THEME_SURFACE, SET_THEME_TEXT,
+} from '@/lib/question-set-theme'
 
 type AutosaveStatus = 'saved' | 'waiting' | 'saving' | 'error'
 
@@ -61,6 +67,9 @@ interface Props {
   teamOptions?: { id: string; name: string }[]
   /** Supplied by local visual fixtures so previewing does not read Supabase. */
   loadQuestionPreviews?: typeof getQuestionPreviewDetails
+  createSet?: typeof createQuestionSet
+  deleteExistingSet?: typeof deleteQuestionSet
+  onCreated?: (id: string, data: QuestionSetData) => void
 }
 
 export function CreateQuestionSetForm({
@@ -70,12 +79,17 @@ export function CreateQuestionSetForm({
   saveExistingSet = saveQuestionSet,
   teamOptions,
   loadQuestionPreviews,
+  createSet = createQuestionSet,
+  deleteExistingSet = deleteQuestionSet,
+  onCreated,
 }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
   const [title, setTitle] = useState(initialSet?.title ?? '')
-  const [description, setDescription] = useState(initialSet?.description ?? '')
+  const [description, setDescription] = useState(() => parseQuestionSetDescription(initialSet?.description).description)
+  const [theme, setTheme] = useState(() => initialSet ? questionSetTheme(initialSet.id, initialSet.description) : '')
+  const activeTheme = isQuestionSetTheme(theme) ? theme : 'slate'
   const [selectedIds, setSelectedIds] = useState<string[]>(initialSet?.question_ids ?? [])
   const [sections, setSections] = useState<QuestionSetSection[]>(initialSet?.sections ?? [])
   // The คลัง picker stages its changes: draftIds is what the teacher is
@@ -161,6 +175,7 @@ export function CreateQuestionSetForm({
   const currentPayload: QuestionSetData = {
     title: title.trim(),
     description: description.trim(),
+    theme,
     question_ids: selectedIds,
     sections,
     visibility,
@@ -262,11 +277,12 @@ export function CreateQuestionSetForm({
   function handleSubmit() {
     if (initialSet) return
     startTransition(async () => {
-      const res = await createQuestionSet(currentPayload)
+      const res = await createSet(currentPayload)
       if ('error' in res) { toast.error(res.error); return }
       if ('id' in res) {
         toast.success('สร้างแฟ้มโจทย์แล้ว')
-        router.push('/questions/sets')
+        if (onCreated) onCreated(res.id, currentPayload)
+        else router.push('/questions/sets')
       }
     })
   }
@@ -323,7 +339,7 @@ export function CreateQuestionSetForm({
     // Only information fields are debounced. Structural actions call
     // changeStructure() and enter the serialized queue immediately.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, description, visibility, teamOrgId, sharedOrgIds, initialSet])
+  }, [title, description, theme, visibility, teamOrgId, sharedOrgIds, initialSet])
 
   useEffect(() => {
     if (!initialSet || autosaveStatus === 'saved') return
@@ -367,7 +383,7 @@ export function CreateQuestionSetForm({
   function handleDelete() {
     if (!initialSet) return
     startTransition(async () => {
-      const res = await deleteQuestionSet(initialSet.id)
+      const res = await deleteExistingSet(initialSet.id)
       if ('error' in res) { toast.error(res.error); return }
       router.push('/questions/sets')
     })
@@ -381,13 +397,13 @@ export function CreateQuestionSetForm({
       : selectedTeamName ? `ทีมของฉัน (${selectedTeamName})` : 'ทีมของฉัน'
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4" style={questionSetThemeStyle(activeTheme)} data-question-set-editor data-question-set-theme={theme || 'auto'}>
       {/* The แฟ้ม's own name is the page's heading, read off the current state
           so a rename appears while its autosave is being queued. */}
       <header className="flex flex-col gap-2 pb-1">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 basis-full sm:basis-0 sm:flex-1">
-            <h1 className="text-2xl font-bold text-foreground">
+            <h1 className={cn('text-2xl font-bold', SET_THEME_TEXT)}>
               {initialSet ? (
                 <>
                   <span className="font-semibold text-muted-foreground">แฟ้มโจทย์</span>{' '}
@@ -434,7 +450,7 @@ export function CreateQuestionSetForm({
       </header>
 
       {editingInfo && (
-        <Card ref={infoCardRef} padding="md">
+        <Card ref={infoCardRef} padding="md" className={SET_THEME_SURFACE}>
           <FieldGroup className="gap-4">
             <Field>
               <FieldLabel htmlFor="set-title">
@@ -461,55 +477,68 @@ export function CreateQuestionSetForm({
               />
             </Field>
 
-            <Field>
-              <FieldLabel>การมองเห็น</FieldLabel>
-              <Select
-                value={visibility === 'school' ? 'organization' : visibility}
-                onValueChange={(v) => {
-                  if (v === null) return
-                  markInfoChanged()
-                  setVisibility(v as Visibility)
-                  if (v === 'private') {
-                    setTeamOrgId(null)
-                    setSharedOrgIds([])
-                  } else if (teams.length === 1) {
-                    setTeamOrgId(teams[0].id)
-                  }
-                }}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="เลือกการมองเห็น">
-                    {visibility === 'organization' || visibility === 'school'
-                      ? (allSelectedTeamIds.length > 1
-                        ? `ทีมของฉัน (${allSelectedTeamIds.length} ทีม)`
-                        : selectedTeamName ? `ทีมของฉัน (${selectedTeamName})` : 'ทีมของฉัน')
-                      : 'ส่วนตัว'}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value="private">ส่วนตัว — แค่ฉันเห็นแฟ้มโจทย์นี้</SelectItem>
-                    <SelectItem value="organization" disabled={teamChecked && !hasTeams}>
-                      ทีมของฉัน{teams.length === 1 ? ` (${teams[0].name})` : ''}
-                    </SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-              {teamChecked && !hasTeams && (
-                <FieldDescription>
-                  สร้างทีมก่อนเพื่อใช้งาน —{' '}
-                  <a href="/settings/team">ไปที่หน้าทีมของฉัน</a>
-                </FieldDescription>
-              )}
-              {visibility === 'organization' && teams.length > 1 && (
-                <TeamShareChips
-                  label="แชร์ให้ทีมไหน (เลือกได้หลายทีม)"
-                  teams={teams}
-                  selectedIds={allSelectedTeamIds}
-                  onToggle={toggleTeam}
+            <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+              <Field>
+                <FieldLabel>การมองเห็น</FieldLabel>
+                <Select
+                  value={visibility === 'school' ? 'organization' : visibility}
+                  onValueChange={(v) => {
+                    if (v === null) return
+                    markInfoChanged()
+                    setVisibility(v as Visibility)
+                    if (v === 'private') {
+                      setTeamOrgId(null)
+                      setSharedOrgIds([])
+                    } else if (teams.length === 1) {
+                      setTeamOrgId(teams[0].id)
+                    }
+                  }}
+                >
+                <SelectTrigger className="w-full" aria-label="การมองเห็น">
+                    <SelectValue placeholder="เลือกการมองเห็น">
+                      {visibility === 'organization' || visibility === 'school'
+                        ? (allSelectedTeamIds.length > 1
+                          ? `ทีมของฉัน (${allSelectedTeamIds.length} ทีม)`
+                          : selectedTeamName ? `ทีมของฉัน (${selectedTeamName})` : 'ทีมของฉัน')
+                        : 'ส่วนตัว'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="private">ส่วนตัว — แค่ฉันเห็นแฟ้มโจทย์นี้</SelectItem>
+                      <SelectItem value="organization" disabled={teamChecked && !hasTeams}>
+                        ทีมของฉัน{teams.length === 1 ? ` (${teams[0].name})` : ''}
+                      </SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                {teamChecked && !hasTeams && (
+                <FieldDescription className="text-foreground/75">
+                    สร้างทีมก่อนเพื่อใช้งาน —{' '}
+                    <a href="/settings/team">ไปที่หน้าทีมของฉัน</a>
+                  </FieldDescription>
+                )}
+                {visibility === 'organization' && teams.length > 1 && (
+                  <TeamShareChips
+                    label="แชร์ให้ทีมไหน (เลือกได้หลายทีม)"
+                    teams={teams}
+                    selectedIds={allSelectedTeamIds}
+                    onToggle={toggleTeam}
+                  />
+                )}
+              </Field>
+              <Field>
+                <ClassroomCoverThemePicker
+                  value={theme}
+                  onValueChange={value => {
+                    markInfoChanged()
+                    setTheme(value || (initialSet ? randomQuestionSetTheme() : ''))
+                  }}
+                  allowAuto
+                  disabled={isPending}
                 />
-              )}
-            </Field>
+              </Field>
+            </div>
           </FieldGroup>
         </Card>
       )}

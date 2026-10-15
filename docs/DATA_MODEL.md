@@ -1,5 +1,11 @@
 # Data model และ invariants
 
+## Question-set colour metadata — 15 October 2026
+
+Colour uses the existing question_sets.description channel, following the classroom metadata approach; no schema, migration, RLS or grants change. A recognized versioned header [korkru:set-theme:v1:<allowed colour>] followed by a newline precedes the teacher's plain description. lib/question-set-theme.ts owns encoding/decoding. Unknown headers and legacy text are preserved as text; composing an already encoded description does not stack headers. Editors, research option DTOs and description search strip the envelope for display/search. The existing portable set descriptor retains the string through export/import and batching, including an empty human description.
+
+Create validates the nine-colour allowlist server-side and persists a random colour if none was selected. Modern edits send a resolved colour with each autosave; legacy callers that omit it read the owner's existing description first and retain its colour. Unthemed legacy folders derive a stable colour from their ID until next saved, avoiding a database backfill or colour changes on navigation. No permission or membership flags are carried in this metadata.
+
 ## Prepared editing and review-pin schema
 
 Migration `20261014144828` adds revision/updated_at to student_practice_exercises. Update locks the exact owner/library exercise row and checks expectedRevision; a retry of the same payload returns its existing revision. List DTO adds revision and allowlisted member titles. student_practice_review_pins has composite library/student/question PK, a membership FK and student FK with cascade deletion and supporting indexes. Browser grants are revoked with RLS enabled; set/list/search RPCs are service-only and share the active student library access assertion. Pins store no answers or correctness. All new schema remains unapplied for local review.

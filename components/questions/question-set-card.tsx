@@ -15,10 +15,12 @@ import { parseSections } from '@/lib/question-set-sections'
 import { withBackHref } from '@/lib/back-link'
 import { downloadTextFile, cn } from '@/lib/utils'
 import type { QuestionSet } from '@/lib/types'
+import { questionSetTheme, questionSetThemeStyle, SET_THEME_SURFACE, SET_THEME_TEXT } from '@/lib/question-set-theme'
 
 export type QuestionSetCardData = Pick<QuestionSet, 'id' | 'created_by' | 'title' | 'sections'> & {
   question_ids?: string[]
   valid_question_count?: number
+  description?: string | null
 }
 
 export function QuestionSetCard({
@@ -35,6 +37,7 @@ export function QuestionSetCard({
   const [deleted, setDeleted] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const isOwner = set.created_by === currentUserId
+  const theme = questionSetTheme(set.id, set.description)
   const sections = parseSections(set.sections)
   const questionCount = set.valid_question_count ?? (set.question_ids?.length ?? 0)
   // Owners open the editor; shared read-only sets open the library filter.
@@ -73,7 +76,9 @@ export function QuestionSetCard({
       elevation="sm"
       interactive
       data-question-set-card
-      className="group relative flex flex-col overflow-hidden focus-within:ring-3 focus-within:ring-ring/50"
+      data-question-set-theme={theme}
+      style={questionSetThemeStyle(theme)}
+      className="group relative flex flex-col overflow-hidden shadow-[0_2px_0_color-mix(in_oklab,var(--question-set-accent)_20%,transparent)] hover:shadow-[0_4px_0_color-mix(in_oklab,var(--question-set-accent)_25%,transparent)] focus-within:ring-3 focus-within:ring-ring/50"
     >
       {/* The whole card is the link, laid over the content rather than wrapped
           around it: an <a> around the footer would swallow its buttons and
@@ -85,19 +90,19 @@ export function QuestionSetCard({
       />
 
       <div className={cn(
-        'relative overflow-hidden bg-primary/5 p-3',
-        isOwner && 'border-b border-primary/10',
+        'relative overflow-hidden p-3', SET_THEME_SURFACE,
+        isOwner && 'border-b',
       )}>
         <Layers
           aria-hidden="true"
-          className="pointer-events-none absolute -right-2 -bottom-5 size-20 text-primary/5 transition-transform group-hover:-translate-y-1 group-hover:rotate-3"
+          className={cn('pointer-events-none absolute -right-2 -bottom-5 size-20 opacity-10 transition-transform group-hover:-translate-y-1 group-hover:rotate-3', SET_THEME_TEXT)}
         />
         <div className="relative flex items-start gap-2.5">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-card text-primary shadow-sm">
+          <span style={{ boxShadow: '0 2px 0 color-mix(in oklab,var(--question-set-accent) 22%,transparent)' }} className={cn('flex size-9 shrink-0 items-center justify-center rounded-xl border', SET_THEME_SURFACE, SET_THEME_TEXT)}>
             <Layers className="size-4" aria-hidden="true" />
           </span>
           <div className="min-w-0 flex-1">
-            <h3 title={set.title} className="truncate text-base leading-snug font-semibold text-foreground transition-colors group-hover:text-primary">
+            <h3 title={set.title} className={cn('truncate text-base leading-snug font-semibold', SET_THEME_TEXT)}>
               {set.title}
             </h3>
             <div className="mt-1.5 flex flex-nowrap items-center gap-1">
@@ -110,7 +115,7 @@ export function QuestionSetCard({
           {dragHandle}
           <ChevronDown
             aria-hidden="true"
-            className="mt-1 size-4 shrink-0 -rotate-90 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary"
+            className={cn('mt-1 size-4 shrink-0 -rotate-90 transition-transform group-hover:translate-x-0.5', SET_THEME_TEXT)}
           />
         </div>
       </div>

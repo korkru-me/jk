@@ -1,5 +1,11 @@
 # Architecture
 
+## Question-set colour flow — 15 October 2026
+
+CreateQuestionSetForm shares ClassroomCoverThemePicker with classrooms. Description text and theme are separate form fields, serialized together by question-set server actions using the existing description column. Theme changes participate in the existing debounced, serialized save queue. An automatic selection in edit mode resolves once in the editor, so subsequent rename or structural saves retain the same colour. Dashboard summaries now include description, allowing the same themed QuestionSetCard on home and the set library; per-set theme variables decorate only folder surfaces/text/icons.
+
+The guarded /exam-screen-lab/question-set-themes route injects create/save/delete callbacks and synthetic rows, never writing a database; its sample title/description/theme persist only in browser storage. It exercises create, edit, reopen and responsive palettes. Live Auth/Data API permission and persistence integration remain untested in this local-only delivery.
+
 ## Teacher home welcome — 15 October 2026
 
 The existing verified dashboard profile supplies full_name to TeacherDashboard. DashboardWelcome renders on the server using the existing counts and Bangkok clock; four time periods each have three wordings selected by Thai calendar day. Greeting changes on a new server render, without timers, additional queries or a client boundary on the production dashboard. Empty teacher accounts retain GettingStarted below the welcome. The guarded /exam-screen-lab/teacher-dashboard route supplies synthetic empty/name/clock cases without database reads or writes.

@@ -56,6 +56,7 @@ export type DashboardClassroom = Pick<
 export interface DashboardQuestionSet {
   id: string
   title: string
+  description?: string | null
   questionCount: number
   sections?: QuestionSet['sections']
 }
@@ -155,6 +156,7 @@ export function TeacherDashboard({
               set={{
                 id: set.id,
                 title: set.title,
+                description: set.description,
                 created_by: currentUserId,
                 sections: set.sections ?? [],
                 valid_question_count: set.questionCount,
