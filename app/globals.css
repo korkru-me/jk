@@ -117,6 +117,19 @@
   --surface-inverse-muted: oklch(0.72 0.01 265);
   --surface-inverse-border: oklch(1 0 0 / 14%);
 
+  /* Stable question identities; ink and surfaces adapt through foreground/card. */
+  --question-type-numeric: oklch(0.62 0.16 255);
+  --question-type-mcq: oklch(0.62 0.16 140);
+  --question-type-true-false: oklch(0.62 0.16 175);
+  --question-type-fill-blank: oklch(0.62 0.16 210);
+  --question-type-ordering: oklch(0.62 0.16 80);
+  --question-type-matching: oklch(0.62 0.16 42);
+  --question-type-essay: oklch(0.62 0.16 295);
+  --question-type-file-upload: oklch(0.62 0.16 335);
+  --question-type-classify: oklch(0.62 0.16 110);
+  --question-type-image-label: oklch(0.62 0.16 12);
+  --question-type-composite: oklch(0.62 0.16 275);
+
   /* Decorative tints — used to tell items apart (stat cards, icon chips,
      category badges). They carry no meaning: swapping them changes nothing a
      teacher reads, unlike --success or --flag. A preset overrides them so its

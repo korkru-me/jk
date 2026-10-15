@@ -1,0 +1,33 @@
+.card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr) auto;
+  column-gap: 0.75rem;
+  row-gap: 0.25rem;
+  align-content: start;
+  padding: 0.75rem;
+  color: color-mix(in oklab, var(--question-accent) 60%, var(--foreground));
+  background: color-mix(in oklab, var(--question-accent) 9%, var(--card));
+  border-color: color-mix(in oklab, var(--question-accent) 32%, var(--border));
+}
+
+/* The link covers the card while the sibling preview remains a separate control. */
+.link {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-row: 1 / span 2;
+  grid-template-columns: subgrid;
+  grid-template-rows: subgrid;
+}
+
+.link::after {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  content: '';
+}
+
+.link:focus-visible::after {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
