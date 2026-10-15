@@ -1,5 +1,12 @@
 # Feature status
 
+### ย่อแถบด้านบนคลังฝึกและย้ายคำแนะนำไป Tooltip — 15 ตุลาคม 2026 (local preview)
+
+- ลดปุ่มค้นหา/ดูข้อที่ปักไว้/สร้างแบบฝึกหัดเป็น size sm, ลดความสูง header/แถบเลือกและช่องว่าง; ย้าย label ค้นหาเป็น placeholder “ค้นหาชื่อหรือเนื้อหาโจทย์” กับ “ค้นหาแท็ก” โดยคง accessible label, ลบ helper จำนวนแท็กและแถวจำนวนผลทั้งหมด คงขีดจำกัดการค้นหาและปุ่มล้างตัวกรองตามเดิม
+- หัวข้อ “แบบฝึกหัดของฉัน” มี CircleHelp เล็กและ Tooltip วิธีเลือก/ตั้งชื่อ พร้อมวิธีนับความคืบหน้าสำหรับชุดที่มีอยู่ เปิดด้วย hover/keyboard focus และปิดเมื่อออกจากหัวข้อ; ตามคำขอเจ้าของเอาบรรทัดห้องทดลองข้อมูลจำลองออกเฉพาะ student/local-student fixture โดย fixture ยังคงไม่อ่านหรือเขียนฐานข้อมูล
+- ตรวจ fixture ที่ 1440px: แถบค้นหา 106→60px, ปุ่มทั้งสาม 52.8→33.6px, การ์ดข้อแรกเลื่อนจาก y603→385px (รวมการลบ banner fixture); 320px ไม่ล้นและหัวข้อ/ดูข้อที่ปักยังอยู่แถวเดียว. ค้นหาแท็ก “สมดุล” ได้หนึ่งข้อพร้อมล้างตัวกรอง, เลือกทั้งหมดและเปิดช่องตั้งชื่อผ่าน; Tooltip hover/focus/ปิดผ่าน
+- TypeScript, token lint, production webpack build แยก cache และ Next runtime checks ผ่าน. WCAG axe หน้าเมื่อปิด Tooltip ไม่มี violations/incomplete; เมื่อเปิดมี contrast incomplete จาก overlay ที่ตรวจภาพร่วม และ default best-practice region check ของ portal ไม่ถือเป็นการรับรอง accessibility ทุกกรณี ไม่เปลี่ยน lib/schema จึงไม่รัน unit suite ซ้ำ ไม่มี migration, database writes, hosted persistence UAT หรือ push/deploy; เก็บใน branch `codex/student-classroom-cards` ตามขอบเขต local preview เดิม
+
 ### การ์ดตัวเลือกโจทย์ใช้รูปแบบเดียวกับคลัง — 15 ตุลาคม 2026 (local preview)
 
 - `QuestionPicker` ใช้ `QuestionCard` เดียวกับหน้าโจทย์รายข้อ: ระดับ/ประเภท/ข้อย่อย วิชา หมวดหมู่ แฟ้ม แท็ก ชื่อ ข้อความย่อ และดูตัวอย่าง/เฉลย พร้อมช่องเลือก แต่ซ่อนแชร์ รายงาน ทำสำเนา แก้ไข และลบ; ป้ายแฟ้มเป็นข้อมูลอ่านอย่างเดียวใน picker เพื่อไม่พาร่างออกจากหน้าต่าง

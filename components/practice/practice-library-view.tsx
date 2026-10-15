@@ -19,6 +19,7 @@ import {
   Pencil,
   Bookmark,
   Minus,
+  CircleHelp,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -38,6 +39,7 @@ import { SolutionLoaderProvider } from '@/components/questions/solution-loader'
 import { Progress } from '@/components/ui/progress'
 import { Field, FieldLabel, FieldGroup } from '@/components/ui/field'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { createPracticeExercise, updatePracticeExercise, setPracticeReviewPin, getPracticeAttachedSolution } from '@/lib/actions/practice-exercises'
 import { PRACTICE_EXERCISE_MAX_QUESTIONS, type PracticeExercise } from '@/lib/practice-exercises'
 import type {
@@ -74,7 +76,6 @@ interface PracticeLibraryViewProps {
 export function PracticeLibraryView({
   library,
   items,
-  total,
   totalPages,
   state,
   storageOwnerId,
@@ -100,6 +101,7 @@ export function PracticeLibraryView({
   const storageKey = `practice-selection:${storageOwnerId}:${library.id}`
   const [selected, setSelected] = useState<Record<string, string>>({})
   const [naming, setNaming] = useState(false)
+  const [exerciseHelpOpen, setExerciseHelpOpen] = useState(false)
   const [title, setTitle] = useState('')
   const [error, setError] = useState('')
   const [pending, startTransition] = useTransition()
@@ -212,12 +214,12 @@ export function PracticeLibraryView({
   const tagLimitReached = state.tags.length >= PRACTICE_MAX_TAGS || state.ignoredTagCount > 0
 
   return (
-    <div className="@container flex min-w-0 w-full flex-col gap-3">
-      <header className="flex min-h-11 items-center gap-2">
+    <div className="@container flex min-w-0 w-full flex-col gap-2">
+      <header className="flex min-h-7 items-center gap-2">
         <Button
           variant="ghost"
-          size="icon"
-          className="size-[44px]"
+          size="icon-sm"
+          className="pointer-coarse:size-11"
           render={<Link href={`/practice/${library.id}`} />}
           aria-label="กลับไปหน้ารอเข้าคลังฝึก"
         >
@@ -246,47 +248,37 @@ export function PracticeLibraryView({
       >
         <form
           method="get"
-          className="grid grid-cols-[minmax(0,1fr)_44px] gap-2 @min-[44rem]:grid-cols-[minmax(0,1fr)_minmax(12rem,0.55fr)_auto]"
+          className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 @min-[44rem]:grid-cols-[minmax(0,1fr)_minmax(12rem,0.55fr)_auto]"
         >
           {Object.entries(searchHiddenFields).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
           {state.reviewOnly && <input type="hidden" name="review" value="1" />}
           {state.tags.map(tag => <input key={tag} type="hidden" name="tag" value={tag} />)}
-          <label className="col-span-2 flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground @min-[44rem]:col-span-1">
-            ค้นหาชื่อหรือเนื้อหาโจทย์
+          <div className="col-span-2 min-w-0 @min-[44rem]:col-span-1">
             <Input
               name="q"
               defaultValue={state.q}
-              placeholder="เช่น กฎของนิวตัน"
+              placeholder="ค้นหาชื่อหรือเนื้อหาโจทย์"
               aria-label="ค้นหาชื่อหรือเนื้อหาโจทย์"
             />
-          </label>
-          <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground">
-            เพิ่มแท็กที่ต้องมี
+          </div>
+          <div className="min-w-0">
             <Input
               name="tag"
-              placeholder={tagLimitReached ? 'ลบแท็กก่อนเพิ่มแท็กใหม่' : 'เช่น สอวน.ค่าย 1'}
-              aria-label="เพิ่มแท็กที่ต้องมี"
-              aria-describedby="practice-tag-limit"
+              placeholder={tagLimitReached ? 'ลบแท็กก่อนเพิ่มแท็กใหม่' : 'ค้นหาแท็ก'}
+              aria-label="ค้นหาแท็ก"
               maxLength={80}
               disabled={tagLimitReached}
             />
-          </label>
+          </div>
           <Button
             type="submit"
-            size="icon"
-            className="size-11 self-end @min-[44rem]:w-auto @min-[44rem]:px-4"
+            size="sm"
+            className="pointer-coarse:min-h-11"
           >
             <Search data-icon="inline-start" aria-hidden="true" />
             <span className="sr-only @min-[44rem]:not-sr-only">ค้นหา</span>
           </Button>
         </form>
-
-        <p id="practice-tag-limit" className="text-xs text-muted-foreground">
-          เลือกได้สูงสุด {PRACTICE_MAX_TAGS} แท็กต่อการค้นหา
-          {state.ignoredTagCount > 0
-            ? ` · ระบบไม่ได้ใช้ ${state.ignoredTagCount.toLocaleString('th-TH')} แท็กที่เกินขีดจำกัด URL`
-            : ''}
-        </p>
 
         {state.tags.length > 0 && (
           <div
@@ -299,7 +291,7 @@ export function PracticeLibraryView({
               <Badge
                 key={tag}
                 variant="outline"
-                className="min-h-11 shrink-0"
+                className="shrink-0 pointer-coarse:min-h-11"
                 render={<Link href={libraryHrefBuilder(library.id, state, {
                   tags: state.tags.filter(value => value !== tag),
                   page: 1,
@@ -316,11 +308,21 @@ export function PracticeLibraryView({
 
       <section aria-labelledby="my-practice-exercises" className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 id="my-practice-exercises" className="flex items-center gap-2 text-base font-semibold">
-            <Layers className="size-5 text-primary" aria-hidden="true" />แบบฝึกหัดของฉัน
+          <h2 id="my-practice-exercises" className="min-w-0 text-sm font-semibold sm:text-base">
+            <Tooltip open={exerciseHelpOpen} onOpenChange={setExerciseHelpOpen}>
+              <TooltipTrigger aria-describedby={exerciseHelpOpen ? 'practice-exercise-help' : undefined} className="flex items-center gap-1.5 rounded-lg py-1 outline-none focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:min-h-11">
+                <Layers className="size-4 shrink-0 text-primary" aria-hidden="true" />
+                แบบฝึกหัดของฉัน
+                <CircleHelp className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />
+              </TooltipTrigger>
+              <TooltipContent id="practice-exercise-help" role="tooltip" side="bottom" align="start" className="flex-col items-start">
+                <p>ติ๊กเลือกโจทย์ด้านล่าง แล้วตั้งชื่อเพื่อสร้างแบบฝึกหัดของตัวเอง</p>
+                {exercises.length > 0 && <p>นับข้อที่กดตรวจคำตอบอย่างน้อยหนึ่งครั้ง รวมการตอบก่อนสร้างแบบฝึกหัด</p>}
+              </TooltipContent>
+            </Tooltip>
           </h2>
-          <div className="flex flex-wrap items-center gap-1.5" aria-label="โจทย์ที่ปักไว้ทบทวน">
-            <Button variant={state.reviewOnly ? 'navigation' : 'outline'} size="sm" className="min-h-11 px-3" disabled={!pinsReady}
+          <div role="group" className="flex flex-wrap items-center gap-1.5" aria-label="โจทย์ที่ปักไว้ทบทวน">
+            <Button variant={state.reviewOnly ? 'navigation' : 'outline'} size="sm" className="pointer-coarse:min-h-11" disabled={!pinsReady}
               aria-label={state.reviewOnly ? 'กลับไปดูทุกข้อ' : `ดูข้อที่ปักไว้ (${pins.size})`}
               title={state.reviewOnly ? 'กลับไปดูทุกข้อ' : `ดูข้อที่ปักไว้ (${pins.size})`}
               render={<Link href={libraryHrefBuilder(library.id, state, { exerciseId: '', reviewOnly: !state.reviewOnly, page: 1 })} />}>
@@ -332,7 +334,6 @@ export function PracticeLibraryView({
           </div>
         </div>
         {!exercisesReady && <Alert><AlertDescription>ยังโหลดแบบฝึกหัดไม่ได้ กรุณาลองโหลดหน้าอีกครั้ง</AlertDescription></Alert>}
-        {exercisesReady && exercises.length === 0 && <p className="text-xs text-muted-foreground">ติ๊กเลือกโจทย์ด้านล่าง แล้วตั้งชื่อเพื่อสร้างแบบฝึกหัดของตัวเอง</p>}
         {exercises.length > 0 && <div className="grid gap-2 @min-[38rem]:grid-cols-2 @min-[62rem]:grid-cols-3">
           {exercises.map(exercise => <Card key={exercise.id} radius="md" padding="none" className={cn('flex items-center gap-2 px-3 py-2', activeExercise?.id === exercise.id && 'border-primary/50')}>
             <Link href={libraryHrefBuilder(library.id, state, { exerciseId: exercise.id, reviewOnly: false, q: '', tags: [], page: 1 })}
@@ -352,7 +353,6 @@ export function PracticeLibraryView({
             </Button>
           </Card>)}
         </div>}
-        {exercises.length > 0 && <p className="text-xs text-muted-foreground">นับข้อที่กดตรวจคำตอบอย่างน้อยหนึ่งครั้ง รวมการตอบก่อนสร้างแบบฝึกหัด</p>}
       </section>
 
       <Card radius="md" padding="none" className="flex flex-col gap-2 px-3 py-1.5">
@@ -361,7 +361,7 @@ export function PracticeLibraryView({
           <Button variant="outline" className="min-h-11" render={<Link href={libraryHrefBuilder(library.id, state, { exerciseId: '', reviewOnly: false, page: 1 })} />}>เพิ่มโจทย์จากคลัง</Button>
         </div>}
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm">
+          <label className="flex min-h-7 cursor-pointer items-center gap-2 text-sm pointer-coarse:min-h-11">
             <input type="checkbox" className="shrink-0 accent-primary" aria-label="เลือกทุกข้อในหน้านี้" disabled={!exercisesReady || pending || items.length === 0}
               checked={items.length > 0 && items.every(item => selected[item.id] !== undefined)}
               onChange={event => {
@@ -377,10 +377,10 @@ export function PracticeLibraryView({
           </label>
           <div className="flex flex-wrap items-center gap-2">
             <span role="status" aria-label={`เลือกแล้ว ${selectedIds.length} ข้อ`} className="text-xs text-muted-foreground"><span className="hidden sm:inline">เลือกแล้ว </span>{selectedIds.length} ข้อ</span>
-            {selectedIds.length > 0 && <Button variant="ghost" className="min-h-11 px-3" disabled={pending} aria-label="ล้างที่เลือก" title="ล้างที่เลือก" onClick={() => updateSelection({})}>
+            {selectedIds.length > 0 && <Button variant="ghost" size="sm" className="pointer-coarse:min-h-11" disabled={pending} aria-label="ล้างที่เลือก" title="ล้างที่เลือก" onClick={() => updateSelection({})}>
               <X data-icon="inline-start" className="sm:hidden" aria-hidden="true" /><span className="hidden sm:inline">ล้างที่เลือก</span>
             </Button>}
-            {!editing && <Button className="min-h-11 px-3" aria-label="สร้างแบบฝึกหัด" title="สร้างแบบฝึกหัด" disabled={!exercisesReady || selectedIds.length === 0 || pending} onClick={() => setNaming(true)}>
+            {!editing && <Button size="sm" className="pointer-coarse:min-h-11" aria-label="สร้างแบบฝึกหัด" title="สร้างแบบฝึกหัด" disabled={!exercisesReady || selectedIds.length === 0 || pending} onClick={() => setNaming(true)}>
               <Plus data-icon="inline-start" aria-hidden="true" /><span className="hidden sm:inline">สร้างแบบฝึกหัด</span>
             </Button>}
           </div>
@@ -418,8 +418,7 @@ export function PracticeLibraryView({
         </form>}
       </Card>
 
-      <div className="flex min-h-6 items-center justify-between gap-2 text-xs">
-        <p className="text-muted-foreground">{activeExercise ? `${activeExercise.title} · ` : ''}พบ {total.toLocaleString('th-TH')} ข้อ</p>
+      {(activeExercise || hasFilters) && <div className="flex items-center justify-end gap-2 text-xs">
         {activeExercise && <Button variant="link" size="sm" className="min-h-11 shrink-0" render={<Link href={libraryHrefBuilder(library.id, state, { exerciseId: '', page: 1 })} />}>ดูโจทย์ทั้งหมด</Button>}
         {hasFilters && !activeExercise && (
           <Button
@@ -431,7 +430,7 @@ export function PracticeLibraryView({
             ล้างตัวกรอง
           </Button>
         )}
-      </div>
+      </div>}
 
       <SolutionLoaderProvider loader={solutionLoader ?? loadSolution}>
         {items.length === 0 ? (
