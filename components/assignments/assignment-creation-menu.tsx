@@ -78,7 +78,6 @@ export function AssignmentCreationMenu({
         <DropdownMenuGroup>
           <DropdownMenuLabel>เลือกสิ่งที่ต้องการสร้าง</DropdownMenuLabel>
           <DropdownMenuItem
-            variant="primary"
             className="py-2"
             render={<Link href={assignmentReuseHref(classroomId)} onNavigate={() => navigate(assignmentReuseHref(classroomId))} />}
           >
@@ -86,7 +85,6 @@ export function AssignmentCreationMenu({
             <span>นำงานเดิมมาใช้</span>
           </DropdownMenuItem>
           <DropdownMenuItem
-            variant="primary"
             className="py-2"
             render={(
               <Link
@@ -100,7 +98,6 @@ export function AssignmentCreationMenu({
           </DropdownMenuItem>
           {practiceLibrary && (
             <DropdownMenuItem
-              variant="primary"
               className="py-2"
               render={(
                 <Link
@@ -114,7 +111,6 @@ export function AssignmentCreationMenu({
             </DropdownMenuItem>
           )}
           <DropdownMenuItem
-            variant="primary"
             className="py-2"
             render={(
               <Link

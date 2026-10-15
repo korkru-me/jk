@@ -143,21 +143,21 @@ const STATUS_CFG = {
     description: 'ยังไม่แสดงให้นักเรียนเห็น จนกว่าครูจะเผยแพร่งานชุดนี้',
     badge: 'statusWarning',
     dot: 'bg-warning',
-    row: 'border-l-warning bg-card hover:bg-muted/30',
+    row: 'border-l-warning',
   },
   published: {
     label: 'เผยแพร่แล้ว',
     description: 'นักเรียนที่ได้รับมอบหมายสามารถเปิดและทำงานชุดนี้ได้',
     badge: 'statusSuccess',
     dot: 'bg-success',
-    row: 'border-l-success bg-card hover:bg-muted/30',
+    row: 'border-l-success',
   },
   closed: {
     label: 'ปิดแล้ว',
     description: 'ปิดรับการทำงานแล้ว นักเรียนจึงเริ่มทำรอบใหม่ไม่ได้',
     badge: 'statusDestructive',
     dot: 'bg-destructive',
-    row: 'border-l-destructive bg-card hover:bg-muted/30',
+    row: 'border-l-destructive',
   },
 } as const
 
@@ -208,7 +208,7 @@ function SortableAssignmentRow({
         transition: freezeLayout ? undefined : transition,
       }}
       className={cn(
-        'relative flex gap-2 border-l-4 py-3 pr-2 pl-3 transition-[background-color,box-shadow,opacity]',
+        'relative flex gap-2 border-l-4 py-3 pr-2 pl-3 transition-[background-color,box-shadow,opacity] [&_.text-muted-foreground]:text-foreground/75',
         tone,
       )}
     >
@@ -706,7 +706,7 @@ export function ClassroomAssignmentsTab({
                       return <SortableAssignmentRow key={assignment.id}
                         assignmentId={assignment.id} categoryId={assignment.category_id} title={assignment.title}
                         disabled={isOrderPending || isPending || layoutBlocked} freezeLayout={!sortingWithinCategory}
-                        tone={statusCfg.row} status={practiceStatus}
+                        tone={cn(statusCfg.row, typeCfg.bg)} status={practiceStatus}
                       >
                         <div className="flex flex-col gap-3 px-2" data-classroom-practice-row>
                           <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
@@ -754,7 +754,7 @@ export function ClassroomAssignmentsTab({
                         title={assignment.title}
                         disabled={isOrderPending || isPending || layoutBlocked}
                         freezeLayout={!sortingWithinCategory}
-                        tone={statusCfg.row}
+                        tone={cn(statusCfg.row, typeCfg.bg)}
                         status={statusCfg}
                       >
                         <div className="flex flex-col gap-3 px-2">
@@ -875,7 +875,7 @@ export function ClassroomAssignmentsTab({
                 radius="md"
                 edge="ring"
                 elevation="lg"
-                className="pointer-events-none flex w-[30rem] max-w-[calc(100vw-2rem)] items-center gap-3 p-3 ring-primary/40"
+                className={cn('pointer-events-none flex w-[30rem] max-w-[calc(100vw-2rem)] items-center gap-3 p-3 ring-primary/40', draggingTypeCfg.bg)}
               >
                 <div className={cn(
                   'flex size-9 shrink-0 items-center justify-center rounded-lg',

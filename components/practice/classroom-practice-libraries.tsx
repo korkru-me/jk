@@ -57,7 +57,7 @@ export function ClassroomPracticeLibraries({
                 className="group block h-full min-w-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 data-student-practice-card
               >
-                <Card radius="md" interactive className="relative flex h-full min-w-0 items-start gap-2.5 overflow-hidden py-3 pl-4 pr-3 group-hover:border-primary/30">
+                <Card radius="md" interactive className="relative flex h-full min-w-0 items-start gap-2.5 overflow-hidden bg-[color-mix(in_oklab,var(--work-practice,var(--primary))_10%,var(--card))] py-3 pl-4 pr-3 group-hover:border-primary/30 [&_.text-muted-foreground]:text-foreground/75">
                   <span className="absolute inset-y-3 left-0 w-[3px] rounded-r-full bg-primary" aria-hidden="true" />
                   <span className={cn('mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg', cover ? `${cover.surface} ${cover.text}` : 'bg-muted text-foreground')}>
                     <BookOpenCheck className="size-4" aria-hidden="true" />
