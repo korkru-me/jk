@@ -158,7 +158,6 @@ export function AssignmentDetailClient({
   const renderContextualSidebar = useCallback((onNavigate?: () => void) => (
     <AssignmentContextNavigation
       assignment={a}
-      studentCount={submissions.length}
       pendingCount={pendingCount}
       pendingReviewCapped={pendingReviewCapped}
       gradeHref={gradeHref}
@@ -171,7 +170,7 @@ export function AssignmentDetailClient({
       onDelete={handleDelete}
       onClose={onNavigate}
     />
-  ), [a, close, duplicateQuestionCount, gradeHref, handleDelete, isPending, missingQuestionCount, pendingCount, pendingReviewCapped, publish, questions.length, submissions.length])
+  ), [a, close, duplicateQuestionCount, gradeHref, handleDelete, isPending, missingQuestionCount, pendingCount, pendingReviewCapped, publish, questions.length])
 
   useContextualSidebar(`/assignments/${a.id}`, renderContextualSidebar)
 

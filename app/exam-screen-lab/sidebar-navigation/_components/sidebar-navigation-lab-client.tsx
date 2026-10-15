@@ -64,7 +64,6 @@ export function SidebarNavigationLabSource() {
     <AssignmentContextNavigation
       assignment={{ id: CLASSROOM_ID, classroom_id: CLASSROOM_ID, title: assignmentType === 'exam' ? 'ข้อสอบจำลอง' : 'แบบฝึกหัดจำลอง', type: assignmentType, mode: 'online', status: 'draft', question_ids: ['one'], random_question_count: null, completion_rule: 'fixed', streak_target: null, classrooms: { name: 'ฟิสิกส์ ห้องจำลอง' } }}
       gradeHref={SOURCE}
-      studentCount={63}
       pendingCount={5}
       availableQuestionCount={1}
       missingQuestionCount={0}
