@@ -7,6 +7,7 @@ ALTER TABLE public.submissions ADD CONSTRAINT submission_close_pair
   CHECK ((closed_at IS NULL) = (close_reason IS NULL));
 CREATE INDEX submissions_pending_close_idx ON public.submissions(started_at)
   WHERE status = 'in_progress';
+
 CREATE FUNCTION public.submission_hard_close(p_submission_id uuid) RETURNS timestamptz
 LANGUAGE sql STABLE SECURITY INVOKER SET search_path = '' AS $$
   SELECT LEAST(CASE WHEN a.duration_minutes > 0
@@ -16,6 +17,7 @@ LANGUAGE sql STABLE SECURITY INVOKER SET search_path = '' AS $$
   LEFT JOIN public.assignment_extensions e ON e.assignment_id = s.assignment_id AND e.student_id = s.student_id
   WHERE s.id = p_submission_id AND a.type IN ('exam', 'exercise');
 $$;
+
 CREATE FUNCTION public.guard_attempt_answer_write() RETURNS trigger
 LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
 DECLARE v public.submissions%ROWTYPE;
@@ -36,6 +38,7 @@ BEGIN
 END; $$;
 CREATE TRIGGER guard_attempt_answer_write BEFORE INSERT OR UPDATE ON public.submission_answers
   FOR EACH ROW EXECUTE FUNCTION public.guard_attempt_answer_write();
+
 CREATE FUNCTION public.guard_attempt_work_write() RETURNS trigger
 LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
 DECLARE v public.submissions%ROWTYPE; v_answer uuid;
@@ -53,6 +56,7 @@ BEGIN
 END; $$;
 CREATE TRIGGER guard_attempt_work_write BEFORE INSERT OR UPDATE OR DELETE ON public.student_work_artifacts
   FOR EACH ROW EXECUTE FUNCTION public.guard_attempt_work_write();
+
 CREATE FUNCTION public.claim_submission_close(p_submission_id uuid, p_student_id uuid,
   p_expired_only boolean, p_expected_revision bigint DEFAULT NULL) RETURNS jsonb
 LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
@@ -76,6 +80,7 @@ BEGIN
   END IF;
   RETURN pg_catalog.jsonb_build_object('completed', false);
 END; $$;
+
 CREATE FUNCTION public.commit_submission_grade(p_submission_id uuid, p_student_id uuid, p_updates jsonb,
   p_missing_work_evidence boolean DEFAULT false)
 RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
@@ -101,6 +106,7 @@ BEGIN
     missing_work_evidence = COALESCE(p_missing_work_evidence, false) WHERE id = v.id;
   RETURN pg_catalog.jsonb_build_object('total_score', v_total);
 END; $$;
+
 CREATE FUNCTION public.close_expired_submission_attempts(p_limit integer DEFAULT 500) RETURNS integer
 LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
 DECLARE v record; v_count integer := 0;
@@ -115,6 +121,7 @@ BEGIN
   END LOOP;
   RETURN v_count;
 END; $$;
+
 -- The optional grader callback uses environment-specific Vault credentials.
 -- Closure itself continues even if HTTP/the grading worker is unavailable.
 CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;
@@ -131,6 +138,7 @@ BEGIN
     'Content-Type', 'application/json', 'Authorization', 'Bearer ' || v_secret),
     body := '{}'::jsonb, timeout_milliseconds := 55000);
 END; $$;
+
 REVOKE ALL ON FUNCTION public.submission_hard_close(uuid), public.guard_attempt_answer_write(),
   public.guard_attempt_work_write(), public.claim_submission_close(uuid,uuid,boolean,bigint),
   public.commit_submission_grade(uuid,uuid,jsonb,boolean), public.close_expired_submission_attempts(integer),

@@ -1,5 +1,7 @@
 # Architecture
 
+รอบที่กำหนดเวลา (14 ตุลาคม 2026) แยกการปิดรับออกจากการตรวจคะแนน: DB cron/write trigger ล็อกรอบที่หมดเวลาทั้งที่ไม่มี browser จากนั้น evaluator TypeScript เดิมตรวจคำตอบที่ล็อกไว้ Claim/commit RPC ใช้ submission row lock กับ revision fence และเผยแพร่คะแนนแบบ atomic งาน POST ที่ตรวจ secret รับการเรียกผ่าน pg_net/Vault ส่วน browser recovery เป็น fallback เฉพาะเจ้าของรอบและเรียกซ้ำได้ GET/prefetch ยังไม่เริ่มหรือให้คะแนนรอบ ต้องมี migration `20261014072745` และตั้ง worker ก่อน rollout; ผ่าน Staging แล้วแต่ยังไม่เปลี่ยน Production
+
 ## Practice management workspace — 15 October 2026 (local only)
 
 The exact-manager `/practice/[id]/edit` route now renders overview by default, `?tab=settings` for the existing editor, and `?tab=progress` for roster data. `student`, `q`, and `page` select one authorized student's detail. Legacy `/progress` and `/progress/[studentId]` URLs redirect to this workspace, preserving search/page; the destination repeats authentication, feature gate and exact-library manage authorization. Sidebar registration uses the existing shell context, with no centered max-width wrapper or extra sidebar column.

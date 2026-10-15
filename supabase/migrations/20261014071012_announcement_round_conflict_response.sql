@@ -22,4 +22,3 @@ begin
   return jsonb_build_object('success', true, 'round', v_round, 'acknowledgedAt', v_at);
 end;
 $$;
-

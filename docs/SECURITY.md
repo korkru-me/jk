@@ -1,5 +1,7 @@
 # Security และ privacy guardrails
 
+การปิดรอบ (`20261014072745`, apply เฉพาะ Staging): RPC เป็น SECURITY INVOKER, `search_path = ''` และ revoke PUBLIC/anon/authenticated Student action ใช้ Auth ที่ตรวจแล้วและ exact owned row โดย SQL ตรวจ owner/expiry ก่อน forced closure Trigger คำตอบ/วิธีทำใช้ row lock เดียวกับการปิดและปฏิเสธ late writes ระหว่าง cron ticks เขียนคะแนนแบบ atomic และส่ง receipt ที่ไม่มีคะแนนซ่อน Global worker ต้องผ่าน constant-time secret comparison แยก environment Vault dispatch ใช้โดย postgres cron เท่านั้น ไม่เปิดให้ browser/service-role worker อ่าน Responses มีเฉพาะยอดรวม ไม่พิมพ์ข้อมูลนักเรียนหรือ key และไม่ใช้ credential ของ Staging ใน Production
+
 ## Reset numeric variants safely — 15 October 2026
 
 Explicit client reset/reload POSTs reauthorize the exact active answer through getWritableStudentAnswer (owner/status/expiry/deadline/native session). No GET or prefetch mutation. Numeric values and answer key change together with old-map equality plus exact row count; stale autosave payloads are bound to the visible numeric map and rejected before update. Returned student data contains only public values, never the newly computed key. Preview grading remains teacher-only. Submitted/carried/checked-streak history stays immutable; no timer reset or permission expansion. No migration or external database write was made for this change.

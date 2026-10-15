@@ -37,14 +37,14 @@ export function StudentClassroomView({ classroom, teacherName, studentCount, ass
       <StudentClassroomTabs assignments={assignments} categories={categories} classroomDescription={classroom.description}
         classroomName={classroom.name} assignmentHrefs={assignmentHrefs}
         initialNow={initialNow ?? new Date().toISOString()} liveTime={initialNow === undefined}
-        header={<StudentClassroomHeader classroom={classroom} teacherName={teacherName} studentCount={studentCount} />}
-        calendar={<AssignmentCalendar events={calendarEvents} initialNow={initialNow} scopeLabel={classroom.name} />}
-        practiceLibraries={practiceLibraries ? <ClassroomPracticeLibraries result={practiceLibraries} studentView classroomDescription={classroom.description} /> : null}
+        header={<StudentClassroomHeader key="header" classroom={classroom} teacherName={teacherName} studentCount={studentCount} />}
+        calendar={<AssignmentCalendar key="calendar" events={calendarEvents} initialNow={initialNow} scopeLabel={classroom.name} />}
+        practiceLibraries={practiceLibraries ? <ClassroomPracticeLibraries key="practice" result={practiceLibraries} studentView classroomDescription={classroom.description} /> : null}
         announcements={posts.length > 0 ? (
-          <ClassroomStream classroomId={classroom.id} canPost={false} initialPosts={posts}
+          <ClassroomStream key="announcements" classroomId={classroom.id} canPost={false} initialPosts={posts}
             variant="panel" maxHeightClass="max-h-[680px]" title="ประกาศจากครู" trackSeen={trackSeen} />
         ) : (
-          <Card data-classroom-panel padding="sm" className="flex flex-wrap items-center justify-between gap-2">
+          <Card key="announcements" data-classroom-panel padding="sm" className="flex flex-wrap items-center justify-between gap-2">
             <h2 data-classroom-heading className="text-sm font-semibold">ประกาศจากครู</h2>
             <p className="text-xs text-muted-foreground">ยังไม่มีประกาศ</p>
           </Card>

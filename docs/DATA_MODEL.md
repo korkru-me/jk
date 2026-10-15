@@ -1,5 +1,7 @@
 # Data model และ invariants
 
+การปิดรอบ (`20261014072745`, apply เฉพาะ Staging): `submissions.closed_at` หยุดคำตอบ/วิธีทำ, `close_reason` เป็น `manual|time_limit|close_time`, `answer_revision` ตรวจข้อมูลที่เปลี่ยนระหว่างยืนยันส่ง และ `missing_work_evidence` แจ้งหลักฐานที่ไม่ครบ รอบที่ปิดอาจยังเป็น `in_progress` ขณะรอตรวจโดยไม่เผยแพร่คะแนนชั่วคราว Commit คะแนนตั้ง `submitted_at = closed_at` กับ `status = submitted` ใน transaction เดียว การเรียกซ้ำไม่ทับผลที่เสร็จหรือครูแก้แล้ว ใช้สเกลคะแนนและช่วงสีเดิม
+
 ## Numeric variant transition — 15 ตุลาคม 2026
 
 ไม่มีคอลัมน์หรือ migration ใหม่: transition ใช้ submission_answers.random_values/correct_answer เดิม เปลี่ยนพร้อม student_answer=null และ math_input_modes={} เฉพาะ active authorized row ที่ old numeric map ยังตรง ไม่แก้ question_id/order/option_order/max_score/submission.started_at ส่วน completed submissions, carried-over answers และ checked streak history ไม่เปลี่ยน ค่า check_count เป็นจำนวนตรวจสะสม ไม่ล้างเพราะเปลี่ยน variant

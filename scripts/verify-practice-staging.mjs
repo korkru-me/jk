@@ -339,6 +339,30 @@ try {
   assert(studentRead.length === 1 && studentRead[0].status === 'published',
     'Roster student could not see the published practice library')
 
+  // The classroom page reads safe metadata through the actor's session and
+  // counts memberships in PostgREST, without loading question/answer payloads.
+  for (const account of [owner, coAdmin, coManage, coView, studentA, studentB, outsider, foreignTeacher]) {
+    const studentView = [studentA, studentB, outsider].includes(account)
+    let listQuery = account.client.from('practice_libraries')
+      .select('id, title, status, practice_library_questions(count)')
+      .eq('classroom_id', classroomId)
+    if (studentView) listQuery = listQuery.eq('status', 'published')
+    const list = successful(await listQuery.order('updated_at', { ascending: false })
+      .order('id', { ascending: false }).range(0, 999), 'Classroom practice metadata read failed')
+    const expected = [outsider, foreignTeacher].includes(account) ? 0 : studentView ? 1 : 2
+    assert(list.length === expected, 'Classroom list crossed an actor/status boundary')
+    assert(list.every(row => Object.keys(row).every(key =>
+      ['id', 'title', 'status', 'practice_library_questions'].includes(key))),
+    'Classroom list included fields outside the metadata allowlist')
+    if (list.length) {
+      assert(list.find(row => row.id === libraryId)?.practice_library_questions[0]?.count === 1000,
+        'Classroom list lost memberships in its aggregate count')
+    }
+  }
+  const anonymousList = await anonymous.from('practice_libraries')
+    .select('id, title, status, practice_library_questions(count)').eq('classroom_id', classroomId)
+  assert(anonymousList.error || anonymousList.data.length === 0, 'Anonymous classroom list was readable')
+
   const startedAt = process.hrtime.bigint()
   const search = await admin.rpc('search_practice_library_questions', {
     p_actor_id: studentA.id,
@@ -451,6 +475,77 @@ try {
     && !('is_correct' in attempted) && !('score' in attempted),
   'Teacher detail exposed unsafe data or returned the wrong count')
 
+  if (args.has('--personal-exercises')) {
+    const exerciseId = randomUUID()
+    const members = questionIds.slice(0, 3)
+    const actor = { p_actor_id: studentA.id, p_library_id: libraryId }
+    const create = { ...actor, p_id: exerciseId, p_title: 'Synthetic private exercise', p_question_ids: members }
+    successful(await admin.rpc('create_student_practice_exercise', create), 'Personal exercise creation failed')
+    successful(await admin.rpc('create_student_practice_exercise', create), 'Personal exercise retry failed')
+    const groups = successful(await admin.rpc('list_student_practice_exercises', actor), 'Personal exercise list failed')
+    assert(groups.length === 1 && groups[0].revision === 1 && groups[0].question_ids.length === 3,
+      'Personal exercise creation was duplicated or lost members')
+    const peerGroups = successful(await admin.rpc('list_student_practice_exercises', {
+      ...actor, p_actor_id: studentB.id,
+    }), 'Peer personal exercise list failed')
+    assert(peerGroups.length === 0, 'Personal group leaked to a classmate')
+    const page = successful(await admin.rpc('get_student_practice_exercise_questions', {
+      ...actor, p_exercise_id: exerciseId, p_limit: 2, p_offset: 0,
+    }), 'Personal exercise pagination failed')
+    assert(page.length === 2 && Number(page[0].total_count) === 3, 'Personal exercise pagination/count differs')
+    const peerPage = await admin.rpc('get_student_practice_exercise_questions', {
+      ...actor, p_actor_id: studentB.id, p_exercise_id: exerciseId, p_limit: 2, p_offset: 0,
+    })
+    assert(peerPage.error?.code === '42501', 'A peer could open another student group')
+    const outsiderGroup = await admin.rpc('create_student_practice_exercise', {
+      ...create, p_actor_id: outsider.id, p_id: randomUUID(),
+    })
+    assert(outsiderGroup.error?.code === '42501', 'An outsider could create a personal exercise')
+    const edit = { ...actor, p_id: exerciseId, p_title: 'Synthetic revised exercise',
+      p_question_ids: members.slice(0, 2), p_expected_revision: 1 }
+    assert(successful(await admin.rpc('update_student_practice_exercise', edit), 'Exercise update failed') === 2,
+      'Exercise revision did not advance')
+    assert(successful(await admin.rpc('update_student_practice_exercise', edit), 'Exercise update retry failed') === 2,
+      'Idempotent update advanced revision')
+    const stale = await admin.rpc('update_student_practice_exercise', { ...edit, p_title: 'Stale update' })
+    assert(stale.error?.code === 'PT409', 'A stale edit overwrote the current exercise')
+    const pin = { ...actor, p_question_id: firstQuestionId, p_pinned: true }
+    successful(await admin.rpc('set_student_practice_review_pin', pin), 'Review pin failed')
+    successful(await admin.rpc('set_student_practice_review_pin', pin), 'Review pin retry failed')
+    const pins = successful(await admin.rpc('list_student_practice_review_pins', actor), 'Review pin list failed')
+    assert(pins.length === 1 && pins[0].question_id === firstQuestionId, 'Review pin was duplicated')
+    const pinnedQuestions = successful(await admin.rpc('search_student_practice_review_questions', {
+      ...actor, p_terms: [], p_tags: [], p_limit: 24, p_offset: 0,
+    }), 'Pinned question search failed')
+    assert(pinnedQuestions.length === 1 && pinnedQuestions[0].question_id === firstQuestionId,
+      'Pinned question search returned another scope')
+    const peerPins = successful(await admin.rpc('list_student_practice_review_pins', {
+      ...actor, p_actor_id: studentB.id,
+    }), 'Peer pin list failed')
+    assert(peerPins.length === 0, 'Review pins leaked to a classmate')
+    const direct = await studentA.client.from('student_practice_exercises').select('id')
+    assert(direct.error?.code === '42501' || direct.data?.length === 0, 'Browser bypassed the server-only table boundary')
+    const spoof = await studentB.client.rpc('list_student_practice_exercises', actor)
+    assert(spoof.error?.code === '42501', 'Browser could spoof the student on a privileged RPC')
+    successful(await admin.rpc('set_student_practice_review_pin', { ...pin, p_pinned: false }), 'Unpin failed')
+    assert(successful(await admin.rpc('list_student_practice_review_pins', actor), 'Unpin verification failed').length === 0,
+      'Unpin did not persist')
+    const roomLibraries = successful(await admin.from('practice_libraries').select('id').eq('classroom_id', classroomId),
+      'Could not load synthetic room work')
+    const workIds = roomLibraries.map(row => `practice:${row.id}`).toReversed()
+    successful(await admin.rpc('reorder_classroom_work', {
+      p_actor_id: owner.id, p_classroom_id: classroomId, p_work_ids: workIds,
+    }), 'Practice ordering failed')
+    const ordered = successful(await admin.from('practice_libraries').select('id,display_order').eq('classroom_id', classroomId),
+      'Practice order verification failed')
+    assert(ordered.every(row => row.display_order === workIds.indexOf(`practice:${row.id}`) + 1),
+      'Practice order was not persisted')
+    const forbiddenOrder = await admin.rpc('reorder_classroom_work', {
+      p_actor_id: outsider.id, p_classroom_id: classroomId, p_work_ids: workIds,
+    })
+    assert(forbiddenOrder.error?.code === '42501', 'An outsider could reorder classroom work')
+  }
+
   const frozenMembership = await owner.client
     .from('practice_library_questions')
     .delete()
@@ -515,6 +610,7 @@ try {
     elapsedMs: Number(elapsedMs.toFixed(2)),
     checks: [
       'authenticated role matrix',
+      'classroom metadata list, exact counts, role/status isolation and safe projection',
       'multi-classroom creation with 1,000 questions and persisted settings',
       'previous editor compatibility preserves settings and permissions',
       'tag AND plus pagination',
@@ -522,6 +618,8 @@ try {
       'student progress isolation',
       'teacher-safe progress DTO',
       'published membership freeze',
+      ...(args.has('--personal-exercises') ? ['private exercise create/edit/pagination and stale-write protection',
+        'private review pin/search/unpin', 'peer/outsider/browser-spoof denial', 'persisted practice order and authorization'] : []),
       ...(!keepForBrowser ? ['closed-library denial'] : []),
     ],
   }))

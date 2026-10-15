@@ -89,6 +89,7 @@ interface Props {
   answers: AnswerRow[]
   profiles: Record<string, SortableStudentProfile>
   inProgressCount: number
+  pendingFinalizationCount?: number
   /** Arrived from a ตรวจให้คะแนน button — start with the filter switched on. */
   initialPendingOnly: boolean
   adjustmentBatches: ScoreAdjustmentBatchRow[]
@@ -206,7 +207,7 @@ function formatAnswerShort(q: Question | undefined, a: AnswerRow | undefined): s
 export function ResultsClient({
   assignmentId, assignmentTitle, classroomName, passingType, passingValue,
   completionRule, streakTarget,
-  questions, submitted, answers, profiles, inProgressCount, initialPendingOnly,
+  questions, submitted, answers, profiles, inProgressCount, pendingFinalizationCount = 0, initialPendingOnly,
   adjustmentBatches, applyAdjustmentAction = applyLateColorScoreAdjustment,
 }: Props) {
   const router = useRouter()
@@ -380,6 +381,7 @@ export function ResultsClient({
         )}
       </div>
 
+      {pendingFinalizationCount > 0 && <p role="status" className="text-sm text-muted-foreground">ปิดรับคำตอบแล้ว {pendingFinalizationCount} รอบ · กำลังรอระบบตรวจคะแนน</p>}
       {/* Summary cards */}
       {isStreakRun && streakStats ? (
         <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
