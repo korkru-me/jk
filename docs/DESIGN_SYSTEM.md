@@ -1,5 +1,9 @@
 # Brand, language และ UI rules
 
+## Compact student classroom work cards — 15 October 2026
+
+Student exercise, exam and practice cards now share three compact rows: a two-line title area, a single metadata line and a status/result line. Remove the large left icon tile and repeated inline icons; use px-3/py-2 with gap-1. Keep the type badge, count, duration (or attempt count when untimed), submission/deadline status and permitted score visible. Shorten deadline/retry wording; long titles and secondary metadata may ellipsize, with complete assignment details available on hover/keyboard focus and in the accessible link name. The whole card remains the navigation target. Completed assignments retain the green surface and circled check; overdue assignments retain the red motion-safe pulsing alert; practice cards do not acquire submission status. The three-row sizing follows text/spacing tokens rather than a fixed pixel card height. At the current theme sizing, all 17 fixture cards measured 117.3px at 320/390/1440px with expanded/collapsed desktop navigation, replacing approximately 132–176px assignment cards. Group headers, teacher work cards and calendar layout are outside this change.
+
 ## หัวรายการห้องเรียนครูรวมกรอบ — 15 ตุลาคม 2026
 
 ชื่อหน้า “ห้องเรียนของฉัน” สถิติสามค่า และคำสั่งเลือก/สร้างอยู่ใน Card เดียว ใช้พื้น primary/5 ขอบ primary/20 และลายกวางเดิมจางด้านขวา ไม่มีกรอบสถิติซ้อน ไม่แสดงปุ่มถังขยะบนหัวหน้า ข้อมูลสรุปเป็นรายการข้อความสั้นพร้อมไอคอน ใช้ text-xs เมื่อ container แคบและ text-sm ตั้งแต่ 30rem ปุ่มสูงอย่างน้อย 44px และพับแถวตามพื้นที่ โหมดเลือกเพิ่มแถวภายในกรอบเดิม เนื้อหาเต็มความกว้าง shell ไม่มี max-width 1200px ซ้อน

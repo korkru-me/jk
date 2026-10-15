@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { BookOpen, BookOpenCheck, Folder, Repeat } from 'lucide-react'
+import { BookOpenCheck, Folder } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
@@ -7,7 +7,6 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/u
 import { PracticeLibraryListActions } from '@/app/(app)/practice/_components/practice-library-list-actions'
 import { PRACTICE_LIBRARY_STATUS_LABELS } from '@/app/(app)/practice/_lib/teacher-contract'
 import type { ClassroomPracticeLibrariesResult } from '@/lib/classroom-practice-libraries'
-import { coverOf, parseDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
 import { groupPreset } from '@/app/(app)/classrooms/_components/group-colors'
 import { cn } from '@/lib/utils'
 
@@ -22,7 +21,6 @@ export function ClassroomPracticeLibraries({
   canManage?: boolean
   classroomDescription?: string | null
 }) {
-  const cover = coverOf(parseDescription(classroomDescription ?? null))
   const practiceGroup = groupPreset('purple')
 
   return (
@@ -57,20 +55,15 @@ export function ClassroomPracticeLibraries({
                 className="group block h-full min-w-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 data-student-practice-card
               >
-                <Card radius="md" interactive className="relative flex h-full min-w-0 items-start gap-2.5 overflow-hidden bg-[color-mix(in_oklab,var(--work-practice,var(--primary))_10%,var(--card))] py-3 pl-4 pr-3 group-hover:border-primary/30 [&_.text-muted-foreground]:text-foreground/75">
-                  <span className={cn('mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg', cover ? `${cover.surface} ${cover.text}` : 'bg-muted text-foreground')}>
-                    <BookOpenCheck className="size-4" aria-hidden="true" />
-                  </span>
-                  <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                    <p className="min-w-0 line-clamp-2 break-words text-sm font-semibold leading-snug" title={item.title}>{item.title}</p>
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                      <span className={cn('font-medium', cover?.textMuted ?? 'text-foreground/75')}>คลังฝึก</span>
-                      <span className="flex items-center gap-1"><BookOpen className="size-3" aria-hidden="true" />{item.questionCount} ข้อ</span>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <Badge variant="outline">ไม่มีคะแนน</Badge>
-                      <span className="flex items-center gap-1 text-xs text-muted-foreground"><Repeat className="size-3" aria-hidden="true" />ฝึกซ้ำได้</span>
-                    </div>
+                <Card radius="md" interactive className="relative flex h-full min-w-0 flex-col gap-1 overflow-hidden bg-[color-mix(in_oklab,var(--work-practice,var(--primary))_10%,var(--card))] px-3 py-2 group-hover:border-primary/30">
+                  <p className="h-[2.75em] min-w-0 line-clamp-2 break-words text-sm font-semibold leading-snug" title={item.title}>{item.title}</p>
+                  <div className="flex h-5 min-w-0 items-center gap-1.5 text-xs text-foreground/75">
+                    <Badge variant="outline" className="text-[color:var(--work-practice,var(--primary))]">คลังฝึก</Badge>
+                    <span>{item.questionCount} ข้อ</span>
+                  </div>
+                  <div className="flex h-5 min-w-0 items-center gap-1.5 text-xs text-foreground/75">
+                    <Badge variant="outline">ไม่มีคะแนน</Badge>
+                    <span>ฝึกซ้ำได้</span>
                   </div>
                 </Card>
               </Link>

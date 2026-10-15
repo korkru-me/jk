@@ -1,5 +1,10 @@
 # Feature status
 
+## Compact student classroom work cards — 15 October 2026
+
+- Student classroom exercise/exam/practice cards use matching compact three-row layouts. Removed large left icon tiles and redundant metadata icons, shortened deadline/retry copy, retained two-line titles and existing completion/status/score visibility rules. Assignment hover/focus shows full metadata, including random sample/bank size, attempt limits, due time and retry scope. The synthetic exam fixture now covers 2 questions sampled from a bank of 4. No submission, grading, authorization or database behavior changed.
+- Local verification: 13 assignments + 4 practice cards all measured 117.3px at 320/390/1440px, including long Thai/unbroken titles, sidebar states, both themes and random/streak/retry/hidden-result cases. No page overflow; pending/done filters, keyboard tooltip and whole-card fixture navigation work. Card-scoped axe reported 0 violations/0 incomplete in light desktop and dark mobile. TypeScript, token lint, Next compilation and isolated Webpack production build passed. A React missing-key warning surfaces from the unchanged StudentClassroomView announcement node after navigating to the synthetic work preview; no new card compilation errors or browser exceptions were observed. No unit suite rerun for this display-only change, real-account/service tests or migrations; local only, no push/deploy.
+
 ## กรอบสรุปรวมบนหน้าห้องเรียนครู — 15 ตุลาคม 2026
 
 - รวมชื่อหน้า จำนวนห้อง นักเรียน และงาน พร้อมปุ่มเลือก/สร้างไว้ใน Card เดียวเต็ม main แทนหัวหน้าแยกกับสถิติสามกรอบ ใช้พื้นสี primary อ่อนและกวาง KorKru จาก ClassroomCoverPattern เดิม ซ่อนงานตกแต่งจาก accessibility tree และไม่รับ pointer โหมดเลือกแสดงจำนวนที่เลือก/เลือกทั้งหมดภายในกรอบเดิม

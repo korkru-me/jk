@@ -38,7 +38,7 @@ const ASSIGNMENTS: StudentAssignmentRow[] = [
   BASE,
   { ...BASE, id: 'work-open', title: 'ทดสอบระบบตรวจกลับไปให้คะแนนเอง', question_ids: ['1','2','3','4','5'], end_at: null, duration_minutes: null, passing_type: null },
   { ...BASE, id: 'work-group', title: 'ทดสอบ 4', category_id: 'cat-group', end_at: null, duration_minutes: null },
-  { ...BASE, id: 'work-exam', title: 'สอบกลางภาค · แรงและการเคลื่อนที่', type: 'exam', passing_type: null, end_at: '2026-10-17T16:00:00+07:00', max_attempts: 1 },
+  { ...BASE, id: 'work-exam', title: 'สอบกลางภาค · แรงและการเคลื่อนที่', type: 'exam', question_ids: ['1', '2', '3', '4'], random_question_count: 2, passing_type: null, end_at: '2026-10-17T16:00:00+07:00', max_attempts: 1 },
   { ...BASE, id: 'work-soon', title: 'ใบงานใกล้กำหนดส่ง', passing_type: null, end_at: '2026-10-15T16:00:00+07:00' },
   { ...BASE, id: 'work-resume', title: 'แบบฝึกหัดที่กำลังทำต่อ', category_id: 'cat-group', end_at: '2026-10-14T16:00:00+07:00', has_in_progress: true, attempts_used: 2, submission: { id: 'sub-old', status: 'graded', total_score: 45, max_score: 100 } },
   { ...BASE, id: 'work-retry', title: 'ทบทวนบทเรียน · แก้เฉพาะข้อที่ยังไม่เต็ม', retry_scope: 'wrong_only', passing_type: null, max_attempts: 3, attempts_used: 1, end_at: null, submission: { id: 'sub-retry', status: 'graded', total_score: 8, max_score: 10 } },

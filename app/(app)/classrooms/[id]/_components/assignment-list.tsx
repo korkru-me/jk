@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { BookOpen, CheckCircle2, CircleAlert, Clock, Folder, Repeat, SlidersHorizontal, Target } from 'lucide-react'
+import { CheckCircle2, CircleAlert, Folder, SlidersHorizontal } from 'lucide-react'
 import { TYPE_CFG } from '@/lib/assignment-display'
 import { cn } from '@/lib/utils'
 import { assignmentSizeLabel } from '@/lib/assignment-size-label'
@@ -11,7 +11,6 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { coverOf, parseDescription, type CoverPreset } from '../../_components/classroom-meta'
 import { groupPreset } from '../../_components/group-colors'
 import type { AssignmentCategory } from '@/lib/assignment-categories'
 import { isCompleted, type StudentAssignmentRow } from './assignment-status'
@@ -30,14 +29,14 @@ const TYPE_OPTIONS = [
 ] as const
 
 function dueInfo(endAt: string | null, now: number) {
-  if (!endAt) return { label: 'ไม่มีกำหนดส่ง', variant: 'outline' as const }
+  if (!endAt) return { label: 'ไม่กำหนดส่ง', variant: 'outline' as const }
   const diff = Date.parse(endAt) - now
-  if (diff < 0) return { label: 'เลยกำหนดส่งแล้ว', variant: 'statusDestructive' as const }
+  if (diff < 0) return { label: 'เลยกำหนด', variant: 'statusDestructive' as const }
   if (diff < 86400000) return { label: `เหลือ ${Math.max(1, Math.ceil(diff / 3600000))} ชม.`, variant: 'statusWarning' as const }
   return { label: `ส่ง ${formatThaiDate(endAt, { dateStyle: 'short' })}`, variant: studentWorkSeverity(endAt, false, now) === 'soon' ? 'statusWarning' as const : 'outline' as const }
 }
 
-export function AssignmentList({ assignments, categories, classroomDescription, assignmentHrefs, initialNow, now: sharedNow }: {
+export function AssignmentList({ assignments, categories, assignmentHrefs, initialNow, now: sharedNow }: {
   assignments: StudentAssignmentRow[]
   categories: AssignmentCategory[]
   classroomDescription?: string | null
@@ -49,7 +48,6 @@ export function AssignmentList({ assignments, categories, classroomDescription, 
   const [statusFilter, setStatusFilter] = useState<StatusFilterKey>('all')
   const [typeFilter, setTypeFilter] = useState<TypeFilterKey>('all')
   const now = sharedNow ?? (initialNow ? Date.parse(initialNow) : Date.now())
-  const cover = coverOf(parseDescription(classroomDescription ?? null))
   const pending = assignments.filter(a => !isCompleted(a))
   const done = assignments.filter(isCompleted)
   const statusFilters = [
@@ -109,7 +107,7 @@ export function AssignmentList({ assignments, categories, classroomDescription, 
                   </div>
                 )}
                 <div className="grid grid-cols-1 gap-2 @min-[30rem]:grid-cols-2 @min-[46rem]:grid-cols-3">
-                  {section.assignments.map(a => <StudentAssignmentCard key={a.id} assignment={a} cover={cover} now={now} href={assignmentHrefs?.[a.id]} />)}
+                  {section.assignments.map(a => <StudentAssignmentCard key={a.id} assignment={a} now={now} href={assignmentHrefs?.[a.id]} />)}
                 </div>
               </section>
             )
@@ -120,51 +118,70 @@ export function AssignmentList({ assignments, categories, classroomDescription, 
   )
 }
 
-function StudentAssignmentCard({ assignment: a, cover, now, href }: { assignment: StudentAssignmentRow; cover: CoverPreset | null; now: number; href?: string }) {
+function StudentAssignmentCard({ assignment: a, now, href }: { assignment: StudentAssignmentRow; now: number; href?: string }) {
   const state = studentAssignmentCardState(a, now)
   const completed = isCompleted(a)
   const severity = studentWorkSeverity(a.end_at, completed, now)
   const due = dueInfo(a.end_at, now)
   const type = TYPE_CFG[a.type] ?? TYPE_CFG.exam
-  const TypeIcon = type.icon
   const passingThreshold = formatPassingThreshold(a.passing_type, a.passing_value)
+  const sizeLabel = assignmentSizeLabel(a)
+  const compactSize = a.completion_rule === 'streak' && a.streak_target
+    ? `ถูกติดกัน ${a.streak_target} ข้อ`
+    : a.random_question_count ? `สุ่ม ${a.random_question_count} ข้อ` : sizeLabel
+  const attemptLabel = a.max_attempts != null ? `${a.attempts_used}/${a.max_attempts} ครั้ง` : null
+  const retryLabel = state.canRetry
+    ? `${a.retry_scope === 'wrong_only' ? 'แก้ข้อที่ยังไม่เต็ม' : 'ทำซ้ำได้'}${state.remaining != null ? ` · เหลือ ${state.remaining} ครั้ง` : ''}`
+    : null
+  const shortStatus = state.statusLabel.replace('ยังไม่ผ่านเกณฑ์', 'ยังไม่ผ่าน').replace('ผ่านเงื่อนไขแล้ว', 'ผ่านแล้ว')
+  const details = [
+    type.label, sizeLabel,
+    a.duration_minutes != null ? `${a.duration_minutes} นาที` : null,
+    passingThreshold ? `เกณฑ์ผ่าน ${passingThreshold}` : null,
+    attemptLabel,
+    !completed ? a.end_at ? `กำหนดส่ง ${formatThaiDateTime(a.end_at)}` : 'ไม่มีกำหนดส่ง' : null,
+    state.statusLabel,
+    state.score ? `${a.has_in_progress ? 'คะแนนเดิม' : 'คะแนน'} ${state.score.total}/${state.score.max}` : null,
+    state.finished && state.canShowScore && !state.score ? 'รอครูตรวจ' : null,
+    retryLabel,
+  ].filter(Boolean).join(' · ')
 
   return (
     <Tooltip>
-    {/* Enter through a document GET so a stale/pending client router cannot
-        strand the student on the classroom. Starting still requires POST. */}
-    <TooltipTrigger render={<a href={href ?? state.href} />} aria-label={`${state.actionLabel}: ${a.title} · ${STUDENT_WORK_STATUS_DESCRIPTION[severity]}`} className="group block h-full min-w-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background" data-student-assignment-card data-assignment-id={a.id} data-work-status={severity}>
-      <Card radius="md" interactive className={cn('relative flex h-full min-w-0 items-start gap-2.5 overflow-hidden py-3 pl-4 pr-3 [&_.text-muted-foreground]:text-foreground/75', completed ? 'bg-[color-mix(in_oklab,var(--success)_10%,var(--card))]' : type.bg, completed ? 'border-success/35 shadow-[0_0_0_1px_color-mix(in_oklab,var(--success)_12%,transparent),0_3px_14px_color-mix(in_oklab,var(--success)_10%,transparent)] group-hover:border-success/60' : 'group-hover:border-primary/30')}>
-        <span className={cn('mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg', cover ? `${cover.surface} ${cover.text}` : 'bg-muted text-foreground')}><TypeIcon className="size-4" aria-hidden="true" /></span>
-        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+      {/* Enter through a document GET so a stale/pending client router cannot
+          strand the student on the classroom. Starting still requires POST. */}
+      <TooltipTrigger render={<a href={href ?? state.href} />} aria-label={`${state.actionLabel}: ${a.title} · ${details} · ${STUDENT_WORK_STATUS_DESCRIPTION[severity]}`} className="group block h-full min-w-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background" data-student-assignment-card data-assignment-id={a.id} data-work-status={severity}>
+        <Card radius="md" interactive className={cn('relative flex h-full min-w-0 flex-col gap-1 overflow-hidden px-3 py-2 [&_.text-muted-foreground]:text-foreground/75', completed ? 'bg-[color-mix(in_oklab,var(--success)_10%,var(--card))]' : type.bg, completed ? 'border-success/35 shadow-[0_0_0_1px_color-mix(in_oklab,var(--success)_12%,transparent),0_3px_14px_color-mix(in_oklab,var(--success)_10%,transparent)] group-hover:border-success/60' : 'group-hover:border-primary/30')}>
           <div className="flex min-w-0 items-start gap-2">
-            <p className="min-w-0 flex-1 text-sm font-semibold leading-snug line-clamp-2">{a.title}</p>
+            <p className="h-[2.75em] min-w-0 flex-1 line-clamp-2 break-words text-sm font-semibold leading-snug" title={a.title}>{a.title}</p>
             {severity === 'overdue' ? (
               <Badge variant="statusDestructive" className="size-7 rounded-full border-2 bg-destructive p-0 text-background motion-safe:animate-pulse motion-reduce:animate-none [&>svg]:size-5!" aria-hidden="true" data-work-deadline-alert={severity}>
                 <CircleAlert strokeWidth={2.5} />
               </Badge>
             ) : completed ? <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[color-mix(in_oklab,var(--success)_60%,var(--foreground))]" aria-hidden="true" data-work-completed /> : <span className={cn('mt-1 size-2.5 shrink-0 rounded-full', SEVERITY_DOT[severity])} aria-hidden="true" data-work-status-dot={severity} />}
           </div>
-          <div className={cn('flex flex-wrap items-center gap-x-2 gap-y-1 text-xs', completed ? 'text-foreground/75' : 'text-muted-foreground')}>
-            <span className={cn('font-medium', cover?.textMuted ?? 'text-foreground/75')}>{type.label}</span>
-            <span className="flex items-center gap-1"><BookOpen className="size-3" aria-hidden="true" />{assignmentSizeLabel(a)}</span>
-            {a.duration_minutes != null && <span className="flex items-center gap-1"><Clock className="size-3" aria-hidden="true" />{a.duration_minutes} นาที</span>}
-            {passingThreshold && !completed && <span className="flex items-center gap-1 text-foreground/75"><Target className="size-3" aria-hidden="true" />เกณฑ์ {passingThreshold}</span>}
-            {a.max_attempts != null && <span className="flex items-center gap-1"><Repeat className="size-3" aria-hidden="true" />{a.attempts_used}/{a.max_attempts} ครั้ง</span>}
+          <div className="flex h-5 min-w-0 items-center gap-1.5 text-xs text-foreground/75">
+            <Badge variant="outline" className={cn(type.bg, type.text)}>{type.label}</Badge>
+            <span className="min-w-0 truncate" title={sizeLabel}>{compactSize}</span>
+            {a.duration_minutes != null ? <span className="ml-auto shrink-0">{a.duration_minutes} นาที</span>
+              : attemptLabel && <span className="ml-auto shrink-0">{attemptLabel}</span>}
           </div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            {completed ? <Badge variant="statusSuccess"><CheckCircle2 aria-hidden="true" />ส่งแล้ว</Badge> : state.statusLabel && <Badge variant={state.statusVariant}>{state.statusLabel}</Badge>}
-            {!completed && <Badge variant={due.variant} title={a.end_at ? formatThaiDateTime(a.end_at) : undefined}>
-              <Clock aria-hidden="true" />{due.label}
-            </Badge>}
-            {state.score && <span className="text-xs font-semibold">{a.has_in_progress ? 'คะแนนเดิม ' : ''}{state.score.total}/{state.score.max}</span>}
-            {state.finished && state.canShowScore && !state.score && <span className={cn('text-xs', completed ? 'text-foreground/75' : 'text-muted-foreground')}>รอครูตรวจ</span>}
-            {state.canRetry && <span className="text-xs font-medium text-foreground/75">{a.retry_scope === 'wrong_only' ? 'แก้ข้อที่ยังไม่เต็ม' : 'ลองใหม่ได้'}{state.remaining != null ? ` · เหลือ ${state.remaining} ครั้ง` : ''}</span>}
+          <div className="flex h-5 min-w-0 items-center gap-1.5 text-xs">
+            {completed ? <Badge variant="statusSuccess">ส่งแล้ว</Badge>
+              : <Badge variant={due.variant} title={a.end_at ? formatThaiDateTime(a.end_at) : undefined}>{due.label}</Badge>}
+            {!completed && shortStatus && <span className="min-w-0 truncate font-medium" title={state.statusLabel}>{shortStatus}</span>}
+            {state.score && <span className="shrink-0 font-semibold">{a.has_in_progress ? 'เดิม ' : ''}{state.score.total}/{state.score.max}</span>}
+            {state.finished && state.canShowScore && !state.score && <span className="min-w-0 truncate text-foreground/75">รอครูตรวจ</span>}
+            {retryLabel ? <span className="min-w-0 truncate text-foreground/75" title={retryLabel}>{a.retry_scope === 'wrong_only' ? 'แก้ข้อเดิม' : 'ทำซ้ำได้'}{state.remaining != null ? ` อีก ${state.remaining} ครั้ง` : ''}</span>
+              : !completed && !shortStatus && passingThreshold && <span className="min-w-0 truncate text-foreground/75">เกณฑ์ {passingThreshold}</span>}
           </div>
-        </div>
-      </Card>
-    </TooltipTrigger>
-    <TooltipContent role="tooltip"><span className={cn('size-1.5 shrink-0 rounded-full', SEVERITY_DOT[severity])} aria-hidden="true" />{STUDENT_WORK_STATUS_DESCRIPTION[severity]}</TooltipContent>
+        </Card>
+      </TooltipTrigger>
+      <TooltipContent role="tooltip" className="block max-w-xs space-y-1">
+        <p className="font-semibold">{a.title}</p>
+        <p>{details}</p>
+        <p className="flex items-center gap-1.5"><span className={cn('size-1.5 shrink-0 rounded-full', SEVERITY_DOT[severity])} aria-hidden="true" />{STUDENT_WORK_STATUS_DESCRIPTION[severity]}</p>
+      </TooltipContent>
     </Tooltip>
   )
 }
