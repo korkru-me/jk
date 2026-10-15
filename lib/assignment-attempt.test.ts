@@ -1276,15 +1276,24 @@ describe('ตัวเลขชุดเดียวกัน — assignments.sh
     expect(one.random_values).toEqual(plain.q3.values)
   })
 
-  it('re-asks a wrong-only retry with the same numbers', () => {
+  it('re-asks a wrong-only retry with fresh numbers even when the first attempt shared a seed', () => {
     const plain = byQuestion(buildAssignmentAttempt(shared, pool))
     const { retried } = buildRetryAttempt(shared, pool, [{
       question_id: 'q1', random_values: plain.q1.values, correct_answer: plain.q1.answer,
       student_answer: '0', is_correct: false, score: 0, max_score: 1, teacher_feedback: null,
       order_index: 0, option_order: null, work_images: null, score_edited_by: null, score_edited_at: null,
     }])
-    expect(retried[0].random_values).toEqual(plain.q1.values)
-    expect(retried[0].correct_answer).toBe(plain.q1.answer)
+    expect(retried[0].random_values).not.toEqual(plain.q1.values)
+    expect(retried[0].correct_answer).toBe(String(retried[0].random_values.a + retried[0].random_values.b))
+  })
+  it('gives a full retry a fresh set and keeps its answer key consistent', () => {
+    const first = buildAssignmentAttempt(shared, pool)
+    const previous = Object.fromEntries(first.map(row => [row.question_id, row.random_values]))
+    const second = buildAssignmentAttempt(shared, pool, previous)
+    for (const row of second) {
+      expect(row.random_values).not.toEqual(previous[row.question_id])
+      expect(row.correct_answer).toBe(String(row.random_values.a + row.random_values.b))
+    }
   })
 
   it('gives another งาน with another seed other numbers', () => {

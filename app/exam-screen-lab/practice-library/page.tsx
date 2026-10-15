@@ -1,9 +1,12 @@
+import { StudentLibraryLab } from './_components/student-library-lab'
 import { notFound } from 'next/navigation'
 import { PracticeLibraryForm } from '@/app/(app)/practice/_components/practice-library-form'
 import { PracticeWaitingRoom } from '@/components/practice/practice-waiting-room'
 import { isExamScreenLabEnabled } from '@/lib/exam-screen-lab-access'
+import { ShellClient } from '@/components/layout/shell-client'
 import type { BankQuestion } from '@/lib/question-bank'
 import type { AssignmentQuestionSetOption } from '@/components/assignments/create-assignment-form'
+import PracticeLoading from '@/app/(app)/practice/[id]/loading'
 
 export const metadata = { title: 'ทดลองคลังฝึก — KorKru' }
 export const dynamic = 'force-dynamic'
@@ -69,12 +72,21 @@ const questionSets: AssignmentQuestionSetOption[] = [
 ]
 
 export default async function PracticeLibraryLabPage({ searchParams }: {
-  searchParams: Promise<{ view?: string }>
+  searchParams: Promise<{ view?: string; shell?: string }>
 }) {
   if (!isExamScreenLabEnabled(process.env)) notFound()
-  const { view } = await searchParams
+  const { view, shell } = await searchParams
 
-  if (view === 'waiting' || view === 'waiting-locked') {
+  if (view === 'student' || view === 'local-student' || view === 'run' || view === 'local-run' || view === 'single-run' || view === 'loading') {
+    const content = view === 'loading' ? <PracticeLoading /> : <StudentLibraryLab localReview={view === 'local-student' || view === 'local-run'} />
+    if (shell === 'student') return <ShellClient
+      user={{ id: '00000000-0000-4000-8300-000000000099', email: 'student@example.invalid', full_name: 'นักเรียนตัวอย่าง', role: 'student' }}
+      initialUnreadCount={0} notificationsEnabled={false} practiceLibraryEnabled
+    >{content}</ShellClient>
+    return <main className="p-4 sm:p-6">{content}</main>
+  }
+
+  if (view === 'waiting'  || view === 'waiting-locked') {
     async function previewUnlock() {
       'use server'
     }

@@ -4,6 +4,9 @@ import { useState } from 'react'
 import { randomizeVariables, evaluateFormula } from '@/lib/math/evaluator'
 import type { Variable } from '@/lib/types'
 import { Button } from '@/components/ui/button'
+import { drawFreshValues } from '@/lib/math/fresh-random-values'
+import { readVisibleRandomValues, rememberVisibleRandomValues, visibleRandomValueStorage } from '@/lib/math/visible-random-values'
+import { toast } from 'sonner'
 
 interface PreviewPanelProps {
   formula: string
@@ -17,8 +20,11 @@ export function PreviewPanel({ formula, variables, unit }: PreviewPanelProps) {
 
   function handlePreview() {
     if (!formula || variables.length === 0) return
-    const randomVals = randomizeVariables(variables)
+    const identity = JSON.stringify([formula, variables])
+    const randomVals = drawFreshValues(() => randomizeVariables(variables), value => value, values ?? readVisibleRandomValues(visibleRandomValueStorage(), identity))
+    if (!randomVals) { toast.error('ยังสุ่มชุดตัวเลขที่แตกต่างไม่ได้ กรุณาตรวจช่วงค่าตัวแปร'); return }
     setValues(randomVals)
+    rememberVisibleRandomValues(visibleRandomValueStorage(), identity, randomVals)
     const ans = evaluateFormula(formula, randomVals)
     setResult(ans)
   }

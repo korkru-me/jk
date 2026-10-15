@@ -22,6 +22,20 @@ const compatibilityMigration = readFileSync(
   new URL('../supabase/migrations/20261014043342_practice_draft_backward_compatibility.sql', import.meta.url),
   'utf8',
 )
+const layoutMigration = readFileSync(
+  new URL('../supabase/migrations/20261014125654_classroom_practice_work_layout.sql', import.meta.url), 'utf8',
+)
+const categoryMigration = readFileSync(
+  new URL('../supabase/migrations/20260928234553_classroom_assignment_categories.sql', import.meta.url), 'utf8',
+)
+const categoryGuard = categoryMigration.slice(
+  categoryMigration.indexOf('CREATE FUNCTION public.enforce_assignment_category_classroom()'),
+  categoryMigration.indexOf('CREATE TRIGGER assignment_classrooms_category_same_classroom'),
+)
+
+const exerciseMigration = readFileSync(new URL('../supabase/migrations/20261014134748_student_practice_exercises.sql', import.meta.url), 'utf8')
+
+const editingMigration = readFileSync(new URL('../supabase/migrations/20261014144828_student_practice_editing_and_review_pins.sql', import.meta.url), 'utf8')
 
 const ORG_A = '10000000-0000-4000-8000-000000000001'
 const ORG_B = '10000000-0000-4000-8000-000000000002'
@@ -47,6 +61,9 @@ const QUESTION_PUBLIC = '40000000-0000-4000-8000-000000000006'
 const LIBRARY = '50000000-0000-4000-8000-000000000001'
 const LIBRARY_DELETE = '50000000-0000-4000-8000-000000000002'
 const PERFORMANCE_LIBRARY = '50000000-0000-4000-8000-000000000003'
+const CATEGORY_A = '60000000-0000-4000-8000-000000000001'
+const CATEGORY_B = '60000000-0000-4000-8000-000000000002'
+const ASSIGNMENT_A = '70000000-0000-4000-8000-000000000001'
 
 let db: PGlite
 
@@ -268,6 +285,28 @@ beforeAll(async () => {
   await db.exec(multiClassroomMigration)
   await db.exec(settingsMigration)
   await db.exec(compatibilityMigration)
+  await db.exec(`
+    CREATE TABLE public.classroom_assignment_categories (
+      id uuid PRIMARY KEY, classroom_id uuid NOT NULL REFERENCES public.classrooms(id) ON DELETE CASCADE
+    );
+    CREATE TABLE public.assignment_classrooms (
+      assignment_id uuid NOT NULL, classroom_id uuid NOT NULL REFERENCES public.classrooms(id) ON DELETE CASCADE,
+      display_order integer, PRIMARY KEY (assignment_id, classroom_id)
+    );
+    INSERT INTO public.classroom_assignment_categories VALUES ('${CATEGORY_A}', '${ROOM_A}'), ('${CATEGORY_B}', '${ROOM_B}');
+    INSERT INTO public.assignment_classrooms VALUES ('${ASSIGNMENT_A}', '${ROOM_A}', 1);
+    GRANT SELECT ON public.classroom_assignment_categories TO authenticated, service_role;
+    GRANT SELECT, UPDATE ON public.assignment_classrooms TO service_role;
+    GRANT SELECT, UPDATE ON public.classrooms TO service_role;
+    GRANT SELECT ON public.users, public.classroom_co_teachers TO service_role;
+  `)
+  await db.exec(categoryGuard)
+  await db.exec(layoutMigration)
+  await db.exec(exerciseMigration)
+  await db.exec(editingMigration)
+  // Supabase's service role already has broad table access; the fixture uses
+  // explicit grants so this check exercises the trigger rather than ACLs.
+  await db.exec('GRANT UPDATE (category_id) ON public.practice_libraries TO service_role')
   await as(user(OWNER_A), async tx => {
     await tx.query(
       `INSERT INTO public.practice_libraries
@@ -289,6 +328,53 @@ beforeAll(async () => {
 }, 60_000)
 
 afterAll(async () => { await db?.close() })
+
+describe('practice work grouping and mixed order', () => {
+  it('groups published practice within its own classroom without changing activity or creation time', async () => {
+    await as(user(OWNER_A), async tx => {
+      const before = (await tx.query<{ created_at: Date }>('SELECT created_at FROM practice_libraries WHERE id=$1', [LIBRARY])).rows[0]
+      await tx.query('UPDATE practice_libraries SET category_id=$1 WHERE id=$2', [CATEGORY_A, LIBRARY])
+      const after = (await tx.query<{ category_id: string; created_at: Date; status: string }>('SELECT category_id, created_at, status FROM practice_libraries WHERE id=$1', [LIBRARY])).rows[0]
+      expect(after.category_id).toBe(CATEGORY_A)
+      expect(after.created_at).toEqual(before.created_at)
+      expect(after.status).toBe('published')
+    })
+  })
+
+  it('rejects a category from a different classroom even for service writes', async () => {
+    await expect(as(service, tx => tx.query('UPDATE practice_libraries SET category_id=$1 WHERE id=$2', [CATEGORY_B, LIBRARY]))).rejects.toMatchObject({ code: '23514' })
+  })
+
+  it('returns practice to ungrouped when a category is deleted', async () => {
+    await db.transaction(async tx => {
+      await tx.query('UPDATE practice_libraries SET category_id=$1 WHERE id=$2', [CATEGORY_A, LIBRARY])
+      await tx.query('DELETE FROM classroom_assignment_categories WHERE id=$1', [CATEGORY_A])
+      expect((await tx.query<{ category_id: string | null }>('SELECT category_id FROM practice_libraries WHERE id=$1', [LIBRARY])).rows[0].category_id).toBeNull()
+      await tx.rollback()
+    })
+  })
+
+  it.each([OWNER_A, CO_MANAGE])('persists interleaved order atomically for an authorized actor %s', async actor => {
+    await as(service, async tx => {
+      await tx.query('SELECT reorder_classroom_work($1,$2,$3)', [actor, ROOM_A, [`practice:${LIBRARY}`, ASSIGNMENT_A]])
+      expect((await tx.query<{ display_order: number }>('SELECT display_order FROM practice_libraries WHERE id=$1', [LIBRARY])).rows[0].display_order).toBe(1)
+      expect((await tx.query<{ display_order: number }>('SELECT display_order FROM assignment_classrooms WHERE assignment_id=$1', [ASSIGNMENT_A])).rows[0].display_order).toBe(2)
+    })
+  })
+
+  it.each([CO_VIEW, OWNER_B, STUDENT_A])('denies ordering for unauthorized actor %s', async actor => {
+    await expect(as(service, tx => tx.query('SELECT reorder_classroom_work($1,$2,$3)', [actor, ROOM_A, [ASSIGNMENT_A, `practice:${LIBRARY}`]]))).rejects.toMatchObject({ code: '42501' })
+  })
+
+  it.each([{ role: 'anon' } as const, user(OWNER_A)])('does not expose the order RPC to browser roles %s', async actor => {
+    await expect(as(actor, tx => tx.query('SELECT reorder_classroom_work($1,$2,$3)', [OWNER_A, ROOM_A, [ASSIGNMENT_A, `practice:${LIBRARY}`]]))).rejects.toMatchObject({ code: '42501' })
+  })
+
+  it.each([[ASSIGNMENT_A], [ASSIGNMENT_A, ASSIGNMENT_A], [ASSIGNMENT_A, `practice:${LIBRARY}`, QUESTION_B]].map(ids => ({ ids })))('rejects stale, duplicate or foreign work without a partial write $ids', async ({ ids }) => {
+    await expect(as(service, tx => tx.query('SELECT reorder_classroom_work($1,$2,$3)', [OWNER_A, ROOM_A, ids]))).rejects.toMatchObject({ code: '22023' })
+    expect((await db.query<{ display_order: number }>('SELECT display_order FROM assignment_classrooms WHERE assignment_id=$1', [ASSIGNMENT_A])).rows[0].display_order).toBe(1)
+  })
+})
 
 describe('self-practice migration privacy contract', () => {
   it('creates exactly five durable attempt fields and no grading payload', async () => {
@@ -1866,5 +1952,157 @@ describe('self-practice atomic authenticated mutations', () => {
       `, [LIBRARY, QUESTION_A1, QUESTION_A2, QUESTION_A3]))
         .rejects.toMatchObject({ code: '23514' })
     })
+  })
+})
+
+
+describe('private student practice exercises', () => {
+  const exerciseId = '80000000-0000-4000-8000-000000000001'
+  const create = (tx: Transaction, actor = STUDENT_A, ids = [QUESTION_A2, QUESTION_A1]) => tx.query(
+    'SELECT public.create_student_practice_exercise($1, $2, $3, $4, $5::uuid[])',
+    [actor, LIBRARY, exerciseId, ' ทบทวนนิวตัน ', ids],
+  )
+  it('creates atomically, retries without duplicates and preserves chosen order', async () => {
+    await as(service, async tx => {
+      await create(tx, STUDENT_ZERO)
+      await create(tx, STUDENT_ZERO)
+      const list = await tx.query<{ title: string; question_ids: string[]; attempted_count: number }>(
+        'SELECT * FROM public.list_student_practice_exercises($1, $2)', [STUDENT_ZERO, LIBRARY],
+      )
+      expect(list.rows).toHaveLength(1)
+      expect(list.rows[0].title).toBe('ทบทวนนิวตัน')
+      expect(list.rows[0].question_ids).toEqual([QUESTION_A2, QUESTION_A1])
+      expect(Number(list.rows[0].attempted_count)).toBe(0)
+      const page = await tx.query<{ question_id: string; position: number }>(
+        'SELECT * FROM public.get_student_practice_exercise_questions($1,$2,$3,24,0)', [STUDENT_ZERO, LIBRARY, exerciseId],
+      )
+      expect(page.rows.map(row => row.question_id)).toEqual([QUESTION_A2, QUESTION_A1])
+      expect(page.rows.map(row => row.position)).toEqual([0, 1])
+    })
+  })
+  it('counts distinct answered questions, including attempts before grouping', async () => {
+    await as(service, async tx => {
+      await recordAttempt(tx, STUDENT_A, QUESTION_A1, '90000000-0000-4000-8000-000000000001')
+      await recordAttempt(tx, STUDENT_A, QUESTION_A1, '90000000-0000-4000-8000-000000000002')
+      await create(tx)
+      const list = await tx.query<{ attempted_count: number }>(
+        'SELECT * FROM public.list_student_practice_exercises($1,$2)', [STUDENT_A, LIBRARY],
+      )
+      expect(Number(list.rows[0].attempted_count)).toBe(1)
+    })
+  })
+  it('isolates classmates and rejects exercise ID reuse by a different student', async () => {
+    await as(service, async tx => {
+      await create(tx)
+      const list = await tx.query('SELECT * FROM public.list_student_practice_exercises($1,$2)', [STUDENT_B, LIBRARY])
+      expect(list.rows).toHaveLength(0)
+    })
+    await expect(as(service, async tx => { await create(tx); await create(tx, STUDENT_B) })).rejects.toThrow(/conflict/)
+    await expect(as(service, async tx => {
+      await create(tx)
+      await tx.query('SELECT * FROM public.get_student_practice_exercise_questions($1,$2,$3,24,0)', [STUDENT_B, LIBRARY, exerciseId])
+    })).rejects.toThrow(/denied/)
+  })
+  it('rejects foreign questions, duplicate IDs and actors outside the exact roster', async () => {
+    await expect(as(service, tx => create(tx, STUDENT_A, [QUESTION_B]))).rejects.toThrow(/invalid/)
+    await expect(as(service, tx => create(tx, STUDENT_A, [QUESTION_A1, QUESTION_A1]))).rejects.toThrow(/invalid/)
+    for (const actor of [STUDENT_OTHER_ROOM, SUSPENDED_STUDENT, OWNER_A, CO_VIEW]) {
+      await expect(as(service, tx => create(tx, actor))).rejects.toThrow(/denied/)
+    }
+  })
+  it('denies reads/writes/RPC execution from the browser, including the owner', async () => {
+    for (const actor of [{ role: 'anon' } as const, user(STUDENT_A), user(STUDENT_B), user(OWNER_A)]) {
+      await expect(as(actor, tx => tx.query('SELECT * FROM public.student_practice_exercises'))).rejects.toThrow(/permission denied/)
+      await expect(as(actor, tx => create(tx))).rejects.toThrow(/permission denied/)
+    }
+  })
+  it('rejects closed libraries and removed roster members', async () => {
+    await expect(as(service, async tx => {
+      await tx.query("UPDATE public.practice_libraries SET status = 'closed' WHERE id = $1", [LIBRARY])
+      await create(tx)
+    })).rejects.toThrow(/denied/)
+    await expect(as(service, async tx => {
+      await tx.query('DELETE FROM public.classroom_students WHERE classroom_id = $1 AND student_id = $2', [ROOM_A, STUDENT_A])
+      await create(tx)
+    })).rejects.toThrow(/denied/)
+  })
+})
+
+
+describe('editing private practice exercises and review pins', () => {
+  const exerciseId = '80000000-0000-4000-8000-000000000002'
+  const create = (tx: Transaction) => tx.query(
+    'SELECT public.create_student_practice_exercise($1,$2,$3,$4,$5::uuid[])',
+    [STUDENT_A, LIBRARY, exerciseId, 'Initial exercise', [QUESTION_A1, QUESTION_A2]],
+  )
+  const update = (tx: Transaction, actor = STUDENT_A, ids = [QUESTION_A2, QUESTION_A3], revision = 1) => tx.query<{ revision: number }>(
+    'SELECT public.update_student_practice_exercise($1,$2,$3,$4,$5::uuid[],$6) AS revision',
+    [actor, LIBRARY, exerciseId, 'Renamed exercise', ids, revision],
+  )
+  const pin = (tx: Transaction, actor = STUDENT_A, question = QUESTION_A1, pinned = true) => tx.query(
+    'SELECT public.set_student_practice_review_pin($1,$2,$3,$4)', [actor, LIBRARY, question, pinned],
+  )
+  it('renames, adds and removes questions atomically while preserving accepted checks', async () => {
+    await as(service, async tx => {
+      await create(tx)
+      const before = (await tx.query<{ count: string }>('SELECT count(*) FROM public.practice_answer_attempts WHERE library_id=$1 AND student_id=$2', [LIBRARY, STUDENT_A])).rows[0].count
+      expect((await update(tx)).rows[0].revision).toBe(2)
+      const row = (await tx.query<{ title: string; question_ids: string[]; revision: number; question_titles: Record<string, string> }>('SELECT * FROM public.list_student_practice_exercises($1,$2)', [STUDENT_A, LIBRARY])).rows[0]
+      expect(row.title).toBe('Renamed exercise')
+      expect(row.question_ids).toEqual([QUESTION_A2, QUESTION_A3])
+      expect(row.revision).toBe(2)
+      expect(Object.keys(row.question_titles).sort()).toEqual([QUESTION_A2, QUESTION_A3].sort())
+      expect((await tx.query<{ count: string }>('SELECT count(*) FROM public.practice_answer_attempts WHERE library_id=$1 AND student_id=$2', [LIBRARY, STUDENT_A])).rows[0].count).toBe(before)
+      expect((await update(tx)).rows[0].revision).toBe(2)
+    })
+  })
+  it('rejects stale revisions without overwriting newer edits', async () => {
+    await expect(as(service, async tx => { await create(tx); await update(tx); await update(tx, STUDENT_A, [QUESTION_A1], 1) })).rejects.toMatchObject({ code: 'PT409' })
+  })
+  it('rejects other owners, foreign members, duplicate IDs and empty exercises', async () => {
+    await expect(as(service, async tx => { await create(tx); await update(tx, STUDENT_B) })).rejects.toMatchObject({ code: '42501' })
+    for (const ids of [[], [QUESTION_B], [QUESTION_A1, QUESTION_A1]]) {
+      await expect(as(service, async tx => { await create(tx); await update(tx, STUDENT_A, ids) })).rejects.toMatchObject({ code: '22023' })
+    }
+  })
+  it('pins idempotently, isolates classmates, filters and paginates exact pinned members', async () => {
+    await as(service, async tx => {
+      await pin(tx); await pin(tx); await pin(tx, STUDENT_A, QUESTION_A2)
+      const own = await tx.query<{ question_id: string }>('SELECT * FROM public.list_student_practice_review_pins($1,$2)', [STUDENT_A, LIBRARY])
+      expect(own.rows).toHaveLength(2)
+      expect((await tx.query('SELECT * FROM public.list_student_practice_review_pins($1,$2)', [STUDENT_B, LIBRARY])).rows).toHaveLength(0)
+      const search = await tx.query<{ question_id: string; total_count: string }>(
+        'SELECT * FROM public.search_student_practice_review_questions($1,$2,$3::text[],$4::text[],1,1)', [STUDENT_A, LIBRARY, [], []],
+      )
+      expect(search.rows).toHaveLength(1)
+      expect(Number(search.rows[0].total_count)).toBe(2)
+      await pin(tx, STUDENT_A, QUESTION_A1, false); await pin(tx, STUDENT_A, QUESTION_A1, false)
+      expect((await tx.query<{ question_id: string }>('SELECT * FROM public.list_student_practice_review_pins($1,$2)', [STUDENT_A, LIBRARY])).rows).toEqual([{ question_id: QUESTION_A2 }])
+    })
+  })
+  it('keeps tag AND and literal search semantics in pinned-only search', async () => {
+    await as(service, async tx => {
+      await pin(tx)
+      const tags = (await tx.query<{ tags: string[]; title: string }>('SELECT title,tags FROM public.questions WHERE id=$1', [QUESTION_A1])).rows[0]
+      const query = (terms: string[], selectedTags: string[]) => tx.query('SELECT * FROM public.search_student_practice_review_questions($1,$2,$3::text[],$4::text[],24,0)', [STUDENT_A, LIBRARY, terms, selectedTags])
+      expect((await query([], tags.tags)).rows).toHaveLength(1)
+      expect((await query([], [...tags.tags, 'missing-whole-tag'])).rows).toHaveLength(0)
+      expect((await query(['%'], [])).rows).toHaveLength(0)
+    })
+  })
+  it('denies direct browser writes/reads and pinning foreign questions or unauthorized actors', async () => {
+    for (const actor of [{ role: 'anon' } as const, user(STUDENT_A), user(OWNER_A)]) {
+      await expect(as(actor, tx => pin(tx))).rejects.toMatchObject({ code: '42501' })
+      await expect(as(actor, tx => update(tx))).rejects.toMatchObject({ code: '42501' })
+      await expect(as(actor, tx => tx.query('SELECT * FROM public.student_practice_review_pins'))).rejects.toMatchObject({ code: '42501' })
+    }
+    await expect(as(service, tx => pin(tx, STUDENT_A, QUESTION_B))).rejects.toMatchObject({ code: '22023' })
+    for (const actor of [STUDENT_OTHER_ROOM, SUSPENDED_STUDENT, OWNER_A]) {
+      await expect(as(service, tx => pin(tx, actor))).rejects.toMatchObject({ code: '42501' })
+    }
+  })
+  it('rejects closed-library updates/pins and withdrawn students', async () => {
+    await expect(as(service, async tx => { await create(tx); await tx.query("UPDATE public.practice_libraries SET status='closed' WHERE id=$1", [LIBRARY]); await update(tx) })).rejects.toMatchObject({ code: '42501' })
+    await expect(as(service, async tx => { await tx.query('DELETE FROM public.classroom_students WHERE classroom_id=$1 AND student_id=$2', [ROOM_A, STUDENT_A]); await pin(tx) })).rejects.toMatchObject({ code: '42501' })
   })
 })

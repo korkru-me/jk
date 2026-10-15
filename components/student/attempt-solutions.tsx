@@ -13,6 +13,8 @@ import { getAttemptSolutions } from '@/lib/actions/attempt-solutions'
 import { submitSubmission } from '@/lib/actions/submissions'
 import { attemptItemHasSolution, type AttemptSolutionItem } from '@/lib/attempt-solutions'
 import { cn } from '@/lib/utils'
+import { SolutionWatermark } from './solution-watermark'
+import type { SolutionWatermarkData } from '@/lib/solution-watermark'
 
 /**
  * The เฉลยวิธีทำ viewer on a student's summary page: one ข้อ at a time, with
@@ -51,7 +53,7 @@ export type AttemptSolutionsLoader = (submissionId: string) => ReturnType<typeof
 
 type LoadState =
   | { status: 'idle' | 'loading' }
-  | { status: 'ready'; items: AttemptSolutionItem[]; Body: BodyModule['AttemptSolutionBody'] }
+  | { status: 'ready'; items: AttemptSolutionItem[]; watermark: SolutionWatermarkData; Body: BodyModule['AttemptSolutionBody'] }
   | { status: 'error'; message: string }
 
 const CONNECTION_FAILED = 'โหลดเฉลยไม่สำเร็จ — ตรวจการเชื่อมต่อแล้วลองอีกครั้ง'
@@ -91,10 +93,15 @@ export function AttemptSolutionsProvider({ submissionId, loader = getAttemptSolu
           setLoad({ status: 'error', message: result.error })
           return
         }
-        const { items } = result.data
+        const { items, watermark } = result.data
+        // A stale action response must never expose a solution without identity.
+        if (!watermark) {
+          setLoad({ status: 'error', message: CONNECTION_FAILED })
+          return
+        }
         const at = target.current ? items.findIndex(item => item.answerId === target.current) : -1
         setIndex(Math.max(at, 0))
-        setLoad({ status: 'ready', items, Body: body.AttemptSolutionBody })
+        setLoad({ status: 'ready', items, watermark, Body: body.AttemptSolutionBody })
       })
       .catch(() => setLoad({ status: 'error', message: CONNECTION_FAILED }))
   }, [loader, submissionId])
@@ -169,6 +176,7 @@ function AttemptSolutionsDialog({ open, onOpenChange, load, index, onIndexChange
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
+      {load.status === 'ready' && <SolutionWatermark data={load.watermark} layer="dialog" active={open} />}
       {/* A fixed height keeps ข้อถัดไป under the same spot on every ข้อ, so a
           student can page through without chasing the button. Only the body
           scrolls: which ข้อ this is and the way out stay on screen. */}

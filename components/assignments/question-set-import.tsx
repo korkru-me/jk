@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { parseSections, questionIdsForSections, type QuestionSetSection } from '@/lib/question-set-sections'
 import { cn } from '@/lib/utils'
+import { parseQuestionSetDescription } from '@/lib/question-set-theme'
 import type { AssignmentQuestionSetOption } from '@/components/assignments/create-assignment-form'
 
 /** Past this many แฟ้ม the list gets a search box of its own. Below it,
@@ -110,7 +111,7 @@ export function QuestionSetImport({ sets, bankIds, selectedIds, onToggle, onPrev
   const matching = term
     ? rows.filter(r =>
         r.set.title.toLowerCase().includes(term)
-        || (r.set.description ?? '').toLowerCase().includes(term)
+        || parseQuestionSetDescription(r.set.description).description.toLowerCase().includes(term)
         || r.sections.some(section => section.choice.title.toLowerCase().includes(term)))
     : rows
   // แฟ้ม with nothing left to give sink to the bottom instead of being hidden:

@@ -1,5 +1,6 @@
+import { ExerciseIcon, ExamIcon, PracticeIcon } from '@/lib/assignment-display'
 import Link from 'next/link'
-import { ArrowLeft, BookOpenCheck, ClipboardPenLine, Copy, Plus, Repeat2 } from 'lucide-react'
+import { ArrowLeft, Copy, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
@@ -93,8 +94,8 @@ export function AssignmentTypeChoice({
       <div className={cn('grid gap-4 md:grid-cols-2', practiceHref && 'lg:grid-cols-3')}>
         <Card padding="md" className="flex min-w-0 flex-col gap-3">
           <div className="flex items-start gap-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <Repeat2 className="size-5" aria-hidden="true" />
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-work-exercise/10 text-work-exercise">
+              <ExerciseIcon className="size-5" aria-hidden="true" />
             </div>
             <div className="min-w-0">
               <h2 className="font-semibold text-foreground">แบบฝึกหัด</h2>
@@ -103,15 +104,15 @@ export function AssignmentTypeChoice({
               </p>
             </div>
           </div>
-          <Button className="mt-auto w-full" render={<Link href={exerciseHref} />}>
-            <Repeat2 data-icon="inline-start" /> สร้างแบบฝึกหัด
+          <Button variant="workExercise" className="mt-auto w-full" render={<Link href={exerciseHref} />}>
+            <ExerciseIcon data-icon="inline-start" /> สร้างแบบฝึกหัด
           </Button>
         </Card>
 
         <Card padding="md" className="flex min-w-0 flex-col gap-3">
           <div className="flex items-start gap-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <ClipboardPenLine className="size-5" aria-hidden="true" />
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-work-exam/10 text-work-exam">
+              <ExamIcon className="size-5" aria-hidden="true" />
             </div>
             <div className="min-w-0">
               <h2 className="font-semibold text-foreground">ข้อสอบ</h2>
@@ -120,16 +121,16 @@ export function AssignmentTypeChoice({
               </p>
             </div>
           </div>
-          <Button className="mt-auto w-full" render={<Link href={examHref} />}>
-            <ClipboardPenLine data-icon="inline-start" /> สร้างข้อสอบ
+          <Button variant="workExam" className="mt-auto w-full" render={<Link href={examHref} />}>
+            <ExamIcon data-icon="inline-start" /> สร้างข้อสอบ
           </Button>
         </Card>
 
         {practiceHref && (
           <Card padding="md" className="flex min-w-0 flex-col gap-3">
             <div className="flex items-start gap-3">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <BookOpenCheck className="size-5" aria-hidden="true" />
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-work-practice/10 text-work-practice">
+                <PracticeIcon className="size-5" aria-hidden="true" />
               </div>
               <div className="min-w-0">
                 <h2 className="font-semibold text-foreground">คลังฝึก</h2>
@@ -138,8 +139,8 @@ export function AssignmentTypeChoice({
                 </p>
               </div>
             </div>
-            <Button variant="outline" className="mt-auto w-full" render={<Link href={practiceHref} />}>
-              <BookOpenCheck data-icon="inline-start" /> สร้างคลังฝึก
+            <Button variant="workPractice" className="mt-auto w-full" render={<Link href={practiceHref} />}>
+              <PracticeIcon data-icon="inline-start" /> สร้างคลังฝึก
             </Button>
           </Card>
         )}

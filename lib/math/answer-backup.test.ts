@@ -54,3 +54,13 @@ describe('answer autosave backup', () => {
     })
   })
 })
+
+it('rejects stale or legacy random-question drafts after a number set changes', () => {
+  const entries = {
+    a: { value: '10', mathInputModes: {}, randomValues: { x: 5 } },
+    b: { value: '10', mathInputModes: {} },
+    c: { value: '14', mathInputModes: {}, randomValues: { x: 7 } },
+  }
+  expect(selectRestorableAnswerBackup(entries, { a: '', b: '', c: '' }, {}, { a: { x: 7 }, b: { x: 7 }, c: { x: 7 } })).toEqual({ c: entries.c })
+  expect(parseAnswerBackup(serializeAnswerBackup(Object.entries(entries))).c.randomValues).toEqual({ x: 7 })
+})

@@ -87,6 +87,7 @@ function LabContent({ initialCoverPattern }: { initialCoverPattern: ClassroomCov
     <Card padding="lg" className="overflow-hidden">
       <TeacherDashboard
         currentUserId={ROOM_ID}
+        fullName="ครูตัวอย่าง"
         classroomsCount={5}
         questionsCount={890}
         setsCount={8}

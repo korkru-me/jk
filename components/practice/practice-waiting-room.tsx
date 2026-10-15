@@ -1,7 +1,6 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { BookOpenCheck, KeyRound, ListChecks, LogIn, Search, ShieldCheck } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { RichText } from '@/components/ui/rich-text'
@@ -43,8 +42,7 @@ export function PracticeWaitingRoom({
 
       <header className="flex max-w-3xl flex-col gap-1.5 md:pr-52">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm font-medium text-primary">หน้ารอเข้าคลังฝึก</p>
-          <Badge variant="secondary">ฝึกเอง · ไม่มีคะแนน</Badge>
+          <p className="flex items-center gap-1.5 text-sm font-medium text-work-practice"><BookOpenCheck className="size-4" aria-hidden="true" />หน้ารอเข้าคลังฝึก</p>
         </div>
         <h1 className="text-2xl font-semibold leading-tight text-foreground sm:text-3xl">
           {library.title}
@@ -55,15 +53,15 @@ export function PracticeWaitingRoom({
 
       <section aria-label="ข้อมูลก่อนเข้าคลังฝึก" className="grid gap-x-6 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
         <p className="flex items-start gap-2 text-sm text-muted-foreground">
-          <ListChecks className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+          <ListChecks className="mt-0.5 size-4 shrink-0 text-work-practice" aria-hidden="true" />
           <span>มีโจทย์ {questionCount.toLocaleString('th-TH')} ข้อ เลือกฝึกข้อใดก่อนก็ได้</span>
         </p>
         <p className="flex items-start gap-2 text-sm text-muted-foreground">
-          <Search className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+          <Search className="mt-0.5 size-4 shrink-0 text-work-practice" aria-hidden="true" />
           <span>ค้นหาด้วยชื่อโจทย์หรือเลือกหลายแท็กพร้อมกันได้</span>
         </p>
         <p className="flex items-start gap-2 text-sm text-muted-foreground">
-          <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+          <ShieldCheck className="mt-0.5 size-4 shrink-0 text-work-practice" aria-hidden="true" />
           <span>ไม่เก็บคำตอบ ผลถูกผิด หรือคะแนน</span>
         </p>
       </section>
@@ -95,7 +93,7 @@ export function PracticeWaitingRoom({
         <ul className="grid list-disc gap-x-8 gap-y-2 pl-5 text-sm text-muted-foreground md:grid-cols-2">
           <li>เลือกโจทย์จากคลังและกลับมาฝึกซ้ำได้ตามต้องการ</li>
           <li>ระบบนับเฉพาะจำนวนครั้งที่กดตรวจในแต่ละข้อ เพื่อให้ครูเห็นความก้าวหน้า</li>
-          <li>การเข้าคลังฝึกไม่สร้างรอบทำงาน ไม่จำกัดเวลา และไม่มีการส่งงาน</li>
+          <li>ไม่จำกัดเวลา เมื่อสร้างแบบฝึกหัดแล้ว สามารถส่งคำตอบเพื่อดูสรุปผลการฝึกได้</li>
           <li>ผลตรวจมีไว้ช่วยฝึกตนเอง ไม่ถูกนำไปคิดคะแนนหรือจัดอันดับ</li>
         </ul>
       </section>
@@ -115,7 +113,7 @@ export function PracticeWaitingRoom({
                   maxLength={100}
                   className="min-h-11"
                 />
-                <Button type="submit" className="min-h-11 shrink-0">
+                <Button type="submit" variant="workPractice" className="min-h-11 shrink-0">
                   <KeyRound data-icon="inline-start" aria-hidden="true" />
                   ตรวจรหัสและเข้าคลัง
                 </Button>
@@ -130,7 +128,7 @@ export function PracticeWaitingRoom({
             </Field>
           </form>
         ) : (
-          <Button className="h-auto min-h-11 whitespace-normal py-2" render={<Link href={enterHref} />}>
+          <Button variant="workPractice" className="h-auto min-h-11 whitespace-normal py-2" render={<Link href={enterHref} />}>
             <LogIn data-icon="inline-start" aria-hidden="true" />
             เข้าคลังฝึก
           </Button>

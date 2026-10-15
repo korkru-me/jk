@@ -22,8 +22,10 @@ export interface QuestionSetRef {
  * taken out or moved between แฟ้มย่อย. A teammate's shared แฟ้ม has no editor
  * for this reader, so it stays plain text.
  */
-export function QuestionSetBadges({ sets, showEmpty = false }: {
+export function QuestionSetBadges({ sets, showEmpty = false, interactive = true }: {
   sets?: QuestionSetRef[]
+  /** Picker dialogs keep memberships informational so drafts cannot be left accidentally. */
+  interactive?: boolean
   /** Prints "ยังไม่อยู่ในแฟ้ม" when the question is in none. Only for the
    *  teacher's own cards — absence on a teammate's card may just mean their
    *  แฟ้ม is private. */
@@ -49,7 +51,7 @@ export function QuestionSetBadges({ sets, showEmpty = false }: {
 
   return (
     <>
-      {sets.map(set => set.isOwner ? (
+      {sets.map(set => set.isOwner && interactive ? (
         <Link
           key={set.id}
           href={`/questions/sets/${set.id}/edit`}

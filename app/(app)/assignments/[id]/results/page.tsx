@@ -58,7 +58,7 @@ export default async function ResultsPage({
   const [{ data: submissions }, { data: questionRows }] = await Promise.all([
     admin
       .from('submissions')
-      .select('id, student_id, status, total_score, score_adjustment, max_score, submitted_at, started_at, attempt_number, current_streak, best_streak, streak_reached, users!submissions_student_id_fkey(full_name, email)')
+      .select('id, student_id, status, closed_at, total_score, score_adjustment, max_score, submitted_at, started_at, attempt_number, current_streak, best_streak, streak_reached, users!submissions_student_id_fkey(full_name, email)')
       .eq('assignment_id', id),
     supabase
       .from('questions')
@@ -162,7 +162,8 @@ export default async function ResultsPage({
     timing: timingByStudent.get(row.student_id) ?? { status: 'not_submitted' as const },
   }))
 
-  const inProgressCount = (submissions ?? []).filter((s: any) => s.status === 'in_progress').length
+  const inProgressCount = (submissions ?? []).filter((s: any) => s.status === 'in_progress' && !s.closed_at).length
+  const pendingFinalizationCount = (submissions ?? []).filter((s: any) => s.status === 'in_progress' && s.closed_at).length
 
   return (
     <ResultsClient
@@ -178,6 +179,7 @@ export default async function ResultsPage({
       answers={(answerRows ?? []) as AnswerRow[]}
       profiles={profiles}
       inProgressCount={inProgressCount}
+      pendingFinalizationCount={pendingFinalizationCount}
       initialPendingOnly={pending === '1'}
       adjustmentBatches={adjustmentBatches}
     />

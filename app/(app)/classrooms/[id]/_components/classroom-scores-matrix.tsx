@@ -511,7 +511,7 @@ export function ClassroomScoresMatrix({
 
   if (assignments.length === 0) {
     return (
-      <Card edge="ring" className="py-12 text-center text-sm text-muted-foreground">
+      <Card data-classroom-panel edge="ring" className="py-12 text-center text-sm text-muted-foreground">
         ยังไม่มีงานที่มอบหมายให้ห้องนี้
       </Card>
     )
@@ -588,7 +588,7 @@ export function ClassroomScoresMatrix({
       </p>
 
       {visibleAssignments.length === 0 ? (
-        <Card edge="ring" className="py-12 text-center text-sm text-muted-foreground">
+        <Card data-classroom-panel edge="ring" className="py-12 text-center text-sm text-muted-foreground">
           ไม่พบงานที่ตรงกับตัวกรอง
         </Card>
       ) : (
@@ -607,13 +607,13 @@ export function ClassroomScoresMatrix({
         }}
       >
       <SortableContext items={visibleAssignments.map(assignment => assignmentDndId(assignment.id))} strategy={horizontalListSortingStrategy}>
-      <Card edge="ring" className="overflow-x-auto shadow-sm">
+      <Card data-classroom-panel edge="ring" className="overflow-x-auto shadow-sm">
         {/* border-separate (not -collapse): sticky positioning on table
             cells doesn't reliably paint over a collapsed border seam, which
             let scrolled-under content show through the gap between the
             sticky ลำดับ/นักเรียน columns. */}
         <table ref={tableRef} className="w-full text-sm border-separate border-spacing-0 [&_tbody_tr:last-child_td]:border-b-0">
-          <thead>
+          <thead data-classroom-table-header>
             {/* Row-divider borders live on the cells, not the <tr> — the
                 separated-borders table model (needed above) doesn't render
                 borders set directly on rows. */}

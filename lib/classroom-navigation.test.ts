@@ -99,7 +99,7 @@ describe('classroom section route detection', () => {
     '/classrooms/archived',
     '/classrooms/trash',
     '/classrooms/room-slug',
-    '/classrooms/room-slug/report',
+    '/classrooms/room-slug/unknown-page',
   ])('recognizes every route in the classroom section: %s', pathname => {
     expect(isClassroomSectionPath(pathname)).toBe(true)
   })
@@ -123,7 +123,7 @@ describe('classroom detail route detection', () => {
     '/classrooms/new',
     '/classrooms/archived',
     '/classrooms/trash',
-    '/classrooms/room-slug/report',
+    '/classrooms/room-slug/unknown-page',
     '/dashboard',
   ])('does not compact the global sidebar on non-detail routes: %s', pathname => {
     expect(isClassroomDetailPath(pathname)).toBe(false)

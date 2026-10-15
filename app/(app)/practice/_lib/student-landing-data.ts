@@ -26,6 +26,8 @@ type StudentLibraryRow = {
   id: string
   classroom_id: string
   title: string
+  published_at: string | null
+  created_at: string
   practice_library_questions: Array<{ count: number }> | null
 }
 
@@ -63,7 +65,7 @@ export async function loadStudentPracticeLibraries(
   const { rows, error } = await fetchAllRows<StudentLibraryRow>(async (from, to) => {
     const result = await supabase
       .from('practice_libraries')
-      .select('id, classroom_id, title, practice_library_questions(count)')
+      .select('id, classroom_id, title, published_at, created_at, practice_library_questions(count)')
       .eq('status', 'published')
       .in('classroom_id', classroomIds)
       .order('published_at', { ascending: false })
@@ -85,6 +87,8 @@ export async function loadStudentPracticeLibraries(
       classroomId: classroom.id,
       classroomName: classroom.name,
       questionCount: row.practice_library_questions?.[0]?.count ?? 0,
+      publishedAt: row.published_at,
+      createdAt: row.created_at,
     })]
   })
   return { items, error: null }

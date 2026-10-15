@@ -13,6 +13,7 @@ import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
 export const metadata = { title: 'ชุดข้อสอบ — KorKru' }
 
 export interface AssignmentRow {
+  type: 'exercise' | 'exam'
   id: string
   title: string
   question_ids: string[]
@@ -90,6 +91,7 @@ export default async function AssignmentsPage() {
   const pList: AssignmentRow[] = reached.map((row: any) => ({
     id: row.id,
     title: row.title,
+    type: row.type,
     question_ids: row.question_ids ?? [],
     random_question_count: row.random_question_count ?? null,
     completion_rule: row.completion_rule ?? null,

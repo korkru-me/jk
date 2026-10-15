@@ -5,6 +5,7 @@ import { ExamWaitingFlow } from '@/components/exam/exam-waiting-client'
 import { ExamWaitingPreviewRoom } from '@/components/exam/exam-waiting-preview'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { NativeSelect } from '@/components/ui/native-select'
+import { Button } from '@/components/ui/button'
 import type { ExamWaitingSummary } from '@/lib/exam-waiting-room'
 
 const receipt = '70000000-0000-4000-8000-000000000001'
@@ -23,6 +24,7 @@ const cases: Record<string, ExamWaitingSummary> = {
   ready: base,
   code: { ...base, requiresAccessCode: true },
   active: { ...base, previousSubmissionId: receipt, activeSubmissionId: receipt, startedAt: '2026-10-10T03:00:00Z' },
+  active_short: { ...base, previousSubmissionId: receipt, activeSubmissionId: receipt, startedAt: '2026-10-10T03:00:00Z' },
   expired: { ...base, previousSubmissionId: receipt, expired: true, startedAt: '2026-10-10T03:00:00Z' },
   blocked: { ...base, blockedReason: 'ยังไม่ถึงเวลาเปิดสอบ กรุณาโหลดหน้านี้ใหม่เมื่อถึงเวลา' },
   completed: { ...base, previousSubmissionId: receipt, completedSubmissionId: receipt },
@@ -36,7 +38,8 @@ const cases: Record<string, ExamWaitingSummary> = {
   exercise,
   exercise_untimed: { ...exercise, durationMinutes: null },
   exercise_code: { ...exercise, requiresAccessCode: true },
-  exercise_active: { ...exercise, durationMinutes: null, previousSubmissionId: receipt, activeSubmissionId: receipt, startedAt: '2026-10-10T03:00:00Z' },
+  exercise_active: { ...exercise, previousSubmissionId: receipt, activeSubmissionId: receipt, startedAt: '2026-10-10T03:00:00Z' },
+  exercise_active_short: { ...exercise, previousSubmissionId: receipt, activeSubmissionId: receipt, startedAt: '2026-10-10T03:00:00Z' },
   exercise_expired: { ...exercise, previousSubmissionId: receipt, expired: true },
   exercise_completed: { ...exercise, previousSubmissionId: receipt, completedSubmissionId: receipt },
   exercise_retry: { ...exercise, exerciseDetails: { ...exercise.exerciseDetails!, retryWrongOnly: true } },
@@ -49,30 +52,40 @@ const cases: Record<string, ExamWaitingSummary> = {
 export function ExamWaitingLab() {
   const [mode, setMode] = useState('ready')
   const [starts, setStarts] = useState(0)
+  const [clockBase, setClockBase] = useState(() => Date.now())
   const [entered, setEntered] = useState('ยังไม่มีการเริ่มหรือส่งรอบทำงาน')
+  const [showRoom, setShowRoom] = useState(true)
+  const [confirmed, setConfirmed] = useState(false)
+  const fixture = cases[mode]
+  const remaining = mode.endsWith('_short') ? 3000 : 90000
+  const summary = confirmed ? { ...fixture, expired: false, activeSubmissionId: null,
+    completedSubmissionId: receipt, expiresAt: null, startedAt: null } : fixture.activeSubmissionId
+    ? { ...fixture, startedAt: new Date(clockBase - (fixture.durationMinutes ?? 30) * 60000 + remaining).toISOString(),
+      expiresAt: new Date(clockBase + remaining).toISOString(), serverNow: new Date().toISOString() } : fixture
   return <div className="assignment-waiting-stage flex w-full max-w-5xl flex-col gap-4">
-    <p className="text-sm text-muted-foreground">ตัวอย่าง UI เท่านั้น · ไม่มี Auth/ฐานข้อมูล/SEB จริง ไม่มีการเปิดโจทย์หรือจับเวลา</p>
+    <p className="text-sm text-muted-foreground">ตัวอย่าง UI และเวลาจำลอง · ไม่มี Auth/ฐานข้อมูล/SEB จริง</p>
     <FieldGroup><Field>
       <FieldLabel htmlFor="waiting-lab-mode">สถานการณ์ตัวอย่าง</FieldLabel>
       <NativeSelect id="waiting-lab-mode" value={mode} onChange={event => {
-        setMode(event.target.value); setStarts(0); setEntered('ยังไม่มีการเริ่มหรือส่งรอบทำงาน')
+        setMode(event.target.value); setClockBase(Date.now()); setConfirmed(false); setShowRoom(true); setStarts(0); setEntered('ยังไม่มีการเริ่มหรือส่งรอบทำงาน')
       }}>
         {Object.keys(cases).map(value => <option key={value} value={value}>{value}</option>)}
       </NativeSelect>
     </Field></FieldGroup>
     <p role="status">คำขอเริ่มที่จำลอง: {starts} · {entered}</p>
-    {mode.startsWith('preview') ? <ExamWaitingPreviewRoom key={mode} summary={cases[mode]}
+    <Button type="button" variant="outline" onClick={() => setShowRoom(value => !value)}>{showRoom ? 'จำลองออกจากหน้ารอ' : 'กลับหน้ารอรอบเดิม'}</Button>
+    {showRoom && (mode.startsWith('preview') ? <ExamWaitingPreviewRoom key={mode} summary={cases[mode]}
       onReload={() => setEntered('โหลดตัวอย่างใหม่เท่านั้น ไม่เริ่มรอบจริง')}
       returnHref="/exam-screen-lab/exam-waiting" onStartPreview={() => {
         setStarts(count => count + 1); setEntered('เปิดตัวอย่างหลังอ่านกติกา · ไม่มีรอบสอบจริง')
-      }} /> : <ExamWaitingFlow key={mode} summary={cases[mode]} requestStart={async code => {
+      }} /> : <ExamWaitingFlow key={mode} summary={summary} confirmExpired={async () => ({ success: true })} requestStart={async code => {
       setStarts(count => count + 1)
       await new Promise(resolve => setTimeout(resolve, 250))
       if (mode === 'lost') throw new Error('simulated lost response')
       if (mode === 'failure') return { error: 'ตัวอย่าง: เซิร์ฟเวอร์ปฏิเสธคำขอเริ่มสอบ' }
       if (cases[mode].requiresAccessCode && code !== 'TEST') return { error: 'รหัสผ่านไม่ถูกต้อง' }
       return { submissionId: receipt, alreadySubmitted: cases[mode].expired }
-    }} onEntered={result => setEntered(`ยืนยัน receipt เดิม · ${result.alreadySubmitted ? 'ไปหน้าผลรอบสอบ' : 'ไปหน้าทำข้อสอบ'}`)}
-      onReload={() => setEntered('โหลดข้อมูลใหม่เท่านั้น ไม่ส่งคำขอเริ่ม')} />}
+    }} onEntered={result => { setConfirmed(result.alreadySubmitted); setEntered(`ยืนยัน receipt เดิม · ${result.alreadySubmitted ? 'ไปหน้าผลรอบสอบ' : 'ไปหน้าทำข้อสอบ'}`) }}
+      onReload={() => setEntered('โหลดข้อมูลใหม่เท่านั้น ไม่ส่งคำขอเริ่ม')} />)}
   </div>
 }

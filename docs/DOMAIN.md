@@ -1,5 +1,17 @@
 # Domain model และคำศัพท์
 
+ข้อสอบและแบบฝึกหัดที่กำหนดเวลา (อนุมัติ 14 ตุลาคม 2026) ทำต่อในรอบและเวลาเริ่มเดิมหลังหลุด/ออกจากหน้า ใช้เวลาที่ถึงก่อนระหว่าง timer กับ hard close ที่รวม extension รายคน โดยแยกจากกำหนดส่งตรงเวลา เมื่อหมดเวลาหยุดรับคำตอบแม้ออฟไลน์ ปิดรอบอัตโนมัติ และตรวจจากคำตอบที่ server รับก่อนปิด หลักฐานที่ขาดแจ้งครูพิจารณาโดยไม่ค้างรอบ การรอ/ยืนยันผลไม่กินสิทธิ์ใหม่ ส่วนรอบใหม่ต้องกดเองตามกติกาจำนวนครั้งและเงื่อนไขผ่านเดิม
+
+## การแก้ชุดฝึกและปักโจทย์ส่วนตัว
+
+นักเรียนแก้ชื่อและสมาชิกของชุดที่ตนเป็นเจ้าของได้โดยต้องเหลืออย่างน้อยหนึ่งข้อ ความคืบหน้าคำนวณใหม่จากสมาชิกปัจจุบัน แต่การเอาข้อออกไม่ลบประวัติการลองตอบ โจทย์ที่ปักไว้ทบทวนเป็นความสัมพันธ์ส่วนตัวกับคลังเดิม ไม่ผูกกับชุดใดชุดหนึ่งและไม่เปลี่ยนผลการตอบ
+
+
+## Student-created personal practice exercises
+
+A personal exercise groups existing questions in one accessible published practice library. It is private to its student and uses the practice domain, without an Assignment, Submission, grade or deadline. Selecting its card selects its member questions; the separate Start action opens a paged practice run using the original check flow and the teacher's library tool/reveal settings. The student chooses a browser-local color and 1/3/5/10 questions per page. Progress on the library card is the count of distinct questions with accepted checks, including checks before group creation, not correct answers or mastery; run navigation represents only the current in-memory answers/checks. Teachers and classmates cannot read the group names or members.
+
+
 อัปเดตล่าสุด: 26 กันยายน 2026
 
 ## บทบาทผู้ใช้
@@ -127,6 +139,10 @@ MCQ แบบคำนวณสามารถสร้างสูตรคำ�
 - mode ปัจจุบัน: `online`, `print`
 
 ## คลังฝึกด้วยตนเอง — โดเมนแยกหลัง feature flag
+
+สรุปงานของนักเรียนแสดงคลังฝึกร่วมกับ assignment เป็น presentation เท่านั้น ใช้สี/ไอคอนห้องและป้าย “คลังฝึก” ชัดเจน เข้าฝึกซ้ำได้โดยไม่มี completed state; ไม่สร้างกำหนดส่งหรือ Submission ไม่เพิ่มงานค้าง/ใกล้กำหนด/ส่งแล้ว/คะแนน/ปฏิทิน งานที่ทำครบเงื่อนไขเดิมอยู่ท้ายเสมอ ส่วนคลังกับงานที่ยังไม่เสร็จใช้ตัวเรียงเดียวกันภายในกลุ่มที่ยังไม่เสร็จ
+
+การรวมรายการคลังฝึกกับข้อสอบ/แบบฝึกหัดในกรอบกลุ่มงานของครูเป็น presentation เท่านั้น คลังฝึกใช้กลุ่มเดิมของห้องและจัดลำดับร่วมกันได้เมื่อ migration ของ layout ถูกติดตั้ง แต่ยังใช้โดเมน practice, ไม่มีคะแนน และไม่เพิ่ม `practice` เข้า `AssignmentType`.
 
 - **คลังฝึก** เป็นชุดโจทย์ไม่มีคะแนนที่ครูเปิดให้นักเรียนในห้องฝึกเอง แยกจาก `Assignment` โดยโครงสร้าง ไม่ใช่แบบฝึกหัดที่ตั้งคะแนนเป็นศูนย์ และไม่สร้าง `Submission` หรือ `SubmissionAnswer`
 - รายการคลังฝึกต้องปรากฏภายในห้องเรียน: ครูผู้จัดการเห็นทุกสถานะในแท็บงานที่มอบหมาย นักเรียนเห็นเฉพาะคลังเผยแพร่ในห้องที่ตนเป็นสมาชิก และกดเข้าหน้ารอของ `/practice/[id]` โดยไม่เปลี่ยนคลังฝึกเป็น assignment

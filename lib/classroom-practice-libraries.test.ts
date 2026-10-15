@@ -25,11 +25,11 @@ describe('classroom practice list', () => {
   it('loads the exact classroom and uses a safe summary with a relation count', async () => {
     const { client, query, from } = sessionClient([published])
     expect(await loadClassroomPracticeLibraries(client, 'room', 'classroom_owner')).toEqual({
-      items: [{ id: 'library', title: 'คลังฝึก', status: 'published', questionCount: 143 }], error: null,
+      items: [{ id: 'library', title: 'คลังฝึก', status: 'published', questionCount: 143, categoryId: null, displayOrder: null }], error: null, layoutAvailable: true,
     })
     expect(from).toHaveBeenCalledWith('practice_libraries')
     expect(query.eq).toHaveBeenCalledWith('classroom_id', 'room')
-    expect(query.select).toHaveBeenCalledWith('id, title, status, practice_library_questions(count)')
+    expect(query.select).toHaveBeenCalledWith('id, title, status, category_id, display_order, practice_library_questions(count)')
   })
 
   it('shows only published libraries to a student even if a relation response includes drafts', async () => {
@@ -49,7 +49,7 @@ describe('classroom practice list', () => {
     const empty = await loadClassroomPracticeLibraries(sessionClient([]).client, 'room', 'student_member')
     expect(failed.items).toEqual([])
     expect(failed.error).toBeTruthy()
-    expect(empty).toEqual({ items: [], error: null })
+    expect(empty).toEqual({ items: [], error: null, layoutAvailable: true })
   })
 
   it('does not read libraries without an authorized classroom relationship', async () => {
@@ -61,5 +61,22 @@ describe('classroom practice list', () => {
   it('drops secret, answer and progress fields before the classroom RSC payload', () => {
     const row = { id: 'library', title: 'คลังฝึก', status: 'published' as const, questionCount: 143, access_code: 'secret', correct_answer: 'answer', score: 10, attempts: 7 }
     expect(Object.keys(classroomPracticeLibraryItem(row)).sort()).toEqual(['id', 'questionCount', 'status', 'title'])
+  })
+
+  it('projects saved grouping and display order without leaking additional columns', async () => {
+    const { client } = sessionClient([{ ...published, category_id: 'group', display_order: 2, access_code: 'secret', score: 100 }])
+    expect((await loadClassroomPracticeLibraries(client, 'room', 'classroom_owner')).items).toEqual([
+      { id: 'library', title: 'คลังฝึก', status: 'published', questionCount: 143, categoryId: 'group', displayOrder: 2 },
+    ])
+  })
+
+  it('keeps the old list readable before the layout migration is deployed', async () => {
+    const { client, query } = sessionClient([published])
+    query.range.mockResolvedValueOnce({ data: null, error: { code: '42703' } })
+    expect(await loadClassroomPracticeLibraries(client, 'room', 'classroom_owner')).toEqual({
+      items: [{ id: 'library', title: 'คลังฝึก', status: 'published', questionCount: 143 }],
+      error: null, layoutAvailable: false,
+    })
+    expect(query.select).toHaveBeenLastCalledWith('id, title, status, practice_library_questions(count)')
   })
 })

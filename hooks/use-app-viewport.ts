@@ -65,7 +65,8 @@ export function useAppViewport() {
     const revealFocusedField = () => {
       const active = document.activeElement
       if (
-        active instanceof HTMLInputElement
+        (active instanceof HTMLInputElement
+          && !['radio', 'checkbox', 'button', 'submit', 'reset', 'hidden', 'range', 'color', 'file'].includes(active.type))
         || active instanceof HTMLTextAreaElement
         || (active instanceof HTMLElement && active.isContentEditable)
       ) {
@@ -81,12 +82,17 @@ export function useAppViewport() {
     sync()
     viewport.addEventListener('resize', onResize)
     viewport.addEventListener('scroll', sync)
+    // Desktop focus/scrollIntoView can scroll the layout viewport without
+    // firing visualViewport.scroll. Only the shell's inner panels scroll;
+    // sync still leaves a pinch-zoomed visual viewport alone.
+    window.addEventListener('scroll', sync, { passive: true })
     window.addEventListener('orientationchange', sync)
 
     return () => {
       cancelAnimationFrame(frame)
       viewport.removeEventListener('resize', onResize)
       viewport.removeEventListener('scroll', sync)
+      window.removeEventListener('scroll', sync)
       window.removeEventListener('orientationchange', sync)
       root.style.removeProperty('--app-height')
     }

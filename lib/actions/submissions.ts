@@ -4,7 +4,9 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { canManageAssignment, studentHasAssignment } from '@/lib/auth/assignment-access'
 import { revalidatePath } from 'next/cache'
-import { isAttemptExpired, isInstantCheckable, isStreakEligible } from '@/lib/grading'
+import { gradeAndFinalizeSubmission } from '@/lib/submission-finalization.server'
+import { attemptExpiresAt, attemptHasExpired } from '@/lib/attempt-expiry'
+import { isInstantCheckable, isStreakEligible } from '@/lib/grading'
 import {
   advanceStreakForVerdict, pickNextStreakQuestion, streakEnding, type StreakEnding,
 } from '@/lib/streak-run'
@@ -27,7 +29,6 @@ import {
   readCurrentAssignmentSebRelease,
 } from '@/lib/seb-assignment-release.server'
 import { parseMathInputModes } from '@/lib/math/input-mode'
-import { hasCompleteWorkEvidence } from '@/lib/math-work'
 import { getWritableStudentAnswer } from '@/lib/exam-write-access'
 import { parseSubmittedFiles } from '@/lib/exam-attachment'
 import { validateStoredExamAttachmentUrl } from '@/lib/exam-attachment-access.server'
@@ -36,8 +37,10 @@ import { completionAttemptLimit, findPassingCompletion } from '@/lib/assignment-
 import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
 import { exerciseWaitingDetails, type ExamWaitingSummary } from '@/lib/exam-waiting-room'
 import { readWithSubmissionRevision } from '@/lib/submission-revision-compatibility'
+import { parseRandomValues, sameRandomValues } from '@/lib/math/fresh-random-values'
+import { drawsRandomValues } from '@/lib/math/shared-random'
 
-type EntrySubmissionRow = Pick<Submission, 'id' | 'status' | 'attempt_number' | 'started_at' | 'exam_access_mode'> & { seb_config_revision?: number | null }
+type EntrySubmissionRow = Pick<Submission, 'id' | 'status' | 'attempt_number' | 'started_at' | 'exam_access_mode'> & { seb_config_revision?: number | null; closed_at?: string | null; close_reason?: 'manual' | 'time_limit' | 'close_time' | null }
 type StreakSubmissionRow = Pick<Submission, 'id' | 'student_id' | 'status' | 'started_at' | 'assignment_id' | 'exam_access_mode' | 'current_streak' | 'best_streak' | 'streak_reached'> & { seb_config_revision?: number | null; assignments: unknown }
 
 export async function startSubmission(
@@ -122,7 +125,7 @@ async function submissionEntry(
       .maybeSingle(),
     readWithSubmissionRevision<EntrySubmissionRow>(includeRevision => admin
       .from('submissions')
-      .select(`id, status, attempt_number, started_at, ${includeRevision ? 'seb_config_revision, ' : ''}exam_access_mode`)
+      .select(`id, status, attempt_number, started_at, closed_at, close_reason, ${includeRevision ? 'seb_config_revision, ' : ''}exam_access_mode`)
       .eq('assignment_id', assignmentId)
       .eq('student_id', user.id)
       .order('attempt_number', { ascending: false })
@@ -157,7 +160,11 @@ async function submissionEntry(
   const extension = extensionRes.data
 
   const effectiveEndAt = extension?.extended_end_at ?? assignment.end_at
-  if (!readOnlyWaiting && effectiveEndAt && new Date(effectiveEndAt) < new Date()) {
+  const existing = existingRes.data
+  const expiresAt = existing?.status === 'in_progress'
+    ? attemptExpiresAt(existing.started_at, assignment.duration_minutes, effectiveEndAt) : null
+  const previousExpired = existing?.status === 'in_progress' && (existing.closed_at != null || attemptHasExpired(expiresAt))
+  if (!readOnlyWaiting && !previousExpired && effectiveEndAt && new Date(effectiveEndAt) < new Date()) {
     return { error: 'หมดเวลาส่งแล้ว' }
   }
 
@@ -173,7 +180,6 @@ async function submissionEntry(
   const currentSebRelease = secureBrowserRequired
     ? await readCurrentAssignmentSebRelease(assignmentId)
     : null
-  const existing = existingRes.data
   const expectedSebRevision = existing?.status === 'in_progress'
     && typeof existing.seb_config_revision === 'number'
       ? existing.seb_config_revision
@@ -192,7 +198,7 @@ async function submissionEntry(
         expectedAccessMode,
       )
     : null
-  if (secureBrowserRequired && !examAccess) {
+  if (secureBrowserRequired && !examAccess && !previousExpired) {
     const reusableChallenge = currentSebRelease
       ? validateSebChallenge(
           sebChallenge,
@@ -231,8 +237,7 @@ async function submissionEntry(
       && existing.seb_config_revision !== examAccess.assignmentConfigRevision) {
       return { error: 'ไฟล์ตั้งค่าของรอบสอบนี้ไม่ตรงกัน กรุณาแจ้งครูผู้คุมสอบ' }
     }
-    const expired = existing?.status === 'in_progress'
-      && isAttemptExpired(existing.started_at, assignment.duration_minutes)
+    const expired = previousExpired
     let completedSubmissionId: string | null = null
     if (existing && existing.status !== 'in_progress') {
       const { rows, error } = await fetchAllRows((from, to) => admin.from('submissions')
@@ -246,7 +251,7 @@ async function submissionEntry(
     }
     const blockedReason = assignment.start_at && new Date(assignment.start_at) > new Date()
       ? `ยังไม่ถึงเวลาเปิด${assignment.type === 'exercise' ? 'แบบฝึกหัด' : 'สอบ'} กรุณาโหลดหน้านี้ใหม่เมื่อถึงเวลา`
-      : effectiveEndAt && new Date(effectiveEndAt) < new Date()
+      : !expired && effectiveEndAt && new Date(effectiveEndAt) < new Date()
         ? 'หมดเวลาส่งแล้ว กรุณาติดต่อครูผู้สอน'
         : null
     const summary: ExamWaitingSummary = {
@@ -263,8 +268,12 @@ async function submissionEntry(
       previousSubmissionId: existing?.id ?? null,
       activeSubmissionId: existing?.status === 'in_progress' && !expired ? existing.id : null,
       completedSubmissionId,
+      finishedSubmissionId: existing && existing.status !== 'in_progress' ? existing.id : null,
       expired: Boolean(expired),
       startedAt: existing?.status === 'in_progress' ? existing.started_at : null,
+      expiresAt,
+      serverNow: new Date().toISOString(),
+      closeReason: existing?.close_reason ?? null,
       blockedReason,
     }
     return { waitingRoom: summary }
@@ -284,7 +293,7 @@ async function submissionEntry(
   let retryFromSubmissionId: string | null = null
   if (existing) {
     if (existing.status === 'in_progress') {
-      if (!isAttemptExpired(existing.started_at, assignment.duration_minutes)) {
+      if (!previousExpired) {
         if (
           examAccess?.mode === 'seb'
           && existing.seb_config_revision !== examAccess.assignmentConfigRevision
@@ -320,9 +329,10 @@ async function submissionEntry(
       const finalized = await gradeAndFinalizeSubmission(admin, existing.id, user.id, {
         enforceWorkImage: false,
         enforceSecureBrowser: false,
+        expiredOnly: true,
       })
       if (!finalized.success) return { error: finalized.error ?? 'ยืนยันการส่งรอบสอบเดิมไม่สำเร็จ กรุณาลองใหม่' }
-      if (waiting && 'previousSubmissionId' in waiting) {
+      if ((waiting && 'previousSubmissionId' in waiting) || (effectiveEndAt && Date.parse(effectiveEndAt) <= Date.now())) {
         return { submissionId: existing.id, alreadySubmitted: true as const }
       }
     }
@@ -387,11 +397,12 @@ async function submissionEntry(
 
     if (!previous || previous.length === 0) return { error: 'ไม่พบคำตอบของครั้งก่อน' }
 
-    const split = buildRetryAttempt(
+    let split: ReturnType<typeof buildRetryAttempt>
+    try { split = buildRetryAttempt(
       assignment,
       questions as Question[],
       previous as unknown as PreviousAttemptAnswer[],
-    )
+    ) } catch { return { error: 'ยังสุ่มตัวเลขชุดใหม่ไม่ได้ กรุณาแจ้งครูผู้สอนตรวจช่วงค่าตัวแปร' } }
     // Nothing to come back for: either every question already earned full
     // marks, or the only shortfalls are still waiting on the teacher. Send the
     // student to their results instead of opening an attempt with no questions.
@@ -416,7 +427,14 @@ async function submissionEntry(
     }
     skeletons = []
   } else {
-    skeletons = buildAssignmentAttempt(assignment, questions as Question[])
+    let previousValues: Record<string, Record<string, number>> = {}
+    if (existing) {
+      const { data: previous, error } = await admin.from('submission_answers').select('question_id, random_values').eq('submission_id', existing.id)
+      if (error || !previous) return { error: 'ยังอ่านชุดตัวเลขครั้งก่อนไม่สำเร็จ กรุณาลองใหม่' }
+      previousValues = Object.fromEntries(previous.map(row => [row.question_id, row.random_values ?? {}]))
+    }
+    try { skeletons = buildAssignmentAttempt(assignment, questions as Question[], previousValues) }
+    catch { return { error: 'ยังสุ่มตัวเลขชุดใหม่ไม่ได้ กรุณาแจ้งครูผู้สอนตรวจช่วงค่าตัวแปร' } }
     if (assignment.random_question_count && skeletons.length < assignment.random_question_count) {
       return { error: 'ข้อสอบในคลังเหลือไม่ครบตามจำนวนที่ตั้งไว้ กรุณาแจ้งครูผู้สอน' }
     }
@@ -581,6 +599,7 @@ export async function saveAnswer(
   submissionAnswerId: string,
   studentAnswer: string,
   mathInputModes?: unknown,
+  expectedRandomValues?: unknown,
 ) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -593,6 +612,11 @@ export async function saveAnswer(
 
   const writable = await getWritableStudentAnswer(admin, submissionAnswerId, user.id)
   if ('error' in writable) return { error: writable.error }
+  const currentValues = writable.answer.random_values ?? {}
+  const expectedValues = expectedRandomValues === undefined ? undefined : parseRandomValues(expectedRandomValues)
+  if (expectedValues === null || (expectedValues && !sameRandomValues(expectedValues, currentValues)) || (Object.keys(currentValues).length > 0 && !expectedValues)) {
+    return { error: 'ตัวเลขโจทย์เปลี่ยนแล้ว กรุณาโหลดโจทย์ล่าสุดก่อนตอบใหม่', variantChanged: true as const }
+  }
 
   let persistedAnswer = studentAnswer
   if (writable.question?.question_type === 'file_upload') {
@@ -616,16 +640,18 @@ export async function saveAnswer(
     persistedAnswer = JSON.stringify(files)
   }
 
-  const { error } = await admin
+  const { error, count } = await admin
     .from('submission_answers')
     .update({
       student_answer: persistedAnswer,
       ...(parsedModes ? { math_input_modes: parsedModes } : {}),
-    })
+    }, { count: 'exact' })
     .eq('id', submissionAnswerId)
     .eq('submission_id', writable.submission.id)
+    .eq('random_values', JSON.stringify(currentValues))
 
-  if (error) return { error: error.message }
+  if (error) return { error: error.code === 'PT425' ? 'รอบนี้ปิดรับคำตอบแล้ว' : error.message }
+  if (count !== 1) return { error: 'ตัวเลขโจทย์เปลี่ยนแล้ว กรุณาโหลดโจทย์ล่าสุดก่อนตอบใหม่', variantChanged: true as const }
   return { success: true }
 }
 
@@ -860,11 +886,11 @@ export async function checkAnswer(submissionAnswerId: string) {
 }
 
 /**
- * Start the next try after an ordinary exercise revealed the answer key.
- * Random-number questions receive a fresh frozen value set and answer key;
- * every other question is intentionally left untouched.
+ * Explicitly start a new numeric try, or refresh an active online attempt.
+ * Values and answer key are replaced together; completed history is immutable.
  */
-export async function rerollCheckedRandomAnswer(submissionAnswerId: string) {
+export async function rerollCheckedRandomAnswer(submissionAnswerId: string, reason: 'retry' | 'refresh' = 'retry', expectedRandomValues?: unknown) {
+  if (reason !== 'retry' && reason !== 'refresh') return { error: 'คำสั่งสุ่มโจทย์ไม่ถูกต้อง' }
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
@@ -875,17 +901,18 @@ export async function rerollCheckedRandomAnswer(submissionAnswerId: string) {
   const assignment = writable.assignment
   if (
     assignment?.mode !== 'online'
-    || assignment.type !== 'exercise'
-    || assignment.instant_check !== true
-    || assignment.instant_check_answer_key !== true
-    || assignment.completion_rule === 'streak'
+    || (assignment.type !== 'exercise' && assignment.type !== 'exam')
   ) {
-    return { error: 'งานนี้ไม่ได้เปิดให้สุ่มโจทย์ใหม่หลังดูคำตอบ' }
+    return { error: 'งานนี้ไม่เปิดให้ทำโจทย์ออนไลน์' }
   }
   if (writable.answer.carried_over) {
+    if (reason === 'refresh') return { success: true as const, rerolled: false as const }
     return { error: 'ข้อนี้ยกคะแนนมาจากครั้งก่อน ไม่ต้องทำใหม่' }
   }
-  if (Number(writable.answer.check_count ?? 0) < 1) {
+  if (assignment.completion_rule === 'streak' && Number(writable.answer.check_count ?? 0) > 0) {
+    return reason === 'refresh' ? { success: true as const, rerolled: false as const } : { error: 'ข้อนี้นับผลในรอบฝึกแล้ว กรุณาทำข้อต่อไป' }
+  }
+  if (reason === 'retry' && Number(writable.answer.check_count ?? 0) < 1) {
     return { error: 'กรุณากดตรวจคำตอบก่อนทำใหม่' }
   }
 
@@ -903,20 +930,24 @@ export async function rerollCheckedRandomAnswer(submissionAnswerId: string) {
   const question = (Array.isArray(row.questions) ? row.questions[0] : row.questions) as Question | null
   if (!question) return { error: 'ไม่พบโจทย์' }
   const previousRandomValues = (row.random_values ?? {}) as Record<string, number>
+  const expected = expectedRandomValues === undefined ? previousRandomValues : parseRandomValues(expectedRandomValues)
+  if (!expected || !sameRandomValues(expected, previousRandomValues)) return { error: 'โจทย์เปลี่ยนจากอีกหน้าต่าง กรุณาโหลดหน้าล่าสุด' }
   const next = buildFreshRandomQuestion(question, previousRandomValues)
-  if (!next) return { success: true as const, rerolled: false as const }
+  if (!next) return drawsRandomValues(question) ? { error: 'ยังสุ่มตัวเลขชุดที่แตกต่างไม่ได้ กรุณาลองอีกครั้งหรือตรวจช่วงค่าตัวแปร' } : { success: true as const, rerolled: false as const }
 
-  const { error } = await admin
+  const { error, count } = await admin
     .from('submission_answers')
     .update({
       random_values: next.random_values,
       correct_answer: next.correct_answer,
       student_answer: null,
       math_input_modes: {},
-    })
+    }, { count: 'exact' })
     .eq('id', submissionAnswerId)
     .eq('submission_id', writable.submission.id)
+    .eq('random_values', JSON.stringify(previousRandomValues))
   if (error) return { error: 'สุ่มตัวเลขชุดใหม่ไม่สำเร็จ กรุณาลองใหม่' }
+  if (count !== 1) return { error: 'โจทย์เปลี่ยนจากอีกหน้าต่าง กรุณาโหลดหน้าล่าสุด' }
 
   // The values are already visible in the question text; the new answer key
   // remains server-only until the next authorized check.
@@ -1028,7 +1059,7 @@ export async function drawNextStreakQuestion(
 
   const { data: existing } = await admin
     .from('submission_answers')
-    .select('id, question_id, order_index, check_count, carried_over, max_score')
+    .select('id, question_id, order_index, check_count, carried_over, max_score, random_values')
     .eq('submission_id', submission.id)
     .order('order_index')
 
@@ -1088,16 +1119,22 @@ export async function drawNextStreakQuestion(
   }
 
   const question = questionsById.get(nextId as string) as Question
-  const skeleton = buildAttemptQuestion(question, {
+  let skeleton = buildAttemptQuestion(question, {
     // Appended after every row already handed out, including any carried from
     // a previous attempt, so order_index stays the sequence the student saw.
     orderIndex: rows.length,
     shuffleOptions: assignment.shuffle_options === true,
     pointOverride: assignment.question_points?.[question.id],
-    // A ข้อ the pool hands out again comes back with the same numbers when the
-    // งาน shares them — the same rule as a retry.
+    // First delivery may share the teacher's seed. A recycled numeric question
+    // below deliberately gets fresh values for this next try.
     sharedRandomSeed: assignment.shared_random_seed,
   })
+  const previousDraw = [...rows].reverse().find(row => row.question_id === question.id)
+  if (previousDraw && drawsRandomValues(question)) {
+    const fresh = buildFreshRandomQuestion(question, previousDraw.random_values ?? {})
+    if (!fresh) return { error: 'ยังสุ่มตัวเลขชุดที่แตกต่างไม่ได้ กรุณาแจ้งครูผู้สอน' }
+    skeleton = { ...skeleton, random_values: fresh.random_values, correct_answer: fresh.correct_answer }
+  }
 
   const { data: inserted, error: insertError } = await admin
     .from('submission_answers')
@@ -1202,197 +1239,32 @@ export async function updateSubmissionAnswerScore(submissionAnswerId: string, ne
   return { success: true, newTotalScore: totalScore }
 }
 
-// Shared by submitSubmission (student-initiated) and startSubmission's
-// stale-attempt handling (server-initiated, when a resumed in-progress
-// attempt's time limit already elapsed). Student-initiated calls enforce both
-// work-image and SEB rules; a forced finalize of an abandoned expired attempt
-// bypasses both because the student can no longer satisfy either requirement.
-async function gradeAndFinalizeSubmission(
-  admin: ReturnType<typeof createAdminClient>,
-  submissionId: string,
-  studentId: string,
-  opts: { enforceWorkImage: boolean; enforceSecureBrowser: boolean }
-): Promise<{ error?: string; success?: true; totalScore?: number }> {
-  const { data: submission } = await admin
-    .from('submissions')
-    .select('*, assignments(duration_minutes, end_at, require_work_image, secure_browser_mode, android_exam_mode)')
-    .eq('id', submissionId)
-    .eq('student_id', studentId)
-    .maybeSingle()
-
-  if (!submission) return { error: 'ไม่พบการสอบ' }
-  if (submission.status !== 'in_progress') return { error: 'ส่งงานแล้ว' }
-
-  const assignment = Array.isArray((submission as any).assignments)
-    ? (submission as any).assignments[0]
-    : (submission as any).assignments
-  if (
-    opts.enforceSecureBrowser
-    && assignment?.secure_browser_mode === 'seb_required'
-    && !await getExamAccessSession(
-      studentId,
-      submission.assignment_id,
-      assignment.android_exam_mode === 'monitored',
-      typeof submission.seb_config_revision === 'number' ? submission.seb_config_revision : null,
-      submission.exam_access_mode === 'seb' || submission.exam_access_mode === 'android_monitored'
-        ? submission.exam_access_mode
-        : null,
-    )
-  ) {
-    return { error: 'เซสชันเข้าสอบหมดอายุ กรุณากลับไปเปิดข้อสอบใหม่' }
-  }
-
-  const { data: answers } = await admin
-    .from('submission_answers')
-    .select('*, questions(answer_tolerance, answer_parts, question_type, extra_data)')
-    .eq('submission_id', submissionId)
-
-  if (!answers) return { error: 'ไม่พบคำตอบ' }
-
-  // Rows carried over from an earlier attempt keep that attempt's answer and
-  // score. Re-grading them would be wrong twice over: the student never saw
-  // them this time, and any score a teacher gave or adjusted by hand would be
-  // recomputed — an essay would drop back to pending and score 0.
-  const gradable = answers.filter((a: any) => !a.carried_over)
-  const carriedScore = answers
-    .filter((a: any) => a.carried_over)
-    .reduce((sum: number, a: any) => sum + Number(a.score ?? 0), 0)
-
-  // A URL-shaped string is not evidence of an uploaded answer. Re-inspect
-  // every legacy photo/file before the final grade so a tampered client cannot
-  // gain credit by calling saveAnswer/saveWorkImage with external or missing
-  // objects. New paths are bound to this exact student + attempt + answer;
-  // two-segment paths are accepted only for attempts opened before S1 shipped.
-  const attachmentChecks: Array<() => ReturnType<typeof validateStoredExamAttachmentUrl>> = []
-  for (const answer of (opts.enforceSecureBrowser ? gradable : []) as any[]) {
-    if (answer.questions?.question_type === 'file_upload') {
-      const files = parseSubmittedFiles(answer.student_answer)
-      if (!files) return { error: 'รายการไฟล์คำตอบไม่ถูกต้อง กรุณาแนบใหม่' }
-      for (const file of files) {
-        attachmentChecks.push(() => validateStoredExamAttachmentUrl(admin, {
-          kind: 'submission_file',
-          url: file.url,
-          studentId,
-          submissionId,
-          submissionAnswerId: answer.id,
-          expectedMimeType: file.type,
-          allowLegacy: true,
-        }))
-      }
-    }
-    const workImages: unknown[] = Array.isArray(answer.work_images) ? answer.work_images : []
-    for (const url of workImages) {
-      if (typeof url !== 'string' || !url) continue
-      attachmentChecks.push(() => validateStoredExamAttachmentUrl(admin, {
-        kind: 'work_image',
-        url,
-        studentId,
-        submissionId,
-        submissionAnswerId: answer.id,
-        allowLegacy: true,
-      }))
-    }
-  }
-  const attachmentCheckConcurrency = 4
-  for (let index = 0; index < attachmentChecks.length; index += attachmentCheckConcurrency) {
-    const results = await Promise.all(
-      attachmentChecks.slice(index, index + attachmentCheckConcurrency).map(check => check()),
-    )
-    const failed = results.find(result => 'error' in result)
-    if (failed?.error) return { error: failed.error }
-  }
-
-  // Server-side defense-in-depth: the exam UI already blocks submission
-  // client-side when required working is missing, but a tampered
-  // client could call this action directly. `require_work_image` is the whole
-  // decision — one answer for the งาน, given by the teacher when they created
-  // it — and it applies to every เติมคำตอบตัวเลข question the งาน contains.
-  const workImageEnforced = opts.enforceWorkImage && (assignment?.require_work_image ?? false)
-  const { data: workArtifactRows, error: workArtifactError } = workImageEnforced && gradable.length > 0
-    ? await admin
-        .from('student_work_artifacts')
-        .select('submission_answer_id, part_key')
-        .in('submission_answer_id', gradable.map((answer: any) => answer.id))
-    : { data: [], error: null }
-  if (workArtifactError) return { error: 'ตรวจสอบวิธีทำที่แนบไม่สำเร็จ กรุณาลองใหม่' }
-  const attachedArtifactSlots = new Set((workArtifactRows ?? []).map(row => (
-    `${row.submission_answer_id}:${row.part_key}`
-  )))
-  const missingWorkImage = workImageEnforced && gradable.some((a: any) => {
-    if (a.questions?.question_type !== 'written') return false
-    const parts: unknown[] = a.questions?.answer_parts ?? []
-    const requiredCount = parts.length > 0 ? parts.length : 1
-    const images: (string | null)[] = Array.isArray(a.work_images) ? a.work_images : []
-    return !hasCompleteWorkEvidence({
-      submissionAnswerId: a.id,
-      partCount: requiredCount,
-      workImages: images,
-      artifactSlots: attachedArtifactSlots,
-    })
-  })
-  if (missingWorkImage) return { error: 'กรุณาแนบวิธีทำให้ครบทุกข้อก่อนส่งคำตอบ' }
-
-  // Auto-grade: compare student_answer vs correct_answer with tolerance
-  const updates = gradable.map((a: any) => gradeAnswer(a))
-
-  // Each answer row is independent. Grade writes can run in small concurrent
-  // batches instead of one-by-one, while avoiding a request spike for a long
-  // exam on the free Supabase tier.
-  const gradeWriteConcurrency = 10
-  for (let i = 0; i < updates.length; i += gradeWriteConcurrency) {
-    await Promise.all(updates.slice(i, i + gradeWriteConcurrency).map(u =>
-      admin
-        .from('submission_answers')
-        .update({ is_correct: u.is_correct, score: u.score })
-        .eq('id', u.id)
-    ))
-  }
-
-  const totalScore = updates.reduce((sum: number, u: any) => sum + u.score, 0) + carriedScore
-
-  const { error } = await admin
-    .from('submissions')
-    .update({
-      status: 'submitted',
-      submitted_at: new Date().toISOString(),
-      total_score: totalScore,
-    })
-    .eq('id', submissionId)
-
-  if (error) return { error: error.message }
-
-  // If this attempt used the live proctor room, stop its presence heartbeat
-  // immediately. This is best-effort supporting state; a failure here must
-  // never roll back or hide an otherwise successful exam submission.
-  const proctorCompletedAt = new Date().toISOString()
-  await Promise.all([
-    admin
-      .from('exam_proctor_connections')
-      .update({ closed_at: proctorCompletedAt, last_seen_at: proctorCompletedAt })
-      .eq('submission_id', submissionId),
-    admin
-      .from('exam_proctor_sessions')
-      .update({
-        is_online: false,
-        active_connection_count: 0,
-        completed_at: proctorCompletedAt,
-        last_seen_at: proctorCompletedAt,
-        updated_at: proctorCompletedAt,
-      })
-      .eq('submission_id', submissionId),
-  ])
-
-  revalidatePath(`/submissions/${submissionId}`)
-  return { success: true, totalScore }
-}
-
 export async function submitSubmission(submissionId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   const admin = createAdminClient()
-  return gradeAndFinalizeSubmission(admin, submissionId, user.id, {
+  const result = await gradeAndFinalizeSubmission(admin, submissionId, user.id, {
     enforceWorkImage: true,
     enforceSecureBrowser: true,
   })
+  // Score visibility belongs to the result route. The submission receipt
+  // must not leak a hidden/after-close score through the action response.
+  return result.success ? { success: true as const } : { error: result.error ?? 'ยืนยันการส่งไม่สำเร็จ' }
+}
+
+/** Only server-expired/closed rounds can bypass evidence and native-session
+ * requirements. An untrusted browser cannot use this to submit early. */
+export async function finalizeExpiredSubmission(submissionId: string) {
+  if (typeof submissionId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(submissionId)) {
+    return { error: 'คำขอยืนยันรอบทำงานไม่ถูกต้อง' }
+  }
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ กรุณาเข้าสู่ระบบเพื่อยืนยันผลรอบเดิม' }
+  const result = await gradeAndFinalizeSubmission(createAdminClient(), submissionId, user.id, {
+    enforceWorkImage: false, enforceSecureBrowser: false, expiredOnly: true,
+  })
+  return result.success ? { success: true as const } : { error: result.error ?? 'ยืนยันการส่งไม่สำเร็จ',
+    ...(result.notExpired ? { notExpired: true as const } : {}) }
 }

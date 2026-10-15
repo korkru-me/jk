@@ -1,5 +1,7 @@
 'use client'
 
+import { workTypeConfig } from '@/lib/assignment-display'
+import { WorkTypeBadge } from '@/components/assignments/work-type'
 import { useState } from 'react'
 import Link from 'next/link'
 import {
@@ -80,6 +82,8 @@ export function ExamDashboard({ assignments, mySubMap, attemptsUsed, hasInProgre
       ) : (
         <div className="space-y-3">
           {filtered.map(a => {
+            const type = workTypeConfig(a.type)
+            const TypeIcon = type.icon
             const sub = mySubMap[a.id]
             const canShowResults = a.show_results !== 'never'
             const isDone = sub?.status === 'submitted' || sub?.status === 'graded'
@@ -94,7 +98,7 @@ export function ExamDashboard({ assignments, mySubMap, attemptsUsed, hasInProgre
               <Card padding="md" className="hover:border-primary/20 dark:hover:border-primary transition-colors" key={a.id}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold">{a.title}</p>
+                    <p className="flex items-center gap-2 font-semibold"><TypeIcon className={cn('size-5 shrink-0', type.text)} aria-hidden="true" />{a.title}<WorkTypeBadge type={a.type} /></p>
                     <p className="text-xs text-muted-foreground mt-0.5">{a.classrooms?.name}</p>
                     <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1">
@@ -127,7 +131,7 @@ export function ExamDashboard({ assignments, mySubMap, attemptsUsed, hasInProgre
                       )}
                       <Link
                         href={`/assignments/${a.id}/take`}
-                        className={cn(buttonVariants({ size: 'sm' }), 'gap-1.5 bg-warning hover:bg-warning/90 text-white border-0')}
+                        className={cn(buttonVariants({ size: 'sm', variant: type.variant }), 'gap-1.5')}
                       >
                         ▶ ทำต่อ
                       </Link>
@@ -140,7 +144,7 @@ export function ExamDashboard({ assignments, mySubMap, attemptsUsed, hasInProgre
                       )}
                       <Link
                         href={`/assignments/${a.id}/take`}
-                        className={cn(buttonVariants({ size: 'sm' }), 'gap-1.5 bg-warning hover:bg-warning/90 text-white border-0')}
+                        className={cn(buttonVariants({ size: 'sm', variant: type.variant }), 'gap-1.5')}
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
                         {a.retry_scope === 'wrong_only' ? 'แก้ข้อที่ยังไม่เต็ม' : 'ลองใหม่'}{a.max_attempts != null && ` (เหลือ ${a.max_attempts - used} ครั้ง)`}
@@ -156,7 +160,7 @@ export function ExamDashboard({ assignments, mySubMap, attemptsUsed, hasInProgre
                   ) : (
                     <Link
                       href={`/assignments/${a.id}/take`}
-                      className={cn(buttonVariants({ size: 'sm' }), 'shrink-0 gap-1.5')}
+                      className={cn(buttonVariants({ size: 'sm', variant: type.variant }), 'shrink-0 gap-1.5')}
                     >
                       <Play className="w-3.5 h-3.5" /> เริ่มทำ
                     </Link>

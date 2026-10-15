@@ -5,7 +5,7 @@ import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import {
   ChevronLeft, BarChart2, Search, TrendingUp, Users,
-  Download, FileSpreadsheet, FileText as FilePdf,
+  Download, FileSpreadsheet,
 } from 'lucide-react'
 import type { Question } from '@/lib/types'
 import { passingPercent } from '@/lib/grading'
@@ -89,11 +89,6 @@ export function AnalyticsClient({ assignment, questions, submissions, teacherNam
     setShowExport(false)
   }
 
-  function exportPrint() {
-    window.print()
-    setShowExport(false)
-  }
-
   return (
     <div className="space-y-6 max-w-[1200px]">
       {/* Back + title */}
@@ -112,7 +107,7 @@ export function AnalyticsClient({ assignment, questions, submissions, teacherNam
         </div>
 
         {/* Export dropdown */}
-        <div className="relative shrink-0 print:hidden">
+        <div className="relative shrink-0">
           <button
             onClick={() => setShowExport(v => !v)}
             className="flex items-center gap-2 px-3.5 py-2 bg-foreground text-background text-sm font-medium rounded-xl hover:bg-foreground transition-colors"
@@ -131,13 +126,6 @@ export function AnalyticsClient({ assignment, questions, submissions, teacherNam
                   <FileSpreadsheet className="w-4 h-4 text-success" />
                   Export as Excel (CSV)
                 </button>
-                <button
-                  onClick={exportPrint}
-                  className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-muted-foreground hover:bg-muted transition-colors"
-                >
-                  <FilePdf className="w-4 h-4 text-destructive" />
-                  Export as PDF
-                </button>
               </Card>
             </>
           )}
@@ -145,7 +133,7 @@ export function AnalyticsClient({ assignment, questions, submissions, teacherNam
       </div>
 
       {/* Tab bar */}
-      <div className="flex items-center gap-1 bg-muted rounded-2xl p-1 print:hidden">
+      <div className="flex items-center gap-1 bg-muted rounded-2xl p-1">
         {TABS.map(tab => {
           const Icon = tab.icon
           return (

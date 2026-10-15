@@ -1,5 +1,39 @@
 # Data model และ invariants
 
+การปิดรอบ (`20261014072745`, apply เฉพาะ Staging): `submissions.closed_at` หยุดคำตอบ/วิธีทำ, `close_reason` เป็น `manual|time_limit|close_time`, `answer_revision` ตรวจข้อมูลที่เปลี่ยนระหว่างยืนยันส่ง และ `missing_work_evidence` แจ้งหลักฐานที่ไม่ครบ รอบที่ปิดอาจยังเป็น `in_progress` ขณะรอตรวจโดยไม่เผยแพร่คะแนนชั่วคราว Commit คะแนนตั้ง `submitted_at = closed_at` กับ `status = submitted` ใน transaction เดียว การเรียกซ้ำไม่ทับผลที่เสร็จหรือครูแก้แล้ว ใช้สเกลคะแนนและช่วงสีเดิม
+
+## Numeric variant transition — 15 ตุลาคม 2026
+
+ไม่มีคอลัมน์หรือ migration ใหม่: transition ใช้ submission_answers.random_values/correct_answer เดิม เปลี่ยนพร้อม student_answer=null และ math_input_modes={} เฉพาะ active authorized row ที่ old numeric map ยังตรง ไม่แก้ question_id/order/option_order/max_score/submission.started_at ส่วน completed submissions, carried-over answers และ checked streak history ไม่เปลี่ยน ค่า check_count เป็นจำนวนตรวจสะสม ไม่ล้างเพราะเปลี่ยน variant
+
+Answer-backup v2 เพิ่ม optional randomValues ซึ่งมีเฉพาะ numeric map ที่แสดงแล้ว การกู้ร่าง random question ต้องตรงกับ map ปัจจุบัน ร่างเก่าที่ไม่มี map ไม่เอากลับมาปะปน Practice/preview history เป็น optional session storage สำหรับกันเลขซ้ำ ไม่เก็บคำตอบหรือเปลี่ยน event schema ของคลังฝึก
+
+## Question-set colour metadata — 15 October 2026
+
+Colour uses the existing question_sets.description channel, following the classroom metadata approach; no schema, migration, RLS or grants change. A recognized versioned header [korkru:set-theme:v1:<allowed colour>] followed by a newline precedes the teacher's plain description. lib/question-set-theme.ts owns encoding/decoding. Unknown headers and legacy text are preserved as text; composing an already encoded description does not stack headers. Editors, research option DTOs and description search strip the envelope for display/search. The existing portable set descriptor retains the string through export/import and batching, including an empty human description.
+
+Create validates the nine-colour allowlist server-side and persists a random colour if none was selected. Modern edits send a resolved colour with each autosave; legacy callers that omit it read the owner's existing description first and retain its colour. Unthemed legacy folders derive a stable colour from their ID until next saved, avoiding a database backfill or colour changes on navigation. No permission or membership flags are carried in this metadata.
+
+## Browser presentation settings for personal exercises — 15 October 2026
+
+`korkru:practice-exercise-settings:<owner>:<library>` stores a strict UUID-keyed map of exercise → `{ questionsPerPage: 1|3|5|10, theme: <existing cover preset> }`, limited to 1000 entries. The map carries no answers, correctness, grades, permission flags or resource authority. Unselected colors are drawn once on save; legacy exercises receive stable defaults. Settings remain on this browser even for server-backed groups; no migration or automatic cloud sync is introduced. Run-page answers/math modes/verdicts/flags remain in memory, with scratch work using the existing local IndexedDB policy. Every question fetch/check repeats server resource access regardless of browser membership or preferences
+
+## Prepared editing and review-pin schema
+
+Migration `20261014144828` adds revision/updated_at to student_practice_exercises. Update locks the exact owner/library exercise row and checks expectedRevision; a retry of the same payload returns its existing revision. List DTO adds revision and allowlisted member titles. student_practice_review_pins has composite library/student/question PK, a membership FK and student FK with cascade deletion and supporting indexes. Browser grants are revoked with RLS enabled; set/list/search RPCs are service-only and share the active student library access assertion. Pins store no answers or correctness. All new schema remains unapplied for local review.
+
+
+## Prepared personal practice exercise schema
+
+The access assertion helper alone is service-only SECURITY DEFINER with an empty search_path, to share-lock protected library/roster rows without expanding direct UPDATE grants. Main creation/list/page RPCs remain SECURITY INVOKER.
+
+student_practice_exercises contains a client request UUID primary key, library/student foreign keys with cascade deletion, a 1-120 character title, 1-500 ordered unique question_ids, and database created_at. The create RPC validates every question against the exact published library, whose membership is already frozen. It stores no answers, verdicts, scores or feedback. RLS is enabled with no browser grants; service-only invoker RPCs repeat actor/roster/library authorization. The list RPC scopes by actor/library and aggregates distinct accepted question checks. The new migration is not applied; see FEATURE_STATUS before release.
+
+
+## Pending: explicit classroom announcement receipts
+
+Migration `20261014053207_classroom_announcement_acknowledgements.sql` is prepared locally, not applied: `classroom_announcement_rounds` stores current round/reminded_at per post; `classroom_announcement_acknowledgements` stores the first explicit receipt per `(post_id, student_id, round_no)`. Both cascade from the existing post/user, enable RLS and permit service-only RPC access. Legacy `post_reads.seen_at` remains a separate sighting and is never backfilled as consent/acknowledgement. The server rollout flag stays off until migration parity and Staging verification pass.
+
 อัปเดตล่าสุด: 12 ตุลาคม 2026
 
 เอกสารนี้เป็นแผนที่เชิงแนวคิด ไม่ใช่ schema dump ก่อนแก้ฐานข้อมูลต้องอ่าน migration ที่เกี่ยวข้องและตรวจสถานะฐานข้อมูลจริง
@@ -55,6 +89,8 @@ Invariant สำคัญ:
 
 ## คลังฝึกด้วยตนเอง
 
+- Presentation metadata ที่เตรียมใน `20261014125654_classroom_practice_work_layout.sql`: `practice_libraries.category_id` อ้างกลุ่มงานของห้องเดียวกันเท่านั้น (ลบกลุ่มแล้วเป็น NULL) และ `display_order` ใช้ร่วมกับลำดับของ assignment_classrooms ในหน้า teacher list; `reorder_classroom_work` ตรวจ active actor, owner/admin/manage, exact classroom และชุด ID ทั้งหมดก่อนเขียนสองตารางใน transaction เดียว ไม่เพิ่มข้อมูลลง submissions หรือ events
+
 - `practice_libraries` — คลังฝึกหนึ่งห้องต่อแถว มี `org_id`, `classroom_id`, `created_by`, ชื่อ/คำชี้แจง, `status = draft|published|closed`, `reveal_answer_key`, `access_code`, `calculator_enabled`, `scratchpad_enabled`, `shuffle_questions`, `shuffle_options` และเวลาจากฐาน `published_at`, `closed_at`, `created_at`, `updated_at`; ไม่มีคะแนน กำหนดส่ง เวลา เกณฑ์ผ่าน หรือวิธีคิดคะแนน รหัสผ่านอ่าน/ตรวจเฉพาะ server และไม่อยู่ใน student DTO
 - `practice_library_questions` — สมาชิกโจทย์และ `position` ของคลัง คีย์หลัก `(library_id, question_id)` และ unique `(library_id, position)`; FK คู่ยืนยันว่า accepted-check อ้างได้เฉพาะโจทย์ที่อยู่ใน exact library สมาชิกเปลี่ยนได้เฉพาะ `draft` และการลบโจทย์ต้นทางที่ถูกใช้ต้องไม่ทำลายประวัติแบบเงียบ ๆ
 - `practice_answer_attempts` — append-only accepted-check event มีเพียง `library_id`, `student_id`, `question_id`, `checked_at` จากนาฬิกาฐานข้อมูล และ `idempotency_key`; unique `(library_id, student_id, idempotency_key)` ทำให้ retry ของการกดเดียวกันไม่นับซ้ำ
@@ -99,10 +135,10 @@ Tenant invariant ของเส้นทางการส่งคำตอบ
 - browser role ไม่มีสิทธิ์เขียน `exam_proctor_sessions`/`exam_proctor_events` โดยตรง; `record_exam_proctor_signal` เรียกได้เฉพาะ service role หลัง Server Action ตรวจว่าเป็น attempt ของนักเรียนคนนั้น ยัง `in_progress`, เป็นข้อสอบ online และเปิด proctoring ส่วนครูอ่านผ่าน RLS ตาม assignment ที่จัดการได้
 - การรับทราบ `exam_proctor_events` ใช้ Server Action ตรวจ exact event ผ่าน session RLS ก่อนเรียก `acknowledge_exam_proctor_events`; RPC ตรวจ owner/co-teacher `admin/manage`/super admin ซ้ำ อัปเดตเฉพาะ reviewable event ที่ยังไม่รับทราบ และคืนค่าครู/เวลาคนแรกแบบ idempotent โดยไม่ให้ authenticated role `UPDATE` ตารางตรง
 - browser role ไม่มีสิทธิ์เขียน `exam_proctor_connections` โดยตรงเช่นกัน RPC ใช้ advisory lock ต่อ submission เพื่อคำนวณ transition จากหนึ่งเป็นหลาย lease แบบ atomic; `concurrent_connection` สร้างโดยฐานข้อมูลเท่านั้นและ client ปลอม event ชนิดนี้ไม่ได้
-- `assignments.proctoring_enabled`, `fullscreen_required`, `block_clipboard` และ `exam_watermark_enabled` เป็นการตั้งค่าแรงเสียดทาน/สัญญาณระดับ browser ไม่ใช่ kiosk mode หรือ security boundary; `proctoring_enabled` มีค่าเริ่มต้น `false` และคุมการเปิดห้องคุมสอบสด/ส่ง heartbeat และ event ให้ครู ส่วนการนับ/เตือนสลับแท็บใน client ตัดสินจาก `assignments.type`: ข้อสอบจริงตรวจอัตโนมัติ แบบฝึกหัดและ teacher preview ไม่ตรวจ; event, connection lease และ session summary ของ attempt ถูกลบเมื่อไม่มี heartbeat เกิน 90 วัน โดยไม่ลบ submission, answer หรือ score และครูผู้จัดการ assignment ล้างก่อนกำหนดได้เมื่อไม่มี session สด
+- `assignments.proctoring_enabled`, `fullscreen_required`, `block_clipboard` และ `exam_watermark_enabled` เป็นการตั้งค่าแรงเสียดทาน/สัญญาณระดับ browser ไม่ใช่ kiosk mode หรือ security boundary; `proctoring_enabled` มีค่าเริ่มต้น `false` และคุมการเปิดห้องคุมสอบสด/ส่ง heartbeat และ event ให้ครู ส่วนการนับ/เตือนสลับแท็บใน client ตัดสินจาก `assignments.type`: ข้อสอบจริงตรวจอัตโนมัติ แบบฝึกหัดและ teacher preview ไม่ตรวจ; นโยบายใหม่เก็บ event, connection lease และ session summary ตามอายุ assignment โดยไม่มี purge แยกหลัง apply migration `20261015132234`; คง FK parent cascade และอายุสิทธิ์เดิม
 - `secure_browser_mode = 'seb_required'` เป็นคนละ boundary กับสัญญาณ browser: server ต้องพบ signed SEB session ที่ผูก exact user + assignment ก่อนเริ่ม/resume/read/save/upload/heartbeat/submit และห้ามเปลี่ยนโหมดหลังมี submission แรก
 - browser เขียน `exam_seb_checkins` ตรงไม่ได้ การบันทึกหลัง `system_check` ผ่านใช้ service-role-only `record_exam_seb_checkin` ซึ่งตรวจซ้ำว่าข้อสอบเป็น `published` + `seb_required` และนักเรียนยังอยู่ใน roster; teacher-select RLS ให้ owner, co-teacher `admin/manage` และ super admin อ่านได้ แต่ไม่เปิดให้นักเรียนหรือผู้ไม่เกี่ยวข้อง แถวเก่ากว่าถูกแทนที่เฉพาะด้วยผลตรวจที่ใหม่กว่าหรือเวลาเท่ากัน
-- check-in ที่ยังไม่หมดอายุหมายถึง “ผ่านการตรวจล่าสุด” เท่านั้น ไม่ใช่ตัวระบุเครื่อง ไม่พิสูจน์ว่าใช้เครื่องเดิมต่อ และไม่ใช่หลักฐานว่าปกติหรือทุจริต จึงไม่ใช้เป็น hard gate ของ `startSubmission`; รายการนี้ลบอัตโนมัติเมื่อเกิน 90 วันและถูกล้างร่วมกับข้อมูลคุมสอบราย assignment ได้
+- check-in ที่ยังไม่หมดอายุหมายถึง “ผ่านการตรวจล่าสุด” เท่านั้น ไม่ใช่ตัวระบุเครื่อง ไม่พิสูจน์ว่าใช้เครื่องเดิมต่อ และไม่ใช่หลักฐานว่าปกติหรือทุจริต จึงไม่ใช้เป็น hard gate ของ `startSubmission`; นโยบายใหม่เก็บรายการตามอายุข้อสอบหลัง apply migration `20261015132234`; ความหมดอายุและการยกเลิก check-in เมื่อเปลี่ยน SEB config ยังคงแยกจากการเก็บหลักฐาน
 - หาก `android_exam_mode = 'monitored'` server ยอมรับ signed Android session แทน SEB ได้เฉพาะหลังครูที่จัดการ assignment อนุมัติ exact student ที่อยู่ใน roster; user-agent ใช้ routing UI เท่านั้น และ Android audit ห้ามถูกแสดงเป็น SEB
 - `completion_rule` เป็น `fixed` (พฤติกรรมเดิมทุกงาน: จบเมื่อทำครบตามจำนวนข้อที่ได้รับ) หรือ `streak` (จบเมื่อตอบถูกติดต่อกันครบ `streak_target` ข้อ จำนวนข้อทั้งหมดจึงไม่คงที่); `streak_question_cap` คือเพดานกันวนไม่จบ และ `streak_recycle_pool` คือทำครบคลังแล้ววนกลับมาถามใหม่ไหม · มี CHECK บังคับสามข้อ: streak ต้องมี `streak_target`, ต้องมี `instant_check = true` และต้องไม่มี `passing_type`/`passing_value` · ยอดที่นับได้อยู่ที่ `submissions.current_streak` / `best_streak` / `streak_reached` เพราะ “ติดต่อกัน” เป็นคุณสมบัติของลำดับการตอบ ไม่ใช่ของผลรวมคะแนน — `computePassed()` จึงคำนวณแทนไม่ได้
 - application invariant สำหรับงานใหม่บังคับให้ `completion_rule = streak` มี `random_question_count` ที่ valid; Server Action ตรวจหลัง normalize จำนวนสุ่มและ UI ปิด control เดียวกันเมื่อไม่มี subset ส่วนแถวเก่าที่ไม่มีจำนวนสุ่มยังรองรับแบบอ่าน/บันทึกค่าอื่นเพื่อ backward compatibility จึงยังไม่มี database CHECK หรือ migration เพิ่ม
@@ -149,7 +185,7 @@ Invariant สำคัญ:
 - เฉลยที่คำนวณจากค่าชุดนั้น
 - max score ตาม assignment ณ เวลาสร้าง attempt
 
-ห้ามคำนวณ random values ใหม่เมื่อ refresh หรือ grade เพราะจะทำให้คำถามและเฉลยเปลี่ยนหลังนักเรียนตอบ
+ตอน grade ใช้ random_values/correct_answer ที่จัดเก็บคู่กันเสมอ ห้ามสุ่มระหว่างตรวจ ส่วน explicit ทำใหม่/refresh เปลี่ยนชุดค่าและเฉลยพร้อมล้างคำตอบเดิมผ่าน authorized POST โดยคงลำดับข้อ/ตัวเลือก/คะแนนเต็มและเวลา attempt
 
 ## เครื่องมือคณิตศาสตร์และ artifact
 
@@ -181,7 +217,7 @@ Session Library ของครูใน drawing-board เฟส 7 ก็ไม�
 - โหมด complete ใช้ `max_attempts` ตามที่ครูตั้ง (งานใหม่ default จาก create action เป็น 1 ไม่เปลี่ยน default/แถวเก่าในฐานข้อมูล); threshold (`fixed` + passing threshold) และ streak normalize เป็น `max_attempts NULL` + `score_strategy best` ตอนสร้าง/บันทึก แอปตีความแถวเก่าสองโหมดนี้ว่าไม่จำกัดจนผ่านเช่นกัน ผ่านจาก finished attempt ใดก็ได้แล้วไม่เริ่มรอบใหม่ ไม่มี column หรือ migration ใหม่ ไม่ backfill/ลบประวัติ submission การเปิดเฉลยใช้ผลผ่านร่วมกับกติกาไม่มี writable attempt ค้าง
 - `assignments.retry_scope` = `all` | `wrong_only` ตัดสินว่าการทำครั้งใหม่ถามซ้ำทั้งชุดหรือเฉพาะข้อที่ `score < max_score`
 - `submission_answers.carried_over` คือแถวที่คัดลอกมาจาก attempt ก่อนหน้า ไม่ได้ตอบใน attempt นี้ — นับใน `max_score`/`total_score` แต่ไม่ถูก auto-grade ซ้ำ และไม่ถูกส่งเข้าหน้าทำข้อสอบ
-- `assignments.instant_check` เปิดให้แบบฝึกหัดออนไลน์กดตรวจทีละข้อระหว่างทำ และ `instant_check_answer_key` ตัดสินว่าการตรวจนั้นเปิดคำตอบที่ถูกด้วยหรือบอกแค่ถูก/ผิด (ค่าเริ่มต้นของงานใหม่คือ `false`; เฉลยวิธีทำไม่อยู่ในการตรวจนี้ ดู `show_solutions`) — เมื่อเปิดบอกคำตอบ โจทย์ที่ `drawsRandomValues` เป็นจริงจะเขียน `random_values`/`correct_answer` ชุดใหม่และล้าง `student_answer` เฉพาะตอนผู้เรียนกด "ทำใหม่" หลังตรวจ; โจทย์ปกติไม่เปลี่ยน · ทั้งคู่ไม่มีผลกับคะแนน `submitSubmission` ยังตรวจใหม่ทั้งชุดจาก `student_answer` เหมือนเดิม คะแนนแบบฝึกหัดจึงมาจากคำตอบสุดท้ายเสมอ
+- `assignments.instant_check` เปิดให้แบบฝึกหัดออนไลน์กดตรวจทีละข้อระหว่างทำ และ `instant_check_answer_key` ตัดสินว่าการตรวจนั้นเปิดคำตอบที่ถูกด้วยหรือบอกแค่ถูก/ผิด (ค่าเริ่มต้นของงานใหม่คือ `false`; เฉลยวิธีทำไม่อยู่ในการตรวจนี้ ดู `show_solutions`) — โจทย์ที่ `drawsRandomValues` เป็นจริงเปลี่ยน `random_values`/`correct_answer` และล้าง `student_answer` เมื่อกด "ทำใหม่" หลังตรวจหรือ refresh active attempt ไม่ขึ้นกับการเปิด answer key; โจทย์ปกติไม่เปลี่ยน · ทั้งคู่ไม่มีผลกับคะแนน `submitSubmission` ยังตรวจใหม่ทั้งชุดจาก `student_answer` เหมือนเดิม คะแนนแบบฝึกหัดจึงมาจากคำตอบสุดท้ายเสมอ
 - `submission_answers.check_count` นับจำนวนครั้งที่นักเรียนกดตรวจข้อนั้นระหว่างทำ ไม่ใช้คิดคะแนนและไม่ใช้กั้นการกดตรวจ เป็นสัญญาณเดียวที่แยก "ถูกตั้งแต่แรก" ออกจาก "ตรวจแล้วแก้จนถูก" เมื่อคะแนนสองคนเท่ากัน
 
 ก่อนแก้ scoring ต้องตรวจ `lib/scoring.ts`, `lib/grading.ts`, `lib/actions/submissions.ts` และหน้าที่อ่านคะแนนทั้งหมด
@@ -233,3 +269,5 @@ Notification body ต้องไม่เปิดเผยข้อมูล�
 5. ทดสอบ RLS ด้วยอย่างน้อย teacher, student, unrelated user และ admin ที่เกี่ยวข้อง
 6. ทดสอบ rollback/recovery plan แม้ migration จะไม่มี down script
 7. อัปเดตเอกสารนี้และ `docs/FEATURE_STATUS.md`
+
+- 14 ต.ค. 2026: `users.avatar_url` เดิมเก็บ URL ของ PNG crop 512×512 ใน public display-identity bucket `profile-avatars`; ไม่เพิ่ม student profile column. Migration `20261014065458_account_avatars.sql` จำกัด 2 MiB/image/png และ restrictive server-only Storage policy ไม่มีการใช้ bucket รูปโจทย์หรือข้อมูลส่วนตัวร่วมกัน. Staging history `20261009142610_atomic_seb_exam_start.sql` คืนจาก CLI history เป็นสำเนา ไม่รันซ้ำ.

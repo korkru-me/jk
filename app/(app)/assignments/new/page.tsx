@@ -25,6 +25,7 @@ import { Button } from '@/components/ui/button'
 import { canManageAssignment } from '@/lib/auth/assignment-access'
 import { loadAssignmentQuestionsByProvenance } from '@/lib/assignment-question-access.server'
 import { loadAssignmentSettingPresets } from '@/lib/actions/assignment-setting-presets'
+import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
 import { isPracticeLibraryEnabled } from '@/lib/practice-question'
 
 interface Props {
@@ -264,6 +265,23 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
       createdAt: assignment.created_at,
     })
   }
+  let reusablePracticeError: string | null = null
+  if (practiceLibraryEnabled && !preselectedAssignmentType && requestedFlow !== 'create' && preselectedClassroomId && contextualClassroom && classroomIdList.length > 0) {
+    const targetOrgId = contextualClassroom.org_id
+    const result = await fetchAllRows<{ id: string; classroom_id: string; title: string; status: ReusableAssignmentOption['status']; created_at: string }>((from, to) => supabase.from('practice_libraries')
+      .select('id, classroom_id, title, status, created_at')
+      .in('classroom_id', classroomIdList)
+      .eq('org_id', targetOrgId)
+      .order('created_at', { ascending: false }).order('id').range(from, to))
+    if (result.error) reusablePracticeError = 'โหลดรายการคลังฝึกสำหรับนำมาใช้ซ้ำไม่สำเร็จ'
+    else for (const library of result.rows) {
+      reusableAssignments.push({
+        id: `practice:${library.id}`, classroomId: library.classroom_id,
+        title: library.title, type: 'practice', status: library.status,
+        createdAt: library.created_at,
+      })
+    }
+  }
   let preselectedSet = copySource
     ? undefined
     : (preselectedSetRow ?? undefined) as AssignmentQuestionSetOption | undefined
@@ -313,7 +331,7 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
   ) : <ClearPendingSidebar />
 
   const hasReusableSource = preselectedClassroomId !== undefined
-    && reusableAssignments.some(assignment => assignment.classroomId !== preselectedClassroomId)
+    && (reusablePracticeError !== null || reusableAssignments.some(assignment => assignment.classroomId !== preselectedClassroomId))
 
   if (!preselectedAssignmentType && requestedFlow === 'create') {
     return (
@@ -349,6 +367,7 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
             targetClassroomId={preselectedClassroomId}
             classrooms={classrooms}
             assignments={reusableAssignments}
+            loadingError={reusablePracticeError}
           />
         </div>
       </>

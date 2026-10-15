@@ -9,9 +9,12 @@ import {
   type SolutionReleaseAssignment,
 } from '@/lib/attempt-solutions-server'
 import type { AttemptSolutionItem } from '@/lib/attempt-solutions'
+import { loadStudentSolutionWatermark } from '@/lib/solution-watermark-server'
+import type { SolutionWatermarkData } from '@/lib/solution-watermark'
 
 export interface AttemptSolutions {
   items: AttemptSolutionItem[]
+  watermark: SolutionWatermarkData
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -61,7 +64,10 @@ export async function getAttemptSolutions(
   const release = await loadSolutionRelease(admin, assignment, user.id)
   if (release.state !== 'open') return { error: 'เฉลยวิธีทำของงานนี้ยังไม่เปิดให้ดู' }
 
-  const items = await loadAttemptSolutionItems(admin, submissionId)
-  if (!items) return { error: LOAD_FAILED }
-  return { data: { items } }
+  const [items, watermark] = await Promise.all([
+    loadAttemptSolutionItems(admin, submissionId),
+    loadStudentSolutionWatermark(admin, user.id),
+  ])
+  if (!items || !watermark) return { error: LOAD_FAILED }
+  return { data: { items, watermark } }
 }

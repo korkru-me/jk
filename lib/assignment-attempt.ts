@@ -1,6 +1,7 @@
 import { randomizeVariables, evaluateFormula, evaluatePartsChained, evaluateStudentAnswer } from '@/lib/math/evaluator'
 import { mathInputPartKey, readMathInputMode } from '@/lib/math/input-mode'
 import { drawsRandomValues, isSharedRandomSeed, questionRandom } from '@/lib/math/shared-random'
+import { drawFreshValues } from '@/lib/math/fresh-random-values'
 import { getBlankType, acceptedAnswers, isBlankCorrect } from '@/lib/fill-blank'
 import {
   CLASSIFY_PREFIX, CLASSIFY_UNSET,
@@ -284,7 +285,8 @@ function buildSkeletonBase(
 export function buildAssignmentAttempt(
   assignment: Pick<Assignment, 'question_ids' | 'shuffle_questions' | 'shuffle_options' | 'question_points' | 'random_question_count'>
     & { shared_random_seed?: SharedRandomSeed },
-  questions: Question[]
+  questions: Question[],
+  previousValues: Record<string, Record<string, number>> = {},
 ): AssignmentAttemptSkeleton[] {
   const questionsById = new Map(questions.map((q) => [q.id, q]))
 
@@ -317,12 +319,19 @@ export function buildAssignmentAttempt(
   const questionPoints = assignment.question_points
 
   return questionOrder
-    .map((qid, orderIndex) => buildAttemptQuestion(questionsById.get(qid) as Question, {
-      orderIndex,
-      shuffleOptions: assignment.shuffle_options === true,
-      pointOverride: questionPoints?.[qid],
-      sharedRandomSeed: assignment.shared_random_seed,
-    }))
+    .map((qid, orderIndex) => {
+      const question = questionsById.get(qid) as Question
+      const original = buildAttemptQuestion(question, {
+        orderIndex,
+        shuffleOptions: assignment.shuffle_options === true,
+        pointOverride: questionPoints?.[qid],
+        sharedRandomSeed: assignment.shared_random_seed,
+      })
+      if (!previousValues[qid] || !drawsRandomValues(question)) return original
+      const fresh = buildFreshRandomQuestion(question, previousValues[qid])
+      if (!fresh) throw new Error('ยังสุ่มตัวเลขชุดที่แตกต่างไม่ได้ กรุณาตรวจช่วงค่าตัวแปร')
+      return { ...original, random_values: fresh.random_values, correct_answer: fresh.correct_answer }
+    })
 }
 
 /**
@@ -382,14 +391,7 @@ export function buildFreshRandomQuestion(
 ): AssignmentAttemptSkeleton | null {
   if (!drawsRandomValues(question)) return null
 
-  const previous = JSON.stringify(previousRandomValues)
-  let next = buildAttemptQuestion(question, { orderIndex: 0, shuffleOptions: false })
-  // A draw may coincidentally repeat. Try a few more times so "ทำใหม่" changes
-  // the visible numbers whenever the authored range has another outcome.
-  for (let attempt = 0; attempt < 7 && JSON.stringify(next.random_values) === previous; attempt += 1) {
-    next = buildAttemptQuestion(question, { orderIndex: 0, shuffleOptions: false })
-  }
-  return next
+  return drawFreshValues(() => buildAttemptQuestion(question, { orderIndex: 0, shuffleOptions: false }), next => next.random_values, previousRandomValues)
 }
 
 // One answer row of the attempt a wrong-only retry is built from. Only the
@@ -466,8 +468,10 @@ export function buildRetryAttempt(
       ? shuffleArray((q.mcq_options as unknown[]).map((_, i) => i))
       : null
 
+    const fresh = drawsRandomValues(q) ? buildFreshRandomQuestion(q, prev.random_values) : null
+    if (drawsRandomValues(q) && !fresh) throw new Error('ยังสุ่มตัวเลขชุดที่แตกต่างไม่ได้ กรุณาตรวจช่วงค่าตัวแปร')
     retried.push({
-      ...buildSkeletonBase(q, assignment.shared_random_seed),
+      ...(fresh ?? buildSkeletonBase(q, assignment.shared_random_seed)),
       max_score: prev.max_score,
       order_index: prev.order_index,
       option_order: optionOrder,

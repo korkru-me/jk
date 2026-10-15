@@ -13,6 +13,8 @@ import { buildStudentLearningData, type LearningAssignment, type LearningSubmiss
 import { getQuestionCardData } from '@/lib/actions/question-card-data'
 import type { QuestionCardRow } from '@/components/questions/question-card'
 import { sortClassroomsByRecentViews } from '@/lib/classroom-recency'
+import { loadStudentPracticeLibraries } from '../practice/_lib/student-landing-data'
+import { isPracticeLibraryEnabled } from '@/lib/practice-question'
 
 export async function generateMetadata() {
   const user = await getAuthUser()
@@ -68,7 +70,7 @@ export default async function DashboardPage({ searchParams }: {
         .limit(RECENT_LIMIT),
       supabase
         .from('question_sets')
-        .select('id, title, question_ids, sections', { count: 'exact' })
+        .select('id, title, description, question_ids, sections', { count: 'exact' })
         .eq('created_by', user.id)
         .order('created_at', { ascending: false })
         .limit(RECENT_LIMIT),
@@ -113,6 +115,7 @@ export default async function DashboardPage({ searchParams }: {
     return (
       <TeacherDashboard
         currentUserId={user.id}
+        fullName={user.full_name}
         classroomsCount={classrooms.length}
         questionsCount={questionsRes.count ?? 0}
         setsCount={setsRes.count ?? 0}
@@ -121,6 +124,7 @@ export default async function DashboardPage({ searchParams }: {
         questionSets={setRows.map(set => ({
           id: set.id,
           title: set.title,
+          description: set.description,
           sections: set.sections,
           questionCount: ((set.question_ids ?? []) as string[])
             .filter(id => liveQuestionIds.has(id)).length,
@@ -136,7 +140,7 @@ export default async function DashboardPage({ searchParams }: {
   // Student path: every service-role read is scoped to the verified user or
   // their roster rows. Classroom links, group targets and score visibility
   // retain the same rules as the former student pages.
-  const [membershipsRes, submissionsRes] = await Promise.all([
+  const [membershipsRes, submissionsRes, practiceLibraries] = await Promise.all([
     admin.from('classroom_students')
       .select('classroom_id, classrooms(id, name, description, status, classroom_type)')
       .eq('student_id', user.id),
@@ -144,6 +148,9 @@ export default async function DashboardPage({ searchParams }: {
       .select('id, assignment_id, total_score, max_score, score_adjustment, status, attempt_number, created_at, assignments(id, classroom_id, title, type, end_at, duration_minutes, passing_type, passing_value, score_strategy, display_max_score, show_results, classrooms(name))')
       .eq('student_id', user.id)
       .order('created_at', { ascending: false }),
+    isPracticeLibraryEnabled(process.env)
+      ? loadStudentPracticeLibraries(supabase, user.id).catch(() => ({ items: [], error: 'โหลดคลังฝึกไม่สำเร็จ' }))
+      : Promise.resolve({ items: [], error: null }),
   ])
   if (membershipsRes.error || submissionsRes.error) throw new Error('ไม่สามารถโหลดข้อมูลการเรียนได้ กรุณาลองใหม่')
   // Supabase's ungenerated relationship types infer arrays for these to-one
@@ -154,7 +161,7 @@ export default async function DashboardPage({ searchParams }: {
   const [assignmentsRes, recentPostsRes, groupOf] = classroomIds.length > 0
     ? await Promise.all([
         admin.from('assignments')
-          .select('id, classroom_id, title, type, end_at, duration_minutes, passing_type, passing_value, score_strategy, display_max_score, show_results, assignment_classrooms!inner(classroom_id, group_ids)')
+          .select('id, classroom_id, title, type, created_at, end_at, duration_minutes, passing_type, passing_value, score_strategy, display_max_score, show_results, assignment_classrooms!inner(classroom_id, group_ids)')
           .in('assignment_classrooms.classroom_id', classroomIds)
           .eq('status', 'published')
           .order('end_at', { ascending: true, nullsFirst: false }),
@@ -171,6 +178,8 @@ export default async function DashboardPage({ searchParams }: {
     classrooms, groupOf,
     assignments: (assignmentsRes.data ?? []) as unknown as LearningAssignment[],
     submissions: (submissionsRes.data ?? []) as unknown as LearningSubmission[],
+    practiceLibraries: practiceLibraries.items,
+    practiceError: practiceLibraries.error,
   })
   const { join } = await searchParams
 

@@ -8,7 +8,7 @@ import {
 } from '@/lib/practice-library-contracts'
 import {
   assertSafePracticeProgressDto,
-  PRACTICE_PROGRESS_PAGE_SIZE,
+  pagePracticeQuestionProgress,
   type PracticeQuestionProgressSummary,
   type PracticeProgressSearchState,
   type PracticeStudentProgressSummary,
@@ -172,18 +172,19 @@ export async function readPracticeStudentProgress(
   const library = await readAuthorizedLibrary(admin, libraryId, actorId)
   if (!library) return null
 
-  const readQuestionPage = (page: number) => admin.rpc(
+  // The service RPC is capped at 100 safe aggregate rows. Read all matching
+  // pages on the server, then order practiced first before UI pagination.
+  const readQuestionPage = (offset: number) => admin.rpc(
     GET_PRACTICE_STUDENT_QUESTION_PROGRESS_RPC,
     {
       p_actor_id: actorId,
       p_library_id: library.id,
       p_student_id: studentId,
       p_query: state.q,
-      p_limit: PRACTICE_PROGRESS_PAGE_SIZE,
-      p_offset: (page - 1) * PRACTICE_PROGRESS_PAGE_SIZE,
+      p_limit: 100,
+      p_offset: offset,
     },
   )
-  let canonicalPage = state.page
   const [membershipResult, profileResult, initialQuestionResult] = await Promise.all([
     admin
       .from('classroom_students')
@@ -196,7 +197,7 @@ export async function readPracticeStudentProgress(
       .select('class_number')
       .eq('student_id', studentId)
       .maybeSingle(),
-    readQuestionPage(canonicalPage),
+    readQuestionPage(0),
   ])
 
   if (membershipResult.error) fail('read practice student membership', membershipResult.error)
@@ -204,17 +205,19 @@ export async function readPracticeStudentProgress(
   if (initialQuestionResult.error) fail('read practice question progress aggregate', initialQuestionResult.error)
   if (!membershipResult.data) return null
 
-  let questionData = Array.isArray(initialQuestionResult.data)
+  const questionData = Array.isArray(initialQuestionResult.data)
     ? initialQuestionResult.data as unknown[]
     : null
   if (!questionData) fail('parse practice question progress aggregate', null)
-  if (questionData.length === 0 && canonicalPage > 1) {
-    const fallback = await readQuestionPage(1)
-    if (fallback.error || !Array.isArray(fallback.data)) {
-      fail('read fallback practice question progress aggregate', fallback.error)
+  const firstTotal = questionData.length > 0 && questionData[0] && typeof questionData[0] === 'object'
+    ? safeCount((questionData[0] as Record<string, unknown>).total_count) : 0
+  if (firstTotal === null) fail('parse practice question progress total', null)
+  while (questionData.length < firstTotal) {
+    const next = await readQuestionPage(questionData.length)
+    if (next.error || !Array.isArray(next.data) || next.data.length === 0) {
+      fail('read remaining practice question progress aggregate', next.error)
     }
-    questionData = fallback.data as unknown[]
-    canonicalPage = 1
+    questionData.push(...next.data)
   }
 
   const membership = membershipResult.data as unknown as {
@@ -240,6 +243,10 @@ export async function readPracticeStudentProgress(
       attempt_count: attemptCount,
     }) satisfies PracticeQuestionProgressSummary
   })
+  if (questions.length !== totalQuestionCount || new Set(questions.map(row => row.question_id)).size !== questions.length) {
+    fail('practice question membership changed while reading progress', null)
+  }
+  const paged = pagePracticeQuestionProgress(questions, state.page)
   const result = Object.freeze({
     library,
     student: Object.freeze({
@@ -247,11 +254,11 @@ export async function readPracticeStudentProgress(
       display_name: membership.users.full_name,
       class_number: (profileResult.data?.class_number as number | null | undefined) ?? null,
     }),
-    questions,
+    questions: paged.questions,
     query: state.q,
     total_question_count: totalQuestionCount,
-    total_pages: Math.max(1, Math.ceil(totalQuestionCount / PRACTICE_PROGRESS_PAGE_SIZE)),
-    canonical_page: canonicalPage,
+    total_pages: paged.totalPages,
+    canonical_page: paged.page,
   })
   assertSafePracticeProgressDto(result)
   return result
