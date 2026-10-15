@@ -13,6 +13,7 @@ import {
   type PendingAnswerPayload,
 } from '@/lib/math/answer-backup'
 import type { MathInputMode } from '@/lib/types'
+import type { RandomValues } from '@/lib/math/fresh-random-values'
 import {
   createSingleFlight,
   hasActiveAnswerSave,
@@ -41,6 +42,7 @@ interface Options {
   initialAnswers: () => Record<string, string>
   /** DEG/RAD per logical numeric input, grouped by answer id. */
   initialMathInputModes?: () => Record<string, MathInputModes>
+  initialRandomValues?: () => Record<string, RandomValues>
   /** Teacher preview keeps answers in React state only and never writes a recovery backup or submission row. */
   previewMode?: boolean
 }
@@ -54,6 +56,7 @@ export function useAnswerAutosave({
   submissionId,
   initialAnswers,
   initialMathInputModes,
+  initialRandomValues,
   previewMode = false,
 }: Options) {
   const persistenceEnabled = shouldPersistExamAnswerLocally(previewMode)
@@ -65,6 +68,8 @@ export function useAnswerAutosave({
   const [saving, setSaving] = useState(false)
 
   const localAnswersRef = useRef(localAnswers)
+  const [initialValues] = useState(() => initialRandomValues?.() ?? {})
+  const randomValuesRef = useRef<Record<string, RandomValues>>(initialValues)
   const localMathInputModesRef = useRef(localMathInputModes)
   const saveTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const pendingRef = useRef<Map<string, PendingAnswerPayload>>(new Map())
@@ -78,6 +83,7 @@ export function useAnswerAutosave({
   const currentPayload = useCallback((answerId: string): PendingAnswerPayload => ({
     value: localAnswersRef.current[answerId] ?? '',
     mathInputModes: copyMathInputModes(localMathInputModesRef.current[answerId]),
+    ...(Object.keys(randomValuesRef.current[answerId] ?? {}).length ? { randomValues: { ...randomValuesRef.current[answerId] } } : {}),
   }), [])
 
   const persistPendingBackup = useCallback(() => {
@@ -154,6 +160,7 @@ export function useAnswerAutosave({
           answerId,
           payload.value,
           payload.mathInputModes,
+          payload.randomValues,
         ))
         if (!call.ok) return markUnsaved()
         if ('error' in call.data) return markUnsaved(call.data.error)
@@ -229,7 +236,9 @@ export function useAnswerAutosave({
     answerId: string,
     value: string,
     mathInputModes: MathInputModes = {},
+    randomValues?: RandomValues,
   ) => {
+    if (randomValues) randomValuesRef.current = { ...randomValuesRef.current, [answerId]: { ...randomValues } }
     const timer = saveTimersRef.current.get(answerId)
     if (timer) clearTimeout(timer)
     saveTimersRef.current.delete(answerId)
@@ -283,6 +292,7 @@ export function useAnswerAutosave({
         entries,
         localAnswersRef.current,
         localMathInputModesRef.current,
+        randomValuesRef.current,
       )
       const restoredIds = Object.keys(restorable)
       if (restoredIds.length === 0) {

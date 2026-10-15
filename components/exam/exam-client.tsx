@@ -16,6 +16,9 @@ import type { GradedAnswer } from '@/lib/assignment-attempt'
 import type { AnswerFeedback } from '@/lib/answer-feedback'
 import { isInstantCheckable } from '@/lib/grading'
 import { useAnswerAutosave } from '@/hooks/use-answer-autosave'
+import { useRefreshRandomAnswers } from '@/hooks/use-refresh-random-answers'
+import { rememberVisibleRandomValues, visibleRandomValueStorage } from '@/lib/math/visible-random-values'
+import { drawsRandomValues } from '@/lib/math/shared-random'
 import { resolveAnswerAutosaveStatus } from '@/lib/exam-autosave-policy'
 import { hasStudentAnswer } from '@/lib/student-answer-state'
 import { useTabSwitchGuard } from '@/hooks/use-tab-switch-guard'
@@ -291,6 +294,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
     submissionId,
     initialAnswers: () => initLocalAnswers(answers),
     initialMathInputModes: () => initMathInputModes(answers),
+    initialRandomValues: () => Object.fromEntries(answers.map(answer => [answer.id, answer.random_values ?? {}])),
     previewMode,
   })
   const [workImages, setWorkImages] = useState<Record<string, (string | null)[]>>(
@@ -574,11 +578,9 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   }, [])
 
   const handleRetry = useCallback(async (answer: AnswerRow) => {
-    // Withheld answer keys and fixed questions retain the current problem.
-    // Only a checked random-number question whose key was revealed asks the
-    // server to freeze a new value set for the next try.
-    const shouldReroll = config.instantCheckAnswerKey === true
-      && Object.keys(randomValueOverrides[answer.id] ?? answer.random_values ?? {}).length > 0
+    // Every new try of a numeric variant needs new numbers, independently of
+    // whether the previous answer key was revealed.
+    const shouldReroll = Object.keys(randomValueOverrides[answer.id] ?? answer.random_values ?? {}).length > 0
     if (!shouldReroll) {
       clearCheck(answer.id)
       return
@@ -587,6 +589,8 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
     if (checkingId) return
     setCheckingId(answer.id)
     try {
+      const saved = await flushQueuedAnswers()
+      if (!saved.ok) { toast.error(saved.error ?? 'ยังบันทึกคำตอบเดิมไม่สำเร็จ กรุณาลองใหม่'); return }
       if (previewMode) {
         const { buildFreshRandomQuestion } = await import('@/lib/assignment-attempt')
         const next = buildFreshRandomQuestion({
@@ -594,24 +598,27 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
           ...answer.questions,
         } as unknown as Question, randomValueOverrides[answer.id] ?? answer.random_values ?? {})
         if (next) {
-          replaceAnswerFromServer(answer.id, '')
+          replaceAnswerFromServer(answer.id, '', {}, next.random_values)
+          rememberVisibleRandomValues(visibleRandomValueStorage(), JSON.stringify([storageOwnerId, location.pathname, answer.question_id]), next.random_values)
           setRandomValueOverrides(previous => ({ ...previous, [answer.id]: next.random_values }))
           setPreviewCorrectAnswerOverrides(previous => ({
             ...previous,
             [answer.id]: next.correct_answer,
           }))
-        }
+        } else if (drawsRandomValues(answer.questions)) { toast.error('ยังสุ่มตัวเลขชุดที่แตกต่างไม่ได้ กรุณาตรวจช่วงค่าตัวแปร'); return }
+        else replaceAnswerFromServer(answer.id, '')
         clearCheck(answer.id)
         return
       }
 
-      const result = await rerollCheckedRandomAnswer(answer.id)
+      const result = await rerollCheckedRandomAnswer(answer.id, 'retry', randomValueOverrides[answer.id] ?? answer.random_values ?? {})
       if (!result || 'error' in result) {
         toast.error(result?.error ?? 'สุ่มตัวเลขชุดใหม่ไม่สำเร็จ กรุณาลองใหม่')
         return
       }
       if (result.rerolled) {
-        replaceAnswerFromServer(answer.id, '')
+        replaceAnswerFromServer(answer.id, '', {}, result.randomValues)
+        rememberVisibleRandomValues(visibleRandomValueStorage(), JSON.stringify([storageOwnerId, location.pathname, answer.question_id]), result.randomValues)
         setRandomValueOverrides(previous => ({
           ...previous,
           [answer.id]: result.randomValues,
@@ -623,7 +630,15 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
     } finally {
       setCheckingId(null)
     }
-  }, [checkingId, clearCheck, config.instantCheckAnswerKey, previewMode, randomValueOverrides, replaceAnswerFromServer])
+  }, [checkingId, clearCheck, flushQueuedAnswers, previewMode, randomValueOverrides, replaceAnswerFromServer, storageOwnerId])
+
+  const replaceRandomVariant = useCallback(({ id, values, correctAnswer }: { id: string; values: Record<string, number>; correctAnswer?: string }) => {
+    replaceAnswerFromServer(id, '', {}, values)
+    setRandomValueOverrides(previous => ({ ...previous, [id]: values }))
+    if (correctAnswer !== undefined) setPreviewCorrectAnswerOverrides(previous => ({ ...previous, [id]: correctAnswer }))
+    clearCheck(id)
+  }, [clearCheck, replaceAnswerFromServer])
+  const refreshRandom = useRefreshRandomAnswers({ answers, previewMode, ownerId: storageOwnerId, flush: flushQueuedAnswers, onReplace: replaceRandomVariant })
 
   /**
    * ตรวจคำตอบข้อนี้ — the one thing a แบบฝึกหัด does that a ข้อสอบ does not.
@@ -1062,7 +1077,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
       const { gradeAnswer } = await import('@/lib/assignment-attempt')
       const graded = answers.map(a => gradeAnswer({
         id: a.id,
-        correct_answer: a.correct_answer ?? '',
+        correct_answer: previewCorrectAnswerOverrides[a.id] ?? a.correct_answer ?? '',
         student_answer: localAnswersRef.current[a.id] ?? null,
         math_input_modes: localMathInputModesRef.current[a.id] ?? {},
         max_score: a.max_score ?? 0,
@@ -1679,6 +1694,11 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
 
   return (
     <>
+      {(refreshRandom.busy || refreshRandom.error) && <Card padding="sm" className="mb-2 flex flex-wrap items-center gap-2">
+        <p role={refreshRandom.error ? 'alert' : 'status'} className={cn('text-sm', refreshRandom.error ? 'text-destructive' : 'text-muted-foreground')}>{refreshRandom.error || 'กำลังสุ่มชุดตัวเลขใหม่…'}</p>
+        {refreshRandom.error && <Button size="sm" variant="outline" onClick={refreshRandom.retry}>ลองอีกครั้ง</Button>}
+      </Card>}
+      <div className="contents" inert={refreshRandom.busy || Boolean(refreshRandom.error) ? true : undefined}>
       {showingSolution ? <SolutionWatermark data={config.solutionWatermark} layer="dialog" />
         : config.watermarkText && <ExamWatermark text={config.watermarkText} />}
 
@@ -2088,6 +2108,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
           </Card>
         </div>
       )}
+      </div>
     </>
   )
 }

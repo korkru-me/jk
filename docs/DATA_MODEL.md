@@ -1,5 +1,11 @@
 # Data model และ invariants
 
+## Numeric variant transition — 15 ตุลาคม 2026
+
+ไม่มีคอลัมน์หรือ migration ใหม่: transition ใช้ submission_answers.random_values/correct_answer เดิม เปลี่ยนพร้อม student_answer=null และ math_input_modes={} เฉพาะ active authorized row ที่ old numeric map ยังตรง ไม่แก้ question_id/order/option_order/max_score/submission.started_at ส่วน completed submissions, carried-over answers และ checked streak history ไม่เปลี่ยน ค่า check_count เป็นจำนวนตรวจสะสม ไม่ล้างเพราะเปลี่ยน variant
+
+Answer-backup v2 เพิ่ม optional randomValues ซึ่งมีเฉพาะ numeric map ที่แสดงแล้ว การกู้ร่าง random question ต้องตรงกับ map ปัจจุบัน ร่างเก่าที่ไม่มี map ไม่เอากลับมาปะปน Practice/preview history เป็น optional session storage สำหรับกันเลขซ้ำ ไม่เก็บคำตอบหรือเปลี่ยน event schema ของคลังฝึก
+
 ## Browser presentation settings for personal exercises — 15 October 2026
 
 `korkru:practice-exercise-settings:<owner>:<library>` stores a strict UUID-keyed map of exercise → `{ questionsPerPage: 1|3|5|10, theme: <existing cover preset> }`, limited to 1000 entries. The map carries no answers, correctness, grades, permission flags or resource authority. Unselected colors are drawn once on save; legacy exercises receive stable defaults. Settings remain on this browser even for server-backed groups; no migration or automatic cloud sync is introduced. Run-page answers/math modes/verdicts/flags remain in memory, with scratch work using the existing local IndexedDB policy. Every question fetch/check repeats server resource access regardless of browser membership or preferences
@@ -171,7 +177,7 @@ Invariant สำคัญ:
 - เฉลยที่คำนวณจากค่าชุดนั้น
 - max score ตาม assignment ณ เวลาสร้าง attempt
 
-ห้ามคำนวณ random values ใหม่เมื่อ refresh หรือ grade เพราะจะทำให้คำถามและเฉลยเปลี่ยนหลังนักเรียนตอบ
+ตอน grade ใช้ random_values/correct_answer ที่จัดเก็บคู่กันเสมอ ห้ามสุ่มระหว่างตรวจ ส่วน explicit ทำใหม่/refresh เปลี่ยนชุดค่าและเฉลยพร้อมล้างคำตอบเดิมผ่าน authorized POST โดยคงลำดับข้อ/ตัวเลือก/คะแนนเต็มและเวลา attempt
 
 ## เครื่องมือคณิตศาสตร์และ artifact
 
@@ -203,7 +209,7 @@ Session Library ของครูใน drawing-board เฟส 7 ก็ไม�
 - โหมด complete ใช้ `max_attempts` ตามที่ครูตั้ง (งานใหม่ default จาก create action เป็น 1 ไม่เปลี่ยน default/แถวเก่าในฐานข้อมูล); threshold (`fixed` + passing threshold) และ streak normalize เป็น `max_attempts NULL` + `score_strategy best` ตอนสร้าง/บันทึก แอปตีความแถวเก่าสองโหมดนี้ว่าไม่จำกัดจนผ่านเช่นกัน ผ่านจาก finished attempt ใดก็ได้แล้วไม่เริ่มรอบใหม่ ไม่มี column หรือ migration ใหม่ ไม่ backfill/ลบประวัติ submission การเปิดเฉลยใช้ผลผ่านร่วมกับกติกาไม่มี writable attempt ค้าง
 - `assignments.retry_scope` = `all` | `wrong_only` ตัดสินว่าการทำครั้งใหม่ถามซ้ำทั้งชุดหรือเฉพาะข้อที่ `score < max_score`
 - `submission_answers.carried_over` คือแถวที่คัดลอกมาจาก attempt ก่อนหน้า ไม่ได้ตอบใน attempt นี้ — นับใน `max_score`/`total_score` แต่ไม่ถูก auto-grade ซ้ำ และไม่ถูกส่งเข้าหน้าทำข้อสอบ
-- `assignments.instant_check` เปิดให้แบบฝึกหัดออนไลน์กดตรวจทีละข้อระหว่างทำ และ `instant_check_answer_key` ตัดสินว่าการตรวจนั้นเปิดคำตอบที่ถูกด้วยหรือบอกแค่ถูก/ผิด (ค่าเริ่มต้นของงานใหม่คือ `false`; เฉลยวิธีทำไม่อยู่ในการตรวจนี้ ดู `show_solutions`) — เมื่อเปิดบอกคำตอบ โจทย์ที่ `drawsRandomValues` เป็นจริงจะเขียน `random_values`/`correct_answer` ชุดใหม่และล้าง `student_answer` เฉพาะตอนผู้เรียนกด "ทำใหม่" หลังตรวจ; โจทย์ปกติไม่เปลี่ยน · ทั้งคู่ไม่มีผลกับคะแนน `submitSubmission` ยังตรวจใหม่ทั้งชุดจาก `student_answer` เหมือนเดิม คะแนนแบบฝึกหัดจึงมาจากคำตอบสุดท้ายเสมอ
+- `assignments.instant_check` เปิดให้แบบฝึกหัดออนไลน์กดตรวจทีละข้อระหว่างทำ และ `instant_check_answer_key` ตัดสินว่าการตรวจนั้นเปิดคำตอบที่ถูกด้วยหรือบอกแค่ถูก/ผิด (ค่าเริ่มต้นของงานใหม่คือ `false`; เฉลยวิธีทำไม่อยู่ในการตรวจนี้ ดู `show_solutions`) — โจทย์ที่ `drawsRandomValues` เป็นจริงเปลี่ยน `random_values`/`correct_answer` และล้าง `student_answer` เมื่อกด "ทำใหม่" หลังตรวจหรือ refresh active attempt ไม่ขึ้นกับการเปิด answer key; โจทย์ปกติไม่เปลี่ยน · ทั้งคู่ไม่มีผลกับคะแนน `submitSubmission` ยังตรวจใหม่ทั้งชุดจาก `student_answer` เหมือนเดิม คะแนนแบบฝึกหัดจึงมาจากคำตอบสุดท้ายเสมอ
 - `submission_answers.check_count` นับจำนวนครั้งที่นักเรียนกดตรวจข้อนั้นระหว่างทำ ไม่ใช้คิดคะแนนและไม่ใช้กั้นการกดตรวจ เป็นสัญญาณเดียวที่แยก "ถูกตั้งแต่แรก" ออกจาก "ตรวจแล้วแก้จนถูก" เมื่อคะแนนสองคนเท่ากัน
 
 ก่อนแก้ scoring ต้องตรวจ `lib/scoring.ts`, `lib/grading.ts`, `lib/actions/submissions.ts` และหน้าที่อ่านคะแนนทั้งหมด

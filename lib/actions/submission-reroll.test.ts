@@ -22,7 +22,7 @@ vi.mock('@/lib/assignment-attempt', async importOriginal => ({
   buildFreshRandomQuestion: mocks.buildFreshRandomQuestion,
 }))
 
-import { rerollCheckedRandomAnswer } from './submissions'
+import { rerollCheckedRandomAnswer, saveAnswer } from './submissions'
 
 const ANSWER_ID = '33333333-3333-4333-8333-333333333333'
 const SUBMISSION_ID = '22222222-2222-4222-8222-222222222222'
@@ -36,6 +36,7 @@ function writable(reveal = true) {
       work_images: [],
       carried_over: false,
       check_count: 1,
+      random_values: { x: 2 },
       questions: { question_type: 'written', answer_parts: [] },
       submissions: null,
     },
@@ -89,7 +90,7 @@ function database() {
     updated = payload
     return query
   })
-  query.then = (resolve: (value: unknown) => unknown) => Promise.resolve({ error: null }).then(resolve)
+  query.then = (resolve: (value: unknown) => unknown) => Promise.resolve({ error: null, count: 1 }).then(resolve)
   const from = vi.fn(() => query)
   mocks.createAdminClient.mockReturnValue({ from })
   return { from, query, updated: () => updated }
@@ -134,12 +135,44 @@ describe('rerollCheckedRandomAnswer', () => {
     expect(db.query.update).not.toHaveBeenCalled()
   })
 
-  it('refuses the transition when the teacher did not enable answer keys', async () => {
+  it('rerolls even when the answer key is withheld', async () => {
     const db = database()
     mocks.getWritableStudentAnswer.mockResolvedValue(writable(false))
-    await expect(rerollCheckedRandomAnswer(ANSWER_ID)).resolves.toEqual({
-      error: 'งานนี้ไม่ได้เปิดให้สุ่มโจทย์ใหม่หลังดูคำตอบ',
-    })
-    expect(db.from).not.toHaveBeenCalled()
+    mocks.buildFreshRandomQuestion.mockReturnValue({ random_values: { x: 7 }, correct_answer: '14' })
+    expect(await rerollCheckedRandomAnswer(ANSWER_ID)).toMatchObject({ rerolled: true, randomValues: { x: 7 } })
+    expect(db.updated()).not.toBeNull()
+  })
+  it('allows a refresh of an unchecked active exam, but never a submitted attempt', async () => {
+    database()
+    const access = writable(false)
+    access.assignment.type = 'exam'; access.assignment.instant_check = false; access.answer.check_count = 0
+    mocks.getWritableStudentAnswer.mockResolvedValue(access)
+    mocks.buildFreshRandomQuestion.mockReturnValue({ random_values: { x: 7 }, correct_answer: '14' })
+    expect(await rerollCheckedRandomAnswer(ANSWER_ID, 'refresh', { x: 2 })).toMatchObject({ rerolled: true })
+    mocks.getWritableStudentAnswer.mockResolvedValue({ error: 'ส่งงานแล้ว' })
+    expect(await rerollCheckedRandomAnswer(ANSWER_ID, 'refresh')).toEqual({ error: 'ส่งงานแล้ว' })
+  })
+  it('refuses stale variable sets and preserves already-counted streak questions', async () => {
+    const db = database()
+    expect(await rerollCheckedRandomAnswer(ANSWER_ID, 'refresh', { x: 99 })).toHaveProperty('error')
+    expect(db.query.update).not.toHaveBeenCalled()
+    const access = writable(); access.assignment.completion_rule = 'streak'
+    mocks.getWritableStudentAnswer.mockResolvedValue(access)
+    expect(await rerollCheckedRandomAnswer(ANSWER_ID, 'refresh')).toEqual({ success: true, rerolled: false })
+  })
+  it('does not save an old answer against a newer number set', async () => {
+    const db = database()
+    expect(await saveAnswer(ANSWER_ID, '4', {}, { x: 99 })).toHaveProperty('variantChanged', true)
+    expect(await saveAnswer(ANSWER_ID, '4', {})).toHaveProperty('variantChanged', true)
+    expect(db.query.update).not.toHaveBeenCalled()
+    expect(await saveAnswer(ANSWER_ID, '4', {}, { x: 2 })).toEqual({ success: true })
+    expect(db.query.eq).toHaveBeenCalledWith('random_values', '{"x":2}')
+  })
+  it('fails closed when another draw wins the conditional update', async () => {
+    const db = database()
+    db.query.then = (resolve: (value: unknown) => unknown) => Promise.resolve({ error: null, count: 0 }).then(resolve)
+    mocks.buildFreshRandomQuestion.mockReturnValue({ random_values: { x: 7 }, correct_answer: '14' })
+    expect(await rerollCheckedRandomAnswer(ANSWER_ID, 'refresh', { x: 2 })).toHaveProperty('error')
+    expect(await saveAnswer(ANSWER_ID, '4', {}, { x: 2 })).toHaveProperty('variantChanged', true)
   })
 })

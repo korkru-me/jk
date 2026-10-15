@@ -1,8 +1,10 @@
 import { sanitizeMathInputModes, type MathInputModes } from './input-mode'
+import { parseRandomValues, sameRandomValues, type RandomValues } from './fresh-random-values'
 
 export interface PendingAnswerPayload {
   value: string
   mathInputModes: MathInputModes
+  randomValues?: RandomValues
 }
 
 interface AnswerBackupV2 {
@@ -24,7 +26,7 @@ export function sameAnswerPayload(
   left: PendingAnswerPayload | undefined,
   right: PendingAnswerPayload,
 ): boolean {
-  return !!left && left.value === right.value && sameMathInputModes(left.mathInputModes, right.mathInputModes)
+  return !!left && left.value === right.value && sameMathInputModes(left.mathInputModes, right.mathInputModes) && sameRandomValues(left.randomValues ?? {}, right.randomValues ?? {})
 }
 
 /** Parse the current v2 backup and the legacy `{ answerId: value }` shape. */
@@ -51,6 +53,7 @@ export function parseAnswerBackup(raw: string): Record<string, PendingAnswerPayl
     result[answerId] = {
       value: candidate.value,
       mathInputModes: sanitizeMathInputModes(candidate.mathInputModes),
+      ...(parseRandomValues(candidate.randomValues) ? { randomValues: parseRandomValues(candidate.randomValues)! } : {}),
     }
   }
   return result
@@ -74,18 +77,22 @@ export function selectRestorableAnswerBackup(
   entries: Record<string, PendingAnswerPayload>,
   currentAnswers: Record<string, string>,
   currentMathInputModes: Record<string, MathInputModes>,
+  currentRandomValues: Record<string, RandomValues> = {},
 ): Record<string, PendingAnswerPayload> {
   const restorable: Record<string, PendingAnswerPayload> = {}
   for (const [answerId, payload] of Object.entries(entries)) {
     if (!Object.prototype.hasOwnProperty.call(currentAnswers, answerId)) continue
+    if (!sameRandomValues(payload.randomValues ?? {}, currentRandomValues[answerId] ?? {})) continue
     const current: PendingAnswerPayload = {
       value: currentAnswers[answerId] ?? '',
       mathInputModes: currentMathInputModes[answerId] ?? {},
+      randomValues: currentRandomValues[answerId],
     }
     if (!sameAnswerPayload(current, payload)) {
       restorable[answerId] = {
         value: payload.value,
         mathInputModes: copyMathInputModes(payload.mathInputModes),
+        ...(payload.randomValues ? { randomValues: { ...payload.randomValues } } : {}),
       }
     }
   }

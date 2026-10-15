@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic'
 export default async function ExamScreenLabPage({
   searchParams,
 }: {
-  searchParams: Promise<{ perPage?: string | string[]; streak?: string | string[]; at?: string | string[]; timed?: string | string[]; type?: string | string[]; shell?: string | string[]; watermark?: string | string[] }>
+  searchParams: Promise<{ perPage?: string | string[]; streak?: string | string[]; at?: string | string[]; timed?: string | string[]; type?: string | string[]; shell?: string | string[]; watermark?: string | string[]; random?: string }>
 }) {
   if (!isExamScreenLabEnabled(process.env)) notFound()
 
@@ -44,7 +44,7 @@ export default async function ExamScreenLabPage({
 
   return (
     <ExamScreenLabClient
-      fixture={buildExamScreenQaFixture()}
+      fixture={buildExamScreenQaFixture(params.random === '1')}
       submissionId={`qa-preview-${randomUUID()}`}
       questionsPerPage={questionsPerPage}
       streak={streak}
@@ -53,6 +53,7 @@ export default async function ExamScreenLabPage({
       assignmentType={params.type === 'exercise' ? 'exercise' : 'exam'}
       shell={params.shell === '1'}
       optionalWatermark={params.watermark !== 'off'}
+      requireWorkImage={params.random !== '1'}
     />
   )
 }

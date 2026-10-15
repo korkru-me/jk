@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { randomizeVariables, evaluateFormula, evaluateStudentAnswer } from '@/lib/math/evaluator'
+import { drawFreshValues } from '@/lib/math/fresh-random-values'
+import { readVisibleRandomValues, rememberVisibleRandomValues, visibleRandomValueStorage } from '@/lib/math/visible-random-values'
 import { gradeValue, naturalMaxScore } from '@/lib/assignment-attempt'
 import { containsMath } from '@/lib/math/latex'
 import { renderRichTextHtml } from '@/lib/rich-text-html'
@@ -145,6 +147,13 @@ export function QuestionPreviewContent({
 }: QuestionPreviewProps) {
   const labels = partLabels(partLabelStyle)
   const [values, setValues] = useState<Record<string, number>>(() => randomizeVariables(variables))
+  const visibleValuesIdentity = JSON.stringify([questionText, variables])
+  useEffect(() => {
+    if (!isRandom) return
+    const previous = readVisibleRandomValues(visibleRandomValueStorage(), visibleValuesIdentity)
+    const next = drawFreshValues(() => randomizeVariables(variables), value => value, previous)
+    if (next) { setValues(next); rememberVisibleRandomValues(visibleRandomValueStorage(), visibleValuesIdentity, next) }
+  }, [visibleValuesIdentity, isRandom])
   // Pairs plus the distractors that belong to no pair — the same list the
   // exam shuffles, so the teacher's preview offers exactly what a student is
   // offered rather than a bank with the decoys quietly missing.
@@ -253,10 +262,13 @@ export function QuestionPreviewContent({
   const [view, setView] = useState<'student' | 'teacher'>('student')
 
   function generate() {
+    const nextValues = isRandom ? drawFreshValues(() => randomizeVariables(variables), value => value, values) : randomizeVariables(variables)
+    if (!nextValues) { toast.error('ยังสุ่มชุดตัวเลขที่แตกต่างไม่ได้ กรุณาลองอีกครั้งหรือตรวจช่วงค่าตัวแปร'); return }
     setView('student')
     setEssayText('')
     releaseLocalFiles()
-    setValues(randomizeVariables(variables))
+    setValues(nextValues)
+    if (isRandom) rememberVisibleRandomValues(visibleRandomValueStorage(), visibleValuesIdentity, nextValues)
     setShuffledRight(matchingBank.length > 0 ? shuffleIndices(matchingBank.length) : [])
     setWrittenInputs(answerParts.map(() => ''))
     setWrittenResults(answerParts.map(() => null))

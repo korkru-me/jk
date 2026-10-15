@@ -1,5 +1,9 @@
 # Security และ privacy guardrails
 
+## Reset numeric variants safely — 15 October 2026
+
+Explicit client reset/reload POSTs reauthorize the exact active answer through getWritableStudentAnswer (owner/status/expiry/deadline/native session). No GET or prefetch mutation. Numeric values and answer key change together with old-map equality plus exact row count; stale autosave payloads are bound to the visible numeric map and rejected before update. Returned student data contains only public values, never the newly computed key. Preview grading remains teacher-only. Submitted/carried/checked-streak history stays immutable; no timer reset or permission expansion. No migration or external database write was made for this change.
+
 ## Request-local practice snapshot reads — 15 October 2026
 
 The optimized development snapshot reuses only the first page's verified actor/library/roster result inside that one call. Its private reader cannot be called by the browser, and every page still uses the actor/library-scoped RPC that repeats current resource authorization. A denied later page or inconsistent totals/IDs rejects the whole snapshot. Public searches and new requests reauthorize independently; no persistent or cross-request authorization cache is introduced. Routes still verify Auth/feature flag and the signed library access-code session before rendering any snapshot; DTOs contain display metadata only. No schema, RLS, RPC grants or grading behavior changed
@@ -108,7 +112,7 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 
 ## Grading integrity
 
-- random values และ correct answer ต้องตรึงต่อ attempt
+- random values และ correct answer ต้องตรงกันตลอดหนึ่งชุดตัวเลข เปลี่ยนพร้อมกันเฉพาะ explicit reset/refresh ที่ตรวจสิทธิ์แล้ว; ลำดับข้อ/ตัวเลือกและประวัติที่ส่งแล้วตรึงต่อ attempt
 - server ต้องบังคับเวลา attempts และ access code ไม่พึ่ง client
 - หน้ารอของ exam/exercise ส่งเฉพาะ allowlisted metadata หลังตรวจ Auth/assignment roster/native session ไม่ส่ง assignment row, access-code value, question/answer content หรือ student score; GET/prefetch ไม่ allocate/grade/draw `startAssignmentFromWaiting` ตรวจทุก gate ใหม่ ไม่ถือว่า UI/previous receipt/query เป็น authorization และ teacher preview ต้องตรวจ `canManageAssignment` ทั้ง waiting และ answer-bearing route (12 ตุลาคม 2026)
 - ประกาศจากครูในหน้ารอใช้ `assignments.description` แบบ rich text: create/update Server Action sanitize ก่อนเขียนและทุก render sanitize ซ้ำ อนุญาตรูปเฉพาะ HTTPS public URL ของ bucket `question-images` บน `NEXT_PUBLIC_SUPABASE_URL` ปัจจุบัน ตัด script/event/style/external/data/signed URL ออก; upload ใช้ session browser และ Storage RLS บังคับโฟลเดอร์ `{auth.uid()}` เดิม ไม่ใช้ service-role upload
@@ -126,7 +130,7 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 - **เฉลยที่ไม่ให้ดู ต้องไม่ถูกส่งไปที่ browser เลย ไม่ใช่ส่งไปแล้วซ่อน** — นักเรียนที่เปิด DevTools อ่าน network response, React props, RSC payload, `localStorage` และ bundle ได้ทั้งหมด การซ่อนด้วย CSS, `hidden`, conditional render, การไม่ผูก state หรือการ obfuscate ไม่ใช่การปกป้อง ถ้าค่าอยู่ใน payload ถือว่านักเรียนอ่านได้แล้ว
 - เกณฑ์ตัดสินคือ **serialize หรือไม่** ไม่ใช่ render หรือไม่: ฟิลด์เฉลยต้องหายไปจาก object ที่ server ส่งกลับ (conditional spread/omit) ไม่ใช่ส่งเป็นค่าว่าง `null` หรือ flag ให้ client ตัดสินใจเอง — ดู `buildAnswerFeedback` ที่ไม่ใส่คีย์ `correct` ของแต่ละแถวเมื่อ `instant_check_answer_key` ปิด และไม่มีเฉลยวิธีทำใน response เลยไม่ว่าตั้งอะไร พร้อมเทสต์ที่ยืนยันด้วย `JSON.stringify` ของ response
 - การตัดสินถูก/ผิดทุกครั้งต้องเกิดที่ server จาก `submission_answers.correct_answer` ที่ตรึงไว้ **ห้ามส่งเฉลยลงไปให้ browser เทียบเอง** แม้จะเทียบแล้วส่งผลกลับขึ้นมาก็ตาม — ผลที่ client คำนวณหรือรายงานขึ้นมาห้ามถูกเชื่อ และห้ามใช้เขียนคะแนน สถานะ หรือตัวนับใด ๆ
-- การสุ่มตัวเลขชุดใหม่หลังเปิดคำตอบทำผ่าน `rerollCheckedRandomAnswer` เท่านั้น: ตรวจสิทธิ์เขียน attempt และยืนยันจากฐานว่าเป็นแบบฝึกหัดออนไลน์ เปิดตรวจ เปิด answer key ตรวจมาแล้วอย่างน้อยหนึ่งครั้ง และไม่ใช่ streak/carried row ก่อนเขียน `random_values` กับ `correct_answer` ใหม่ · response ส่งกลับเฉพาะค่าตัวเลขที่ต้องแสดง ห้ามส่ง answer key ชุดใหม่
+- การเปลี่ยนตัวเลขใน active online exam/exercise ทำผ่าน `rerollCheckedRandomAnswer`: retry ต้องตรวจแล้ว ส่วน refresh เปลี่ยนข้อที่ยังไม่ตรวจได้ด้วย ไม่ขึ้นกับการเปิด answer key; ตรวจสิทธิ์เขียน/เวลา/native session ทุกครั้ง ข้อยกคะแนนและ streak ที่นับแล้วไม่เปลี่ยน ก่อน update ใช้ expected old numeric map และ exact row count · response ส่งกลับเฉพาะค่าตัวเลขที่ต้องแสดง ห้ามส่ง answer key ชุดใหม่
 - ตัวนับที่เป็นเงื่อนไขจบงาน (`submissions.current_streak` / `best_streak` / `streak_reached`) เขียนได้จาก verdict ที่ server ตัดสินเองเท่านั้น ถ้ารับจาก browser ได้ นักเรียนจบงานจาก console ได้
 - `correct_answer` เข้า Client Component ได้เฉพาะ `previewMode` ของครู ซึ่งครูเป็นเจ้าของเฉลยนั้นอยู่แล้ว เส้นทางนักเรียน (`getExamTakingData` → `toSafeExamAnswer`) ห้ามใส่ฟิลด์นี้ และ `SafeExamAnswer` ต้องไม่มีฟิลด์นี้อยู่ใน type
 - นักเรียนอ่าน answer snapshot/คำตอบที่ถูกได้หลังส่งเมื่อ `show_results` เป็น `immediate` หรือ `after_due` ที่พ้นกำหนดแล้วเท่านั้น; `score_only` ห้ามอ่านคำตอบรายข้อและ `never` ห้ามอ่านคะแนนด้วย

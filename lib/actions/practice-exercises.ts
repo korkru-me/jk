@@ -11,6 +11,7 @@ import { buildQuestionSolution, type QuestionSolution } from '@/lib/question-sol
 import { isUuid } from '@/lib/practice-library-contracts'
 import { preparePracticeRunQuestion } from '@/lib/practice-run.server'
 import type { PracticeRunQuestionResult } from '@/lib/practice-run'
+import { parseRandomValues } from '@/lib/math/fresh-random-values'
 
 async function studentAccess(libraryId: string) {
   if (!isPracticeLibraryEnabled(process.env) || !isUuid(libraryId)) return null
@@ -23,16 +24,18 @@ async function studentAccess(libraryId: string) {
 }
 
 /** Load just the requested question; browser-saved exercise IDs never confer access. */
-export async function getPracticeRunQuestion(libraryId: string, questionId: string): Promise<PracticeRunQuestionResult> {
+export async function getPracticeRunQuestion(libraryId: string, questionId: string, previousValues?: unknown): Promise<PracticeRunQuestionResult> {
   const denied = { ok: false as const, error: 'ยังเปิดโจทย์นี้ไม่ได้ กรุณาเข้าคลังฝึกอีกครั้ง' }
   if (!isUuid(libraryId) || !isUuid(questionId)) return denied
+  const previous = previousValues === undefined ? undefined : parseRandomValues(previousValues)
+  if (previous === null) return denied
   try {
     const access = await studentAccess(libraryId)
     if (!access) return denied
     const question = await loadPracticeQuestionForStudent(access.user.id, libraryId, questionId)
     if (question.status !== 'ready') return denied
     if (question.library.requiresAccessCode && !await hasPracticeAccessSession(access.user.id, libraryId)) return denied
-    const data = preparePracticeRunQuestion(access.user.id, question.library, question.question)
+    const data = preparePracticeRunQuestion(access.user.id, question.library, question.question, previous)
     return data ? { ok: true, data } : denied
   } catch { return denied }
 }

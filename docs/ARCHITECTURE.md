@@ -1,5 +1,15 @@
 # Architecture
 
+## วงจรตัวเลขสุ่มใหม่ — 15 ตุลาคม 2026
+
+`drawFreshValues` เปรียบเทียบ numeric map แบบไม่ขึ้นกับลำดับ key และลองไม่เกิน 128 ครั้ง ถ้าไม่มีชุดต่างให้คืน error แทนรายงานสำเร็จด้วยค่าเก่า `buildAssignmentAttempt` รับชุดก่อนหน้าสำหรับ full retry; wrong-only retry และ recycled streak ใช้ helper เดียวกัน โดย shared seed ใช้กับ initial draw เท่านั้น
+
+Document reload ของ ExamClient เรียก useRefreshRandomAnswers เป็น client POST หลัง flush autosave; GET/RSC/prefetch ไม่เขียนคำตอบ Hook ไม่ทำซ้ำเมื่อ viewport หรือ state เปลี่ยน และ retry เฉพาะข้อที่ยังไม่สำเร็จ Server action ตรวจ getWritableStudentAnswer แล้ว update random_values/correct_answer/student_answer/math_input_modes พร้อมเงื่อนไข exact id/submission/old numeric map และ count=1 Browser ได้เฉพาะค่าที่แสดง ไม่ได้เฉลย
+
+useAnswerAutosave และ backup v2 เพิ่ม numeric-map token แบบ optional สำหรับ compatibility; ร่างของ random question ที่ไม่มี token หรือไม่ตรงกับ server ถูกตัดออก Save เก่าจากอีกหน้าต่างถูกปฏิเสธ ไม่เอาคำตอบชุดเดิมไปทับชุดใหม่ PracticeSingleQuestionRunner และ PracticeExerciseRunner ขอ variant ใหม่โดยส่งค่าที่เห็นล่าสุดเป็น exclusion เท่านั้น การตรวจสิทธิ์/receipt/evaluation ยังอยู่ server ทั้งหมด
+
+Session storage เก็บเพียงค่าตัวเลขที่แสดงแล้วแยก actor/library/question หรือ pathname ไม่มีคำตอบ/ผลตรวจ/receipt/secret และไม่ใช่ authority; manual retry มี ref สำรองแม้ storage ใช้ไม่ได้ การเปรียบเทียบข้าม document ของ preview/คลังฝึกอาศัย optional session history (หาก browser ปิด storage จะยังสุ่มใหม่แต่ไม่รับรองการกันค่าซ้ำข้าม reload) งานที่มี submission เทียบจากแถว server ได้เสมอ Teacher question preview ใช้ client-only dynamic boundary เพราะมีการสุ่มใน initial state; teacher final grading อ่าน latest answer-key override
+
 ## ส่งคำตอบชุดฝึกและสรุปผลเฉพาะรอบ — 15 ตุลาคม 2026
 
 PracticeExerciseRunner จัด registry ของ PracticeQuestionHandle บน panel ที่โหลดและคง mount ไว้ การส่งตรวจเรียงเฉพาะข้อที่มีคำตอบแต่ยังไม่มี verdict โดยเรียก check เดิมของแต่ละ panel จึงใช้ safe receipt, math modes, การตรวจสิทธิ์ และ retry idempotency envelope เดิม ไม่มี submitSubmission หรือ grading client-side เพิ่ม ข้อที่ตรวจแล้วไม่ส่งซ้ำเมื่อเปิดสรุป ส่วน error หยุดการส่ง แสดงข้อที่ต้องแก้ และไม่เปิดผลสำเร็จ

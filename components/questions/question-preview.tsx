@@ -27,6 +27,8 @@ export type { QuestionPreviewProps }
 export const QuestionPreviewContent = dynamic(
   () => import('./question-preview-content').then(m => m.QuestionPreviewContent),
   {
+    // Random values and option shuffles belong to the visible browser preview.
+    ssr: false,
     loading: () => (
       <p className="py-10 text-center text-sm text-muted-foreground">
         กำลังเตรียมตัวอย่าง...

@@ -1,6 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import { PracticeAccessState } from '@/components/practice/practice-access-state'
-import { PracticeQuestionRunner } from '@/components/practice/practice-question-runner'
+import { PracticeSingleQuestionRunner } from '@/components/practice/practice-single-question-runner'
 import { getAuthUser } from '@/lib/auth/server'
 import { isPracticeLibraryEnabled } from '@/lib/practice-question'
 import { loadPracticeQuestionForStudent } from '@/lib/practice-question-access.server'
@@ -42,17 +42,13 @@ export default async function StudentPracticeQuestionPage({
   if (!prepared) return <PracticeAccessState kind="unavailable" returnHref={returnHref} />
 
   return (
-    <PracticeQuestionRunner
+    <PracticeSingleQuestionRunner
       key={prepared.variantReceipt}
       libraryId={id}
       libraryTitle={access.library.title}
-      question={prepared.question}
-      variantReceipt={prepared.variantReceipt}
+      initial={prepared}
       returnHref={returnHref}
-      changesOnRefresh={prepared.changesOnRefresh}
       storageOwnerId={user.id}
-      calculatorEnabled={access.library.calculatorEnabled}
-      scratchpadEnabled={access.library.scratchpadEnabled}
     />
   )
 }

@@ -25,6 +25,8 @@ import type { PracticeFeedback } from '@/lib/practice-question'
 import type { MathInputMode } from '@/lib/types'
 import { DEFAULT_FINGER_INPUT_MODE, type FingerInputMode } from '@/lib/drawing-board-input'
 import { cn } from '@/lib/utils'
+import { readPracticeVisibleValues, rememberPracticeVisibleValues } from '@/lib/practice-visible-variant'
+import { visibleRandomValueStorage } from '@/lib/math/visible-random-values'
 
 const ScientificCalculator = lazy(() => import('@/components/exam/scientific-calculator'))
 const Scratchpad = lazy(() => import('@/components/exam/scratchpad'))
@@ -51,6 +53,7 @@ export function PracticeExerciseRunner({ library, exerciseId, storageOwnerId, ex
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [reloadNonce, setReloadNonce] = useState(0)
   const [states, setStates] = useState<Record<string, PracticeRunState>>({})
+  const visibleValues = useRef<Record<string, Record<string, number>>>({})
   const questionHandles = useRef<Record<string, PracticeQuestionHandle>>({})
   const [submitOpen, setSubmitOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -98,16 +101,19 @@ export function PracticeExerciseRunner({ library, exerciseId, storageOwnerId, ex
     let cancelled = false
     for (const id of page.ids) {
       if (cacheRef.current[id]) continue
-      void questionLoader(library.id, id).then(result => {
+      const previous = visibleValues.current[id] ?? readPracticeVisibleValues(visibleRandomValueStorage(), storageOwnerId, library.id, id)
+      void questionLoader(library.id, id, previous).then(result => {
         if (cancelled) return
         if (!result.ok) { setErrors(previous => ({ ...previous, [id]: result.error })); return }
         cacheRef.current = { ...cacheRef.current, [id]: result.data }
+        visibleValues.current[id] = result.data.question.random_values
+        rememberPracticeVisibleValues(visibleRandomValueStorage(), storageOwnerId, library.id, id, result.data.question.random_values)
         setCache(cacheRef.current)
         setErrors(previous => { const next = { ...previous }; delete next[id]; return next })
       }).catch(() => { if (!cancelled) setErrors(previous => ({ ...previous, [id]: 'การเชื่อมต่อสะดุด กรุณาลองเปิดโจทย์อีกครั้ง' })) })
     }
     return () => { cancelled = true }
-  }, [ready, pageKey, library.id, questionLoader, reloadNonce])
+  }, [ready, pageKey, library.id, storageOwnerId, questionLoader, reloadNonce])
 
   const onProgress = useCallback((id: string, answered: boolean, verdict?: PracticeFeedback['verdict']) => {
     setStates(previous => previous[id]?.answered === answered && previous[id]?.verdict === verdict ? previous : { ...previous, [id]: { answered, verdict } })
