@@ -1,18 +1,19 @@
 'use client'
 
-import { useLayoutEffect, useRef, useState } from 'react'
-import { Eye, Search } from 'lucide-react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { IconButton } from '@/components/ui/icon-button'
 import { Input } from '@/components/ui/input'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { DIFF_META, TYPE_SHORT, questionExcerpt } from '@/lib/question-display'
+import { DIFF_META } from '@/lib/question-display'
 import { filterQuestions, tagsMatchingTerm } from '@/lib/question-search'
 import type { AssignmentQuestionOption } from '@/components/assignments/create-assignment-form'
 import { QuestionListPreviewDialog } from '@/components/assignments/question-list-preview-dialog'
 import type { getQuestionPreviewDetails } from '@/lib/actions/question-previews'
 import { Card } from '@/components/ui/card'
-import { cn } from '@/lib/utils'
+import { QuestionCard } from '@/components/questions/question-card'
+import { getQuestionCardData } from '@/lib/actions/question-card-data'
+import { CARD_DATA_MAX_IDS, EMPTY_CARD_DATA, type QuestionCardData } from '@/lib/question-card-data'
 
 const DIFFICULTY_FILTERS = ['all', 'easy', 'medium', 'hard', 'analytical'] as const
 
@@ -49,6 +50,7 @@ interface Props {
   baselineIds?: string[]
   /** What the picks go into, for the pending-removal note on each row. */
   collectionNoun?: string
+  initialCardData?: QuestionCardData
   /** Local visual fixtures may supply synthetic details without reading Supabase. */
   loadPreviewQuestions?: typeof getQuestionPreviewDetails
 }
@@ -56,7 +58,7 @@ interface Props {
 export function QuestionPicker({
   questions, selectedIds, onToggle, search, onSearchChange, diffFilter, onDiffFilterChange,
   title = 'เลือกโจทย์', toolbar, banner, showSelectedFooter = true, showHeader = true, surface = 'card',
-  baselineIds, collectionNoun = 'แฟ้ม', loadPreviewQuestions,
+  baselineIds, collectionNoun = 'แฟ้ม', loadPreviewQuestions, initialCardData,
 }: Props) {
   const [previewId, setPreviewId] = useState<string | null>(null)
   const allTags = Array.from(new Set(questions.flatMap(q => q.tags ?? []))).sort()
@@ -97,6 +99,8 @@ export function QuestionPicker({
 
   const listRef = useRef<HTMLDivElement>(null)
   const bankRowRefs = useRef(new Map<string, HTMLDivElement>())
+  const [cardData, setCardData] = useState(initialCardData ?? EMPTY_CARD_DATA)
+  const requestedIds = useRef(new Set(Object.keys(initialCardData?.details ?? {})))
   const pendingAnchorRef = useRef<{ id: string; top: number } | null>(null)
 
   useLayoutEffect(() => {
@@ -109,6 +113,39 @@ export function QuestionPicker({
     pendingAnchorRef.current = null
   }, [selectedIds])
 
+  // Read badges only for cards reaching the scroll viewport, in bounded batches.
+  // The bank can contain thousands of questions; opening a picker must not
+  // request all of their folder memberships, duplicates and solution status.
+  const visibleRowsKey = [...selectedQs, ...filteredQs].map(q => q.id).join(',')
+  useEffect(() => {
+    const list = listRef.current
+    if (!list) return
+    const observer = new IntersectionObserver(entries => {
+      const missing = [...new Set(entries
+        .filter(entry => entry.isIntersecting)
+        .map(entry => (entry.target as HTMLElement).dataset.questionId!))]
+        .filter(id => !requestedIds.current.has(id))
+      for (let offset = 0; offset < missing.length; offset += CARD_DATA_MAX_IDS) {
+        const ids = missing.slice(offset, offset + CARD_DATA_MAX_IDS)
+        ids.forEach(id => requestedIds.current.add(id))
+        void getQuestionCardData(ids).then(data => {
+          setCardData(prev => ({
+            details: { ...prev.details, ...data.details },
+            duplicateCounts: { ...prev.duplicateCounts, ...data.duplicateCounts },
+            subQuestionCounts: { ...prev.subQuestionCounts, ...data.subQuestionCounts },
+            setMemberships: { ...prev.setMemberships, ...data.setMemberships },
+            solutionPresence: { ...prev.solutionPresence, ...data.solutionPresence },
+          }))
+        }).catch(error => {
+          console.error('[question-picker] card details failed:', error)
+          ids.forEach(id => requestedIds.current.delete(id))
+        })
+      }
+    }, { root: list, rootMargin: '100px' })
+    list.querySelectorAll('[data-question-id]').forEach(row => observer.observe(row))
+    return () => observer.disconnect()
+  }, [visibleRowsKey])
+
   function toggleFromBank(id: string) {
     const row = bankRowRefs.current.get(id)
     if (row) pendingAnchorRef.current = { id, top: row.getBoundingClientRect().top }
@@ -118,7 +155,6 @@ export function QuestionPicker({
   const Surface = surface === 'plain' ? PlainSurface : CardSurface
 
   function questionRow(q: AssignmentQuestionOption, toggle: () => void, location: 'selected' | 'bank') {
-    const diff = DIFF_META[q.difficulty]
     const orderNumber = selectedOrder.get(q.id) ?? null
     const isSelected = orderNumber !== null
     const wasSelected = baselineSet.has(q.id)
@@ -127,54 +163,34 @@ export function QuestionPicker({
       : !isSelected && wasSelected ? 'remove'
       : null
     return (
-      <div
-        className={cn(
-          'flex items-start gap-2 rounded-xl border p-3 transition-all',
-          pending === 'add' && 'border-success/30 bg-success/10',
-          pending === 'remove' && 'border-destructive/30 bg-destructive/10',
-          !pending && isSelected && 'border-border bg-primary/10',
-          !pending && !isSelected && 'border-transparent hover:bg-muted',
-        )}
-      >
-        <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-3">
-          <input
-            type="checkbox"
-            checked={isSelected}
-            onChange={toggle}
-            aria-label={`${isSelected ? 'ยกเลิกการเลือก' : 'เลือก'}โจทย์ ${q.title}${location === 'selected' ? ' จากกลุ่มโจทย์ที่เลือก' : ''}`}
-            className="mt-0.5 shrink-0 accent-primary"
-          />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-foreground">
-              {orderNumber !== null && (
-                <span className="mr-1.5 font-semibold text-primary">ข้อ {orderNumber}</span>
-              )}
-              {q.title}
-            </p>
-            {pending === 'remove' ? (
-              <p className="mt-0.5 text-xs font-medium text-destructive">
-                − จะเอาออกจาก{collectionNoun}
-              </p>
-            ) : (
-              <p className="mt-0.5 truncate text-xs text-muted-foreground">{questionExcerpt(q.question_text)}</p>
-            )}
-          </div>
-          <div className="flex shrink-0 items-center gap-1.5">
-            <span className={cn('rounded border px-1.5 py-0.5 text-xs', diff ? `${diff.badge} ${diff.border}` : 'border-border bg-muted text-muted-foreground')}>
-              {diff?.label ?? q.difficulty}
-            </span>
-            <span className="text-xs text-muted-foreground">{TYPE_SHORT[q.question_type] ?? q.question_type}</span>
-          </div>
-        </label>
-        <IconButton
-          type="button"
-          size="2xs"
-          label={`ดูตัวอย่างโจทย์ ${q.title}`}
-          onClick={() => setPreviewId(q.id)}
-        >
-          <Eye className="h-3.5 w-3.5" />
-        </IconButton>
-      </div>
+      <QuestionCard
+        question={{
+          ...q,
+          subject: cardData.details[q.id]?.subject ?? q.subject,
+          group_id: cardData.details[q.id]?.group_id ?? null,
+          order_in_group: cardData.details[q.id]?.order_in_group ?? null,
+          question_categories: cardData.details[q.id]?.category
+            ? { name: cardData.details[q.id].category! } : null,
+        }}
+        isFlagged={false}
+        onToggleFlag={() => {}}
+        myTeams={[]}
+        allTags={allTags}
+        detailsLoaded={!!cardData.details[q.id]}
+        duplicateCount={cardData.duplicateCounts[q.id] ?? 0}
+        subQuestionCount={cardData.subQuestionCounts[q.id] ?? q.sub_question_count}
+        sets={cardData.setMemberships[q.id]}
+        hasSolution={cardData.solutionPresence[q.id]}
+        position={orderNumber ?? undefined}
+        onPreview={() => setPreviewId(q.id)}
+        pickerContext={{
+          selected: isSelected,
+          onSelect: toggle,
+          label: `${isSelected ? 'ยกเลิกการเลือก' : 'เลือก'}โจทย์ ${q.title}${location === 'selected' ? ' จากกลุ่มโจทย์ที่เลือก' : ''}`,
+          pending,
+          removalNote: `− จะเอาออกจาก${collectionNoun}`,
+        }}
+      />
     )
   }
 
@@ -260,7 +276,7 @@ export function QuestionPicker({
         </p>
       )}
 
-      <div ref={listRef} className="max-h-96 overflow-y-auto space-y-1.5 pr-1">
+      <div ref={listRef} className="flex max-h-96 flex-col gap-2 overflow-y-auto p-1">
         {filteredQs.length === 0 ? (
           <div className="text-center py-12 text-sm space-y-2">
             <p className="text-muted-foreground">
@@ -292,7 +308,7 @@ export function QuestionPicker({
                   โจทย์ที่เลือก ({selectedIds.length} ข้อ)
                 </p>
                 {selectedQs.map(q => (
-                  <div key={`selected-${q.id}`}>
+                  <div key={`selected-${q.id}`} data-question-id={q.id}>
                     {questionRow(q, () => onToggle(q.id), 'selected')}
                   </div>
                 ))}
@@ -304,6 +320,7 @@ export function QuestionPicker({
             {filteredQs.map(q => (
               <div
                 key={`bank-${q.id}`}
+                data-question-id={q.id}
                 ref={node => {
                   if (node) bankRowRefs.current.set(q.id, node)
                   else bankRowRefs.current.delete(q.id)

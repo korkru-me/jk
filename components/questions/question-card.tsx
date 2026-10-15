@@ -112,13 +112,21 @@ interface Props {
   hasSolution?: boolean
   /** Present only when the card is listed inside one แฟ้ม. See the type. */
   setContext?: QuestionCardSetContext
+  /** Selection mode keeps the bank card and its readers, without management actions. */
+  pickerContext?: {
+    selected: boolean
+    onSelect: () => void
+    label: string
+    pending: 'add' | 'remove' | null
+    removalNote: string
+  }
   /** Recent questions return to home and refresh its totals after deletion. */
   returnToDashboard?: boolean
 }
 
 export function QuestionCard({
   question: q, isFlagged, onPreview, onToggleFlag, myTeams, detailsLoaded = true, readOnly = false, position, sectionTitles,
-  allTags, duplicateCount, subQuestionCount, sets, hasSolution, setContext, returnToDashboard = false,
+  allTags, duplicateCount, subQuestionCount, sets, hasSolution, setContext, pickerContext, returnToDashboard = false,
 }: Props) {
   const router = useRouter()
   // The edit page carries the bank's current view back with it, so returning
@@ -211,6 +219,9 @@ export function QuestionCard({
       className={cn(
         '@container group transition-all hover:shadow-sm',
         isFlagged ? 'ring-flag/40 hover:ring-flag/60' : 'hover:ring-primary/30',
+        pickerContext?.pending === 'add' && 'ring-success/30 bg-success/10',
+        pickerContext?.pending === 'remove' && 'ring-destructive/30 bg-destructive/10',
+        pickerContext?.selected && !pickerContext.pending && 'ring-primary/50 bg-primary/10',
       )}
     >
       {/* Flagged banner */}
@@ -224,7 +235,21 @@ export function QuestionCard({
       )}
 
       <div className="p-3">
-        <div className="flex flex-col @md:flex-row @md:items-start gap-2">
+        <div className={cn(
+          'flex flex-col @md:flex-row @md:items-start gap-2',
+          pickerContext && 'grid grid-cols-[auto_minmax(0,1fr)] @md:flex',
+        )}>
+          {pickerContext && (
+            <label className="flex min-h-11 min-w-11 cursor-pointer items-center justify-center self-start shrink-0 @md:-my-2">
+              <input
+                type="checkbox"
+                checked={pickerContext.selected}
+                onChange={pickerContext.onSelect}
+                aria-label={pickerContext.label}
+                className="accent-primary shrink-0"
+              />
+            </label>
+          )}
           {/* Inside a แฟ้ม, the tick and the position come before the โจทย์
               itself: bulk actions and the numbering students will see are the
               two things this list exists to control. */}
@@ -282,12 +307,13 @@ export function QuestionCard({
                   {q.question_categories.name}
                 </span>
               )}
-              {!readOnly && !setContext && <QuestionSetBadges sets={sets} showEmpty />}
+              {!readOnly && !setContext && <QuestionSetBadges sets={sets} showEmpty={detailsLoaded} interactive={!pickerContext} />}
               {readOnly ? (q.tags ?? []).map(tag => <span key={tag} className="text-xs text-muted-foreground">#{tag}</span>) : <QuestionTagsEditor questionId={q.id} tags={q.tags ?? []} allTags={allTags} />}
             </div>
 
             {/* Title */}
             <button
+              type="button"
               onClick={onPreview}
               className="text-sm font-semibold text-foreground hover:text-primary transition-colors text-left line-clamp-1 w-full"
             >
@@ -296,6 +322,10 @@ export function QuestionCard({
 
             {/* Question text preview */}
             <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{questionExcerpt(q.question_text)}</p>
+
+            {pickerContext?.pending === 'remove' && (
+              <p className="mt-0.5 text-xs font-medium text-destructive">{pickerContext.removalNote}</p>
+            )}
 
             {sectionTitles && <QuestionSectionBadges titles={sectionTitles} showEmpty className="mt-1.5" />}
 
@@ -314,21 +344,32 @@ export function QuestionCard({
           </div>
 
           {/* Right: actions (always visible on hover) */}
-          <div className="flex flex-wrap items-center justify-between @md:flex-col @md:items-end @md:justify-start gap-1.5 @md:shrink-0">
+          <div className={cn(
+            'flex flex-wrap items-center justify-between @md:flex-col @md:items-end @md:justify-start gap-1.5 @md:shrink-0',
+            pickerContext && 'col-span-2 min-w-0 max-w-full justify-end',
+          )}>
             {/* The two ways to look at a โจทย์: its เฉลย on its own, or the
                 whole of it as a student meets it. Side by side on a wide card,
                 with ดูตัวอย่าง keeping the corner it has always had; stacked
                 on a narrow one — a grid column — where side by side would
                 take its width out of the title. */}
-            <div className="flex items-center gap-1.5 @md:flex-col @md:items-end @2xl:flex-row @2xl:items-center">
+            <div className={cn(
+              'flex items-center gap-1.5 @md:flex-col @md:items-end @2xl:flex-row @2xl:items-center',
+              pickerContext && 'min-w-0 max-w-full flex-wrap justify-end',
+            )}>
               {!readOnly && <SolutionButton questionId={q.id} questionTitle={q.title} hasSolution={hasSolution} />}
-              <Button onClick={onPreview} size="sm" className="bg-primary/10 text-primary hover:bg-primary/20">
+              <Button
+                onClick={onPreview}
+                size="sm"
+                aria-label={pickerContext ? `ดูตัวอย่างโจทย์ ${q.title}` : undefined}
+                className="bg-primary/10 text-primary hover:bg-primary/20"
+              >
                 <Eye /> ดูตัวอย่าง
               </Button>
             </div>
 
             {/* Secondary actions row */}
-            {!readOnly && (
+            {!readOnly && !pickerContext && (
               <div className="flex items-center flex-wrap gap-0.5">
                 {/* Share */}
                 <div className="relative">

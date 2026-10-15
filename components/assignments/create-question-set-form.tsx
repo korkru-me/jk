@@ -551,6 +551,7 @@ export function CreateQuestionSetForm({
             showHeader={false}
             surface="plain"
             loadPreviewQuestions={loadQuestionPreviews}
+            initialCardData={initialCardData}
           />
 
           <DialogFooter className="sm:items-center sm:justify-between">
