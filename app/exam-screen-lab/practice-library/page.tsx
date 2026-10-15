@@ -76,8 +76,8 @@ export default async function PracticeLibraryLabPage({ searchParams }: {
   if (!isExamScreenLabEnabled(process.env)) notFound()
   const { view, shell } = await searchParams
 
-  if (view === 'student' || view === 'local-student') {
-    const content = <StudentLibraryLab localReview={view === 'local-student'} />
+  if (view === 'student' || view === 'local-student' || view === 'run' || view === 'local-run') {
+    const content = <StudentLibraryLab localReview={view === 'local-student' || view === 'local-run'} />
     if (shell === 'student') return <ShellClient
       user={{ id: '00000000-0000-4000-8300-000000000099', email: 'student@example.invalid', full_name: 'นักเรียนตัวอย่าง', role: 'student' }}
       initialUnreadCount={0} notificationsEnabled={false} practiceLibraryEnabled

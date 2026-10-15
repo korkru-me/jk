@@ -56,7 +56,7 @@ export function ExamQuestionNavigation({ items, touchFriendly = false, onNavigat
   )
 }
 
-export function ExamQuestionNavigationLegend({ instantCheck }: { instantCheck: boolean }) {
+export function ExamQuestionNavigationLegend({ instantCheck, flagDescription = QUESTION_FLAG_DESCRIPTION }: { instantCheck: boolean; flagDescription?: string }) {
   const items = [
     { cls: 'border border-primary bg-card ring-2 ring-primary/30', label: 'ข้อที่กำลังแสดง' },
     { cls: 'border border-success/40 bg-success/15', label: 'ตอบแล้ว' },
@@ -78,7 +78,7 @@ export function ExamQuestionNavigationLegend({ instantCheck }: { instantCheck: b
         ))}
       </div>
       <p className="flex items-start gap-1.5 text-[10px] leading-relaxed text-muted-foreground">
-        <Flag className="mt-0.5 size-3 shrink-0 text-flag" aria-hidden="true" />{QUESTION_FLAG_DESCRIPTION}
+        <Flag className="mt-0.5 size-3 shrink-0 text-flag" aria-hidden="true" />{flagDescription}
       </p>
     </div>
   )

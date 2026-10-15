@@ -1,5 +1,11 @@
 # Brand, language และ UI rules
 
+## การ์ดและหน้าฝึกชุดของนักเรียน — 15 ตุลาคม 2026
+
+ปุ่มโจทย์ในคลังฝึกใช้ “ฝึกทำ” + Target แทนตา/ดูตัวอย่าง; คลิกชื่อเป็นการเลือกและปุ่มฝึกทำจึงค่อยเปลี่ยนหน้า. หมุดใช้ขอบกับ glow token destructive/25 และ 18% แบบนุ่มโดยคง aria-pressed. การ์ดชุดใช้ลาย SVG สมุด/ดินสอ/เส้นทางความก้าวหน้าที่วาดใหม่จาก currentColor และ preset เดิม ไอคอน NotebookPen size-4; คลิกชื่อเลือกสมาชิก แยกเริ่มทำและแก้ไขชัดเจน. จอกว้างตั้งแต่ container 44rem ใช้สามคอลัมน์, 32rem สองคอลัมน์ และจอแคบหนึ่งคอลัมน์; footer รวม progress กับปุ่มในแถวเดียวเพื่อลดความสูง
+
+สร้าง/แก้ชุดผ่าน Dialog เดิม ตั้งชื่อ จำนวนข้อต่อหน้าและ ClassroomCoverThemePicker; สีอัตโนมัติสุ่มเมื่อบันทึก. Outside/Escape ขอคำยืนยันตามกฎกลางและคงร่างเมื่อกลับไปทำต่อ. หน้าเริ่มทำใช้กรอบ/เลขนำทาง/ธง/toolbar/เครื่องมือเดิม ธีมย้อมเฉพาะหัวข้อและขอบเพื่อคง contrast ของช่องตอบ ตัวอักษรชื่อยาวจำกัดสองบรรทัดพร้อม title; บนมือถือ toolbar ใช้ไอคอนเล็กพร้อมชื่อที่อ่านโดย screen reader และพับคำอธิบายสี/ธงเพื่อประหยัดแกน Y
+
 ## Picker card interaction and density — 15 October 2026
 
 In picker mode, the card frame/content/title toggles selection and only the eye action opens preview. Nested controls and their overlays act independently; the title button exposes its selected state for keyboard use. The plain picker uses gap-2; select-all uses min-h-6 on desktop and min-h-11 for coarse pointers, avoiding a tall empty band above the questions.

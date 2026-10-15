@@ -1,5 +1,13 @@
 # Feature status
 
+### ชุดฝึกนักเรียนแบบมีธีม ป๊อปอัป และหน้าเริ่มทำ — 15 ตุลาคม 2026 (local preview)
+
+- ปุ่มรายข้อใช้ “ฝึกทำ” + Target, คลิกชื่อ/การ์ดชุดเพื่อเลือกแทน navigate และข้อที่ปักหมุดมีขอบ/glow แดงอ่อน. การ์ดชุดเป็นลายสมุด/ดินสอ/เส้นทางฝึกที่วาดใหม่ มี checkbox, ความคืบหน้า ไอคอนแก้เล็กและปุ่มเริ่มทำ; ตามคำขอเพิ่ม แสดงสามคอลัมน์ตั้งแต่พื้นที่ 44rem และรวม footer แถวเดียว สูง 143→113px ที่ 1440px, 320px หนึ่งคอลัมน์ไม่ล้น
+- Dialog สร้าง/แก้ชุดตั้งชื่อ 1/3/5/10 ข้อต่อหน้า และเลือกสีด้วย picker ของห้องเรียน ไม่เลือกสีสุ่มครั้งเดียวตอนบันทึก; Outside/Escape ยืนยันก่อนปิดพร้อมคงร่าง/focus เมื่อกลับไปทำต่อ. หน้าแก้ยังเอาสมาชิกออกหรือปิด popup ไปเลือกโจทย์เพิ่มแล้วกลับมาตั้งค่า/บันทึกได้
+- เพิ่ม `/practice/[id]/exercises/[exerciseId]/take` กับ paged runner ที่ใช้ ExamQuestionFrame/navigation/flags/toolbar/calculator/scratchpad เดิม และ action ตรวจ practice เดิม. โหมดโฟกัส, เลขนำทางพร้อมผลตรวจ, คำตอบ/math modes ระหว่างเปลี่ยนหน้า และเครื่องมือที่แสดงตาม library settings ทำงาน; server ตรวจ Auth/feature flag/access-code/exact membership ทุก load/check และส่งเฉพาะ safe signed variants ไม่มีการเปลี่ยน grading หรือเปิด raw key
+- ชื่อ/สมาชิก/หมุดใน development ยังผ่าน browser adapter เดิม; theme/per-page เป็น strict presentation storage แยก owner/library/exercise ใน browser ทั้ง local/server groups ไม่มีคำตอบ/คะแนน/สิทธิ์ใน storage. ยังไม่ sync ข้ามอุปกรณ์ ไม่ apply migration หรือเขียน Production. Scratchpad แก้ I/O ระหว่าง render ให้ hydrate หลัง commit พร้อม stable scope/cancellation หลังพบ React warning ตอน lazy mount
+- TypeScript, token lint, 261 test files / 3,361 tests, isolated webpack production build และ Next compilation/runtime checks ผ่าน. Synthetic Chrome ตรวจ normal/local adapters, เลือกชื่อ, หมุด, Dialog/คำยืนยัน/คงร่าง, ธีมเจาะจง/สุ่ม/คงหลัง reload/แก้ per-page, 1/3 ข้อต่อหน้า, เปลี่ยนหน้าและคงคำตอบ, ตรวจคำตอบ/ธง, calculator insert, scratchpad เปิด, fullscreen, tool settings off และจอ 1440/320px. WCAG axe หน้ารันและ scoped Dialog หลัง animation 0 violations/0 incomplete; cover artwork มี contrast incomplete จาก SVG overlap จึงตรวจภาพร่วม ไม่อ้าง physical-touch หรือ Auth-to-DB/hosted persistence UAT. เก็บเฉพาะ source/documentation ใน `codex/student-classroom-cards` ตาม local-preview scope ไม่ push/deploy
+
 ### Browser tab deer legibility — 15 October 2026 (local preview)
 
 - Enlarged the browser favicon artwork from 86% to 96% of its canvas and added a rounded 16-unit black outline, with viewBox padding to keep antler tips intact. The shared deer SVG, in-page logos and Apple touch icon are unchanged. Regenerate with `node scripts/build-brand-icons.mjs`.

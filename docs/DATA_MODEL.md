@@ -1,5 +1,9 @@
 # Data model และ invariants
 
+## Browser presentation settings for personal exercises — 15 October 2026
+
+`korkru:practice-exercise-settings:<owner>:<library>` stores a strict UUID-keyed map of exercise → `{ questionsPerPage: 1|3|5|10, theme: <existing cover preset> }`, limited to 1000 entries. The map carries no answers, correctness, grades, permission flags or resource authority. Unselected colors are drawn once on save; legacy exercises receive stable defaults. Settings remain on this browser even for server-backed groups; no migration or automatic cloud sync is introduced. Run-page answers/math modes/verdicts/flags remain in memory, with scratch work using the existing local IndexedDB policy. Every question fetch/check repeats server resource access regardless of browser membership or preferences
+
 ## Prepared editing and review-pin schema
 
 Migration `20261014144828` adds revision/updated_at to student_practice_exercises. Update locks the exact owner/library exercise row and checks expectedRevision; a retry of the same payload returns its existing revision. List DTO adds revision and allowlisted member titles. student_practice_review_pins has composite library/student/question PK, a membership FK and student FK with cascade deletion and supporting indexes. Browser grants are revoked with RLS enabled; set/list/search RPCs are service-only and share the active student library access assertion. Pins store no answers or correctness. All new schema remains unapplied for local review.

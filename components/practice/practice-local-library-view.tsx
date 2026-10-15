@@ -12,7 +12,7 @@ import type { PracticeQuestionListItem, StudentPracticeLibrary } from '@/lib/pra
 import type { getPracticeAttachedSolution } from '@/lib/actions/practice-exercises'
 import type { buildPracticeSearchHref, buildPracticeQuestionHref } from '@/lib/practice-search'
 
-export function PracticeLocalLibraryView({ library, items, matchingIds, state, storageOwnerId, solutionLoader, libraryHrefBuilder, questionHrefBuilder, searchHiddenFields }: {
+export function PracticeLocalLibraryView({ library, items, matchingIds, state, storageOwnerId, solutionLoader, libraryHrefBuilder, questionHrefBuilder, exerciseHrefBuilder, searchHiddenFields }: {
   library: StudentPracticeLibrary
   items: PracticeQuestionListItem[]
   matchingIds: string[]
@@ -21,6 +21,7 @@ export function PracticeLocalLibraryView({ library, items, matchingIds, state, s
   solutionLoader?: (questionId: string) => ReturnType<typeof getPracticeAttachedSolution>
   libraryHrefBuilder?: typeof buildPracticeSearchHref
   questionHrefBuilder?: typeof buildPracticeQuestionHref
+  exerciseHrefBuilder?: (libraryId: string, exerciseId: string) => string
   searchHiddenFields?: Record<string, string>
 }) {
   const storageKey = `korkru:practice-local-review:${storageOwnerId}:${library.id}`
@@ -56,7 +57,7 @@ export function PracticeLocalLibraryView({ library, items, matchingIds, state, s
   const totalPages = practiceTotalPages(visible.length)
   const page = Math.min(state.page, totalPages)
   const missingGroup = ready && state.exerciseId && !active
-  return <div className="flex min-w-0 w-full max-w-[1200px] flex-col gap-2">
+  return <div className="flex min-w-0 w-full flex-col gap-2">
     <Alert className="w-full px-3 py-2 text-xs">
       <AlertDescription>ตรวจโลคอล · ชุดฝึกและหมุดเก็บในเบราว์เซอร์นี้ ยังไม่ซิงก์ข้ามอุปกรณ์</AlertDescription>
     </Alert>
@@ -65,7 +66,7 @@ export function PracticeLocalLibraryView({ library, items, matchingIds, state, s
     {!ready && !storageError ? <p role="status" className="w-full text-sm text-muted-foreground">กำลังโหลดแบบฝึกหัดที่บันทึกในเบราว์เซอร์…</p> : <PracticeLibraryView library={library} items={missingGroup ? [] : visible.slice((page - 1) * PRACTICE_PAGE_SIZE, page * PRACTICE_PAGE_SIZE)}
       total={missingGroup ? 0 : visible.length} totalPages={totalPages} state={{ ...state, page }} storageOwnerId={storageOwnerId}
       exercises={groups} exercisesReady={ready} pinnedQuestionIds={stored.pinnedQuestionIds} pinsReady={ready} solutionLoader={solutionLoader}
-      libraryHrefBuilder={libraryHrefBuilder} questionHrefBuilder={questionHrefBuilder} searchHiddenFields={searchHiddenFields}
+      libraryHrefBuilder={libraryHrefBuilder} questionHrefBuilder={questionHrefBuilder} exerciseHrefBuilder={exerciseHrefBuilder} searchHiddenFields={searchHiddenFields}
       createExerciseAction={async input => {
         try {
           const result = changeLocalPracticeExercise(readStored(), library.id, items, input, false)

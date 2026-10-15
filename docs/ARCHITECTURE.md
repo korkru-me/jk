@@ -1,5 +1,13 @@
 # Architecture
 
+### หน้าทำชุดฝึกส่วนตัว — 15 ตุลาคม 2026
+
+`/practice/[id]/exercises/[exerciseId]/take` ตรวจ Auth, feature flag, published student library และ access-code session ก่อนเปิดหน้ารัน ใน development อ่านชุดจาก local adapter แล้ว intersect สมาชิกกับ authorized metadata snapshot; production อ่านชุดผ่าน owner/library-scoped RPC เดิม. `getPracticeRunQuestion` ตรวจ exact question access และ access session ซ้ำทุกคำขอ แล้วใช้ `preparePracticeRunQuestion` ร่วมกับหน้ารายข้อเพื่อส่งเฉพาะ safe variant, signed receipt และ tool flags ไม่มี raw key/seed
+
+`PracticeExerciseRunner` โหลดเฉพาะหน้าที่กำลังแสดง (1/3/5/10 ข้อ) และคง panel ที่โหลดแล้วแบบ hidden เพื่อรักษาคำตอบ/math modes/feedback ในหน่วยความจำระหว่างเปลี่ยนหน้า ใช้ `ExamQuestionFrame`, navigation, flags, toolbar, calculator และ Scratchpad เดิม ตรวจคำตอบผ่าน action practice เดิมและไม่สร้าง Submission. สี/จำนวนข้อต่อหน้าเก็บแยก owner/library/exercise ใน browser presentation storage; ไม่แก้ schema หรือย้ายข้อมูลขึ้น cloud. โหมดโฟกัสใช้ fullscreen ของ document เพื่อให้ portal ของเครื่องมือยังเปิดได้ และออกจาก fullscreen เมื่อออกจากหน้ารัน
+
+Scratchpad สร้าง initial-data promise แบบไม่มี I/O ใน render แล้วย้ายการอ่าน IndexedDB/เผยสถานะไป effect หลัง commit พร้อม cancellation guard และ stable scope ตาม owner/submission/answer/part. ป้องกัน async state update ของ render ที่ถูกทิ้งระหว่าง lazy/Suspense และไม่เริ่มการเขียนก่อน draft hydrate ผ่าน policy เดิม
+
 ### ตรวจชุดฝึกส่วนตัวใน checkout ที่รัน localhost — 14 ตุลาคม 2026
 
 `/practice/[id]/library` ใช้ `isLocalPracticeReviewEnabled` เฉพาะ `NODE_ENV=development` เพื่อให้ตรวจ UI ใน checkout หลักได้ก่อนลง schema ใหม่ `loadPracticeLibraryLocalSnapshot` เรียก RPC ค้นหาเดิมเป็นหน้า 24 ข้อใน batch ที่จำกัด ตรวจ actor/library/access session เดิม และส่งเฉพาะ display DTO ไม่มี answer key/solution payload ในรายการ ทั้ง snapshot รวมและ search matching IDs ช่วยให้เลือก/กรองหมุดข้ามหน้าได้โดยไม่ต้องเรียก RPC ของ schema ที่ยังไม่ apply

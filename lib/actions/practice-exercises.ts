@@ -9,6 +9,8 @@ import { isPracticeLibraryEnabled } from '@/lib/practice-question'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { buildQuestionSolution, type QuestionSolution } from '@/lib/question-solution'
 import { isUuid } from '@/lib/practice-library-contracts'
+import { preparePracticeRunQuestion } from '@/lib/practice-run.server'
+import type { PracticeRunQuestionResult } from '@/lib/practice-run'
 
 async function studentAccess(libraryId: string) {
   if (!isPracticeLibraryEnabled(process.env) || !isUuid(libraryId)) return null
@@ -18,6 +20,21 @@ async function studentAccess(libraryId: string) {
   if (access.status !== 'ready' || (access.library.requiresAccessCode
     && !await hasPracticeAccessSession(user.id, libraryId))) return null
   return { user, library: access.library }
+}
+
+/** Load just the requested question; browser-saved exercise IDs never confer access. */
+export async function getPracticeRunQuestion(libraryId: string, questionId: string): Promise<PracticeRunQuestionResult> {
+  const denied = { ok: false as const, error: 'ยังเปิดโจทย์นี้ไม่ได้ กรุณาเข้าคลังฝึกอีกครั้ง' }
+  if (!isUuid(libraryId) || !isUuid(questionId)) return denied
+  try {
+    const access = await studentAccess(libraryId)
+    if (!access) return denied
+    const question = await loadPracticeQuestionForStudent(access.user.id, libraryId, questionId)
+    if (question.status !== 'ready') return denied
+    if (question.library.requiresAccessCode && !await hasPracticeAccessSession(access.user.id, libraryId)) return denied
+    const data = preparePracticeRunQuestion(access.user.id, question.library, question.question)
+    return data ? { ok: true, data } : denied
+  } catch { return denied }
 }
 
 export async function createPracticeExercise(input: unknown): Promise<{ ok: true } | { ok: false; error: string }> {

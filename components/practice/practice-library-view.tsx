@@ -16,7 +16,6 @@ import {
   X,
   Plus,
   Layers,
-  Pencil,
   Bookmark,
   Minus,
   CircleHelp,
@@ -36,7 +35,11 @@ import { Input } from '@/components/ui/input'
 import { RichText } from '@/components/ui/rich-text'
 import { PracticeQuestionCard } from './practice-question-card'
 import { SolutionLoaderProvider } from '@/components/questions/solution-loader'
-import { Progress } from '@/components/ui/progress'
+import { PracticeExerciseCard } from './practice-exercise-card'
+import { ClassroomCoverThemePicker } from '@/components/classrooms/classroom-cover-theme-picker'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { NativeSelect } from '@/components/ui/native-select'
+import { defaultPracticeExerciseSettings, readPracticeExerciseSettings, writePracticeExerciseSettings, randomPracticeExerciseTheme, PRACTICE_EXERCISE_PAGE_SIZES, type PracticeExerciseSettings, type PracticeExerciseSettingsMap } from '@/lib/practice-exercise-settings'
 import { Field, FieldLabel, FieldGroup } from '@/components/ui/field'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -70,6 +73,7 @@ interface PracticeLibraryViewProps {
   libraryHrefBuilder?: typeof buildPracticeSearchHref
   questionHrefBuilder?: typeof buildPracticeQuestionHref
   createExerciseAction?: typeof createPracticeExercise
+  exerciseHrefBuilder?: (libraryId: string, exerciseId: string) => string
   solutionLoader?: (questionId: string) => ReturnType<typeof getPracticeAttachedSolution>
 }
 
@@ -90,6 +94,7 @@ export function PracticeLibraryView({
   questionHrefBuilder = buildPracticeQuestionHref,
   createExerciseAction = createPracticeExercise,
   solutionLoader,
+  exerciseHrefBuilder = (libraryId, exerciseId) => `/practice/${libraryId}/exercises/${exerciseId}/take`,
 }: PracticeLibraryViewProps) {
   const router = useRouter()
   const [confirm, confirmation] = useConfirm()
@@ -103,6 +108,18 @@ export function PracticeLibraryView({
   const [naming, setNaming] = useState(false)
   const [exerciseHelpOpen, setExerciseHelpOpen] = useState(false)
   const [title, setTitle] = useState('')
+  const [questionsPerPage, setQuestionsPerPage] = useState<PracticeExerciseSettings['questionsPerPage']>(1)
+  const [theme, setTheme] = useState('')
+  const [exerciseSettings, setExerciseSettings] = useState<PracticeExerciseSettingsMap>({})
+  const namingTriggerRef = useRef<HTMLElement | null>(null)
+  useEffect(() => {
+    function hydrate() {
+      try { setExerciseSettings(readPracticeExerciseSettings(localStorage, storageOwnerId, library.id)) } catch { /* Existing groups use stable default presentation. */ }
+    }
+    hydrate()
+    window.addEventListener('storage', hydrate)
+    return () => window.removeEventListener('storage', hydrate)
+  }, [storageOwnerId, library.id])
   const [error, setError] = useState('')
   const [pending, startTransition] = useTransition()
   const requestId = useRef<string | null>(null)
@@ -128,7 +145,7 @@ export function PracticeLibraryView({
           && typeof draft.expectedRevision === 'number' && Number.isSafeInteger(draft.expectedRevision) && draft.expectedRevision > 0) {
           setEditing({ ...found, revision: draft.expectedRevision })
           setTitle(draft.title)
-          setNaming(true)
+          setNaming(false)
         }
       }
     } catch { /* Selection remains usable when browser storage is unavailable. */ }
@@ -158,6 +175,8 @@ export function PracticeLibraryView({
     rememberEdit(null, '')
     setEditing(null)
     setTitle('')
+    setQuestionsPerPage(1)
+    setTheme('')
     setNaming(false)
   }
   async function beginEdit(group: PracticeExercise) {
@@ -168,6 +187,9 @@ export function PracticeLibraryView({
     updateSelection(Object.fromEntries(group.questionIds.map(id => [id, group.questionTitles[id] ?? 'โจทย์ในแบบฝึกหัด'])))
     setEditing(group)
     setTitle(group.title)
+    const settings = exerciseSettings[group.id] ?? defaultPracticeExerciseSettings(group.id)
+    setQuestionsPerPage(settings.questionsPerPage)
+    setTheme(settings.theme)
     setNaming(true)
     rememberEdit(group, group.title)
   }
@@ -188,6 +210,13 @@ export function PracticeLibraryView({
           ? await updateExerciseAction({ ...payload, expectedRevision: editing.revision })
           : await createExerciseAction(payload)
         if (!result.ok) { setError(result.error); setConflict('conflict' in result && result.conflict === true); return }
+        const savedTheme = theme || randomPracticeExerciseTheme()
+        try {
+          setExerciseSettings(writePracticeExerciseSettings(localStorage, storageOwnerId, library.id, id, { questionsPerPage, theme: savedTheme as PracticeExerciseSettings['theme'] }))
+        } catch {
+          setError('บันทึกชุดแล้ว แต่ยังเก็บธีมและจำนวนข้อต่อหน้าไม่ได้ กรุณาตรวจพื้นที่จัดเก็บแล้วกดบันทึกอีกครั้ง')
+          return
+        }
         const edited = Boolean(editing)
         clearEditor()
         toast.success(edited ? 'บันทึกการแก้ไขแล้ว' : 'สร้างแบบฝึกหัดแล้ว')
@@ -334,31 +363,30 @@ export function PracticeLibraryView({
           </div>
         </div>
         {!exercisesReady && <Alert><AlertDescription>ยังโหลดแบบฝึกหัดไม่ได้ กรุณาลองโหลดหน้าอีกครั้ง</AlertDescription></Alert>}
-        {exercises.length > 0 && <div className="grid gap-2 @min-[38rem]:grid-cols-2 @min-[62rem]:grid-cols-3">
-          {exercises.map(exercise => <Card key={exercise.id} radius="md" padding="none" className={cn('flex items-center gap-2 px-3 py-2', activeExercise?.id === exercise.id && 'border-primary/50')}>
-            <Link href={libraryHrefBuilder(library.id, state, { exerciseId: exercise.id, reviewOnly: false, q: '', tags: [], page: 1 })}
-              aria-current={activeExercise?.id === exercise.id ? 'page' : undefined}
-              className="flex min-w-0 flex-1 flex-col gap-1 rounded-lg py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              <div className="flex items-start justify-between gap-2">
-                <h3 className="line-clamp-1 text-sm font-semibold" title={exercise.title}>{exercise.title}</h3>
-                <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-              </div>
-              <div className="flex items-center gap-2">
-                <p className="shrink-0 text-xs text-muted-foreground">ตอบแล้ว {exercise.attemptedCount} จาก {exercise.questionIds.length} ข้อ</p>
-                <Progress className="min-w-8 flex-1" value={exercise.attemptedCount / exercise.questionIds.length * 100} aria-label={`ความคืบหน้า ${exercise.title}`} />
-              </div>
-            </Link>
-            <Button variant="ghost" size="icon" className="size-11 shrink-0" disabled={pending} onClick={() => void beginEdit(exercise)} aria-label={`แก้ไข ${exercise.title}`} title="แก้ชื่อและโจทย์">
-              <Pencil aria-hidden="true" />
-            </Button>
-          </Card>)}
+        {exercises.length > 0 && <div className="grid gap-2 @min-[32rem]:grid-cols-2 @min-[44rem]:grid-cols-3">
+          {exercises.map(exercise => <PracticeExerciseCard key={exercise.id} exercise={exercise}
+            settings={exerciseSettings[exercise.id] ?? defaultPracticeExerciseSettings(exercise.id)}
+            selected={exercise.questionIds.every(id => selected[id] !== undefined)} disabled={pending || !exercisesReady}
+            onSelect={checked => {
+              const next = { ...selected }
+              for (const id of exercise.questionIds) {
+                if (!checked) delete next[id]
+                else if (Object.keys(next).length < PRACTICE_EXERCISE_MAX_QUESTIONS) next[id] = exercise.questionTitles[id]
+              }
+              updateSelection(next)
+            }}
+            onEdit={() => { namingTriggerRef.current = document.activeElement as HTMLElement; void beginEdit(exercise) }}
+            startHref={exerciseHrefBuilder(library.id, exercise.id)} />)}
         </div>}
       </section>
 
       <Card radius="md" padding="none" className="flex flex-col gap-2 px-3 py-1.5">
         {editing && <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="min-w-0 break-words text-sm font-semibold">กำลังแก้ไข: {editing.title}</h3>
-          <Button variant="outline" className="min-h-11" render={<Link href={libraryHrefBuilder(library.id, state, { exerciseId: '', reviewOnly: false, page: 1 })} />}>เพิ่มโจทย์จากคลัง</Button>
+          <div className="flex flex-wrap gap-1.5">
+            <Button variant="outline" size="sm" className="pointer-coarse:min-h-11" render={<Link href={libraryHrefBuilder(library.id, state, { exerciseId: '', reviewOnly: false, page: 1 })} />}>เพิ่มโจทย์จากคลัง</Button>
+            <Button size="sm" onClick={event => { namingTriggerRef.current = event.currentTarget; setNaming(true) }}>ตั้งค่าและบันทึก</Button>
+          </div>
         </div>}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <label className="flex min-h-7 cursor-pointer items-center gap-2 text-sm pointer-coarse:min-h-11">
@@ -380,42 +408,12 @@ export function PracticeLibraryView({
             {selectedIds.length > 0 && <Button variant="ghost" size="sm" className="pointer-coarse:min-h-11" disabled={pending} aria-label="ล้างที่เลือก" title="ล้างที่เลือก" onClick={() => updateSelection({})}>
               <X data-icon="inline-start" className="sm:hidden" aria-hidden="true" /><span className="hidden sm:inline">ล้างที่เลือก</span>
             </Button>}
-            {!editing && <Button size="sm" className="pointer-coarse:min-h-11" aria-label="สร้างแบบฝึกหัด" title="สร้างแบบฝึกหัด" disabled={!exercisesReady || selectedIds.length === 0 || pending} onClick={() => setNaming(true)}>
+            {!editing && <Button size="sm" className="pointer-coarse:min-h-11" aria-label="สร้างแบบฝึกหัด" title="สร้างแบบฝึกหัด" disabled={!exercisesReady || selectedIds.length === 0 || pending} onClick={event => { namingTriggerRef.current = event.currentTarget; setNaming(true) }}>
               <Plus data-icon="inline-start" aria-hidden="true" /><span className="hidden sm:inline">สร้างแบบฝึกหัด</span>
             </Button>}
           </div>
         </div>
-        {naming && <form onSubmit={saveExercise} className={cn('gap-2', editing ? 'flex flex-col' : 'grid @min-[44rem]:grid-cols-[minmax(0,1fr)_auto] @min-[44rem]:items-end')}>
-          <FieldGroup className="min-w-0"><Field className="gap-1" data-invalid={Boolean(error)}>
-            <FieldLabel htmlFor="practice-exercise-name">ชื่อแบบฝึกหัด</FieldLabel>
-            <Input ref={editorRef} id="practice-exercise-name" value={title} maxLength={120} required autoFocus disabled={pending}
-              placeholder="เช่น ทบทวนกฎของนิวตัน" aria-invalid={Boolean(error)}
-              onChange={event => { setTitle(event.target.value); rememberEdit(editing, event.target.value); requestId.current = null; setError('') }} />
-          </Field></FieldGroup>
-          {editing && <div className="flex flex-col gap-2">
-            <p className="text-xs text-muted-foreground">ติ๊กเลือกเพื่อเพิ่มโจทย์ หรือเอาข้อออกด้านล่าง ต้องเหลืออย่างน้อย 1 ข้อ</p>
-            <ol className="flex max-h-60 flex-col gap-1 overflow-y-auto" aria-label="โจทย์ที่เลือกในแบบฝึกหัด">
-              {selectedIds.map(id => <li key={id} className="flex items-center justify-between gap-2">
-                <span className="min-w-0 truncate text-sm">{selected[id]}</span>
-                <Button type="button" variant="ghost" className="min-h-11 shrink-0" disabled={pending}
-                  aria-label={`เอา ${selected[id]} ออกจากแบบฝึกหัด`}
-                  onClick={() => { const next = { ...selected }; delete next[id]; updateSelection(next) }}>
-                  <Minus data-icon="inline-start" aria-hidden="true" />เอาออก
-                </Button>
-              </li>)}
-            </ol>
-          </div>}
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" size="sm" className="pointer-coarse:min-h-11" disabled={pending || !title.trim() || selectedIds.length === 0}>{pending ? 'กำลังบันทึก…' : `${editing ? 'บันทึกการแก้ไข' : 'บันทึกแบบฝึกหัด'} ${selectedIds.length} ข้อ`}</Button>
-            <Button type="button" variant="outline" size="sm" className="pointer-coarse:min-h-11" disabled={pending} onClick={() => editing ? void cancelEdit() : setNaming(false)}>{editing ? 'ยกเลิกการแก้ไข' : 'พักการตั้งชื่อ'}</Button>
-          </div>
-          {error && <p role="alert" className="text-sm text-destructive @min-[44rem]:col-span-2">{error}</p>}
-          {conflict && <Button type="button" variant="outline" className="min-h-11" onClick={async () => {
-            if (await confirm({ title: 'โหลดข้อมูลล่าสุด?', description: 'การแก้ไขที่ยังไม่บันทึกจะถูกยกเลิก จากนั้นเปิดแก้ไขแบบฝึกหัดอีกครั้งได้', confirmLabel: 'โหลดข้อมูลล่าสุด', cancelLabel: 'กลับไปแก้ไข' })) {
-              clearEditor(); router.refresh()
-            }
-          }}>โหลดข้อมูลล่าสุด</Button>}
-        </form>}
+
       </Card>
 
       {(activeExercise || hasFilters) && <div className="flex items-center justify-end gap-2 text-xs">
@@ -467,6 +465,63 @@ export function PracticeLibraryView({
           </ol>
         )}
       </SolutionLoaderProvider>
+
+      <Dialog open={naming} onOpenChange={(open, details) => {
+        if (open) { setNaming(true); return }
+        details.cancel()
+        if (pending) return
+        if (details.reason === 'outside-press' || details.reason === 'escape-key') {
+          void confirm({ title: 'ปิดการตั้งชื่อแบบฝึกหัด?', description: 'ชื่อและการตั้งค่าที่ยังไม่บันทึกจะถูกยกเลิก รายการโจทย์ที่เลือกยังอยู่', confirmLabel: 'ยืนยันปิด', cancelLabel: 'กลับไปดำเนินการต่อ' }).then(accepted => {
+            if (accepted) { setNaming(false); setEditing(null); setTitle(''); rememberEdit(null, '') }
+          })
+        } else if (editing) void cancelEdit()
+        else { setNaming(false); setTitle('') }
+      }}>
+        <DialogContent className="sm:max-w-md" initialFocus={editorRef} finalFocus={namingTriggerRef}>
+          <DialogHeader>
+            <DialogTitle>{editing ? 'แก้ไขแบบฝึกหัดของฉัน' : 'สร้างแบบฝึกหัดของฉัน'}</DialogTitle>
+            <DialogDescription>{selectedIds.length} ข้อที่เลือก · ไม่เลือกสี ระบบจะสุ่มให้</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={saveExercise} className="flex flex-col gap-3">
+          <FieldGroup className="min-w-0"><Field className="gap-1" data-invalid={Boolean(error)}>
+            <FieldLabel htmlFor="practice-exercise-name">ชื่อแบบฝึกหัด</FieldLabel>
+            <Input ref={editorRef} id="practice-exercise-name" value={title} maxLength={120} required autoFocus disabled={pending}
+              placeholder="เช่น ทบทวนกฎของนิวตัน" aria-invalid={Boolean(error)}
+              onChange={event => { setTitle(event.target.value); rememberEdit(editing, event.target.value); requestId.current = null; setError('') }} />
+          </Field></FieldGroup>
+          <FieldGroup className="gap-3"><Field className="gap-1">
+            <FieldLabel htmlFor="practice-exercise-page-size">โจทย์ต่อหน้า</FieldLabel>
+            <NativeSelect id="practice-exercise-page-size" value={questionsPerPage} disabled={pending} onChange={event => setQuestionsPerPage(Number(event.target.value) as PracticeExerciseSettings['questionsPerPage'])}>
+              {PRACTICE_EXERCISE_PAGE_SIZES.map(size => <option key={size} value={size}>{size} ข้อต่อหน้า</option>)}
+            </NativeSelect>
+          </Field></FieldGroup>
+          <ClassroomCoverThemePicker value={theme} onValueChange={setTheme} disabled={pending} allowAuto />
+          {editing && <div className="flex flex-col gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => { rememberEdit(editing, title); setNaming(false) }}>เลือกโจทย์เพิ่มจากคลัง</Button>
+            <ol className="flex max-h-60 flex-col gap-1 overflow-y-auto" aria-label="โจทย์ที่เลือกในแบบฝึกหัด">
+              {selectedIds.map(id => <li key={id} className="flex items-center justify-between gap-2">
+                <span className="min-w-0 truncate text-sm">{selected[id]}</span>
+                <Button type="button" variant="ghost" className="min-h-11 shrink-0" disabled={pending}
+                  aria-label={`เอา ${selected[id]} ออกจากแบบฝึกหัด`}
+                  onClick={() => { const next = { ...selected }; delete next[id]; updateSelection(next) }}>
+                  <Minus data-icon="inline-start" aria-hidden="true" />เอาออก
+                </Button>
+              </li>)}
+            </ol>
+          </div>}
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" size="sm" className="pointer-coarse:min-h-11" disabled={pending || !title.trim() || selectedIds.length === 0}>{pending ? 'กำลังบันทึก…' : `${editing ? 'บันทึกการแก้ไข' : 'บันทึกแบบฝึกหัด'} ${selectedIds.length} ข้อ`}</Button>
+            <Button type="button" variant="outline" size="sm" className="pointer-coarse:min-h-11" disabled={pending} onClick={() => { if (editing) void cancelEdit(); else { setNaming(false); setTitle('') } }}>{editing ? 'ยกเลิกการแก้ไข' : 'ยกเลิก'}</Button>
+          </div>
+          {error && <p role="alert" className="text-sm text-destructive @min-[44rem]:col-span-2">{error}</p>}
+          {conflict && <Button type="button" variant="outline" className="min-h-11" onClick={async () => {
+            if (await confirm({ title: 'โหลดข้อมูลล่าสุด?', description: 'การแก้ไขที่ยังไม่บันทึกจะถูกยกเลิก จากนั้นเปิดแก้ไขแบบฝึกหัดอีกครั้งได้', confirmLabel: 'โหลดข้อมูลล่าสุด', cancelLabel: 'กลับไปแก้ไข' })) {
+              clearEditor(); router.refresh()
+            }
+          }}>โหลดข้อมูลล่าสุด</Button>}
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {confirmation}
 

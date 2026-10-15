@@ -7,7 +7,7 @@
 
 ## Student-created personal practice exercises
 
-A personal exercise groups existing questions in one accessible published practice library. It is private to its student and uses the practice domain, without an Assignment, Submission, grade or deadline. Opening the group filters the original questions; each still uses the original check flow. Progress is the count of distinct questions with accepted checks, including checks before group creation, not correct answers or mastery. Teachers and classmates cannot read the group names or members.
+A personal exercise groups existing questions in one accessible published practice library. It is private to its student and uses the practice domain, without an Assignment, Submission, grade or deadline. Selecting its card selects its member questions; the separate Start action opens a paged practice run using the original check flow and the teacher's library tool/reveal settings. The student chooses a browser-local color and 1/3/5/10 questions per page. Progress on the library card is the count of distinct questions with accepted checks, including checks before group creation, not correct answers or mastery; run navigation represents only the current in-memory answers/checks. Teachers and classmates cannot read the group names or members.
 
 
 อัปเดตล่าสุด: 26 กันยายน 2026

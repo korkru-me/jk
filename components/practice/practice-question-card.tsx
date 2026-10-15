@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Eye, Check, Bookmark, BookmarkCheck } from 'lucide-react'
+import { Target, Check, Bookmark, BookmarkCheck } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -22,7 +22,7 @@ export function PracticeQuestionCard({ item, href, selected, onSelect, selection
 }) {
   const difficulty = item.difficulty ? DIFF_META[item.difficulty] : undefined
   return (
-    <Card edge="ring" radius="md" padding="none" className={cn('@container h-full px-3 py-2 transition-shadow hover:shadow-sm', selected && 'ring-primary/50')}>
+    <Card edge="ring" radius="md" padding="none" className={cn('@container h-full px-3 py-2 transition-shadow hover:shadow-sm', selected && 'ring-primary/50', pinned && 'ring-destructive/25 shadow-[0_0_0.8rem_color-mix(in_oklab,var(--destructive)_18%,transparent)]')}>
       <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-2 @sm:grid-cols-[auto_minmax(0,1fr)_auto]">
         <label className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-lg focus-within:ring-2 focus-within:ring-ring pointer-coarse:size-11">
           <input type="checkbox" checked={selected} disabled={selectionDisabled}
@@ -41,9 +41,9 @@ export function PracticeQuestionCard({ item, href, selected, onSelect, selection
                 {item.attemptCount > 0 ? `ตอบแล้ว ${item.attemptCount} ครั้ง` : 'ยังไม่เคยตอบ'}
               </span>
             </div>
-            <Link href={href} title={item.title} className="line-clamp-2 text-sm font-semibold text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring @lg:line-clamp-1">
-              {item.title}
-            </Link>
+            <Button type="button" variant="ghost" disabled={selectionDisabled} aria-pressed={selected} onClick={() => onSelect(!selected)} title={item.title} className="h-auto justify-start whitespace-normal p-0 text-left font-semibold hover:bg-transparent">
+              <span className="line-clamp-2 @lg:line-clamp-1">{item.title}</span>
+            </Button>
             {item.excerpt && <p className="line-clamp-2 text-xs text-muted-foreground @lg:line-clamp-1">{item.excerpt}</p>}
           </div>
           <div className="col-span-2 flex flex-wrap items-center justify-end gap-1.5 @sm:col-span-1 @sm:flex-col @sm:items-end @2xl:flex-row @2xl:items-center">
@@ -55,7 +55,7 @@ export function PracticeQuestionCard({ item, href, selected, onSelect, selection
             {item.hasSolution && <SolutionButton questionId={item.id} questionTitle={item.title} hasSolution canAttach={false} confirmDismissal />}
             <Button variant="navigation" size="sm" className="pointer-coarse:min-h-11"
               render={<Link href={href} />}>
-              <Eye data-icon="inline-start" aria-hidden="true" />ดูตัวอย่าง
+              <Target data-icon="inline-start" aria-hidden="true" />ฝึกทำ
             </Button>
           </div>
       </div>
