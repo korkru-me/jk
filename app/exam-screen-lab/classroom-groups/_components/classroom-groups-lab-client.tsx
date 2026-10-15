@@ -157,12 +157,14 @@ export function ClassroomGroupsLabClient({
   overviewOnly = false,
   workOnly = false,
   previewNow = '2026-10-14T12:00:00.000Z',
+  missingLayout = false,
 }: {
   scenario: GroupsLabScenario
   fail: boolean
   overviewOnly?: boolean
   workOnly?: boolean
   previewNow?: string
+  missingLayout?: boolean
 }) {
   const seed = useMemo(() => initial(scenario), [scenario])
   const [state, setState] = useState<GroupState>(seed.state)
@@ -290,8 +292,8 @@ export function ClassroomGroupsLabClient({
       submissions={[]}
       studentCount={32}
       pendingReviewByAssignment={{ '00000000-0000-4000-b000-000000000004': 2 }}
-      practiceLibraries={{ error: null, layoutAvailable: true, items: [
-        { id: '00000000-0000-4000-a000-000000000001', title: 'คลังฝึกทบทวนแรงและการเคลื่อนที่', status: 'published', questionCount: 24, categoryId: CATEGORY_ONE_ID, displayOrder: 2 },
+      practiceLibraries={{ error: null, layoutAvailable: !missingLayout, items: [
+        { id: '00000000-0000-4000-a000-000000000001', title: 'คลังฝึกทบทวนแรงและการเคลื่อนที่', status: 'published', questionCount: 24, categoryId: missingLayout ? null : CATEGORY_ONE_ID, displayOrder: missingLayout ? null : 2 },
         { id: '00000000-0000-4000-a000-000000000002', title: 'คลังฝึกฉบับร่าง ชื่อยาวสำหรับตรวจรายการรวมบนมือถือ', status: 'draft', questionCount: 8, categoryId: null, displayOrder: null },
       ] }}
       recentWork={{ asOf: previewNow, error: null, items: [
@@ -314,7 +316,7 @@ export function ClassroomGroupsLabClient({
   )
 
   if (workOnly) {
-    return <div className="mx-auto w-full min-w-0 max-w-7xl p-4 sm:p-6">{workFixture}</div>
+    return <div className="w-full min-w-0 p-4 sm:p-6">{workFixture}</div>
   }
 
   if (overviewOnly) {

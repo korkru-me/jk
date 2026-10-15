@@ -1,5 +1,11 @@
 # Feature status
 
+## Two-column compact work cards and drag fix - 15 October 2026 (local only)
+
+- The latest owner revision uses at most two work cards per row, fills the classroom's available width, and reduces vertical padding/gaps. Sample cards at 1440px measure about 151-172px compared with the previous 204-209px. At 1920px the room scope measures about 1555px with no right-side unused gutter.
+- Fixed a pre-existing all-or-nothing drag guard: when practice layout is unavailable, ordinary exercises/exams can still reorder and change category. Locked libraries stay fixed and explain their restriction. Explicit pointer tests confirmed press/drag activation, moving to an empty group, and appending before locked libraries; keyboard reorder also passed in layout=missing. Normal supported layouts retain library dragging.
+- TypeScript isolated/main, token lint, Next runtime/compilation and a separate webpack production build passed. Checked 320px layout without overflow/clipping. Only synthetic in-memory writes were tested; hosted database persistence and unit suite were not rerun. No migration, push or deployment. The first automatic approval review for the build timed out; its allowed retry succeeded.
+
 ## Teacher assignment cards - 15 October 2026 (local only)
 
 - Replaced full-width rows with individual rounded cards in a responsive 1/2/3-column grid. Preserved all exercise/exam/practice metadata, group selectors, status indicators and actions. Grid sorting uses rectSortingStrategy without changing server actions or permissions.

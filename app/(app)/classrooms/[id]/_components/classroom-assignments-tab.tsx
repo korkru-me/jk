@@ -209,7 +209,7 @@ function SortableAssignmentRow({
         transition: freezeLayout ? undefined : transition,
       }}
       className={cn(
-        'relative flex h-full min-w-0 overflow-hidden border-l-4 p-3 transition-[background-color,box-shadow,opacity]',
+        'relative flex h-full min-w-0 overflow-hidden border-l-4 px-3 py-2 transition-[background-color,box-shadow,opacity]',
         tone,
       )}
     >
@@ -236,12 +236,12 @@ function SortableAssignmentRow({
       <Button
         ref={setActivatorNodeRef}
         type="button"
-        variant="ghost"
+        variant="outline"
         size="icon-sm"
         aria-label={`ลากเพื่อเปลี่ยนลำดับหรือย้ายกลุ่ม ${title}`}
-        title="กดค้างแล้วลากเพื่อเรียงหรือย้ายกลุ่ม"
+        title={disabled ? 'กำลังบันทึก หรือยังไม่รองรับการย้ายงานนี้' : 'กดค้างแล้วลากเพื่อเรียงหรือย้ายกลุ่ม'}
         disabled={disabled}
-        className="absolute right-2 top-2 cursor-grab touch-none text-muted-foreground hover:bg-primary/10 hover:text-primary active:cursor-grabbing pointer-coarse:size-[44px]"
+        className="absolute right-2 top-2 z-10 cursor-grab touch-none text-muted-foreground hover:bg-primary/10 hover:text-primary active:cursor-grabbing pointer-coarse:size-[44px]"
         {...attributes}
         {...listeners}
       >
@@ -333,7 +333,7 @@ function AssignmentCategoryCard({
             </span>
           </div>
         )}
-        <div className="grid min-w-0 grid-cols-1 items-stretch gap-2 @min-[40rem]/teacher-work:grid-cols-2 @min-[64rem]/teacher-work:grid-cols-3">
+        <div className="grid min-w-0 grid-cols-1 items-stretch gap-2 @min-[40rem]/teacher-work:grid-cols-2">
           {assignmentCount === 0 ? (
             <Card edge="dashed" radius="md" className="col-span-full flex min-h-16 items-center justify-center gap-2 px-3 py-3 text-center text-xs text-muted-foreground">
               <Folder className="size-4 shrink-0" aria-hidden="true" />
@@ -535,18 +535,22 @@ export function ClassroomAssignmentsTab({
     const previousCategoryId = normalizeAssignmentCategoryId(categoryByAssignment[assignmentId], categories)
     const previousOrder = rows.map(assignment => assignment.id)
     const categoryChanged = previousCategoryId !== targetCategoryId
+    // Libraries without layout support stay in their existing slots. They
+    // must not disable or become reorder targets for ordinary assignments.
+    const movableRows = layoutBlocked ? rows.filter(work => work.kind === 'assignment') : rows
+    const movableIds = new Set(movableRows.map(work => work.id))
     const visibleIds = filtered
-      .filter(assignment => assignment.category_id === previousCategoryId)
+      .filter(assignment => assignment.category_id === previousCategoryId && movableIds.has(assignment.id))
       .map(assignment => assignment.id)
     let nextOrder = previousOrder
 
     if (categoryChanged) {
       // Cross-group drops always append, even over an existing row or with a type filter.
-      const lastAssignmentId = rows
+      const lastAssignmentId = movableRows
         .filter(assignment => assignment.id !== assignmentId && assignment.category_id === targetCategoryId)
         .at(-1)?.id
       if (lastAssignmentId) {
-        nextOrder = moveVisibleAssignmentAfter(previousOrder, previousOrder, assignmentId, lastAssignmentId)
+        nextOrder = moveVisibleAssignmentAfter(previousOrder, movableRows.map(work => work.id), assignmentId, lastAssignmentId)
       }
     } else if (overData?.type === 'assignment' && assignmentId !== String(event.over.id)) {
       nextOrder = moveVisibleAssignmentColumn(previousOrder, visibleIds, assignmentId, String(event.over.id))
@@ -640,10 +644,13 @@ export function ClassroomAssignmentsTab({
       {practiceLibraries?.error && <Alert variant="destructive"><AlertTitle>แสดงคลังฝึกไม่สำเร็จ</AlertTitle><AlertDescription>{practiceLibraries.error}</AlertDescription></Alert>}
 
       {filtered.length > 0 && (
-        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
           <GripVertical className="size-3.5 shrink-0" aria-hidden="true" />
-          ลากตัวจับมุมการ์ดเพื่อเรียงลำดับ หรือวางในกลุ่มงานเพื่อย้ายกลุ่ม ระบบจะบันทึกให้อัตโนมัติ
-          {(isOrderPending || isPending) && <span className="font-medium text-primary">กำลังบันทึก...</span>}
+          <span className="min-w-0">
+            ลากตัวจับมุมการ์ดเพื่อเรียงลำดับ หรือวางในกลุ่มงานเพื่อย้ายกลุ่ม ระบบจะบันทึกให้อัตโนมัติ
+            {layoutBlocked && ' · คลังฝึกยังย้ายไม่ได้ในขณะนี้'}
+            {(isOrderPending || isPending) && <span className="ml-1 font-medium text-primary">กำลังบันทึก...</span>}
+          </span>
         </p>
       )}
 
@@ -709,8 +716,8 @@ export function ClassroomAssignmentsTab({
                         disabled={isOrderPending || isPending || layoutBlocked} freezeLayout={!sortingWithinCategory}
                         tone={statusCfg.row} status={practiceStatus}
                       >
-                        <div className="flex h-full min-w-0 flex-col gap-2" data-classroom-practice-row>
-                          <div className="flex min-w-0 flex-col gap-2">
+                        <div className="flex h-full min-w-0 flex-col gap-1.5" data-classroom-practice-row>
+                          <div className="flex min-w-0 flex-col gap-1.5">
                             <Link href={`/practice/${assignment.libraryId}/edit`} className="flex min-w-0 items-start gap-2 rounded-lg pr-8 outline-none focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:pr-12">
                               <div className={cn('flex size-8 shrink-0 items-center justify-center rounded-lg', typeCfg.bg)}>
                                 <TypeIcon className={cn('size-4', typeCfg.text)} aria-hidden="true" />
@@ -726,7 +733,7 @@ export function ClassroomAssignmentsTab({
                               <Badge variant={statusCfg.badge}>{statusCfg.label}</Badge>
                             </div>
                           </div>
-                          <div className="mt-auto flex flex-wrap items-center gap-1 border-t border-border/60 pt-2">
+                          <div className="mt-auto flex flex-wrap items-center gap-1 border-t border-border/60 pt-1.5">
                             <Button variant="ghost" size="sm" render={<Link href={`/practice/${assignment.libraryId}/progress`} />}>
                               <BarChart3 data-icon="inline-start" /> ดูความคืบหน้า
                             </Button>
@@ -753,13 +760,13 @@ export function ClassroomAssignmentsTab({
                         assignmentId={assignment.id}
                         categoryId={assignment.category_id ?? null}
                         title={assignment.title}
-                        disabled={isOrderPending || isPending || layoutBlocked}
+                        disabled={isOrderPending || isPending}
                         freezeLayout={!sortingWithinCategory}
                         tone={statusCfg.row}
                         status={statusCfg}
                       >
-                        <div className="flex h-full min-w-0 flex-col gap-2">
-                        <div className="flex min-w-0 flex-col gap-2">
+                        <div className="flex h-full min-w-0 flex-col gap-1.5">
+                        <div className="flex min-w-0 flex-col gap-1.5">
                           <Link href={`/assignments/${assignment.id}`} className="flex min-w-0 items-start gap-2 rounded-lg pr-8 outline-none focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:pr-12">
                             <div className={cn('flex size-8 shrink-0 items-center justify-center rounded-lg', typeCfg.bg)}>
                               <TypeIcon className={cn('size-4', typeCfg.text)} />
@@ -831,7 +838,7 @@ export function ClassroomAssignmentsTab({
                           </div>
                         </div>
 
-                        <div className="mt-auto flex flex-wrap items-center gap-1 border-t border-border/60 pt-2">
+                        <div className="mt-auto flex flex-wrap items-center gap-1 border-t border-border/60 pt-1.5">
                           <Button
                             variant="ghost"
                             size="sm"

@@ -254,7 +254,7 @@ export function ClassroomDetailClient({
   }
 
   return (
-    <ClassroomTheme cover={classroomMeta.cover} className="flex min-w-0 max-w-[1200px] flex-col gap-6">
+    <ClassroomTheme cover={classroomMeta.cover} className="flex w-full min-w-0 flex-col gap-6">
       {/* Header card */}
       <div
         className={cn(

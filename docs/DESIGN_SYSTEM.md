@@ -2,7 +2,9 @@
 
 ## Teacher assignment cards and compact recent work - 15 October 2026
 
-Teacher work uses individual rounded Card surfaces with the existing status stripe. Each category has a separate tinted heading and a 1/2/3-column grid at container widths 40rem/64rem. The drag handle sits at the upper right with title clearance. All metadata, category selection, type/status badges and preview/grading/copy or practice actions remain visible. Actions align at the card bottom; there is no fixed aspect ratio or added minimum height.
+Teacher work uses individual rounded Card surfaces with the existing status stripe. Each category has a separate tinted heading and a 1/2-column grid at container width 40rem (never three columns). The drag handle sits at the upper right with title clearance. All metadata, category selection, type/status badges and preview/grading/copy or practice actions remain visible. Actions align at the card bottom; there is no fixed aspect ratio or added minimum height.
+
+The classroom detail now fills the available content width. The owner's latest revision explicitly asks for shorter cards: vertical card padding is py-2, internal gaps and footer spacing are reduced, while all details remain. The upper-right drag handle uses an outline and sits above card content for a clear pointer target.
 
 Recent work removes the redundant success subtitle, uses padding sm and gap-2, and packs type/date/status together when space allows. Inner cards use px-3/py-2; titles allow two lines with the full title available. Item identity, timestamps, status and destinations remain unchanged.
 

@@ -28,15 +28,17 @@ export default async function ClassroomGroupsLabPage({
     scenario?: string | string[]
     fail?: string | string[]
     view?: string | string[]
+    layout?: string | string[]
   }>
 }) {
   if (!isExamScreenLabEnabled(process.env)) notFound()
-  const { scenario, fail, view } = await searchParams
+  const { scenario, fail, view, layout } = await searchParams
   const requested = Array.isArray(scenario) ? scenario[0] : scenario
   const picked = SCENARIOS.find(s => s === requested) ?? 'default'
   return (
     <ClassroomGroupsLabClient
       previewNow={new Date().toISOString()}
+      missingLayout={(Array.isArray(layout) ? layout[0] : layout) === 'missing'}
       scenario={picked}
       fail={(Array.isArray(fail) ? fail[0] : fail) === '1'}
       overviewOnly={(Array.isArray(view) ? view[0] : view) === 'overview'}
