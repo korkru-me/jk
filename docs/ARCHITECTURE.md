@@ -1,5 +1,9 @@
 # Architecture
 
+## Student dashboard welcome composition — 15 October 2026
+
+StudentDashboard renders the server-side StudentDashboardWelcome above StudentView inside the existing classrooms anchor. The welcome reuses JoinClassroomForm with the same initial code and Server Action; StudentView's optional showJoinForm defaults true and is false only when the parent hosts that form. There is one form/state boundary, no additional data read, authentication check or mutation path. BRAND_MARK_URL is a decorative CSS mask. The environment-gated student-dashboard fixture adds a synthetic long-name case; its join action still returns mock feedback without database access. Teacher dashboard files and behavior are unchanged by this task.
+
 ## วงจรตัวเลขสุ่มใหม่ — 15 ตุลาคม 2026
 
 `drawFreshValues` เปรียบเทียบ numeric map แบบไม่ขึ้นกับลำดับ key และลองไม่เกิน 128 ครั้ง ถ้าไม่มีชุดต่างให้คืน error แทนรายงานสำเร็จด้วยค่าเก่า `buildAssignmentAttempt` รับชุดก่อนหน้าสำหรับ full retry; wrong-only retry และ recycled streak ใช้ helper เดียวกัน โดย shared seed ใช้กับ initial draw เท่านั้น

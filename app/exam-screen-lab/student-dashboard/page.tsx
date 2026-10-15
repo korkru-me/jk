@@ -94,7 +94,7 @@ export default async function StudentDashboardLabPage({ searchParams }: {
 
   return (
     <ShellClient user={USER} initialUnreadCount={0} notificationsEnabled={false}>
-        <StudentDashboard user={USER} data={data} calendarNow={calendarNow} initialJoinCode={join} joinAction={previewJoinClassroom}
+        <StudentDashboard user={{ ...USER, full_name: scenario === 'long-name' ? 'เด็กหญิงก่อการเรียนรู้ นามสกุลสำหรับตรวจชื่อยาวในพื้นที่เรียนรู้ของฉัน' : USER.full_name }} data={data} calendarNow={calendarNow} initialJoinCode={join} joinAction={previewJoinClassroom}
           previewLabel="ตัวอย่างสำหรับตรวจหน้าตา · ข้อมูลนักเรียนและงานจำลอง"
           backHref="/exam-screen-lab/student-dashboard#classrooms"
           recentPosts={scenario === 'empty' ? [] : CLASSROOMS.slice(0, 3).map(c => ({ id: `post-${c.id}`, classroom_id: c.id, body: 'อย่าลืมทบทวนเรื่องแรงและการเคลื่อนที่ก่อนเรียนครั้งถัดไปนะครับ', created_at: calendarNow, users: { full_name: 'ครูจำลอง' }, classrooms: { name: c.name } }))}

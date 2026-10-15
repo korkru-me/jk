@@ -13,6 +13,7 @@ export function StudentView({
   initialJoinCode,
   joinAction,
   embedded = false,
+  showJoinForm = true,
   backHref,
 }: {
   classrooms: StudentClassroom[]
@@ -20,6 +21,8 @@ export function StudentView({
   initialJoinCode: string
   joinAction?: JoinClassroomAction
   embedded?: boolean
+  /** A containing welcome frame can host the existing join form instead. */
+  showJoinForm?: boolean
   backHref?: string
 }) {
   const Heading = embedded ? 'h2' : 'h1'
@@ -39,15 +42,15 @@ export function StudentView({
   }
 
   return (
-    <div className="@container flex flex-col gap-4">
+    <div className={cn('@container flex flex-col', embedded ? 'gap-2' : 'gap-4')}>
       <div className="flex flex-col gap-3 @min-[34rem]:flex-row @min-[34rem]:flex-wrap @min-[34rem]:items-center @min-[34rem]:justify-between">
         <div className="flex shrink-0 flex-wrap items-baseline gap-2">
           <Heading id="student-classrooms-heading" className="text-xl font-bold">ห้องเรียนของฉัน</Heading>
           <p className="text-xs text-muted-foreground">{classrooms.length} ห้องเรียน</p>
         </div>
-        <Card padding="sm" className="w-full @min-[34rem]:ml-auto @min-[34rem]:w-[19rem] @min-[34rem]:shrink-0">
+        {showJoinForm && <Card padding="sm" className="w-full @min-[34rem]:ml-auto @min-[34rem]:w-[19rem] @min-[34rem]:shrink-0">
           <JoinClassroomForm initialCode={initialJoinCode} compact joinAction={joinAction} />
-        </Card>
+        </Card>}
       </div>
 
       {classrooms.length === 0 ? (

@@ -11,6 +11,7 @@ import type { StudentLearningData } from './student-learning-data'
 import { coverOf, parseDescription } from '../../classrooms/_components/classroom-meta'
 import { ClassroomIcon } from '@/components/classrooms/classroom-icon'
 import { cn } from '@/lib/utils'
+import { StudentDashboardWelcome } from './student-dashboard-welcome'
 
 export type StudentDashboardPost = {
   id: string
@@ -37,12 +38,12 @@ export function StudentDashboard({ user, data, calendarNow, recentPosts, initial
   return (
     <div className="student-learning-stage @container/learning flex w-full min-w-0 flex-col gap-3" data-student-dashboard>
       <h1 className="sr-only">พื้นที่เรียนรู้ของฉัน</h1>
-      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-base font-medium"><span>{greeting} 👋</span><span className="text-lg font-bold text-primary">{user.full_name}</span></p>
       {previewLabel && <p className="text-xs text-muted-foreground">{previewLabel}</p>}
       <div className="grid items-start gap-4 @min-[46rem]/learning:grid-cols-[minmax(0,1fr)_14rem] @min-[64rem]/learning:grid-cols-[minmax(0,1fr)_16rem]" data-student-learning-grid>
         <div className="flex min-w-0 flex-col gap-6">
-          <section id="classrooms" aria-labelledby="student-classrooms-heading" className="scroll-mt-20">
-            <StudentView classrooms={data.classrooms} pendingCountMap={data.pendingCountMap} initialJoinCode={initialJoinCode} joinAction={joinAction} embedded backHref={backHref} />
+          <section id="classrooms" aria-labelledby="student-classrooms-heading" className="scroll-mt-20 flex min-w-0 flex-col gap-2">
+            <StudentDashboardWelcome fullName={user.full_name} greeting={greeting} initialJoinCode={initialJoinCode} joinAction={joinAction} />
+            <StudentView classrooms={data.classrooms} pendingCountMap={data.pendingCountMap} initialJoinCode={initialJoinCode} showJoinForm={false} embedded backHref={backHref} />
           </section>
           <StudentWorkSummary data={data} now={calendarNow ? Date.parse(calendarNow) : Date.now()} />
           {recentPosts.length > 0 && (
