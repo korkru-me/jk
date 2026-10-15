@@ -1,5 +1,9 @@
 # Architecture
 
+## Teacher home welcome — 15 October 2026
+
+The existing verified dashboard profile supplies full_name to TeacherDashboard. DashboardWelcome renders on the server using the existing counts and Bangkok clock; four time periods each have three wordings selected by Thai calendar day. Greeting changes on a new server render, without timers, additional queries or a client boundary on the production dashboard. Empty teacher accounts retain GettingStarted below the welcome. The guarded /exam-screen-lab/teacher-dashboard route supplies synthetic empty/name/clock cases without database reads or writes.
+
 ### ตรวจชุดฝึกส่วนตัวใน checkout ที่รัน localhost — 14 ตุลาคม 2026
 
 `/practice/[id]/library` ใช้ `isLocalPracticeReviewEnabled` เฉพาะ `NODE_ENV=development` เพื่อให้ตรวจ UI ใน checkout หลักได้ก่อนลง schema ใหม่ `loadPracticeLibraryLocalSnapshot` เรียก RPC ค้นหาเดิมเป็นหน้า 24 ข้อใน batch ที่จำกัด ตรวจ actor/library/access session เดิม และส่งเฉพาะ display DTO ไม่มี answer key/solution payload ในรายการ ทั้ง snapshot รวมและ search matching IDs ช่วยให้เลือก/กรองหมุดข้ามหน้าได้โดยไม่ต้องเรียก RPC ของ schema ที่ยังไม่ apply

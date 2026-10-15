@@ -1,5 +1,11 @@
 # Brand, language และ UI rules
 
+## กรอบต้อนรับหน้าหลักครู — 15 ตุลาคม 2026
+
+แทนสถิติสามการ์ดด้วย Card เดียวสองแถว: คำทักทายพร้อมชื่อจริง และลิงก์สถิติห้องเรียน/โจทย์/แฟ้ม ใช้ edge ring, ring-border และ radius lg เหมือนการ์ดวิชา พื้นไล่สี primary จาง ๆ และเครื่องหมายกวางจาก brand-mark-data วาง absolute ทางขวา จึงไม่เพิ่มความสูง ใช้ padding แนวตั้ง 8px ตามสเกลเดิม ไม่ตั้ง min-height ของกรอบ และคงพื้นที่กดลิงก์อย่างน้อย 44×44px
+
+ปรับรายละเอียดตามความกว้างกรอบ: จอแคบลดคำเป็น “โจทย์”/“แฟ้ม” และซ่อนไอคอนเมื่อแคบมาก โดย aria-label ยังให้ชื่อเต็มและจำนวนนักเรียน ชื่อยาวตัดบรรทัดได้ไม่ล้น ห้ามเพิ่มแถวคำโปรย/วันที่หรือภาพประกอบที่กินพื้นที่เนื้อหาโดยไม่จำเป็น
+
 ## Picker card interaction and density — 15 October 2026
 
 In picker mode, the card frame/content/title toggles selection and only the eye action opens preview. Nested controls and their overlays act independently; the title button exposes its selected state for keyboard use. The plain picker uses gap-2; select-all uses min-h-6 on desktop and min-h-11 for coarse pointers, avoiding a tall empty band above the questions.

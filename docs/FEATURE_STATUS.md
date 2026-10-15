@@ -1,5 +1,13 @@
 # Feature status
 
+### กรอบต้อนรับหน้าหลักครู — 15 ตุลาคม 2026 (local preview)
+
+- แทนสามการ์ดสถิติด้วยกรอบต้อนรับสองแถว เรียกชื่อจริงจาก profile เดิม มีคำทักทาย 12 แบบตามช่วงเวลาและวันในเวลาไทย โดยประเมินใหม่เมื่อหน้า render; รวมจำนวนห้องเรียน/นักเรียน โจทย์ และแฟ้มเป็นลิงก์เล็ก ๆ พร้อมโลโก้กวางจางทางขวา ไม่มี query เพิ่มหรือการแก้สิทธิ์/ฐานข้อมูล
+- ตามคำขอเจ้าของ เส้นขอบใช้ edge ring / ring-border / radius lg ชุดเดียวกับการ์ดวิชา ตรวจ computed style ได้ ring 1px สีเดียวกันและรัศมีเดียวกัน กรอบตัวอย่างชื่อปกติสูง 85.2px เทียบสถิติเดิม 86.4px ที่ 1440px และ 102.2px ที่ 390/320px; เนื้อหาห้องเรียนเลื่อนขึ้นเมื่อรวม gap ที่ลดลง ชื่อยาวยอมเพิ่มบรรทัดเพื่อไม่ตัดชื่อและไม่ล้น
+- ตรวจ local synthetic fixture บน 1440/390/320px, ชื่อยาว/ชื่อว่าง/บัญชีใหม่, ขอบช่วงเวลา 04/05/11/12/16/17/19/20 และถ้อยคำสามวัน, ธีมสว่าง/มืด, focus และปลายทางลิงก์ พื้นที่กดอย่างน้อย 44×44px; แก้ fixture classroom-icons ให้ส่งชื่อด้วย
+- TypeScript, token lint, production Turbopack build แยก cache และ Next MCP compilation/runtime ผ่าน; React tree ยืนยัน TeacherDashboard และ DashboardWelcome เป็น Server Components ในเส้นทางจริงของ fixture. Axe เฉพาะกรอบไม่พบ WCAG violations แต่ contrast เป็น incomplete เนื่องจากพื้น gradient จึงไม่อ้างรับรอง contrast อัตโนมัติ
+- ไม่รัน unit suite เพราะไม่แก้ lib/scoring; ไม่ทดสอบบัญชีจริง/บริการภายนอกหรือ deploy และไม่มี migration การตรวจข้อมูลจริงยังอาศัย query เดิมของ dashboard
+
 ### Browser tab deer legibility — 15 October 2026 (local preview)
 
 - Enlarged the browser favicon artwork from 86% to 96% of its canvas and added a rounded 16-unit black outline, with viewBox padding to keep antler tips intact. The shared deer SVG, in-page logos and Apple touch icon are unchanged. Regenerate with `node scripts/build-brand-icons.mjs`.

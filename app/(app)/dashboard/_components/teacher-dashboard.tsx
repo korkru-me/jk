@@ -15,6 +15,7 @@ import type { QuestionCardData } from '@/lib/question-card-data'
 import type { Classroom, QuestionSet } from '@/lib/types'
 import { QuestionSetCard } from '@/components/questions/question-set-card'
 import { ClassroomCard } from '@/app/(app)/classrooms/_components/classroom-card'
+import { DashboardWelcome } from './dashboard-welcome'
 
 /**
  * Decorative accents distinguish the three kinds of work without claiming a
@@ -63,6 +64,7 @@ export type DashboardQuestion = QuestionCardRow
 
 interface Props {
   currentUserId: string
+  fullName: string
   classroomsCount: number
   questionsCount: number
   setsCount: number
@@ -77,6 +79,7 @@ interface Props {
 
 export function TeacherDashboard({
   currentUserId,
+  fullName,
   classroomsCount,
   questionsCount,
   setsCount,
@@ -90,38 +93,26 @@ export function TeacherDashboard({
 }: Props) {
   const isEmpty = classroomsCount === 0 && questionsCount === 0 && setsCount === 0
 
-  if (isEmpty) return <GettingStarted />
+  const welcome = (
+    <DashboardWelcome
+      fullName={fullName}
+      classroomsCount={classroomsCount}
+      studentsCount={studentsCount}
+      questionsCount={questionsCount}
+      setsCount={setsCount}
+    />
+  )
+
+  if (isEmpty) return (
+    <div className="flex max-w-[1200px] flex-col gap-4">
+      {welcome}
+      <GettingStarted />
+    </div>
+  )
 
   return (
-    <div className="flex max-w-[1200px] flex-col gap-7">
-      {/* A compact strip keeps useful totals without pushing the actual work
-          below the fold. */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-3">
-        <CompactStatCard
-          href="/classrooms"
-          icon={School}
-          accent={CLASSROOM_ACCENT}
-          value={classroomsCount}
-          label="ห้องเรียน"
-          sub={studentsCount > 0 ? `นักเรียนรวม ${studentsCount} คน` : 'ยังไม่มีนักเรียน'}
-        />
-        <CompactStatCard
-          href="/questions"
-          icon={BookOpen}
-          accent={QUESTION_ACCENT}
-          value={questionsCount}
-          label="โจทย์ในคลัง"
-          sub="โจทย์ที่คุณสร้างเอง"
-        />
-        <CompactStatCard
-          href="/questions/sets"
-          icon={Layers}
-          accent={SET_ACCENT}
-          value={setsCount}
-          label="แฟ้มโจทย์"
-          sub="แฟ้มที่คุณสร้างเอง"
-        />
-      </div>
+    <div className="flex max-w-[1200px] flex-col gap-4">
+      {welcome}
 
       <DashboardSection
         title="ห้องเรียนของฉัน"
@@ -194,48 +185,6 @@ export function TeacherDashboard({
         />
       </DashboardSection>
     </div>
-  )
-}
-
-function CompactStatCard({
-  href,
-  icon: Icon,
-  accent,
-  value,
-  label,
-  sub,
-}: {
-  href: string
-  icon: React.ElementType
-  accent: Accent
-  value: number
-  label: string
-  sub: string
-}) {
-  return (
-    <Link href={href} className="group" data-dashboard-stat-card>
-      <Card
-        radius="md"
-        padding="sm"
-        interactive
-        className={cn(
-          'flex min-h-20 flex-col items-center justify-center gap-1.5 p-2 text-center sm:min-h-18 sm:flex-row sm:justify-start sm:gap-3 sm:p-3 sm:text-left',
-          accent.border
-        )}
-      >
-        <span className={cn('flex size-8 shrink-0 items-center justify-center rounded-lg sm:size-9', accent.chip)}>
-          <Icon className="size-4" aria-hidden="true" />
-        </span>
-        <span className="min-w-0 sm:flex-1">
-          <span className="flex flex-col items-center gap-0.5 sm:flex-row sm:items-baseline sm:gap-2">
-            <strong className="text-lg leading-none sm:text-xl">{value.toLocaleString()}</strong>
-            <span className="text-xs leading-tight font-medium sm:truncate sm:text-sm">{label}</span>
-          </span>
-          <span className="mt-1 hidden truncate text-xs text-muted-foreground sm:block">{sub}</span>
-        </span>
-        <ChevronRight className="hidden size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 sm:block" aria-hidden="true" />
-      </Card>
-    </Link>
   )
 }
 
@@ -320,7 +269,7 @@ function GettingStarted() {
   return (
     <div className="flex max-w-[1200px] flex-col gap-4">
       <div>
-        <h1 className="text-xl font-bold">เริ่มต้นใช้งาน</h1>
+        <h2 className="text-xl font-bold">เริ่มต้นใช้งาน</h2>
         <p className="mt-1 text-sm text-muted-foreground">เลือกสิ่งที่คุณอยากสร้างก่อน</p>
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

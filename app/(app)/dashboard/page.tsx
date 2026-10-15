@@ -115,6 +115,7 @@ export default async function DashboardPage({ searchParams }: {
     return (
       <TeacherDashboard
         currentUserId={user.id}
+        fullName={user.full_name}
         classroomsCount={classrooms.length}
         questionsCount={questionsRes.count ?? 0}
         setsCount={setsRes.count ?? 0}
