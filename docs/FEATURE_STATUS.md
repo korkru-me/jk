@@ -1,5 +1,12 @@
 # Feature status
 
+## Teacher assignment cards - 15 October 2026 (local only)
+
+- Replaced full-width rows with individual rounded cards in a responsive 1/2/3-column grid. Preserved all exercise/exam/practice metadata, group selectors, status indicators and actions. Grid sorting uses rectSortingStrategy without changing server actions or permissions.
+- Removed the success subtitle from recent work and reduced padding/gaps, combining metadata/status when space permits. The two-item sample frame measures about 130px on desktop. Names, type, timestamps, status, links and expiry behavior remain intact.
+- Verified the guarded classroom-groups work fixture at 1440/900/390/320px: 3/2/1/1 columns, no horizontal overflow or clipped cards. All 22 action links match the baseline; the enhanced exam fixture separately verifies the pending-review destination. Keyboard reorder, mouse drop into an empty category and Select category changes passed. fail=1 rolls order/category changes back with feedback.
+- TypeScript in isolated/main, token lint, Next compilation/runtime and an isolated webpack production build passed. Scoped axe checks in light/dark each found zero violations/incomplete checks. No lib changes, so unit suite was not repeated; no real-data/external-service writes or tests, no migration, push or deployment. Changes remain local as requested.
+
 ## ธีมสีภายในห้องเรียน — 15 ตุลาคม 2026 (local only)
 
 - ตกแต่งหัวข้อ/ไอคอน ขอบและพื้นหัวกรอบ ประกาศปักหมุด avatar ปุ่มหลัก และเมนูห้องเรียนตาม cover เดิม 9 สี รวมกรอบรายชื่อ คะแนน ผู้ช่วยสอน ศักยภาพ และโฮมรูม มุมมองนักเรียนใช้ scope เดียวกัน ไม่เปลี่ยนสีสถานะ/คะแนน/หมวดที่เลือก ไม่เพิ่มความสูงหรือ spacing

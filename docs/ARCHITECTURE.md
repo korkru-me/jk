@@ -1,5 +1,9 @@
 # Architecture
 
+## Teacher work card layout - 15 October 2026
+
+ClassroomAssignmentsTab keeps the same rows, category/order state, sensors, collision rules, persistence callbacks and rollback logic. SortableAssignmentRow now renders a Card and category contents use a responsive grid. In-category sorting uses rectSortingStrategy; cross-category drops keep existing append semantics and stationary layout. The handle remains the sole drag activator, independent from menus and action links. ClassroomRecentWork changes only copy/layout, retaining the same expiry logic. The guarded classroom-groups fixture receives a server timestamp so recent samples remain visible; category/order mutations still run in memory.
+
 ## Classroom interior theme — 15 October 2026
 
 `components/classrooms/classroom-theme.tsx` maps the existing validated cover id to the same nine semantic tokens as COVER_PRESETS; no metadata format, database query, server action, or permission changes. A CSS module applies colour only to explicit data-classroom-* decoration hooks. Teacher detail, its separately rendered contextual sidebar, subject student view, and homeroom student view each mount the scope. Category, urgency and grading palettes are independent. The optional trusted navigationPathname on ClassroomDetailClient keeps the guarded synthetic classroom-themes fixture on its own path; production defaults to /classrooms/:id and retains its existing routing/authorization.

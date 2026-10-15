@@ -36,6 +36,7 @@ export default async function ClassroomGroupsLabPage({
   const picked = SCENARIOS.find(s => s === requested) ?? 'default'
   return (
     <ClassroomGroupsLabClient
+      previewNow={new Date().toISOString()}
       scenario={picked}
       fail={(Array.isArray(fail) ? fail[0] : fail) === '1'}
       overviewOnly={(Array.isArray(view) ? view[0] : view) === 'overview'}

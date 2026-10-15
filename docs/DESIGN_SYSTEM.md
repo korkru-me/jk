@@ -1,5 +1,11 @@
 # Brand, language และ UI rules
 
+## Teacher assignment cards and compact recent work - 15 October 2026
+
+Teacher work uses individual rounded Card surfaces with the existing status stripe. Each category has a separate tinted heading and a 1/2/3-column grid at container widths 40rem/64rem. The drag handle sits at the upper right with title clearance. All metadata, category selection, type/status badges and preview/grading/copy or practice actions remain visible. Actions align at the card bottom; there is no fixed aspect ratio or added minimum height.
+
+Recent work removes the redundant success subtitle, uses padding sm and gap-2, and packs type/date/status together when space allows. Inner cards use px-3/py-2; titles allow two lines with the full title available. Item identity, timestamps, status and destinations remain unchanged.
+
 ## สีภายในหน้าห้องเรียน — 15 ตุลาคม 2026
 
 ใช้ ClassroomTheme อ่านสี cover เดิมทั้ง 9 สีและตั้ง --classroom-accent เฉพาะภายในหน้าห้องและ contextual sidebar หัวข้อ ไอคอน ขอบกรอบ พื้นหัวกรอบอ่อน ปุ่มหลัก เมนูที่เลือก และประกาศปักหมุดใช้สีห้องเดียวกัน ตารางรายชื่อ/คะแนน ผู้ช่วยสอน และกรอบศักยภาพ/โฮมรูมรับขอบสีด้วย data hooks ที่ระบุไว้ มุมมองนักเรียนและเพื่อนร่วมโฮมรูมใช้ scope เดียวกัน สีสถานะงาน คะแนน และสีหมวดที่ผู้ใช้เลือกยังคงความหมายเดิม ไม่ override primary ทั่วทั้งหน้า

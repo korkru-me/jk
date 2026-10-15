@@ -156,11 +156,13 @@ export function ClassroomGroupsLabClient({
   fail,
   overviewOnly = false,
   workOnly = false,
+  previewNow = '2026-10-14T12:00:00.000Z',
 }: {
   scenario: GroupsLabScenario
   fail: boolean
   overviewOnly?: boolean
   workOnly?: boolean
+  previewNow?: string
 }) {
   const seed = useMemo(() => initial(scenario), [scenario])
   const [state, setState] = useState<GroupState>(seed.state)
@@ -283,17 +285,18 @@ export function ClassroomGroupsLabClient({
   const workFixture = (
     <ClassroomAssignmentsTab
       classroomId={CLASSROOM_ID}
-      assignments={[...LAB_ASSIGNMENTS, { ...LAB_ASSIGNMENTS[1], id: '00000000-0000-4000-b000-000000000004', title: 'ข้อสอบกลางภาคจำลอง', type: 'exam', category_id: CATEGORY_ONE_ID, display_order: 4 }]}
+      assignments={[...LAB_ASSIGNMENTS, { ...LAB_ASSIGNMENTS[1], id: '00000000-0000-4000-b000-000000000004', title: 'ข้อสอบกลางภาคจำลอง', type: 'exam', category_id: CATEGORY_ONE_ID, display_order: 4, max_attempts: 1, passing_type: 'percent', passing_value: 70, random_question_count: 2 }]}
       categories={LAB_CATEGORIES}
       submissions={[]}
       studentCount={32}
-      pendingReviewByAssignment={{}}
+      pendingReviewByAssignment={{ '00000000-0000-4000-b000-000000000004': 2 }}
       practiceLibraries={{ error: null, layoutAvailable: true, items: [
         { id: '00000000-0000-4000-a000-000000000001', title: 'คลังฝึกทบทวนแรงและการเคลื่อนที่', status: 'published', questionCount: 24, categoryId: CATEGORY_ONE_ID, displayOrder: 2 },
         { id: '00000000-0000-4000-a000-000000000002', title: 'คลังฝึกฉบับร่าง ชื่อยาวสำหรับตรวจรายการรวมบนมือถือ', status: 'draft', questionCount: 8, categoryId: null, displayOrder: null },
       ] }}
-      recentWork={{ asOf: '2026-10-14T12:00:00.000Z', error: null, items: [
-        { id: '00000000-0000-4000-a000-000000000001', title: 'คลังฝึกทบทวนแรงและการเคลื่อนที่', type: 'practice', status: 'published', createdAt: '2026-10-14T12:00:00.000Z' },
+      recentWork={{ asOf: previewNow, error: null, items: [
+        { id: '00000000-0000-4000-a000-000000000001', title: 'คลังฝึกทบทวนแรงและการเคลื่อนที่', type: 'practice', status: 'published', createdAt: previewNow },
+        { id: '00000000-0000-4000-b000-000000000002', title: 'การเคลื่อนที่แบบโปรเจกไทล์', type: 'exercise', status: 'published', createdAt: previewNow },
       ] }}
       onReorderAssignments={async () => {
         await wait()

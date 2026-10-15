@@ -40,7 +40,7 @@ import {
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
-  verticalListSortingStrategy,
+  rectSortingStrategy,
   type SortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS as DndCSS } from '@dnd-kit/utilities'
@@ -199,8 +199,9 @@ function SortableAssignmentRow({
   })
 
   return (
-    <div
+    <Card
       ref={setNodeRef}
+      radius="md"
       data-assignment-row
       style={{
         // The overlay follows the pointer; the original row keeps its place.
@@ -208,7 +209,7 @@ function SortableAssignmentRow({
         transition: freezeLayout ? undefined : transition,
       }}
       className={cn(
-        'relative flex gap-2 border-l-4 py-3 pr-2 pl-3 transition-[background-color,box-shadow,opacity]',
+        'relative flex h-full min-w-0 overflow-hidden border-l-4 p-3 transition-[background-color,box-shadow,opacity]',
         tone,
       )}
     >
@@ -240,14 +241,14 @@ function SortableAssignmentRow({
         aria-label={`ลากเพื่อเปลี่ยนลำดับหรือย้ายกลุ่ม ${title}`}
         title="กดค้างแล้วลากเพื่อเรียงหรือย้ายกลุ่ม"
         disabled={disabled}
-        className="mt-0.5 cursor-grab touch-none text-muted-foreground hover:bg-primary/10 hover:text-primary active:cursor-grabbing"
+        className="absolute right-2 top-2 cursor-grab touch-none text-muted-foreground hover:bg-primary/10 hover:text-primary active:cursor-grabbing pointer-coarse:size-[44px]"
         {...attributes}
         {...listeners}
       >
         <GripVertical />
       </Button>
-      <div className="min-w-0 flex-1">{children}</div>
-    </div>
+      <div className="flex min-w-0 flex-1 flex-col">{children}</div>
+    </Card>
   )
 }
 
@@ -299,14 +300,13 @@ function AssignmentCategoryCard({
   return (
     <Card
       ref={setNodeRef}
-      edge="ring"
+      edge="none"
       role="group"
       aria-label={`กลุ่มงาน ${category?.name ?? 'ยังไม่จัดกลุ่ม'} ${assignmentCount} งาน`}
       data-assignment-category-id={category?.id ?? UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE}
-      data-classroom-panel={!preset || undefined}
       className={cn(
-        'relative overflow-hidden transition-shadow',
-        isDropTarget && '[&_[data-assignment-row]]:bg-transparent',
+        'relative min-w-0 bg-transparent transition-shadow',
+        isDropTarget && 'ring-2 ring-primary/40',
       )}
     >
       {isDropTarget && (
@@ -318,27 +318,27 @@ function AssignmentCategoryCard({
           )}
         />
       )}
-      <div className="relative">
+      <div className="relative flex min-w-0 flex-col gap-2">
         {showHeader && (
           <div data-classroom-panel-header={!preset || undefined} className={cn(
-            'flex items-center gap-2 border-b px-4 py-2.5',
+            'flex min-w-0 items-center gap-2 rounded-lg px-3 py-2',
             preset?.surface ?? 'bg-muted/40',
           )}>
             <Folder className={cn('size-4', preset?.text ?? 'text-muted-foreground')} aria-hidden="true" />
-            <h3 className={cn('text-sm font-semibold', preset?.text ?? 'text-muted-foreground')}>
+            <h3 className={cn('min-w-0 break-words text-sm font-semibold', preset?.text ?? 'text-muted-foreground')}>
               {category?.name ?? 'ยังไม่จัดกลุ่ม'}
             </h3>
-            <span className={cn('text-xs', preset?.textMuted ?? 'text-muted-foreground')}>
+            <span className={cn('ml-auto shrink-0 text-xs', preset?.textMuted ?? 'text-muted-foreground')}>
               {assignmentCount} งาน
             </span>
           </div>
         )}
-        <div className={cn('divide-y divide-border', assignmentCount === 0 && 'min-h-24')}>
+        <div className="grid min-w-0 grid-cols-1 items-stretch gap-2 @min-[40rem]/teacher-work:grid-cols-2 @min-[64rem]/teacher-work:grid-cols-3">
           {assignmentCount === 0 ? (
-            <div className="flex min-h-24 items-center justify-center gap-2 px-4 py-6 text-center text-xs text-muted-foreground">
+            <Card edge="dashed" radius="md" className="col-span-full flex min-h-16 items-center justify-center gap-2 px-3 py-3 text-center text-xs text-muted-foreground">
               <Folder className="size-4 shrink-0" aria-hidden="true" />
               ยังไม่มีงาน · ลากงานมาวางในกลุ่มนี้ได้
-            </div>
+            </Card>
           ) : children}
         </div>
       </div>
@@ -591,7 +591,7 @@ export function ClassroomAssignmentsTab({
       onValueChange={value => moveToCategory(work.id, value)}
       disabled={isPending || isOrderPending || (work.kind === 'practice' && layoutBlocked)}
     >
-      <SelectTrigger size="sm" className="w-40 max-w-full" aria-label={`กลุ่มของ ${work.title}`}>
+      <SelectTrigger size="sm" className="min-w-0 flex-1" aria-label={`กลุ่มของ ${work.title}`}>
         <Folder />
         <SelectValue>{value => categoryItems.find(item => item.value === value)?.label ?? 'ยังไม่จัดกลุ่ม'}</SelectValue>
       </SelectTrigger>
@@ -620,7 +620,7 @@ export function ClassroomAssignmentsTab({
   }
 
   return (
-    <div className="flex min-w-0 flex-col gap-3" data-classroom-work-list>
+    <div className="@container/teacher-work flex min-w-0 flex-col gap-3 pointer-coarse:[&_[data-slot=button]]:min-h-[44px] pointer-coarse:[&_[data-slot=select-trigger]]:min-h-[44px]" data-classroom-work-list>
       {recentWork && <ClassroomRecentWork result={recentWork} />}
 
       <div className="flex flex-wrap items-center gap-2" data-classroom-work-toolbar>
@@ -642,7 +642,7 @@ export function ClassroomAssignmentsTab({
       {filtered.length > 0 && (
         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <GripVertical className="size-3.5 shrink-0" aria-hidden="true" />
-          กดค้างที่ตัวจับแล้วลากขึ้น–ลงเพื่อเรียง หรือวางในกรอบกลุ่มงานเพื่อย้ายกลุ่ม ระบบจะบันทึกให้อัตโนมัติ
+          ลากตัวจับมุมการ์ดเพื่อเรียงลำดับ หรือวางในกลุ่มงานเพื่อย้ายกลุ่ม ระบบจะบันทึกให้อัตโนมัติ
           {(isOrderPending || isPending) && <span className="font-medium text-primary">กำลังบันทึก...</span>}
         </p>
       )}
@@ -681,7 +681,7 @@ export function ClassroomAssignmentsTab({
                   <SortableContext
                     key={sectionKey}
                     items={section.assignments.map(assignment => assignment.id)}
-                    strategy={sortingWithinCategory ? verticalListSortingStrategy : stationaryAssignmentStrategy}
+                    strategy={sortingWithinCategory ? rectSortingStrategy : stationaryAssignmentStrategy}
                   >
                   <AssignmentCategoryCard
                     category={section.category}
@@ -709,24 +709,24 @@ export function ClassroomAssignmentsTab({
                         disabled={isOrderPending || isPending || layoutBlocked} freezeLayout={!sortingWithinCategory}
                         tone={statusCfg.row} status={practiceStatus}
                       >
-                        <div className="flex flex-col gap-3 px-2" data-classroom-practice-row>
-                          <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
-                            <Link href={`/practice/${assignment.libraryId}/edit`} className="flex min-w-0 flex-1 items-center gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                        <div className="flex h-full min-w-0 flex-col gap-2" data-classroom-practice-row>
+                          <div className="flex min-w-0 flex-col gap-2">
+                            <Link href={`/practice/${assignment.libraryId}/edit`} className="flex min-w-0 items-start gap-2 rounded-lg pr-8 outline-none focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:pr-12">
                               <div className={cn('flex size-8 shrink-0 items-center justify-center rounded-lg', typeCfg.bg)}>
                                 <TypeIcon className={cn('size-4', typeCfg.text)} aria-hidden="true" />
                               </div>
                               <div className="min-w-0">
-                                <p className="line-clamp-2 text-sm font-medium leading-snug" title={assignment.title}>{assignment.title}</p>
+                                <p className="line-clamp-2 text-sm font-semibold leading-snug" title={assignment.title}>{assignment.title}</p>
                                 <p className="mt-0.5 text-xs text-muted-foreground">{assignment.questionCount} ข้อ · ฝึกซ้ำได้ · ไม่มีคะแนน</p>
                               </div>
                             </Link>
-                            <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
+                            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                               {categoryPicker(assignment)}
                               <Badge variant="secondary">คลังฝึก</Badge>
                               <Badge variant={statusCfg.badge}>{statusCfg.label}</Badge>
                             </div>
                           </div>
-                          <div className="flex flex-wrap items-center gap-1 rounded-xl bg-muted/40 p-1 md:justify-end">
+                          <div className="mt-auto flex flex-wrap items-center gap-1 border-t border-border/60 pt-2">
                             <Button variant="ghost" size="sm" render={<Link href={`/practice/${assignment.libraryId}/progress`} />}>
                               <BarChart3 data-icon="inline-start" /> ดูความคืบหน้า
                             </Button>
@@ -758,17 +758,17 @@ export function ClassroomAssignmentsTab({
                         tone={statusCfg.row}
                         status={statusCfg}
                       >
-                        <div className="flex flex-col gap-3 px-2">
-                        <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
-                          <Link href={`/assignments/${assignment.id}`} className="flex min-w-0 flex-1 items-center gap-3">
+                        <div className="flex h-full min-w-0 flex-col gap-2">
+                        <div className="flex min-w-0 flex-col gap-2">
+                          <Link href={`/assignments/${assignment.id}`} className="flex min-w-0 items-start gap-2 rounded-lg pr-8 outline-none focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:pr-12">
                             <div className={cn('flex size-8 shrink-0 items-center justify-center rounded-lg', typeCfg.bg)}>
                               <TypeIcon className={cn('size-4', typeCfg.text)} />
                             </div>
                             <div className="min-w-0">
-                              <p className="line-clamp-2 text-sm font-medium leading-snug text-foreground" title={assignment.title}>
+                              <p className="line-clamp-2 text-sm font-semibold leading-snug text-foreground" title={assignment.title}>
                                 {assignment.title}
                               </p>
-                              <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
                                 <span className="text-xs text-muted-foreground">{assignmentSizeLabel(assignment)}</span>
                                 {assignment.group_ids && (
                                   <span className="flex items-center gap-0.5 text-xs font-medium text-tint-1">
@@ -820,7 +820,7 @@ export function ClassroomAssignmentsTab({
                             </div>
                           </Link>
 
-                          <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
+                          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                             {categoryPicker(assignment)}
                             <span className={cn('whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium', typeCfg.bg, typeCfg.text)}>
                               {typeCfg.label}
@@ -831,7 +831,7 @@ export function ClassroomAssignmentsTab({
                           </div>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-1 rounded-xl bg-muted/40 p-1 md:justify-end">
+                        <div className="mt-auto flex flex-wrap items-center gap-1 border-t border-border/60 pt-2">
                           <Button
                             variant="ghost"
                             size="sm"
