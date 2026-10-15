@@ -31,6 +31,7 @@ interface PracticeStudentDetailProps {
   page: number
   totalPages: number
   total: number
+  hrefBase?: string
 }
 
 export function PracticeStudentDetail({
@@ -41,12 +42,15 @@ export function PracticeStudentDetail({
   page,
   totalPages,
   total,
+  hrefBase,
 }: PracticeStudentDetailProps) {
   const state = { q: query, page }
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <form method="get" className="flex w-full max-w-lg items-end gap-2">
+          <input type="hidden" name="tab" value="progress" />
+          <input type="hidden" name="student" value={studentId} />
           <Field className="min-w-0 flex-1 gap-1.5">
             <FieldLabel htmlFor="practice-question-progress-search" className="sr-only">
               ค้นหาโจทย์
@@ -92,7 +96,7 @@ export function PracticeStudentDetail({
               <TableRow>
                 <TableHead>โจทย์</TableHead>
                 <TableHead className="hidden sm:table-cell">แท็ก</TableHead>
-                <TableHead className="text-right">จำนวนครั้งที่ตอบ</TableHead>
+                <TableHead className="text-right">จำนวนรอบ</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -100,6 +104,7 @@ export function PracticeStudentDetail({
                 <TableRow key={row.question_id} className="h-12">
                   <TableCell className="max-w-80 whitespace-normal font-medium">
                     <span className="line-clamp-2">{row.title}</span>
+                    <p className="mt-1 text-xs font-normal text-muted-foreground">{row.attempt_count > 0 ? 'ฝึกแล้ว' : 'ยังไม่ได้ฝึก'}</p>
                     <div className="mt-1 flex gap-1 sm:hidden">
                       {row.tags.slice(0, 1).map(tag => (
                         <Badge key={tag} variant="secondary" className="max-w-36 truncate">
@@ -120,7 +125,7 @@ export function PracticeStudentDetail({
                     </div>
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
-                    {row.attempt_count === 0 ? 'ยังไม่เคยตอบ' : `${row.attempt_count} ครั้ง`}
+                    {row.attempt_count} รอบ
                   </TableCell>
                 </TableRow>
               ))}
@@ -137,7 +142,7 @@ export function PracticeStudentDetail({
             className="min-h-11"
             disabled={page <= 1}
             render={page > 1
-              ? <Link href={buildPracticeProgressHref(libraryId, studentId, state, page - 1)} />
+              ? <Link href={buildPracticeProgressHref(libraryId, studentId, state, page - 1, hrefBase)} />
               : undefined}
           >
             <ChevronLeft data-icon="inline-start" aria-hidden="true" />
@@ -152,7 +157,7 @@ export function PracticeStudentDetail({
             className="min-h-11"
             disabled={page >= totalPages}
             render={page < totalPages
-              ? <Link href={buildPracticeProgressHref(libraryId, studentId, state, page + 1)} />
+              ? <Link href={buildPracticeProgressHref(libraryId, studentId, state, page + 1, hrefBase)} />
               : undefined}
           >
             ถัดไป

@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 interface Props {
   title: string
   classroom?: { name: string; description?: string | null } | null
+  showClassroom?: boolean
   kind: 'assignment' | 'practice'
   badges?: ReactNode
   actions?: ReactNode
@@ -18,7 +19,7 @@ interface Props {
 }
 
 /** One saved classroom identity, with compact inline information instead of nested cards. */
-export function ClassroomWorkHeader({ title, classroom, kind, badges, actions, summary, note, details = [] }: Props) {
+export function ClassroomWorkHeader({ title, classroom, showClassroom = true, kind, badges, actions, summary, note, details = [] }: Props) {
   const meta = parseDescription(classroom?.description ?? null)
   const cover = coverOf(meta)
   const muted = cover?.textMuted ?? 'text-muted-foreground'
@@ -32,7 +33,7 @@ export function ClassroomWorkHeader({ title, classroom, kind, badges, actions, s
           <div className="min-w-0 flex-1 basis-56">
             {badges && <div className="mb-1 flex flex-wrap items-center gap-1.5 text-xs">{badges}</div>}
             <h1 className="break-words text-xl font-bold leading-snug sm:text-2xl">{title}</h1>
-            {classroom && <p className={cn('mt-1 flex min-w-0 items-center gap-1.5 text-xs', muted)}>
+            {classroom && showClassroom && <p className={cn('mt-1 flex min-w-0 items-center gap-1.5 text-xs', muted)}>
               <ClassroomIcon iconKey={meta.iconKey} className="size-3.5 shrink-0" />
               <span className="min-w-0 break-words">{classroom.name}</span>
             </p>}

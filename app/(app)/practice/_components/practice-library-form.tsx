@@ -60,6 +60,7 @@ import {
   type PracticeLibraryStatus,
 } from '../_lib/teacher-contract'
 import { PracticeBulkTagEditor } from './practice-bulk-tag-editor'
+import { usePracticeManagementFormState } from '@/components/practice/practice-management-shell'
 
 const CREATE_STEPS = ['รายละเอียดและโจทย์', 'ตั้งค่า', 'ตรวจสอบและสร้าง']
 
@@ -102,8 +103,9 @@ interface PracticeLibraryFormProps {
   unsupportedQuestionIds?: string[]
   loadingWarning?: string | null
   editableQuestionIds?: string[]
+  embedded?: boolean
   /** Guarded local previews can capture creation without external writes. */
-  actions?: { createPracticeLibrary: typeof createPracticeLibrary; onSaved?: (id: string) => void }
+  actions?: { createPracticeLibrary: typeof createPracticeLibrary; updatePracticeLibrary?: typeof updatePracticeLibrary; deletePracticeLibrary?: typeof deletePracticeLibrary; onSaved?: (id: string) => void }
 }
 
 function statusBadgeVariant(status: PracticeLibraryStatus) {
@@ -123,6 +125,7 @@ export function PracticeLibraryForm({
   unsupportedQuestionIds = [],
   loadingWarning,
   editableQuestionIds = [],
+  embedded = false,
   actions,
 }: PracticeLibraryFormProps) {
   const initialValues = initialLibrary ?? copyPreset
@@ -210,6 +213,12 @@ export function PracticeLibraryForm({
     shuffleOptions,
   })
   const isDirty = currentSnapshot !== savedSnapshot
+  const setManagementDirty = usePracticeManagementFormState()
+  useEffect(() => {
+    if (!embedded || !setManagementDirty) return
+    setManagementDirty(isDirty || isPending)
+    return () => setManagementDirty(false)
+  }, [embedded, isDirty, isPending, setManagementDirty])
   const membershipFrozen = initialLibrary?.status !== undefined && initialLibrary.status !== 'draft'
   const initialQuestionIds = initialValues?.questionIds ?? []
   const membershipDirty = Boolean(initialLibrary) && (
@@ -377,7 +386,7 @@ export function PracticeLibraryForm({
     setFieldErrors({})
     startTransition(async () => {
       const result = initialLibrary
-        ? await updatePracticeLibrary({
+        ? await (actions?.updatePracticeLibrary ?? updatePracticeLibrary)({
             libraryId: initialLibrary.id,
             title,
             description,
@@ -410,10 +419,11 @@ export function PracticeLibraryForm({
       }
 
       setSavedSnapshot(currentSnapshot)
-      allowNavigationRef.current = true
       toast.success(initialLibrary ? 'บันทึกคลังฝึกแล้ว'
         : intent === 'publish' ? 'สร้างและเผยแพร่คลังฝึกแล้ว' : 'บันทึกร่างคลังฝึกแล้ว')
       if (actions?.onSaved) { actions.onSaved(result.id); return }
+      if (embedded) { router.refresh(); return }
+      allowNavigationRef.current = true
       const returnClassroomId = initialLibrary?.classroomId ?? contextualPrimaryClassroomId ?? classroomIds[0]
       router.push(returnClassroomId ? classroomNavigationPath(returnClassroomId, 'assignments') : '/practice')
     })
@@ -436,13 +446,13 @@ export function PracticeLibraryForm({
 
   async function leaveForm() {
     if (!await confirmDiscardChanges()) return
-    router.push('/practice')
+    router.push(embedded && initialLibrary ? `/practice/${initialLibrary.id}/edit` : '/practice')
   }
 
   function runDelete() {
     if (!initialLibrary) return
     startTransition(async () => {
-      const result = await deletePracticeLibrary({ libraryId: initialLibrary.id })
+      const result = await (actions?.deletePracticeLibrary ?? deletePracticeLibrary)({ libraryId: initialLibrary.id })
       if (!result.ok) {
         toast.error(result.error)
         return
@@ -453,8 +463,8 @@ export function PracticeLibraryForm({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-4">
-      <ClassroomWorkHeader
+    <div className={cn('flex w-full min-w-0 flex-col gap-3', !embedded && 'mx-auto max-w-6xl')}>
+      {!embedded && <ClassroomWorkHeader
         kind="practice"
         title={initialLibrary ? title || 'คลังฝึก' : copyPreset ? 'ทำสำเนาคลังฝึก' : 'สร้างคลังฝึก'}
         classroom={classrooms.find(room => room.id === (initialLibrary?.classroomId ?? contextualPrimaryClassroomId ?? classroomIds[0]))}
@@ -494,7 +504,7 @@ export function PracticeLibraryForm({
         )}
         details={initialLibrary ? [{ label: 'โจทย์', value: `${selectedIds.length} ข้อ` }] : []}
         note="ครูเห็นเฉพาะข้อที่เคยตอบและจำนวนครั้ง ไม่เห็นคำตอบหรือผลถูกผิด"
-      />
+      />}
 
       {copyPreset && <Card padding="md" className="flex flex-col gap-2">
         <p className="text-sm font-semibold">นำข้อมูลจาก “{copyPreset.sourceTitle}” มาเตรียมสร้างคลังฝึกใหม่</p>

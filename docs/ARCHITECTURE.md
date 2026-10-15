@@ -1,5 +1,13 @@
 # Architecture
 
+## Practice management workspace — 15 October 2026 (local only)
+
+The exact-manager `/practice/[id]/edit` route now renders overview by default, `?tab=settings` for the existing editor, and `?tab=progress` for roster data. `student`, `q`, and `page` select one authorized student's detail. Legacy `/progress` and `/progress/[studentId]` URLs redirect to this workspace, preserving search/page; the destination repeats authentication, feature gate and exact-library manage authorization. Sidebar registration uses the existing shell context, with no centered max-width wrapper or extra sidebar column.
+
+Overview question cards project only safe metadata from the existing exact-membership manager loader and use its authorized preview action lazily. Overview and progress reuse one roster component. Progress still exposes only identity, tags and accepted-check counts. The existing service-only detail RPC is read in batches of at most 100 rows under the same actor/library/student scope, up to the library's existing 1,000-question limit; safe aggregates are stably partitioned into practiced/unpracticed before UI pagination. Partial/error reads fail rather than becoming zero counts. No learner answers, verdicts, event times, grades, RLS or schema change.
+
+The embedded editor keeps existing validation and persistence actions. Saving refreshes the workspace instead of leaving for the classroom, and its dirty state disables lifecycle buttons. Link navigation still asks before discarding changes, including edits made after a prior successful save. Lifecycle rules remain draft → published → closed; this UI does not add reopening a closed library.
+
 ## Practice reuse through the assignment creation hub - 15 October 2026
 
 The reuse picker merges paginated practice metadata from manageable same-organization classrooms under ordinary RLS and the existing feature flag. Practice choices route to the create page with a source library id. The page rechecks source management and destination access/organization, reads ordered membership, and seeds an explicit content/settings-only copyPreset. Existing initialLibrary edit/lifecycle behavior stays separate. Creation uses the existing validated create action and invoker RPC; no GET creates rows, and no learner history or display grouping is copied.
