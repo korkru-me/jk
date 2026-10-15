@@ -212,7 +212,7 @@ export function PracticeLibraryView({
   const tagLimitReached = state.tags.length >= PRACTICE_MAX_TAGS || state.ignoredTagCount > 0
 
   return (
-    <div className="@container flex min-w-0 w-full max-w-[1200px] flex-col gap-3">
+    <div className="@container flex min-w-0 w-full flex-col gap-3">
       <header className="flex min-h-11 items-center gap-2">
         <Button
           variant="ghost"
@@ -362,7 +362,7 @@ export function PracticeLibraryView({
         </div>}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm">
-            <input type="checkbox" className="size-5 accent-primary" aria-label="เลือกทุกข้อในหน้านี้" disabled={!exercisesReady || pending || items.length === 0}
+            <input type="checkbox" className="shrink-0 accent-primary" aria-label="เลือกทุกข้อในหน้านี้" disabled={!exercisesReady || pending || items.length === 0}
               checked={items.length > 0 && items.every(item => selected[item.id] !== undefined)}
               onChange={event => {
                 const next = { ...selected }
@@ -458,8 +458,8 @@ export function PracticeLibraryView({
             )}
           </Empty>
         ) : (
-          <ol className="flex flex-col gap-2" aria-label="รายการโจทย์ในคลังฝึก">
-            {items.map(item => <li key={item.id} id={`practice-question-${item.id}`} className="scroll-mt-20">
+          <ol className="grid grid-cols-1 gap-3 @min-[44rem]:grid-cols-2" aria-label="รายการโจทย์ในคลังฝึก">
+            {items.map(item => <li key={item.id} id={`practice-question-${item.id}`} className="min-w-0 scroll-mt-20">
               <PracticeQuestionCard item={item} href={questionHrefBuilder(library.id, item.id, state)}
                 selected={selected[item.id] !== undefined} onSelect={checked => choose(item, checked)}
                 pinned={pins.has(item.id)} onTogglePin={() => togglePin(item.id)} pinDisabled={!pinsReady || pinPending}

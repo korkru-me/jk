@@ -22,12 +22,12 @@ export function PracticeQuestionCard({ item, href, selected, onSelect, selection
 }) {
   const difficulty = item.difficulty ? DIFF_META[item.difficulty] : undefined
   return (
-    <Card edge="ring" radius="md" padding="none" className={cn('@container px-3 py-2 transition-shadow hover:shadow-sm', selected && 'ring-primary/50')}>
-      <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-2 @lg:grid-cols-[auto_minmax(0,1fr)_auto] @lg:items-center">
-        <label className="flex min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center rounded-lg focus-within:ring-2 focus-within:ring-ring">
+    <Card edge="ring" radius="md" padding="none" className={cn('@container h-full px-3 py-2 transition-shadow hover:shadow-sm', selected && 'ring-primary/50')}>
+      <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-2 @sm:grid-cols-[auto_minmax(0,1fr)_auto]">
+        <label className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-lg focus-within:ring-2 focus-within:ring-ring pointer-coarse:size-11">
           <input type="checkbox" checked={selected} disabled={selectionDisabled}
             onChange={event => onSelect(event.target.checked)}
-            aria-label={`เลือก ${item.title}`} className="size-5 accent-primary" />
+            aria-label={`เลือก ${item.title}`} className="shrink-0 accent-primary" />
         </label>
           <div className="flex min-w-0 flex-col gap-1">
             <div className="flex flex-wrap items-center gap-1">
@@ -46,14 +46,14 @@ export function PracticeQuestionCard({ item, href, selected, onSelect, selection
             </Link>
             {item.excerpt && <p className="line-clamp-2 text-xs text-muted-foreground @lg:line-clamp-1">{item.excerpt}</p>}
           </div>
-          <div className="col-span-2 flex flex-wrap items-center justify-end gap-1.5 @lg:col-span-1">
-            <Button variant={pinned ? 'navigation' : 'outline'} size="icon" className="size-11 shrink-0" disabled={pinDisabled}
+          <div className="col-span-2 flex flex-wrap items-center justify-end gap-1.5 @sm:col-span-1 @sm:flex-col @sm:items-end @2xl:flex-row @2xl:items-center">
+            <Button variant={pinned ? 'navigation' : 'outline'} size="icon-sm" className="shrink-0 pointer-coarse:size-11" disabled={pinDisabled}
               title={pinned ? 'เอาปักหมุดออก' : 'ปักไว้ทบทวน'}
               aria-pressed={pinned} aria-label={`${pinned ? 'เอาปักหมุดออกจาก' : 'ปักไว้ทบทวน'} ${item.title}`} onClick={onTogglePin}>
               {pinned ? <BookmarkCheck data-icon="inline-start" aria-hidden="true" /> : <Bookmark data-icon="inline-start" aria-hidden="true" />}
             </Button>
             {item.hasSolution && <SolutionButton questionId={item.id} questionTitle={item.title} hasSolution canAttach={false} confirmDismissal />}
-            <Button variant="secondary" className="min-h-11 bg-primary/10 text-primary hover:bg-primary/20"
+            <Button variant="navigation" size="sm" className="pointer-coarse:min-h-11"
               render={<Link href={href} />}>
               <Eye data-icon="inline-start" aria-hidden="true" />ดูตัวอย่าง
             </Button>

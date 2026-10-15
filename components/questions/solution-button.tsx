@@ -64,7 +64,7 @@ export function SolutionButton({ questionId, questionTitle, hasSolution, size = 
         // among it) is fetched on the way to the click.
         onPointerEnter={preloadSolutionParts}
         onFocus={preloadSolutionParts}
-        className={cn('bg-warning/10 text-[color-mix(in_oklab,var(--warning)_60%,var(--foreground))] hover:bg-warning/20', confirmDismissal && 'min-h-11')}
+        className={cn('bg-warning/10 text-[color-mix(in_oklab,var(--warning)_60%,var(--foreground))] hover:bg-warning/20', confirmDismissal && 'pointer-coarse:min-h-11')}
       >
         <Lightbulb aria-hidden="true" /> ดูเฉลย
       </Button>
