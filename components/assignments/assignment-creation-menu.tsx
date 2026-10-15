@@ -1,12 +1,10 @@
 'use client'
 
+import { ExerciseIcon, ExamIcon, PracticeIcon } from '@/lib/assignment-display'
 import Link from 'next/link'
 import {
-  ClipboardPenLine,
-  BookOpenCheck,
   Copy,
   Plus,
-  Repeat2,
 } from 'lucide-react'
 import { assignmentCreationHref, assignmentReuseHref } from '@/lib/assignment-creation'
 import { Button } from '@/components/ui/button'
@@ -89,7 +87,7 @@ export function AssignmentCreationMenu({
             <span>นำงานเดิมมาใช้</span>
           </DropdownMenuItem>
           <DropdownMenuItem
-            variant="primary"
+            variant="workExercise"
             className="py-2"
             render={(
               <Link
@@ -98,12 +96,12 @@ export function AssignmentCreationMenu({
               />
             )}
           >
-            <Repeat2 aria-hidden="true" />
+            <ExerciseIcon aria-hidden="true" />
             <span>แบบฝึกหัด</span>
           </DropdownMenuItem>
           {practiceLibrary && (
             <DropdownMenuItem
-              variant="primary"
+              variant="workPractice"
               className="py-2"
               render={(
                 <Link
@@ -112,12 +110,12 @@ export function AssignmentCreationMenu({
                 />
               )}
             >
-              <BookOpenCheck aria-hidden="true" />
+              <PracticeIcon aria-hidden="true" />
               <span>คลังฝึก</span>
             </DropdownMenuItem>
           )}
           <DropdownMenuItem
-            variant="primary"
+            variant="workExam"
             className="py-2"
             render={(
               <Link
@@ -126,7 +124,7 @@ export function AssignmentCreationMenu({
               />
             )}
           >
-            <ClipboardPenLine aria-hidden="true" />
+            <ExamIcon aria-hidden="true" />
             <span>ข้อสอบ</span>
           </DropdownMenuItem>
         </DropdownMenuGroup>

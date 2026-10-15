@@ -1,5 +1,6 @@
 'use client'
 
+import { workTypeConfig } from '@/lib/assignment-display'
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -1183,7 +1184,7 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
       )}
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row">
-        <Button type="submit" disabled={isPending} className="w-full sm:w-auto">
+        <Button type="submit" variant={workTypeConfig(a.type).variant} disabled={isPending} className="w-full sm:w-auto">
           {isPending ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข'}
         </Button>
         <Button type="button" variant="outline" onClick={() => router.back()} className="w-full sm:w-auto">

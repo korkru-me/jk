@@ -1,5 +1,9 @@
 # Brand, language และ UI rules
 
+## สีและไอคอนประจำประเภทงาน — 15 ตุลาคม 2026
+
+ใช้ lib/assignment-display.tsx เป็นชุดกลาง: แบบฝึกหัด = NotebookPen / ส้มอิฐ, ข้อสอบ = ClipboardPenLine / ม่วงพลัม, คลังฝึก = BookOpenCheck / เขียวอมฟ้า. ใช้ semantic tokens work-exercise, work-exam, work-practice และ work-foreground; สีประเภทคงความหมายข้ามธีมเว็บ/ธีมห้องเรียน โดยปรับความสว่างตาม light/dark. Button/Badge/DropdownMenu มี workExercise, workExam, workPractice variants; ปุ่มประเภทเติมสีเต็ม ส่วนไอคอนและป้ายใช้พื้นสีบางพร้อมข้อความ. ห้ามใช้สีประเภทแทนสีส่งงาน/กำหนดส่ง/คะแนน และไม่ใช้สีเพียงอย่างเดียวบอกประเภท. ใช้ WorkTypeBadge/WorkTypeIcon หรือ metadata กลางเมื่อเพิ่มจุดแสดงประเภทงานใหม่ โดยคงรูปแบบกระชับเดิม.
+
 ## Teacher assignment cards and compact recent work - 15 October 2026
 
 Teacher work uses individual rounded Card surfaces with the existing status stripe. Each category has a separate tinted heading and a 1/2-column grid at container width 40rem (never three columns). The drag handle sits at the upper right with title clearance. All metadata, category selection, type/status badges and preview/grading/copy or practice actions remain visible. Actions align at the card bottom; there is no fixed aspect ratio or added minimum height.

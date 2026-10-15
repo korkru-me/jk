@@ -1,5 +1,7 @@
 'use client'
 
+import { WorkTypeIcon } from '@/components/assignments/work-type'
+import { workTypeConfig } from '@/lib/assignment-display'
 import { useEffect, useId, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -43,7 +45,7 @@ import {
 } from '@/components/ui/select'
 import {
   Check, ChevronRight, ChevronLeft, ChevronDown, Eye,
-  X, Save, FileText,
+  X, Save,
 } from 'lucide-react'
 import {
   filterSectionsToQuestions, moveQuestionOrderToIndex, parseSections,
@@ -1046,7 +1048,8 @@ export function CreateAssignmentForm({
       className="space-y-4 [&_[data-assignment-description]]:hidden [&_[data-slot=field-description]]:hidden"
     >
       <div>
-        <h1 className="text-xl font-bold text-foreground sm:text-2xl">
+        <h1 className="flex items-center gap-2 text-xl font-bold text-foreground sm:text-2xl">
+          <WorkTypeIcon type={assignmentType} className="size-6 shrink-0" />
           {isCopy ? 'ทำสำเนา' : assignmentCreationTitle(assignmentType)}
         </h1>
         <p data-assignment-description className="mt-1 text-sm text-muted-foreground">
@@ -2200,11 +2203,12 @@ export function CreateAssignmentForm({
             </Button>
             <Button
               type="button"
+              variant={workTypeConfig(assignmentType).variant}
               onClick={openPublishDialog}
               disabled={isPending}
               className="w-full gap-2 sm:w-auto"
             >
-              <FileText className="w-4 h-4" />
+              <WorkTypeIcon type={assignmentType} className="text-current" />
               {isPending
                 ? (isCopy ? 'กำลังทำสำเนา...' : 'กำลังสร้าง...')
                 : (isCopy ? 'ทำสำเนา' : assignmentType === 'exam' ? 'สร้างชุดข้อสอบ' : 'สร้างแบบฝึกหัด')}

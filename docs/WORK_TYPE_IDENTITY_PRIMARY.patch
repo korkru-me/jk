@@ -1,0 +1,193 @@
+--- a/app/(app)/classrooms/[id]/_components/assignment-list.tsx
++++ b/app/(app)/classrooms/[id]/_components/assignment-list.tsx
+@@ -137,7 +137,7 @@
+     <TooltipTrigger render={<a href={href ?? state.href} />} aria-label={`${state.actionLabel}: ${a.title} · ${STUDENT_WORK_STATUS_DESCRIPTION[severity]}`} className="group block h-full min-w-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background" data-student-assignment-card data-assignment-id={a.id} data-work-status={severity}>
+       <Card radius="md" interactive className={cn('relative flex h-full min-w-0 items-start gap-2.5 overflow-hidden py-3 pl-4 pr-3', completed ? 'border-success/35 bg-success/5 shadow-[0_0_0_1px_color-mix(in_oklab,var(--success)_12%,transparent),0_3px_14px_color-mix(in_oklab,var(--success)_10%,transparent)] group-hover:border-success/60' : 'group-hover:border-primary/30')}>
+         <span className={cn('absolute inset-y-3 left-0 w-[3px] rounded-r-full', SEVERITY_DOT[severity])} aria-hidden="true" data-work-status-stripe={severity} />
+-        <span className={cn('mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg', cover ? `${cover.surface} ${cover.text}` : 'bg-muted text-foreground')}><TypeIcon className="size-4" aria-hidden="true" /></span>
++        <span className={cn('mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg', type.bg, type.text)}><TypeIcon className="size-4" aria-hidden="true" /></span>
+         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+           <div className="flex min-w-0 items-start gap-2">
+             <p className="min-w-0 flex-1 text-sm font-semibold leading-snug line-clamp-2">{a.title}</p>
+@@ -148,7 +148,7 @@
+             ) : completed ? <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[color-mix(in_oklab,var(--success)_60%,var(--foreground))]" aria-hidden="true" data-work-completed /> : <ArrowRight className="mt-0.5 size-3.5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden="true" />}
+           </div>
+           <div className={cn('flex flex-wrap items-center gap-x-2 gap-y-1 text-xs', completed ? 'text-foreground/75' : 'text-muted-foreground')}>
+-            <span className={cn('font-medium', cover?.textMuted ?? 'text-foreground/75')}>{type.label}</span>
++            <Badge variant={type.variant}>{type.label}</Badge>
+             <span className="flex items-center gap-1"><BookOpen className="size-3" aria-hidden="true" />{assignmentSizeLabel(a)}</span>
+             {a.duration_minutes != null && <span className="flex items-center gap-1"><Clock className="size-3" aria-hidden="true" />{a.duration_minutes} นาที</span>}
+             {passingThreshold && !completed && <span className="flex items-center gap-1 text-foreground/75"><Target className="size-3" aria-hidden="true" />เกณฑ์ {passingThreshold}</span>}
+--- a/components/practice/classroom-practice-libraries.tsx
++++ b/components/practice/classroom-practice-libraries.tsx
+@@ -7,8 +7,6 @@
+ import { PracticeLibraryListActions } from '@/app/(app)/practice/_components/practice-library-list-actions'
+ import { PRACTICE_LIBRARY_STATUS_LABELS } from '@/app/(app)/practice/_lib/teacher-contract'
+ import type { ClassroomPracticeLibrariesResult } from '@/lib/classroom-practice-libraries'
+-import { coverOf, parseDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
+-import { groupPreset } from '@/app/(app)/classrooms/_components/group-colors'
+ import { cn } from '@/lib/utils'
+
+ export function ClassroomPracticeLibraries({
+@@ -22,8 +20,7 @@
+   canManage?: boolean
+   classroomDescription?: string | null
+ }) {
+-  const cover = coverOf(parseDescription(classroomDescription ?? null))
+-  const practiceGroup = groupPreset('purple')
++  const practiceGroup = { surface: 'bg-work-practice/10', text: 'text-work-practice' }
+
+   return (
+     <section aria-labelledby="classroom-practice-heading" className={cn('@container flex min-w-0 flex-col', studentView ? 'gap-2' : 'gap-2.5')} data-classroom-practice-libraries>
+@@ -58,14 +55,14 @@
+                 data-student-practice-card
+               >
+                 <Card radius="md" interactive className="relative flex h-full min-w-0 items-start gap-2.5 overflow-hidden py-3 pl-4 pr-3 group-hover:border-primary/30">
+-                  <span className="absolute inset-y-3 left-0 w-[3px] rounded-r-full bg-primary" aria-hidden="true" />
+-                  <span className={cn('mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg', cover ? `${cover.surface} ${cover.text}` : 'bg-muted text-foreground')}>
++                  <span className="absolute inset-y-3 left-0 w-[3px] rounded-r-full bg-work-practice" aria-hidden="true" />
++                  <span className={cn('mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg', 'bg-work-practice/10 text-work-practice')}>
+                     <BookOpenCheck className="size-4" aria-hidden="true" />
+                   </span>
+                   <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                     <p className="min-w-0 line-clamp-2 break-words text-sm font-semibold leading-snug" title={item.title}>{item.title}</p>
+                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+-                      <span className={cn('font-medium', cover?.textMuted ?? 'text-foreground/75')}>คลังฝึก</span>
++                      <Badge variant="workPractice">คลังฝึก</Badge>
+                       <span className="flex items-center gap-1"><BookOpen className="size-3" aria-hidden="true" />{item.questionCount} ข้อ</span>
+                     </div>
+                     <div className="flex flex-wrap items-center gap-1.5">
+@@ -83,7 +80,7 @@
+           <ul className="divide-y divide-border">
+             {result.items.map(item => (
+               <li key={item.id} className="flex min-h-16 min-w-0 items-center gap-2 px-3 py-2" data-classroom-practice-row>
+-                <BookOpenCheck className="size-5 shrink-0 text-primary" aria-hidden="true" />
++                <BookOpenCheck className="size-5 shrink-0 text-work-practice" aria-hidden="true" />
+                 <div className="min-w-0 flex-1">
+                   {canManage ? (
+                     <Link
+--- a/components/practice/practice-waiting-room.tsx
++++ b/components/practice/practice-waiting-room.tsx
+@@ -42,7 +42,7 @@
+
+       <header className="flex max-w-3xl flex-col gap-1.5 md:pr-52">
+         <div className="flex flex-wrap items-center gap-2">
+-          <p className="text-sm font-medium text-primary">หน้ารอเข้าคลังฝึก</p>
++          <p className="flex items-center gap-1.5 text-sm font-medium text-work-practice"><BookOpenCheck className="size-4" aria-hidden="true" />หน้ารอเข้าคลังฝึก</p>
+         </div>
+         <h1 className="text-2xl font-semibold leading-tight text-foreground sm:text-3xl">
+           {library.title}
+@@ -53,15 +53,15 @@
+
+       <section aria-label="ข้อมูลก่อนเข้าคลังฝึก" className="grid gap-x-6 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
+         <p className="flex items-start gap-2 text-sm text-muted-foreground">
+-          <ListChecks className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
++          <ListChecks className="mt-0.5 size-4 shrink-0 text-work-practice" aria-hidden="true" />
+           <span>มีโจทย์ {questionCount.toLocaleString('th-TH')} ข้อ เลือกฝึกข้อใดก่อนก็ได้</span>
+         </p>
+         <p className="flex items-start gap-2 text-sm text-muted-foreground">
+-          <Search className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
++          <Search className="mt-0.5 size-4 shrink-0 text-work-practice" aria-hidden="true" />
+           <span>ค้นหาด้วยชื่อโจทย์หรือเลือกหลายแท็กพร้อมกันได้</span>
+         </p>
+         <p className="flex items-start gap-2 text-sm text-muted-foreground">
+-          <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
++          <ShieldCheck className="mt-0.5 size-4 shrink-0 text-work-practice" aria-hidden="true" />
+           <span>ไม่เก็บคำตอบ ผลถูกผิด หรือคะแนน</span>
+         </p>
+       </section>
+@@ -113,7 +113,7 @@
+                   maxLength={100}
+                   className="min-h-11"
+                 />
+-                <Button type="submit" className="min-h-11 shrink-0">
++                <Button type="submit" variant="workPractice" className="min-h-11 shrink-0">
+                   <KeyRound data-icon="inline-start" aria-hidden="true" />
+                   ตรวจรหัสและเข้าคลัง
+                 </Button>
+@@ -128,7 +128,7 @@
+             </Field>
+           </form>
+         ) : (
+-          <Button className="h-auto min-h-11 whitespace-normal py-2" render={<Link href={enterHref} />}>
++          <Button variant="workPractice" className="h-auto min-h-11 whitespace-normal py-2" render={<Link href={enterHref} />}>
+             <LogIn data-icon="inline-start" aria-hidden="true" />
+             เข้าคลังฝึก
+           </Button>
+--- a/components/practice/practice-library-view.tsx
++++ b/components/practice/practice-library-view.tsx
+@@ -1,5 +1,7 @@
+ 'use client'
+
++import { WorkTypeBadge } from '@/components/assignments/work-type'
++import { ExerciseIcon } from '@/lib/assignment-display'
+ import { useRouter } from 'next/navigation'
+ import { useConfirm } from '@/components/ui/confirm-dialog'
+ import { isUuid } from '@/lib/practice-library-contracts'
+@@ -275,6 +277,7 @@
+         <div className="min-w-0 flex-1">
+           <div className="flex min-w-0 items-center gap-2">
+             <h1 className="min-w-0 flex-1 truncate text-xl font-semibold text-foreground">{library.title}</h1>
++            <WorkTypeBadge type="practice" />
+           </div>
+           {library.description && (
+             <RichText text={library.description} className="line-clamp-1 text-sm text-muted-foreground" />
+@@ -285,7 +288,7 @@
+       <section aria-labelledby="my-practice-exercises" className="flex flex-col gap-2">
+         <div className="flex flex-wrap items-center justify-between gap-2">
+           <h2 id="my-practice-exercises" className="flex min-w-0 items-center gap-1.5 text-sm font-semibold sm:text-base">
+-            <Layers className="size-4 shrink-0 text-primary" aria-hidden="true" />แบบฝึกหัดของฉัน
++            <ExerciseIcon className="size-4 shrink-0 text-work-exercise" aria-hidden="true" />แบบฝึกหัดของฉัน
+           </h2>
+           <div role="group" className="flex flex-wrap items-center gap-1.5" aria-label="โจทย์ที่ปักไว้ทบทวน">
+             <Button variant={state.reviewOnly ? 'navigation' : 'outline'} size="sm" className="pointer-coarse:min-h-11" disabled={!pinsReady}
+@@ -409,8 +412,8 @@
+             {selectedIds.length > 0 && <Button variant="ghost" size="sm" className="pointer-coarse:min-h-11" disabled={pending} aria-label="ล้างที่เลือก" title="ล้างที่เลือก" onClick={() => updateSelection({})}>
+               <X data-icon="inline-start" className="sm:hidden" aria-hidden="true" /><span className="hidden sm:inline">ล้างที่เลือก</span>
+             </Button>}
+-            {!editing && <Button size="sm" className="pointer-coarse:min-h-11" aria-label="สร้างแบบฝึกหัด" title="สร้างแบบฝึกหัด" disabled={!exercisesReady || selectedIds.length === 0 || pending} onClick={event => { namingTriggerRef.current = event.currentTarget; setNaming(true) }}>
+-              <Plus data-icon="inline-start" aria-hidden="true" /><span className="hidden sm:inline">สร้างแบบฝึกหัด</span>
++            {!editing && <Button size="sm" variant="workExercise" className="pointer-coarse:min-h-11" aria-label="สร้างแบบฝึกหัด" title="สร้างแบบฝึกหัด" disabled={!exercisesReady || selectedIds.length === 0 || pending} onClick={event => { namingTriggerRef.current = event.currentTarget; setNaming(true) }}>
++              <ExerciseIcon data-icon="inline-start" aria-hidden="true" /><span className="hidden sm:inline">สร้างแบบฝึกหัด</span>
+             </Button>}
+           </div>
+         </div>
+@@ -513,7 +516,7 @@
+           </div>}
+           </div>
+           <div className="flex min-w-0 shrink-0 flex-wrap gap-2">
+-            <Button type="submit" size="sm" className="pointer-coarse:min-h-11" disabled={pending || !title.trim() || selectedIds.length === 0}>{pending ? 'กำลังบันทึก…' : `${editing ? 'บันทึกการแก้ไข' : 'บันทึกแบบฝึกหัด'} ${selectedIds.length} ข้อ`}</Button>
++            <Button type="submit" size="sm" variant="workExercise" className="pointer-coarse:min-h-11" disabled={pending || !title.trim() || selectedIds.length === 0}>{pending ? 'กำลังบันทึก…' : `${editing ? 'บันทึกการแก้ไข' : 'บันทึกแบบฝึกหัด'} ${selectedIds.length} ข้อ`}</Button>
+             <Button type="button" variant="outline" size="sm" className="pointer-coarse:min-h-11" disabled={pending} onClick={() => { if (editing) void cancelEdit(); else { setNaming(false); setTitle('') } }}>{editing ? 'ยกเลิกการแก้ไข' : 'ยกเลิก'}</Button>
+           </div>
+           {error && <p role="alert" className="text-sm text-destructive @min-[44rem]:col-span-2">{error}</p>}
+--- a/components/practice/practice-exercise-card.tsx
++++ b/components/practice/practice-exercise-card.tsx
+@@ -1,7 +1,8 @@
+ 'use client'
+
++import { ExerciseIcon } from '@/lib/assignment-display'
+ import Link from 'next/link'
+-import { NotebookPen, Pencil, Play } from 'lucide-react'
++import { Pencil, Play } from 'lucide-react'
+ import { COVER_PRESETS } from '@/app/(app)/classrooms/_components/classroom-meta'
+ import { Button } from '@/components/ui/button'
+ import { Card } from '@/components/ui/card'
+@@ -39,7 +40,7 @@
+         <input type="checkbox" checked={selected} disabled={disabled} onChange={event => onSelect(event.target.checked)} aria-label={`เลือกแบบฝึกหัด ${exercise.title}`} className="accent-primary" />
+       </label>
+       <Button type="button" variant="ghost" aria-pressed={selected} disabled={disabled} onClick={() => onSelect(!selected)} className="relative h-auto min-w-0 flex-1 flex-col items-start gap-1 whitespace-normal p-0 text-left hover:bg-transparent">
+-        <span className="flex min-w-0 items-center gap-1.5"><NotebookPen className="size-4 shrink-0" aria-hidden="true" /><span className="truncate text-sm font-semibold" title={exercise.title}>{exercise.title}</span></span>
++        <span className="flex min-w-0 items-center gap-1.5"><ExerciseIcon className="size-4 shrink-0 text-work-exercise" aria-hidden="true" /><span className="truncate text-sm font-semibold" title={exercise.title}>{exercise.title}</span></span>
+         <span className={cn('text-xs', preset.textMuted)}>{exercise.questionIds.length} ข้อ · {settings.questionsPerPage} ข้อต่อหน้า</span>
+       </Button>
+     </div>
+@@ -50,7 +51,7 @@
+       </div>
+       <div className="flex items-center justify-end gap-1.5">
+         <Button variant="ghost" size="icon-sm" className="pointer-coarse:size-11" disabled={disabled} onClick={onEdit} aria-label={`แก้ไข ${exercise.title}`} title="แก้ไขแบบฝึกหัด"><Pencil aria-hidden="true" /></Button>
+-        <Button size="sm" variant="navigation" className="pointer-coarse:min-h-11" render={<Link href={startHref} />} aria-label={`เริ่มทำ ${exercise.title}`}><Play data-icon="inline-start" aria-hidden="true" />เริ่มทำ</Button>
++        <Button size="sm" variant="workExercise" className="pointer-coarse:min-h-11" render={<Link href={startHref} />} aria-label={`เริ่มทำ ${exercise.title}`}><Play data-icon="inline-start" aria-hidden="true" />เริ่มทำ</Button>
+       </div>
+     </div>
+   </Card>

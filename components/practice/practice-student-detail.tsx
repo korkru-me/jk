@@ -74,7 +74,7 @@ export function PracticeStudentDetail({
         {rows.length === 0 && !query ? (
           <Empty className="min-h-52 border-0">
             <EmptyHeader>
-              <EmptyMedia variant="icon"><BookOpenCheck aria-hidden="true" /></EmptyMedia>
+              <EmptyMedia variant="icon"><BookOpenCheck className="text-work-practice" aria-hidden="true" /></EmptyMedia>
               <EmptyTitle>คลังนี้ยังไม่มีโจทย์</EmptyTitle>
               <EmptyDescription>เพิ่มโจทย์ในหน้าตั้งค่าคลังฝึกก่อนดูความคืบหน้า</EmptyDescription>
             </EmptyHeader>

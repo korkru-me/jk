@@ -34,7 +34,7 @@ export default async function PracticeStudentProgressPage({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="truncate text-xl font-semibold text-foreground">{progress.student.display_name}</h1>
-            <Badge variant="secondary"><BookOpenCheck data-icon="inline-start" /> ไม่มีคะแนน</Badge>
+            <Badge variant="workPractice"><BookOpenCheck data-icon="inline-start" /> ไม่มีคะแนน</Badge>
           </div>
           <p className="truncate text-sm text-muted-foreground">
             {progress.student.class_number !== null ? `เลขที่ ${progress.student.class_number} · ` : ''}

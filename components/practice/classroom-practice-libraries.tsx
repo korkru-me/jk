@@ -20,7 +20,7 @@ export function ClassroomPracticeLibraries({
   return (
     <section aria-labelledby="classroom-practice-heading" className="flex min-w-0 flex-col gap-2.5" data-classroom-practice-libraries>
       <div className="flex flex-wrap items-center gap-2">
-        <h2 id="classroom-practice-heading" className="font-semibold">คลังฝึก</h2>
+        <h2 id="classroom-practice-heading" className="flex items-center gap-1.5 font-semibold text-work-practice"><BookOpenCheck className="size-4" aria-hidden="true" />คลังฝึก</h2>
         <Badge variant="outline">ไม่มีคะแนน</Badge>
         {!result.error && <span className="text-xs text-muted-foreground">{result.items.length} คลัง</span>}
       </div>
@@ -43,7 +43,7 @@ export function ClassroomPracticeLibraries({
           <ul className="divide-y divide-border">
             {result.items.map(item => (
               <li key={item.id} className="flex min-h-16 min-w-0 items-center gap-2 px-3 py-2" data-classroom-practice-row>
-                <BookOpenCheck className="size-5 shrink-0 text-primary" aria-hidden="true" />
+                <BookOpenCheck className="size-5 shrink-0 text-work-practice" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
                   {studentView || canManage ? (
                     <Link

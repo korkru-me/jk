@@ -1,5 +1,9 @@
 # Architecture
 
+## Work type presentation — 15 October 2026
+
+lib/assignment-display.tsx owns the work-type icon, label, semantic colour and primitive variant for exercise/exam/practice. components/assignments/work-type.tsx renders consistent icons/badges; buttons, dropdowns and filters consume that metadata. Browser palettes define work-* tokens independently from classroom cover and submission-state colours. Student summary and legacy assignment-list DTOs forward the existing selected type only for this presentation; access/scoring/query boundaries are unchanged.
+
 ## Teacher work card layout - 15 October 2026
 
 ClassroomAssignmentsTab keeps the same rows, category/order state, sensors, collision rules, persistence callbacks and rollback logic. SortableAssignmentRow now renders a Card and category contents use a responsive grid. In-category sorting uses rectSortingStrategy; cross-category drops keep existing append semantics and stationary layout. The handle remains the sole drag activator, independent from menus and action links. ClassroomRecentWork changes only copy/layout, retaining the same expiry logic. The guarded classroom-groups fixture receives a server timestamp so recent samples remain visible; category/order mutations still run in memory.

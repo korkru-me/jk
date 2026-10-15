@@ -1,5 +1,6 @@
 'use client'
 
+import { WorkTypeBadge } from '@/components/assignments/work-type'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { CircleCheck } from 'lucide-react'
@@ -8,7 +9,6 @@ import { Card } from '@/components/ui/card'
 import { formatThaiDateTime } from '@/lib/thai-time'
 import { RECENT_WORK_WINDOW_MS, visibleRecentClassroomWork, type RecentClassroomWorkResult } from '@/lib/classroom-recent-work'
 
-const TYPE_LABELS = { exercise: 'แบบฝึกหัด', exam: 'ข้อสอบ', practice: 'คลังฝึก' }
 
 export function ClassroomRecentWork({ result }: { result: RecentClassroomWorkResult }) {
   const [now, setNow] = useState(() => Date.parse(result.asOf))
@@ -45,7 +45,8 @@ export function ClassroomRecentWork({ result }: { result: RecentClassroomWorkRes
                   <Card radius="sm" className="h-full min-w-0 border-success/30 px-3 py-2 transition-colors group-hover:bg-success/10">
                     <p className="line-clamp-2 break-words text-sm font-semibold" title={item.title}>{item.title}</p>
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-                      <span className="text-xs text-muted-foreground">{TYPE_LABELS[item.type]} · {formatThaiDateTime(item.createdAt)}</span>
+                      <WorkTypeBadge type={item.type} />
+                      <span className="text-xs text-muted-foreground">{formatThaiDateTime(item.createdAt)}</span>
                       <Badge variant={item.status === 'published' ? 'statusSuccess' : 'secondary'}>{item.status === 'published' ? 'เผยแพร่แล้ว' : 'บันทึกร่างแล้ว'}</Badge>
                     </div>
                   </Card>

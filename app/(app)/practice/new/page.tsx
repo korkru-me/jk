@@ -73,7 +73,7 @@ export default async function NewPracticeLibraryPage({
     return (
       <Empty className="min-h-64">
         <EmptyHeader>
-          <EmptyMedia variant="icon"><BookOpenCheck aria-hidden="true" /></EmptyMedia>
+          <EmptyMedia variant="icon"><BookOpenCheck className="text-work-practice" aria-hidden="true" /></EmptyMedia>
           <EmptyTitle>ยังไม่มีห้องเรียนที่สร้างคลังฝึกได้</EmptyTitle>
           <EmptyDescription>
             ใช้ห้องเรียนรายวิชาที่เปิดอยู่ และต้องเป็นเจ้าของหรือผู้ช่วยสอนที่มีสิทธิ์จัดการ

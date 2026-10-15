@@ -31,7 +31,7 @@ export default async function PracticeProgressPage({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="truncate text-xl font-semibold text-foreground">ความคืบหน้าการฝึก</h1>
-              <Badge variant="secondary"><BookOpenCheck data-icon="inline-start" /> ไม่มีคะแนน</Badge>
+              <Badge variant="workPractice"><BookOpenCheck data-icon="inline-start" /> ไม่มีคะแนน</Badge>
             </div>
             <p className="truncate text-sm text-muted-foreground">{progress.library.title}</p>
           </div>

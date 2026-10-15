@@ -4,7 +4,6 @@ import { useEffect, useId, useMemo, useState, useTransition, type ReactNode } fr
 import Link from 'next/link'
 import {
   CheckCircle2,
-  BookOpenCheck,
   BarChart3,
   Pencil,
   ClipboardCheck,
@@ -45,7 +44,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS as DndCSS } from '@dnd-kit/utilities'
 import { toast } from 'sonner'
-import { TYPE_CFG } from '@/lib/assignment-display'
+import { TYPE_CFG, workTypeConfig } from '@/lib/assignment-display'
 import { setAssignmentCategory } from '@/lib/actions/assignment-categories'
 import { reorderAssignmentDisplayOrder } from '@/lib/actions/classrooms'
 import { reorderClassroomWork, setPracticeLibraryCategory } from '@/lib/actions/classroom-work'
@@ -134,8 +133,6 @@ type ClassroomWorkRow = (ClassroomAssignmentRow & { kind: 'assignment' }) | (
     display_order: number | null
   }
 )
-const PRACTICE_TYPE_CFG = { label: 'คลังฝึก', bg: 'bg-primary/10', text: 'text-primary', icon: BookOpenCheck }
-const workTypeConfig = (type: string) => type === 'practice' ? PRACTICE_TYPE_CFG : TYPE_CFG[type] ?? TYPE_CFG.exam
 
 const STATUS_CFG = {
   draft: {
@@ -727,7 +724,7 @@ export function ClassroomAssignmentsTab({
                               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                                 <p className="min-w-0 flex-[1_1_12rem] line-clamp-2 text-sm font-semibold leading-snug" title={assignment.title}>{assignment.title}</p>
                                 <div className="flex shrink-0 items-center gap-1">
-                                  <Badge variant="secondary">คลังฝึก</Badge>
+                                  <Badge variant={typeCfg.variant}>คลังฝึก</Badge>
                                   <Badge variant={statusCfg.badge}>{statusCfg.label}</Badge>
                                 </div>
                               </div>
@@ -780,7 +777,7 @@ export function ClassroomAssignmentsTab({
                                   {assignment.title}
                                 </p>
                                 <div className="flex shrink-0 items-center gap-1">
-                                  <Badge variant="secondary" className={cn(typeCfg.bg, typeCfg.text)}>{typeCfg.label}</Badge>
+                                  <Badge variant={typeCfg.variant}>{typeCfg.label}</Badge>
                                   <Badge variant={statusCfg.badge}>{statusCfg.label}</Badge>
                                 </div>
                               </div>

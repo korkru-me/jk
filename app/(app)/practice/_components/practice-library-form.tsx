@@ -1,5 +1,6 @@
 'use client'
 
+import { WorkTypeBadge } from '@/components/assignments/work-type'
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
@@ -447,7 +448,7 @@ export function PracticeLibraryForm({
         classroom={classrooms.find(room => room.id === (initialLibrary?.classroomId ?? contextualPrimaryClassroomId ?? classroomIds[0]))}
         badges={<>
           {initialLibrary && <span className="font-medium">ตั้งค่าคลังฝึก</span>}
-          <Badge variant="outline">ไม่มีคะแนน</Badge>
+          <WorkTypeBadge type="practice" /><Badge variant="outline">ไม่มีคะแนน</Badge>
           {initialLibrary && <Badge variant={statusBadgeVariant(initialLibrary.status)}>{PRACTICE_LIBRARY_STATUS_LABELS[initialLibrary.status]}</Badge>}
         </>}
         actions={initialLibrary && (
@@ -925,6 +926,7 @@ export function PracticeLibraryForm({
             {!initialLibrary && step < CREATE_STEPS.length - 1 ? (
               <Button
                 key={`practice-next-${step}`}
+                variant="workPractice"
                 type="button"
                 className="min-h-11"
                 onClick={event => {
@@ -944,7 +946,7 @@ export function PracticeLibraryForm({
                   key="practice-save-draft"
                   className="min-h-11"
                   type="submit"
-                  variant={initialLibrary ? 'default' : 'outline'}
+                  variant={initialLibrary ? 'workPractice' : 'outline'}
                   disabled={isPending || !isDirty || !title.trim() || classroomIds.length === 0 || hasDraftQuestionBlock}
                 >
                   <Save data-icon="inline-start" />
@@ -954,6 +956,7 @@ export function PracticeLibraryForm({
                   <Button
                     type="button"
                     className="min-h-11"
+                    variant="workPractice"
                     onClick={() => runSave('publish')}
                     disabled={isPending || !canAdvanceDetails}
                   >

@@ -135,14 +135,14 @@ function StudentAssignmentCard({ assignment: a, cover, now, href }: { assignment
     <TooltipTrigger render={<a href={href ?? state.href} />} aria-label={`${state.actionLabel}: ${a.title} · ${STUDENT_WORK_STATUS_DESCRIPTION[severity]}`} className="group block h-full min-w-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background" data-student-assignment-card data-assignment-id={a.id} data-work-status={severity}>
       <Card radius="md" interactive className={cn('relative flex h-full min-w-0 items-start gap-2.5 overflow-hidden py-3 pl-4 pr-3', completed ? 'border-success/35 bg-success/5 shadow-[0_0_0_1px_color-mix(in_oklab,var(--success)_12%,transparent),0_3px_14px_color-mix(in_oklab,var(--success)_10%,transparent)] group-hover:border-success/60' : 'group-hover:border-primary/30')}>
         <span className={cn('absolute inset-y-3 left-0 w-[3px] rounded-r-full', SEVERITY_DOT[severity])} aria-hidden="true" data-work-status-stripe={severity} />
-        <span className={cn('mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg', cover ? `${cover.surface} ${cover.text}` : 'bg-muted text-foreground')}><TypeIcon className="size-4" aria-hidden="true" /></span>
+        <span className={cn('mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg', type.bg, type.text)}><TypeIcon className="size-4" aria-hidden="true" /></span>
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <div className="flex min-w-0 items-start gap-2">
             <p className="min-w-0 flex-1 text-sm font-semibold leading-snug line-clamp-2">{a.title}</p>
             {completed ? <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[color-mix(in_oklab,var(--success)_60%,var(--foreground))]" aria-hidden="true" data-work-completed /> : <ArrowRight className="mt-0.5 size-3.5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden="true" />}
           </div>
           <div className={cn('flex flex-wrap items-center gap-x-2 gap-y-1 text-xs', completed ? 'text-foreground/75' : 'text-muted-foreground')}>
-            <span className={cn('font-medium', cover?.textMuted ?? 'text-foreground/75')}>{type.label}</span>
+            <Badge variant={type.variant}>{type.label}</Badge>
             <span className="flex items-center gap-1"><BookOpen className="size-3" aria-hidden="true" />{assignmentSizeLabel(a)}</span>
             {a.duration_minutes != null && <span className="flex items-center gap-1"><Clock className="size-3" aria-hidden="true" />{a.duration_minutes} นาที</span>}
             {passingThreshold && !completed && <span className="flex items-center gap-1 text-foreground/75"><Target className="size-3" aria-hidden="true" />เกณฑ์ {passingThreshold}</span>}

@@ -1,5 +1,12 @@
 # Feature status
 
+## Unified work type colours and icons — 15 October 2026 (local only)
+
+- Exercise uses a notebook/pen in muted terracotta, exam a clipboard/pen in plum, and practice an open book/check in teal. Semantic light/dark tokens and shared metadata/components replace the inconsistent repeated-arrow/plain-file identities. Creation menus/choices/buttons, type filters, teacher/student work cards, recent work, student summary, assignment detail/edit/reuse, practice landing/progress/waiting and personal exercises use this identity. Status/deadline/classroom colours keep their separate meaning; existing controls, destinations and drag callbacks remain intact.
+- Added an allowlisted presentation field from the already-selected assignment type to legacy list/summary DTOs; no additional query, authorization, grading or persistence change. The guarded work-type-identity fixture previews all three creation choices/menu with synthetic links; its practice flag does not enable real routes.
+- TypeScript/token lint and isolated/primary webpack production builds passed. All 3,367 unit tests in 261 files passed. Checked creation colours, type icons, menus, student cards and narrow layouts; light/dark scoped axe checks found no violations after transitions settled. Main dev server was restarted without deleting its cache after it served stale CSS. No hosted writes, physical-device/SEB tests or migrations; no push/deployment as requested.
+- The primary checkout has newer student/practice layouts than the isolated branch. Their type styling was adapted with small separate hunks, retaining deadline alerts, tabs and personal-exercise features. Shared implementation is on codex/question-set-themes; the already-applied primary-only integration is preserved in docs/WORK_TYPE_IDENTITY_PRIMARY.patch without staging unrelated primary changes.
+
 ## Two-row teacher work card layout - 15 October 2026 (local only)
 
 - Combined the category selector and all existing actions in one compact footer, with a bounded 9rem selector and the type/status badges beside the title. Cards still fill the room width in at most two columns. Narrow cards wrap controls to preserve readable labels and access.
