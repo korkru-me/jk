@@ -107,8 +107,8 @@ export function CoTeachers({ classroomId, ownerName, canManage, coTeachers, invi
       </div>
 
       {/* Co-teacher list */}
-      <Card edge="ring" className="overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+      <Card data-classroom-panel edge="ring" className="overflow-hidden">
+        <div data-classroom-panel-header className="flex items-center justify-between px-4 py-3 border-b border-border">
           <p className="text-sm font-semibold text-foreground">ผู้ช่วยสอน ({coTeachers.length} คน)</p>
           {canManage && (
             <Button size="sm" variant="outline" className="gap-1.5" onClick={() => { setShowInvite(!showInvite); setPendingLink(null) }}>
@@ -142,7 +142,7 @@ export function CoTeachers({ classroomId, ownerName, canManage, coTeachers, invi
             ) : (
               <div className="space-y-2">
                 <p className="text-xs text-muted-foreground">ส่งลิงก์นี้ให้ครูที่ต้องการเชิญ (ผ่าน Line, Email ฯลฯ)</p>
-                <Card radius="md" className="flex items-center gap-2 p-2.5">
+                <Card data-classroom-panel radius="md" className="flex items-center gap-2 p-2.5">
                   <Link2 className="w-4 h-4 text-muted-foreground shrink-0" />
                   <p className="text-xs text-muted-foreground truncate flex-1 font-mono">{pendingLink}</p>
                 </Card>
@@ -188,7 +188,7 @@ export function CoTeachers({ classroomId, ownerName, canManage, coTeachers, invi
                     {openPerm === t.id && (
                       <>
                         <div className="fixed inset-0 z-10" onClick={() => setOpenPerm(null)} />
-                        <Card radius="md" edge="ring" elevation="lg" className="absolute right-0 top-9 z-20 py-1 min-w-[180px]">
+                        <Card data-classroom-panel radius="md" edge="ring" elevation="lg" className="absolute right-0 top-9 z-20 py-1 min-w-[180px]">
                           {(Object.keys(PERM_CFG) as CoTeacherPermission[]).map(p => {
                             const cfg = PERM_CFG[p]
                             const Icon = cfg.icon
@@ -229,7 +229,7 @@ export function CoTeachers({ classroomId, ownerName, canManage, coTeachers, invi
 
       {/* Active invite links */}
       {canManage && invites.length > 0 && (
-        <Card edge="ring" className="overflow-hidden">
+        <Card data-classroom-panel edge="ring" className="overflow-hidden">
           <div className="px-4 py-3 border-b border-border">
             <p className="text-sm font-semibold text-foreground">คำเชิญที่ยังไม่ถูกใช้ ({invites.length})</p>
           </div>

@@ -14,6 +14,10 @@ The reuse picker merges paginated practice metadata from manageable same-organiz
 
 loadPracticeCopyQuestions reuses the request's actor-scoped bank and queries only missing source ids through ordinary question RLS in bounded chunks. Missing/inaccessible/unsupported ids remain in the source selection with explicit blocking metadata, so library management does not grant reuse of another owner's private questions. No new admin query or answer-bearing DTO crosses the client boundary. Guarded fixtures inject in-memory creation/navigation callbacks; route permission and DTO regressions run without external services.
 
+## Work type presentation — 15 October 2026
+
+lib/assignment-display.tsx owns the work-type icon, label, semantic colour and primitive variant for exercise/exam/practice. components/assignments/work-type.tsx renders consistent icons/badges; buttons, dropdowns and filters consume that metadata. Browser palettes define work-* tokens independently from classroom cover and submission-state colours. Student summary and legacy assignment-list DTOs forward the existing selected type only for this presentation; access/scoring/query boundaries are unchanged.
+
 ## Student subject classroom tabs and deadline alerts — 15 October 2026
 
 StudentClassroomView keeps the verified server projections and passes header/announcement/practice/calendar React nodes into StudentClassroomTabs. The shared grid keeps the classroom header and left-aligned TabsList above one dynamic TabsContent, with the calendar beside the header. One AssignmentList preserves its filters while switching announcements on/off; the tab list stays outside its labelled panel. Native history updates only the tab query and preserves other search/hash values. One initialized timestamp drives both classroomWorkAlertCount and AssignmentList; production ticks locally each minute, and focus/visible/pageshow-persisted refreshes the existing authorized route with a 5-second duplicate-event guard. No polling query, read/dismiss storage or new data boundary is introduced.
@@ -34,15 +38,35 @@ useAnswerAutosave และ backup v2 เพิ่ม numeric-map token แบ�
 
 Session storage เก็บเพียงค่าตัวเลขที่แสดงแล้วแยก actor/library/question หรือ pathname ไม่มีคำตอบ/ผลตรวจ/receipt/secret และไม่ใช่ authority; manual retry มี ref สำรองแม้ storage ใช้ไม่ได้ การเปรียบเทียบข้าม document ของ preview/คลังฝึกอาศัย optional session history (หาก browser ปิด storage จะยังสุ่มใหม่แต่ไม่รับรองการกันค่าซ้ำข้าม reload) งานที่มี submission เทียบจากแถว server ได้เสมอ Teacher question preview ใช้ client-only dynamic boundary เพราะมีการสุ่มใน initial state; teacher final grading อ่าน latest answer-key override
 
+## Teacher work card layout - 15 October 2026
+
+ClassroomAssignmentsTab keeps the same rows, category/order state, sensors, collision rules, persistence callbacks and rollback logic. SortableAssignmentRow now renders a Card and category contents use a responsive grid. In-category sorting uses rectSortingStrategy; cross-category drops keep existing append semantics and stationary layout. The handle remains the sole drag activator, independent from menus and action links. ClassroomRecentWork changes only copy/layout, retaining the same expiry logic. The guarded classroom-groups fixture receives a server timestamp so recent samples remain visible; category/order mutations still run in memory.
+
+Legacy layout fallback: missing practice-library layout metadata no longer disables ordinary assignment handles. Unsupported library handles/selects stay disabled with a short explanation; assignment sorting/category changes use existing persistence. Reorder calculations skip locked library slots, so moving an assignment into a category containing locked libraries places it after the movable assignments without moving those libraries. The synthetic work fixture adds layout=missing for this regression path. No schema, permission or server-action changes.
+
+## Classroom interior theme — 15 October 2026
+
+`components/classrooms/classroom-theme.tsx` maps the existing validated cover id to the same nine semantic tokens as COVER_PRESETS; no metadata format, database query, server action, or permission changes. A CSS module applies colour only to explicit data-classroom-* decoration hooks. Teacher detail, its separately rendered contextual sidebar, subject student view, and homeroom student view each mount the scope. Category, urgency and grading palettes are independent. The optional trusted navigationPathname on ClassroomDetailClient keeps the guarded synthetic classroom-themes fixture on its own path; production defaults to /classrooms/:id and retains its existing routing/authorization.
+
 ## ส่งคำตอบชุดฝึกและสรุปผลเฉพาะรอบ — 15 ตุลาคม 2026
 
 PracticeExerciseRunner จัด registry ของ PracticeQuestionHandle บน panel ที่โหลดและคง mount ไว้ การส่งตรวจเรียงเฉพาะข้อที่มีคำตอบแต่ยังไม่มี verdict โดยเรียก check เดิมของแต่ละ panel จึงใช้ safe receipt, math modes, การตรวจสิทธิ์ และ retry idempotency envelope เดิม ไม่มี submitSubmission หรือ grading client-side เพิ่ม ข้อที่ตรวจแล้วไม่ส่งซ้ำเมื่อเปิดสรุป ส่วน error หยุดการส่ง แสดงข้อที่ต้องแก้ และไม่เปิดผลสำเร็จ
 
 PracticeExerciseSummary ใช้ snapshot ของสถานะเมื่อส่งครบ และ practiceRunSummary นับผลรายข้อโดย intersect กับสมาชิกชุดเท่านั้น ไม่มีการสร้าง Submission เก็บคำตอบ/ผลถูกผิด/คะแนนใหม่ หรือเปลี่ยน schema accepted-check event ยังคงเป็น metadata ตาม action เดิม การทบทวนซ่อนสรุปแล้วเปิด panel เดิม จึงคงร่างในหน่วยความจำ; ออกจากหน้าหรือ reload ไม่รับรองการกู้ร่าง/ผลสรุป เกณฑ์ hasStudentAnswer แยกเป็น helper ร่วมกับ ExamClient สำหรับสี/จำนวนคำตอบ โดยไม่เปลี่ยน evaluator หรือผลคะแนนงาน
 
+## Question-set colour flow — 15 October 2026
+
+CreateQuestionSetForm shares ClassroomCoverThemePicker with classrooms. Description text and theme are separate form fields, serialized together by question-set server actions using the existing description column. Theme changes participate in the existing debounced, serialized save queue. An automatic selection in edit mode resolves once in the editor, so subsequent rename or structural saves retain the same colour. Dashboard summaries now include description, allowing the same themed QuestionSetCard on home and the set library; per-set theme variables decorate only folder surfaces/text/icons.
+
+The guarded /exam-screen-lab/question-set-themes route injects create/save/delete callbacks and synthetic rows, never writing a database; its sample title/description/theme persist only in browser storage. It exercises create, edit, reopen and responsive palettes. Live Auth/Data API permission and persistence integration remain untested in this local-only delivery.
+
 ## คลังฝึกลดการโหลดซ้ำ — 15 ตุลาคม 2026
 
 Search ใช้ Next Form `action=""`/`scroll={false}` เพื่อ client navigation แทน native GET document reload. Local route อ่าน all snapshot โดยตรงเพื่อได้ library metadata และทำ filtered snapshot ขนานเฉพาะเมื่อมีคำ/แท็ก ไม่อ่าน page แรกแยกซ้ำก่อน snapshot. ภายใน snapshot หน้าแรกตรวจ student/library/roster ตามเดิม แล้ว private page reader ใช้ authorized library เดียวกันเฉพาะคำขอ/รอบ batch นั้น; แต่ละ RPC ยังตรวจ actor/library ปัจจุบันและมีขอบเขต 24 rows, concurrency สูงสุด 8. ไม่มี cache สิทธิ์หรือข้อมูลส่วนตัวข้าม request; public search ยังตรวจสิทธิ์ใหม่ทุกครั้ง และ snapshot ไม่ส่งผลบางส่วนเมื่อหน้าใดล้มเหลว/total เปลี่ยน/IDs ซ้ำ
+
+## Teacher home welcome — 15 October 2026
+
+The existing verified dashboard profile supplies full_name to TeacherDashboard. DashboardWelcome renders on the server using the existing counts and Bangkok clock; four time periods each have three wordings selected by Thai calendar day. Greeting changes on a new server render, without timers, additional queries or a client boundary on the production dashboard. Empty teacher accounts retain GettingStarted below the welcome. The guarded /exam-screen-lab/teacher-dashboard route supplies synthetic empty/name/clock cases without database reads or writes.
 
 ### หน้าทำชุดฝึกส่วนตัว — 15 ตุลาคม 2026
 

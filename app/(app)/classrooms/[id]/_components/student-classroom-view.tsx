@@ -1,3 +1,5 @@
+import { ClassroomTheme } from '@/components/classrooms/classroom-theme'
+import { parseDescription } from '../../_components/classroom-meta'
 import { ClassroomStream } from './classroom-stream'
 import { StudentClassroomTabs } from './student-classroom-tabs'
 import type { StudentAssignmentRow } from './assignment-status'
@@ -30,7 +32,7 @@ export function StudentClassroomView({ classroom, teacherName, studentCount, ass
   const calendarEvents = classroomCalendarEvents(assignments, classroom.name).map(event => ({ ...event, href: assignmentHrefs?.[event.id] }))
 
   return (
-    <div className="student-learning-stage @container/subject flex w-full min-w-0 flex-col gap-3" data-student-subject>
+    <ClassroomTheme cover={parseDescription(classroom.description).cover} className="student-learning-stage @container/subject flex w-full min-w-0 flex-col gap-3" data-student-subject>
       {previewLabel && <p className="text-xs text-muted-foreground">{previewLabel}</p>}
       <StudentClassroomTabs assignments={assignments} categories={categories} classroomDescription={classroom.description}
         classroomName={classroom.name} assignmentHrefs={assignmentHrefs}
@@ -42,12 +44,12 @@ export function StudentClassroomView({ classroom, teacherName, studentCount, ass
           <ClassroomStream classroomId={classroom.id} canPost={false} initialPosts={posts}
             variant="panel" maxHeightClass="max-h-[680px]" title="ประกาศจากครู" trackSeen={trackSeen} />
         ) : (
-          <Card padding="sm" className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold">ประกาศจากครู</h2>
+          <Card data-classroom-panel padding="sm" className="flex flex-wrap items-center justify-between gap-2">
+            <h2 data-classroom-heading className="text-sm font-semibold">ประกาศจากครู</h2>
             <p className="text-xs text-muted-foreground">ยังไม่มีประกาศ</p>
           </Card>
         )}
       />
-    </div>
+    </ClassroomTheme>
   )
 }

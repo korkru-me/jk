@@ -7,7 +7,6 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/u
 import { PracticeLibraryListActions } from '@/app/(app)/practice/_components/practice-library-list-actions'
 import { PRACTICE_LIBRARY_STATUS_LABELS } from '@/app/(app)/practice/_lib/teacher-contract'
 import type { ClassroomPracticeLibrariesResult } from '@/lib/classroom-practice-libraries'
-import { groupPreset } from '@/app/(app)/classrooms/_components/group-colors'
 import { cn } from '@/lib/utils'
 
 export function ClassroomPracticeLibraries({
@@ -21,7 +20,7 @@ export function ClassroomPracticeLibraries({
   canManage?: boolean
   classroomDescription?: string | null
 }) {
-  const practiceGroup = groupPreset('purple')
+  const practiceGroup = { surface: 'bg-work-practice/10', text: 'text-work-practice' }
 
   return (
     <section aria-labelledby="classroom-practice-heading" className={cn('@container flex min-w-0 flex-col', studentView ? 'gap-2' : 'gap-2.5')} data-classroom-practice-libraries>
@@ -58,7 +57,7 @@ export function ClassroomPracticeLibraries({
                 <Card radius="md" interactive className="relative flex h-full min-w-0 flex-col gap-1 overflow-hidden bg-[color-mix(in_oklab,var(--work-practice,var(--primary))_10%,var(--card))] px-3 py-2 group-hover:border-primary/30">
                   <p className="h-[2.75em] min-w-0 line-clamp-2 break-words text-sm font-semibold leading-snug" title={item.title}>{item.title}</p>
                   <div className="flex h-5 min-w-0 items-center gap-1.5 text-xs text-foreground/75">
-                    <Badge variant="outline" className="text-[color:var(--work-practice,var(--primary))]">คลังฝึก</Badge>
+                    <Badge variant="workPractice">คลังฝึก</Badge>
                     <span>{item.questionCount} ข้อ</span>
                   </div>
                   <div className="flex h-5 min-w-0 items-center gap-1.5 text-xs text-foreground/75">
@@ -75,7 +74,7 @@ export function ClassroomPracticeLibraries({
           <ul className="divide-y divide-border">
             {result.items.map(item => (
               <li key={item.id} className="flex min-h-16 min-w-0 items-center gap-2 px-3 py-2" data-classroom-practice-row>
-                <BookOpenCheck className="size-5 shrink-0 text-primary" aria-hidden="true" />
+                <BookOpenCheck className="size-5 shrink-0 text-work-practice" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
                   {canManage ? (
                     <Link

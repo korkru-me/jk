@@ -1,5 +1,7 @@
 'use client'
 
+import { WorkTypeIcon } from '@/components/assignments/work-type'
+import { workTypeConfig } from '@/lib/assignment-display'
 import { useEffect, useId, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -43,7 +45,7 @@ import {
 } from '@/components/ui/select'
 import {
   Check, ChevronRight, ChevronLeft, ChevronDown, Eye,
-  X, Save, FileText,
+  X, Save,
 } from 'lucide-react'
 import {
   filterSectionsToQuestions, moveQuestionOrderToIndex, parseSections,
@@ -406,9 +408,12 @@ export function CreateAssignmentForm({
       : initialSettings.passing_type != null && initialSettings.passing_value != null,
   )
   const [passingType, setPassingType] = useState<'score' | 'percent'>(copySource?.passing_type ?? initialSettings.passing_type ?? 'percent')
+  // The value shown on the card must be a real draft, ready when selected.
+  // Keep explicit saved values, including zero; an emptied input stays invalid.
   const [passingValue, setPassingValue] = useState(
     (copySource ? copySource.passing_value : initialSettings.passing_value) != null
-      ? String(copySource ? copySource.passing_value : initialSettings.passing_value) : '',
+      ? String(copySource ? copySource.passing_value : initialSettings.passing_value)
+      : passingType === 'percent' ? '70' : '7',
   )
 
   // Capture requested settings, not the question-dependent effective payload.
@@ -467,7 +472,8 @@ export function CreateAssignmentForm({
     setStreakRecycle(settings.streak_recycle_pool)
     setPassingEnabled(presetCompletionRule !== 'streak' && settings.passing_type !== null && settings.passing_value !== null)
     setPassingType(settings.passing_type ?? 'percent')
-    setPassingValue(numberDraft(settings.passing_value))
+    setPassingValue(settings.passing_value != null
+      ? String(settings.passing_value) : settings.passing_type === 'score' ? '7' : '70')
     setRandomQuestionCount(numberDraft(settings.random_question_count))
     setDisplayMaxScore(numberDraft(settings.display_max_score))
     setShowSections(settings.show_question_sections)
@@ -1046,7 +1052,8 @@ export function CreateAssignmentForm({
       className="space-y-4 [&_[data-assignment-description]]:hidden [&_[data-slot=field-description]]:hidden"
     >
       <div>
-        <h1 className="text-xl font-bold text-foreground sm:text-2xl">
+        <h1 className="flex items-center gap-2 text-xl font-bold text-foreground sm:text-2xl">
+          <WorkTypeIcon type={assignmentType} className="size-6 shrink-0" />
           {isCopy ? 'ทำสำเนา' : assignmentCreationTitle(assignmentType)}
         </h1>
         <p data-assignment-description className="mt-1 text-sm text-muted-foreground">
@@ -1492,7 +1499,6 @@ export function CreateAssignmentForm({
                     value={passingValue}
                     onFocus={() => chooseCompletion('threshold')}
                     onChange={event => setPassingValue(event.target.value)}
-                    placeholder={passingType === 'percent' ? '70' : '7'}
                     aria-label="ค่าเกณฑ์ผ่าน"
                     className={completionRuleInputClassName}
                   />
@@ -2200,11 +2206,12 @@ export function CreateAssignmentForm({
             </Button>
             <Button
               type="button"
+              variant={workTypeConfig(assignmentType).variant}
               onClick={openPublishDialog}
               disabled={isPending}
               className="w-full gap-2 sm:w-auto"
             >
-              <FileText className="w-4 h-4" />
+              <WorkTypeIcon type={assignmentType} className="text-current" />
               {isPending
                 ? (isCopy ? 'กำลังทำสำเนา...' : 'กำลังสร้าง...')
                 : (isCopy ? 'ทำสำเนา' : assignmentType === 'exam' ? 'สร้างชุดข้อสอบ' : 'สร้างแบบฝึกหัด')}

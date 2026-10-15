@@ -11,16 +11,16 @@
 - ถอดลิงก์ถังขยะและจำนวนถังขยะจากส่วนหัว พร้อม prop และ query นับห้องที่ลบซึ่งไม่มีผู้ใช้แล้ว เส้นทางถังขยะ/การลบจากการ์ด/การเลือกหลายห้องใช้เดิม ไม่เปลี่ยนสิทธิ์หรือวิธีนับสถิติ
 - ตรวจ fixture local ของคอมโพเนนต์จริง: สถิติ 5/211/21, เลือกทั้งหมดและยกเลิก, หน้าว่างเป็นศูนย์, 1440/390/320px สว่าง/มืดไม่ล้น; ส่วนหัวจอใหญ่ลดประมาณ 161→100px มือถือจัดปุ่มเลือก/สร้างในแถวเดียวได้และสูงประมาณ 177px ปุ่มอย่างน้อย 44px axe ไม่พบ violation มี contrast incomplete จากพื้นตกแต่ง จึงตรวจข้อความส่วนมองเห็นด้วยภาพร่วมด้วย TypeScript/token lint/isolated Webpack build/Next runtime ผ่าน ไม่รัน unit suite ซ้ำสำหรับ UI ไม่มี migration หรือการทดสอบผ่านบัญชีจริง งาน local ยังไม่ push/deploy
 
-## Completed student work cards — 15 October 2026 (local only)
-
-- การ์ดแบบฝึกหัด/ข้อสอบนักเรียนที่ทำเสร็จใช้ CheckCircle2 สีเขียวมุมขวาบนและพื้นเขียวอ่อน แทนจุดเขียวและพื้นสีประเภทตามคำขอล่าสุด ใช้ completed/isCompleted เดิม ไม่เปลี่ยนคะแนน เงื่อนไขจบงาน หรือเลขเตือนงานค้าง ครอบคลุมภาพรวมและงานที่มอบหมายผ่านคอมโพเนนต์ร่วม
-- ตรวจ local 1440/320px ทั้งภาพรวม/งานที่มอบหมายและธีมสว่าง/มืด การ์ดสำเร็จ 6 รายการมีเครื่องหมายถูกและพื้นสีเดียวกัน ไม่มีจุดเขียวซ้ำ/overflow; ตัวอย่าง 5 รายการสูงเท่าเดิม อีก 1 รายการเพิ่มประมาณ 2.4px จากไอคอนวงกลม โดยไม่มีแถวหรือ padding ใหม่ Scoped axe ไม่พบ violation/incomplete, TypeScript/token lint และ Next compilation/runtime ผ่าน ไม่รัน unit suite หรือ production build ซ้ำสำหรับการเปลี่ยนรูปแบบเล็กน้อยนี้ ไม่ทดสอบบัญชีจริง ไม่มี migration ไม่ push/deploy
-
 ## แนวไอคอนและกรอบสรุปด้านข้างของงาน — 15 ตุลาคม 2026
 
 - แบบฝึกหัด/ข้อสอบถอดชื่อห้อง จำนวนข้อ/โจทย์หายซ้ำ และจำนวนนักเรียนออกจากกรอบสรุป sidebar เหลือสถานะ ประเภท และชื่องาน ถอด prop studentCount ที่ไม่ใช้งานพร้อม caller/dependency เดิม การตรวจจำนวนโจทย์ที่ใช้ปิดปุ่มเผยแพร่และคำเตือนแก้โจทย์ยังคงอยู่
 - คง padding ซ้ายเดียวกันของ SidebarButton ในโหมดย่อ/ขยาย และเปลี่ยนปุ่มเผยแพร่จาก border-0 เป็นขอบโปร่งใสปกติเพื่อเอาความเหลื่อม 1px ออก เมนูแบบฝึกหัด/ข้อสอบใช้พื้นที่กดอย่างน้อย 44px เท่าคลังฝึก ส่วนคลังฝึกมีโค้ดถอดกรอบสรุปไว้แล้ว จึงตรวจการแสดงผลเดิมร่วมด้วย
 - ตรวจ local shell: แบบฝึกหัด/ข้อสอบ/คลังฝึกที่ 1440px ทุกไอคอนมี X เท่ากันทั้งย่อ/ขยาย กรอบงานไม่มีข้อความประกอบที่ถอดออก เมนูมือถือ 390/320px เปิด/ปิดได้ ไม่มี overflow, axe สว่าง/มืดไม่พบ violation/incomplete, TypeScript/token lint/isolated Webpack build/Next compilation/runtime ผ่าน ไม่รัน unit suite ซ้ำสำหรับ UI นี้และไม่ทดสอบบัญชีจริง งาน local ยังไม่ push/deploy
+
+## Completed student work cards — 15 October 2026 (local only)
+
+- การ์ดแบบฝึกหัด/ข้อสอบนักเรียนที่ทำเสร็จใช้ CheckCircle2 สีเขียวมุมขวาบนและพื้นเขียวอ่อน แทนจุดเขียวและพื้นสีประเภทตามคำขอล่าสุด ใช้ completed/isCompleted เดิม ไม่เปลี่ยนคะแนน เงื่อนไขจบงาน หรือเลขเตือนงานค้าง ครอบคลุมภาพรวมและงานที่มอบหมายผ่านคอมโพเนนต์ร่วม
+- ตรวจ local 1440/320px ทั้งภาพรวม/งานที่มอบหมายและธีมสว่าง/มืด การ์ดสำเร็จ 6 รายการมีเครื่องหมายถูกและพื้นสีเดียวกัน ไม่มีจุดเขียวซ้ำ/overflow; ตัวอย่าง 5 รายการสูงเท่าเดิม อีก 1 รายการเพิ่มประมาณ 2.4px จากไอคอนวงกลม โดยไม่มีแถวหรือ padding ใหม่ Scoped axe ไม่พบ violation/incomplete, TypeScript/token lint และ Next compilation/runtime ผ่าน ไม่รัน unit suite หรือ production build ซ้ำสำหรับการเปลี่ยนรูปแบบเล็กน้อยนี้ ไม่ทดสอบบัญชีจริง ไม่มี migration ไม่ push/deploy
 
 ## Practice management workspace — 15 October 2026 (local only)
 
@@ -80,6 +80,13 @@
 - `/exam-screen-lab/question-types` แสดงคอมโพเนนต์จริงใน shell ครูตัวอย่างภายใต้ guard local/Staging เดิม ไม่มีการอ่าน/เขียนฐานข้อมูล ใช้ตรวจ responsive, สี และ preview โดยไม่แก้ Auth; ยังไม่ได้ทดสอบการสร้าง/บันทึกโจทย์ผ่านบัญชีจริง
 - ตรวจ local: TypeScript และ lint:tokens ผ่าน; จอ 320/390/1024/1200/1440/1920px ไม่ล้น, ตัวอย่างครบ 11 ประเภทเปิด/โหลดได้โดยไม่เปลี่ยนหน้า, keyboard focus ผ่าน และ axe WCAG 2 A/AA ของ main ไม่พบ violation ทั้งสว่าง/มืด; production build ผ่านด้วย Webpack; Turbopack production build ถูก environment ปฏิเสธการเปิดพอร์ตภายใน (EPERM); ไม่ได้ทดสอบการบันทึกหรือ production
 
+## Unified work type colours and icons — 15 October 2026 (local only)
+
+- Exercise uses a notebook/pen in muted terracotta, exam a clipboard/pen in plum, and practice an open book/check in teal. Semantic light/dark tokens and shared metadata/components replace the inconsistent repeated-arrow/plain-file identities. Creation menus/choices/buttons, type filters, teacher/student work cards, recent work, student summary, assignment detail/edit/reuse, practice landing/progress/waiting and personal exercises use this identity. Status/deadline/classroom colours keep their separate meaning; existing controls, destinations and drag callbacks remain intact.
+- Added an allowlisted presentation field from the already-selected assignment type to legacy list/summary DTOs; no additional query, authorization, grading or persistence change. The guarded work-type-identity fixture previews all three creation choices/menu with synthetic links; its practice flag does not enable real routes.
+- TypeScript/token lint and isolated/primary webpack production builds passed. All 3,367 unit tests in 261 files passed. Checked creation colours, type icons, menus, student cards and narrow layouts; light/dark scoped axe checks found no violations after transitions settled. Main dev server was restarted without deleting its cache after it served stale CSS. No hosted writes, physical-device/SEB tests or migrations; no push/deployment as requested.
+- The primary checkout has newer student/practice layouts than the isolated branch. Their type styling was adapted with small separate hunks, retaining deadline alerts, tabs and personal-exercise features. Shared implementation is on codex/question-set-themes; the already-applied primary-only integration is preserved in docs/WORK_TYPE_IDENTITY_PRIMARY.patch without staging unrelated primary changes.
+
 ## Student classroom overdue submission reminders — 15 October 2026 (local only)
 
 - หัวคลังฝึกของนักเรียนเป็นแถบสีพร้อมไอคอน Folder และระยะเดียวกับหัวกลุ่มงาน ไม่มีจำนวนคลังข้างชื่อ การ์ดคลังฝึกไม่มีลูกศรด้านขวา แต่ทั้งการ์ดยังเป็นลิงก์เดิม วัดหัวแถบได้ 39.19px เท่ากลุ่มงาน และการ์ดตัวอย่างยังสูง 104.44px
@@ -103,6 +110,18 @@
 - Guarded synthetic browser ตรวจ overview มีประกาศ/work ไม่มีประกาศ, filters คงเดิม, URL/Back/keyboard/reload, เปิดงาน count=3 ยังเท่าเดิม แล้วจำลอง complete หนึ่งงานเหลือ 2 และ warning หาย, complete ทุกงาน/empty เหลือ 0, คลังฝึกยังอยู่ ตรวจ 320/900/1440px ไม่ล้น แถบ mobile ยุบ 92.8→44px โดยใช้ปุ่มย้อนกลับไอคอนและ tab padding กระชับ การ์ดตัวอย่างสูง 144.48px เท่าเดิมก่อนเพิ่มไอคอน
 - TypeScript, lint:tokens, 3,399 tests/269 files, isolated webpack build และ Next compilation/runtime ผ่าน React ยืนยัน StudentClassroomTabs/AssignmentList ครั้งเดียว Scoped axe light/dark ไม่พบ violation มี contrast incomplete จึงตรวจภาพร่วม ยังไม่ได้ทดสอบบัญชีจริง การส่งงาน/refresh completion ผ่านฐานจริง หรือ hosted UAT ไม่มี migration/database write/push/deploy งานเก็บ local
 
+## Two-row teacher work card layout - 15 October 2026 (local only)
+
+- Combined the category selector and all existing actions in one compact footer, with a bounded 9rem selector and the type/status badges beside the title. Cards still fill the room width in at most two columns. Narrow cards wrap controls to preserve readable labels and access.
+- At 1440px, ordinary sample cards are about 115px tall (previously 151px); mixed rows with a practice menu are about 134px (previously 169px). All 22 action links remain present. Checked 320/390/1024/1440px without horizontal overflow or clipped controls, category selection, keyboard reorder and mouse drag into an empty category using the in-memory fixture.
+- TypeScript, token lint, Next compilation/runtime and a separate webpack production build passed; scoped axe found zero violations/incomplete checks. No lib changes, so unit tests were not repeated. No real-data persistence tests, migration, push or deployment; changes remain local by owner request.
+
+## Two-column compact work cards and drag fix - 15 October 2026 (local only)
+
+- The latest owner revision uses at most two work cards per row, fills the classroom's available width, and reduces vertical padding/gaps. Sample cards at 1440px measure about 151-172px compared with the previous 204-209px. At 1920px the room scope measures about 1555px with no right-side unused gutter.
+- Fixed a pre-existing all-or-nothing drag guard: when practice layout is unavailable, ordinary exercises/exams can still reorder and change category. Locked libraries stay fixed and explain their restriction. Explicit pointer tests confirmed press/drag activation, moving to an empty group, and appending before locked libraries; keyboard reorder also passed in layout=missing. Normal supported layouts retain library dragging.
+- TypeScript isolated/main, token lint, Next runtime/compilation and a separate webpack production build passed. Checked 320px layout without overflow/clipping. Only synthetic in-memory writes were tested; hosted database persistence and unit suite were not rerun. No migration, push or deployment. The first automatic approval review for the build timed out; its allowed retry succeeded.
+
 ## กรอบต้อนรับนักเรียนรวมช่องเข้าห้องเรียน — 15 ตุลาคม 2026 (local only)
 
 - StudentDashboardWelcome รวมคำทักทาย ชื่อนักเรียน และ JoinClassroomForm เดิมใน Card เดียว พื้น gradient อ่อนและลายกวางจาก BRAND_MARK_URL เดียวกับครู หัวข้อ “ห้องเรียนของฉัน”/จำนวนห้องอยู่ภายนอกใต้กรอบและเหนือกริด ไม่เพิ่มคำอธิบายหรือกรอบฟอร์มซ้อน ปฏิทินยังใช้คอลัมน์ขวาเดิม
@@ -118,6 +137,20 @@
 - ตรวจ browser ด้วยข้อมูลจำลอง: ชุดฝึก x=81→22→12 และรายข้อ 31→50→54 หลังทำใหม่/refresh ช่องตอบว่าง; preview แบบฝึกหัดส่งคำตอบหลังเปลี่ยนค่าได้ 2/2 สำหรับข้อแรก; preview ข้อสอบ refresh (8,60,2)→(3,20,5); โหมดสอนล้าง (10,50,6)→(2,35,6); ตัวอย่างโจทย์และสูตรเปลี่ยนค่าจริง ตรวจหน้าข้อสอบที่ 320px ไม่มี overflow
 - TypeScript, lint:tokens, unit suite 3,397 tests, Next compilation/runtime และ isolated webpack build ผ่าน ไม่ได้ทดสอบด้วยบัญชีจริงหรือเขียนฐานข้อมูลภายนอก ตรวจ migration history พบ 8 local-only จึงไม่ apply/repair migration ไม่มี schema เพิ่ม งานเก็บเฉพาะในเครื่อง ไม่ push/deploy
 
+## Teacher assignment cards - 15 October 2026 (local only)
+
+- Replaced full-width rows with individual rounded cards in a responsive 1/2/3-column grid. Preserved all exercise/exam/practice metadata, group selectors, status indicators and actions. Grid sorting uses rectSortingStrategy without changing server actions or permissions.
+- Removed the success subtitle from recent work and reduced padding/gaps, combining metadata/status when space permits. The two-item sample frame measures about 130px on desktop. Names, type, timestamps, status, links and expiry behavior remain intact.
+- Verified the guarded classroom-groups work fixture at 1440/900/390/320px: 3/2/1/1 columns, no horizontal overflow or clipped cards. All 22 action links match the baseline; the enhanced exam fixture separately verifies the pending-review destination. Keyboard reorder, mouse drop into an empty category and Select category changes passed. fail=1 rolls order/category changes back with feedback.
+- TypeScript in isolated/main, token lint, Next compilation/runtime and an isolated webpack production build passed. Scoped axe checks in light/dark each found zero violations/incomplete checks. No lib changes, so unit suite was not repeated; no real-data/external-service writes or tests, no migration, push or deployment. Changes remain local as requested.
+
+## ธีมสีภายในห้องเรียน — 15 ตุลาคม 2026 (local only)
+
+- ตกแต่งหัวข้อ/ไอคอน ขอบและพื้นหัวกรอบ ประกาศปักหมุด avatar ปุ่มหลัก และเมนูห้องเรียนตาม cover เดิม 9 สี รวมกรอบรายชื่อ คะแนน ผู้ช่วยสอน ศักยภาพ และโฮมรูม มุมมองนักเรียนใช้ scope เดียวกัน ไม่เปลี่ยนสีสถานะ/คะแนน/หมวดที่เลือก ไม่เพิ่มความสูงหรือ spacing
+- ตรวจ guarded fixture /exam-screen-lab/classroom-themes และ student-classroom: 1440/390/320px ไม่ล้น สลับรายชื่อ คะแนน ผู้ช่วยสอน งาน และภาพรวมได้ในเส้นทางจำลอง วัดกรอบเปิด/ปิด scope ได้ความสูงต่าง 0px ตรวจทั้ง 9 สีในสว่าง/มืด: คอนทราสต์หัวข้อสว่างต่ำสุด 5.25:1 และปุ่ม 5.45:1; มืดหัวข้อต่ำสุด 7.38:1 และปุ่ม 7.82:1
+- TypeScript ทั้ง isolated/main, lint:tokens, Next MCP compilation/runtime ผ่าน Production build แบบ webpack ผ่าน; Turbopack build ติดข้อจำกัดเครื่องเมื่อ subprocess ของ PostCSS เปิดพอร์ต (Operation not permitted) หลังครั้งแรกดาวน์โหลด Google Fonts ไม่ได้ ใช้ dist แยกจาก dev ทุกครั้ง Axe scoped หลังแก้ข้อความรองไม่พบ violations ในสว่าง/มืด แต่มี incomplete เรื่องภาพปก/ARIA เดิม จึงไม่อ้างรับรอง accessibility ทั้งหน้า
+- ไม่รัน unit suite เพราะไม่มี lib/ตรรกะคำนวณเปลี่ยน ไม่ทดสอบข้อมูลจริง/บริการภายนอก ไม่มี migration ไม่ push/deploy ตามคำสั่งเจ้าของ นำ source ไป main checkout โดยรักษา column widths และ practice-library props ใหม่ของงานอื่นไว้
+
 ## ชุดฝึกใช้หน้าทำและสรุปผลสอดคล้องกับงานนักเรียน — 15 ตุลาคม 2026 (local preview)
 
 - เปลี่ยนสุ่มโจทย์ใหม่/ลองอีกครั้งเป็น “ทำใหม่” สำหรับเริ่มคำตอบข้อเดิมใหม่ เอาป้าย “ฝึกเอง · ไม่มีคะแนน” ออกจากหัวหน้ารอ คลัง รายข้อ และชุดฝึก แถบเครื่องมือชุดฝึกชิดใต้ topbar แผงสถานะ/เลขข้อย้ายขวา ใช้สี/legend/answer-presence helper ร่วมกับ ExamClient มือถือเปิดเลขข้อจากปุ่มใน toolbar เพื่อลดแกน Y
@@ -130,6 +163,16 @@
 - ห้องเรียนนักเรียนเปลี่ยนคลังฝึกจากแถวเต็มความกว้างเป็นการ์ดแยก 1/2/3 คอลัมน์ตามพื้นที่จริง ใช้ขนาดกรอบ ระยะ ไอคอนสีธีมห้อง ลูกศร และ focus แบบงานที่มอบหมาย กดทั้งกรอบเข้าหน้ารอเดิม พร้อมจำนวนข้อ/ไม่มีคะแนน/ฝึกซ้ำได้ ไม่เปลี่ยนข้อมูลหรือการจัดการของครู
 - เพิ่ม synthetic scenarios practice-one/many/empty/error ใน student-classroom lab ตรวจ Chrome ที่ 320/768/1024/1440/1920px: ความกว้างการ์ดเท่างานที่มอบหมายทุกขนาด ไม่มี overflow รวมชื่อไทยยาวและชื่ออังกฤษไม่เว้นวรรค ที่ 1440px จากแถวกว้าง 798px/สูง 76.8px เป็นการ์ดกว้าง 260.3px; หลายคลังสูงตามชื่อที่ยาวที่สุดในแถว (123.7px) ไม่ตั้งความสูงเกินจำเป็น
 - ตรวจ keyboard focus ring, link ปลายทาง, empty/error, React production components และ scoped WCAG audit 0 violations ผ่าน TypeScript, token lint, isolated webpack production build และ Next compilation/runtime; ไม่รัน unit suite หรือ hosted-account/ฐานข้อมูล เพราะเป็น presentation-only ไม่มี migration เก็บ local ตาม scope เดิม ไม่ push/deploy
+
+## ปุ่มบันทึกข้อมูลแฟ้มโจทย์ — 15 ตุลาคม 2026
+
+เปลี่ยนคำสั่ง “เสร็จสิ้น” เป็น “บันทึก” พร้อมไอคอนและกรอบ outline วางล่างขวาใน Card ข้อมูลแฟ้ม ใช้ finishEditingInfo/คิว autosave และ validation เดิม ไม่เปลี่ยน server action หรือ schema หน้าสร้างยังใช้ปุ่มสร้างเดิม ตรวจ fixture ข้อมูลจำลองที่ 1440/390/320px: ปุ่มอยู่ในกรอบ ไม่มี overflow, พื้นที่กด 44px; กดบันทึกชื่อและเปิดซ้ำได้ TypeScript, lint:tokens, Next compilation/runtime errors ผ่าน ไม่รัน build/unit suite ซ้ำเพราะแก้เฉพาะ copy/ตำแหน่งปุ่ม และไม่ได้ทดสอบฐานข้อมูลภายนอก ไม่มี migration งานเก็บเฉพาะในเครื่องตามเจ้าของสั่ง
+
+### กระชับช่องว่างการ์ดห้องเรียนบนหน้าหลัก — 15 ตุลาคม 2026 (local only)
+
+- เปลี่ยนเฉพาะ gap ของกริดห้องเรียนจาก gap-5 เป็น gap-3 ให้เท่าแฟ้มโจทย์ล่าสุด คง breakpoint/จำนวนคอลัมน์และตัวการ์ดเดิม ใช้พื้นที่คืนมาเพิ่มความกว้างการ์ด และนำ source ไป checkout หลักแล้ว
+- Local fixture ที่ 1440px วัด gap 24→14.4px และการ์ดกว้าง 342.4→348.8px โดยสูงเท่าเดิม 144px; ตรวจ 900/390/320px ไม่มี overflow จอมือถือสามใบรวมสูง 460.8px จากการลด gap ระหว่างแถว
+- TypeScript, token lint และ Next runtime ผ่าน ไม่รัน build/unit suite ซ้ำสำหรับการเปลี่ยน class spacing เดียว ไม่มี database test, migration, push หรือ deploy
 
 ### ปฏิทินนักเรียนชิดขอบขวาและขยายพื้นที่ — 15 ตุลาคม 2026 (local preview)
 
@@ -146,6 +189,22 @@
 - Synthetic normal/local browser fixtures ตรวจ dialog 61 ข้อ/ชื่อไม่มีช่องว่าง, เลื่อนรายการและ footer บนมือถือ, ยกเลิกหลังเปลี่ยน page size แล้วกลับไปแก้ต่อคงร่าง, สร้าง/แก้ชื่อ/ธีม/page size/นำสมาชิกออก/คงหลัง reload, เพิ่ม/ซ้ำ/หลายแท็ก/นำออก/เงื่อนไข AND, query ร่วมแท็ก/ไม่ reload document, Tooltip และลำดับหัวข้อ, จอ 1440/320px. TypeScript, token lint, isolated webpack production build และ Next compilation/runtime ผ่าน; scoped filter WCAG 0 violations/0 incomplete ส่วน dialog 61 ข้อ 0 violations แต่ contrast incomplete ในแถวที่ scroll clipping จึงตรวจภาพ/การเลื่อนร่วม ไม่อ้างรับรองทุกกรณี
 - ไม่แก้ lib/schema/RLS/grading จึงไม่รัน full unit suite ซ้ำ ไม่มี migration หรือการทดสอบบัญชีจริง/hosted persistence. เก็บ local commit บน `codex/student-classroom-cards` ไม่ push/deploy ตามขอบเขตเดิม
 
+### ธีมสีแฟ้มโจทย์และกรอบแฟ้มย่อย — 15 ตุลาคม 2026 (local only)
+
+- สร้าง/แก้ไขแฟ้มเลือก 9 สีด้วยเมนูเดียวกับห้องเรียน มีสีอัตโนมัติ; ไม่เลือกขณะสร้างให้ server สุ่มแล้วเก็บสี แฟ้มเก่าได้สีจาก ID แบบคงที่ และเมื่อบันทึกจะเก็บสีพร้อมคำอธิบายโดยไม่เพิ่ม schema เปลี่ยนสีใน edit เข้า autosave เดิมและไม่สุ่มซ้ำเมื่อแก้ชื่อหรือจัดข้อ
+- การ์ดแฟ้มทั้งหน้าหลัก/คลัง และหัวเรื่อง/พื้น/ขอบ/ไอคอนในหน้าแฟ้มอิงธีมเดียวกัน เปลี่ยนเฉพาะสีของพื้นผิวแฟ้ม ไม่เปลี่ยนสีสถานะหรือโจทย์ทั้งระบบ; ส่ง description ไปยัง home card เพิ่มหนึ่ง field ใน query เดิม และ decode metadata ในหน้าวิจัยกับการค้นหาแฟ้มสำหรับนำเข้า
+- แฟ้มย่อยและ tile สร้างใช้มุม 12px เป็นสี่เหลี่ยมมุมมน คงความสูง/พฤติกรรมเดิม; browser fixture วัดสูง 67.2px ทั้ง 1440/390/320px ไม่ล้นแนวนอน เลือกสีคืน focus และคลิกนอกเมนูพับได้ ส่วนสร้างวางสีข้างการมองเห็นบนจอกว้าง
+- TypeScript, token lint, production Turbopack build แยก cache และ unit suite 261 files / 3367 tests ผ่าน รวม 12 tests ใหม่ของ codec/ไฟล์ portable และ mock server queries สำหรับสุ่ม/บันทึก/รักษาสี/ปฏิเสธค่าสีผิดหรือไม่ได้ login การทดสอบ query เป็น mock ไม่ใช่การยืนยัน RLS ของฐานจริง
+- Local synthetic browser ตรวจเลือกน้ำเงิน แก้ชื่อ autosave เปิดใหม่คงสี, สร้างสีส้ม, สร้างอัตโนมัติ/เปิดใหม่, ชื่อคำอธิบายไม่เห็น metadata, มุมแฟ้มย่อย, mobile palette 10 ตัวเลือกไม่ล้น และธีมสว่าง/มืด ผ่าน Next compilation/runtime; axe เฉพาะ editor ไม่พบ WCAG violations ทั้งสว่าง/มืด แต่มี incomplete 1 รายการ จึงไม่อ้างรับรอง accessibility ครบทุกกรณี
+- เพิ่ม fixture /exam-screen-lab/question-set-themes ใช้ข้อมูลสังเคราะห์และ callback บันทึกใน browser เท่านั้น ไม่มี hosted/Staging persistence UAT, database writes, migration, push หรือ deploy ตามคำขอให้เก็บในเครื่อง
+
+### สัดส่วนตัวอักษรกรอบต้อนรับ — 15 ตุลาคม 2026 (local only)
+
+- ตามคำขอเจ้าของ ขยายคำทักทาย/ชื่อเป็น text-3xl เมื่อความกว้างกรอบอย่างน้อย 30rem และ text-xl บนกรอบแคบ ใช้น้ำหนัก bold, leading tight และช่องห่างระหว่างคำทักทายกับชื่อ 2–3 หน่วย สถิติขยายเป็น text-base บนจอกว้างและตัวเลข bold พร้อมไอคอน size-4; คงข้อความสองแถวหลัก
+- จัดกลุ่มข้อความกลางกรอบด้วย gap-1, เพิ่มระยะข้างเป็น 4–6 หน่วยและแนวตั้ง 3 หน่วยให้สมดุลกับโลโก้ คง min-h-30 เท่าการ์ดวิชา โดย source ใหม่อยู่ทั้ง checkout แยกและ checkout หลักแล้ว
+- Browser fixture ตรวจ 1440/900/768/390/320px, บัญชีว่างและชื่อยาว ไม่มี horizontal/heading overflow; ชื่อปกติและบัญชีว่างคงสูง 144px หัวเรื่องวัดได้ 30px บน desktop และ 20px บนกรอบแคบ สถิติ 16/12px และยังอยู่แถวเดียว ชื่อยาวมากบน 320px โตตามเนื้อหาเป็น 202.6px เพื่อแสดงชื่อครบ
+- TypeScript, token lint และ Next runtime ผ่าน ไม่รัน production build/unit suite ซ้ำเพราะเปลี่ยนเฉพาะ class typography/layout ไม่มี migration หรือ external-service test ไม่ push/deploy ตามที่เจ้าของกำหนด
+
 ### แก้คลังฝึกรอโหลดซ้ำและค้นหารีโหลดทั้งหน้า — 15 ตุลาคม 2026 (local preview)
 
 - รูปกรอบเทาเป็น `practice/[id]/loading.tsx` ที่แสดงระหว่างรอข้อมูล ไม่ได้สร้าง delay เอง; เปลี่ยนเป็น status Card/ข้อความ/ไอคอนหมุนหนึ่งแถวประมาณ 41px บน 1440/320px ไม่มี overflow และเคารพ reduced motion
@@ -153,11 +212,26 @@
 - เพิ่ม 6 server-loader mock tests: จำนวนคำขอ/ขอบเขต actor+library, no secret solution DTO, สิทธิ์ใหม่ในคำขอถัดไป, fail closed เมื่อ RPC หน้าอื่นปฏิเสธหรือ total เปลี่ยน, exact exercise search และ development-only snapshot. Full suite 262 files / 3,367 tests, TypeScript, token lint, isolated webpack production build และ Next compilation/runtime ผ่าน; build ครั้งแรกติด sandbox อ่าน Google Fonts แล้ว retry ด้วย network permission ผ่าน
 - Synthetic practice-library normal/local fixtures และ loading fixture ตรวจ browser/React components จริง; scoped loading WCAG 0 violations/0 incomplete. ยังไม่วัด latency ด้วยบัญชีจริง/Auth-to-DB หรือ hosted persistence; ไม่เปลี่ยน schema/RLS/การตรวจคำตอบ ไม่มี migration และไม่ push/deploy ตาม local-preview scope เดิม
 
+### ปรับความสูงกรอบต้อนรับให้เท่าการ์ดวิชา — 15 ตุลาคม 2026 (local only)
+
+- แก้การตีความคำขอเรื่อง “ความหนาของกรอบ”: เจ้าของต้องการเพิ่มความสูงของตัวกรอบต้อนรับให้เด่นเท่าการ์ดวิชา จึงใช้ min-h-30 ตามผลรวม cover h-16 และ body min-h-14 จัดคำทักทายกับสถิติตรงกลางแนวตั้ง และเว้นโลโก้จากขอบบน/ล่าง 3 หน่วย โดยคงข้อความสองแถวและไม่เพิ่มช่องว่างนอกกรอบ
+- วัด local fixture 1440/390/320px: กรอบต้อนรับ 144px เท่าการ์ดวิชา 143.99px (ต่างจากเดิม 85.2px); ชื่อยาวมากบน 320px โตตามเนื้อหาเป็น 151.2px เพื่อไม่ตัดชื่อ ทุกกรณีไม่มี horizontal overflow
+- TypeScript, token lint และ Next Turbopack compilation ผ่าน; ตรวจภาพ browser ใน checkout แยกพอร์ต 3024 และนำ source ไป checkout หลักแล้ว พอร์ต 3000 ขณะตรวจมี build error จาก app/(app)/practice/[id]/loading.tsx ซึ่ง import components/ui/spinner ที่ยังไม่มี จึงไม่แก้ไฟล์งานอื่นร่วมใน commit นี้
+- ไม่รัน production build/unit suite ซ้ำสำหรับการแก้ class layout เท่านั้น ไม่มี migration หรือ external-service test และไม่ push/deploy ตามที่เจ้าของกำหนด
+
 ### รูปแบบเลือกคลังฝึกตรงกับเพิ่มโจทย์จากคลัง — 15 ตุลาคม 2026 (local preview)
 
 - PracticeQuestionCard ใช้พื้นเขียวอ่อนและขอบเดียวกับ pending-add ใน QuestionCard ผ่านไฟล์กลาง `question-card-selection.ts`; รวม click guard เพื่อให้คลิกกรอบ/metadata/ข้อความย่อ/ชื่อเลือกได้เหมือนกันและ controls/portal ทำงานแยก. หมุดคง glow แดงอ่อน ขอบเขียวเมื่อเลือก และกลับขอบแดงเมื่อยกเลิก ไม่เพิ่มความสูง/แก้ layout
 - Synthetic browser ตรวจทั้ง practice-library และ question-sets fixtures: title/frame/checkbox toggle, Space เลือกโดยไม่ navigate, หมุด/เปิดปิดเฉลยไม่เปลี่ยนการเลือก, pending add/remove/selected ของ picker เดิม, React components จริง, 1440/320px ไม่ล้น และโหมดสว่าง/มืด. Computed selected background ตรงกับ picker pending-add; WCAG scoped selected card 0 violations/0 incomplete. TypeScript, token lint และ Next compilation/runtime ผ่าน
 - ไม่เปลี่ยน lib/schema/สิทธิ์/การบันทึก จึงไม่รัน full unit suite หรือ production build ซ้ำสำหรับ UI change นี้ ไม่ทดสอบบัญชีจริง/hosted persistence และไม่มี migration. เก็บ local commit ใน `codex/student-classroom-cards` ไม่ push/deploy ตาม preview scope เดิม
+
+### กรอบต้อนรับหน้าหลักครู — 15 ตุลาคม 2026 (local preview)
+
+- แทนสามการ์ดสถิติด้วยกรอบต้อนรับสองแถว เรียกชื่อจริงจาก profile เดิม มีคำทักทาย 12 แบบตามช่วงเวลาและวันในเวลาไทย โดยประเมินใหม่เมื่อหน้า render; รวมจำนวนห้องเรียน/นักเรียน โจทย์ และแฟ้มเป็นลิงก์เล็ก ๆ พร้อมโลโก้กวางจางทางขวา ไม่มี query เพิ่มหรือการแก้สิทธิ์/ฐานข้อมูล
+- ตามคำขอเจ้าของ เส้นขอบใช้ edge ring / ring-border / radius lg ชุดเดียวกับการ์ดวิชา ตรวจ computed style ได้ ring 1px สีเดียวกันและรัศมีเดียวกัน กรอบตัวอย่างชื่อปกติสูง 85.2px เทียบสถิติเดิม 86.4px ที่ 1440px และ 102.2px ที่ 390/320px; เนื้อหาห้องเรียนเลื่อนขึ้นเมื่อรวม gap ที่ลดลง ชื่อยาวยอมเพิ่มบรรทัดเพื่อไม่ตัดชื่อและไม่ล้น
+- ตรวจ local synthetic fixture บน 1440/390/320px, ชื่อยาว/ชื่อว่าง/บัญชีใหม่, ขอบช่วงเวลา 04/05/11/12/16/17/19/20 และถ้อยคำสามวัน, ธีมสว่าง/มืด, focus และปลายทางลิงก์ พื้นที่กดอย่างน้อย 44×44px; แก้ fixture classroom-icons ให้ส่งชื่อด้วย
+- TypeScript, token lint, production Turbopack build แยก cache และ Next MCP compilation/runtime ผ่าน; React tree ยืนยัน TeacherDashboard และ DashboardWelcome เป็น Server Components ในเส้นทางจริงของ fixture. Axe เฉพาะกรอบไม่พบ WCAG violations แต่ contrast เป็น incomplete เนื่องจากพื้น gradient จึงไม่อ้างรับรอง contrast อัตโนมัติ
+- ไม่รัน unit suite เพราะไม่แก้ lib/scoring; ไม่ทดสอบบัญชีจริง/บริการภายนอกหรือ deploy และไม่มี migration การตรวจข้อมูลจริงยังอาศัย query เดิมของ dashboard
 
 ### ชุดฝึกนักเรียนแบบมีธีม ป๊อปอัป และหน้าเริ่มทำ — 15 ตุลาคม 2026 (local preview)
 
@@ -290,6 +364,11 @@ The access assertion helper alone is service-only SECURITY DEFINER with an empty
 - TypeScript, token lint, webpack build และ unit suite 245 ไฟล์ / 3,237 เคสผ่าน รวม PGlite 7 เคสตรวจ SQL/permission/round และ sort 3 เคส Browser ตรวจ 320/390/1280/1600px, 3 Card ต่อแถว, แนวขอบ/ย่อเมนู, sticky calendar, ตัวเรียง/กรอบเลื่อน, light/dark, receipt สำเร็จ/ล้มเหลว/ไม่เด้งหลัง reload/แจ้งใหม่/พักคิวและ nested image; Next MCP runtime ไม่พบ error, axe ไม่มี violation (contrast/focus บางส่วน incomplete ตรวจภาพ/keyboard ร่วมด้วย) ไม่ทดสอบ hosted Staging/Auth จริงหรือ race บน connection แยก
 - fixtures `/exam-screen-lab/student-dashboard?scenario=busy`, `/exam-screen-lab/student-classroom` และ `/exam-screen-lab/announcement-acknowledgements` ใช้ข้อมูลสังเคราะห์เท่านั้น ตามคำสั่งเจ้าของ commit ในเครื่อง ไม่ push/deploy/เปลี่ยนฐานข้อมูลจริง
 
+### กวางดำเฉพาะ browser tab — 14 ตุลาคม 2026
+
+- ไอคอนแท็บ `app/icon.png` เป็นกวางดำบนวงกลมขาวเพื่อให้อ่านรูปทรงได้ชัดขึ้น; generator เปลี่ยนสีเฉพาะ browser icon ส่วน SVG, โลโก้ในเว็บ และ Apple touch icon ยังม่วง/theme เดิม ไม่มี migration
+
+
 ### หน้าข้อมูลส่วนตัวนักเรียนแบบกะทัดรัดและการจัดรูปตัวอย่าง — 14 ตุลาคม 2026
 
 - เอาเมนูตั้งค่าซ้ำออกเฉพาะนักเรียน ใช้ `SettingsShell` ร่วมกับ local fixture; บน desktop ขอบซ้ายเริ่มที่แนว padding ของเนื้อหาหลัก ไม่จัดกลางด้วย max-width เดิม และขอบขวาใช้แนว notification anchor เช่นหน้าสร้างงาน เมื่อย่อ/ขยาย sidebar จะคำนวณใหม่ ส่วนจอเล็กใช้ความกว้างเต็มและช่องฟอร์มปรับตามความกว้าง Card
@@ -297,6 +376,13 @@ The access assertion helper alone is service-only SECURITY DEFINER with an empty
 - รูปโปรไฟล์เปิด popup ให้ลากด้วย mouse/touch pointer ใช้ลูกศรเลื่อน ซูม และเริ่มใหม่ ก่อนกด “ใช้รูปนี้”; crop เป็น PNG 512×512 ที่รักษาความโปร่งใสและใช้เป็นตัวอย่างในหน้าเท่านั้นตามคำตอบเจ้าของ รูปจะกลับค่าเดิมเมื่อรีเฟรช ไม่มี upload, Storage, avatar persistence หรือ migration การยกเลิก/คลิกภายนอก/Escape ต้องยืนยันก่อนทิ้งตำแหน่งร่าง และไม่ลบข้อมูลส่วนตัวที่กรอกอยู่
 - `/exam-screen-lab/student-profile` ใช้ข้อมูล/รูปสังเคราะห์และ component จริง รวมสถานะไม่มีรูปและ shell ของครู; ฟอร์มทั้งหมดใช้ action จำลองที่ไม่เขียนข้อมูลหรือเปลี่ยนรหัสผ่าน ขอบเขตรอบนี้เป็น local commit/localhost เท่านั้น ไม่ push หรือเผยแพร่ Production
 - ตรวจ TypeScript, design-token lint, webpack build และ unit suite 243 ไฟล์ / 3,227 เคสผ่าน (crop geometry ใหม่ 6 เคส); browser 320/390/768/1280px, light/dark, เลือกไฟล์/ลาก/ลูกศร/ซูม/crop PNG จริง, สลับป้ายสิทธิ์, nested confirm, คงร่างและคืน focus ผ่าน Next MCP ไม่พบ compilation/runtime error และ axe ไม่มี violation ในหน้า/ป้ายสิทธิ์/ตัวจัดรูป (dialog มี `aria-hidden-focus` incomplete ซึ่งตรวจ focus trap ด้วย keyboard ร่วมด้วย) ไม่ทดสอบการบันทึกบัญชีจริงหรืออุปกรณ์ touch จริง
+
+### หน้า Landing เพิ่มโลโก้กวางและถอดคำเกี่ยวกับแผนการจัดการเรียนรู้ — 14 ตุลาคม 2026 (local preview)
+
+- ถอด “แผนการจัดการเรียนรู้” ออกจากชุดคำสลับของ `HeroHeadline`; คำอื่นและ motion/reduced-motion เดิมยังทำงานตามเดิม เจ้าของยืนยันว่าไม่ทำฟีเจอร์สร้างแผนการจัดการเรียนรู้
+- `HeroSection` วางโลโก้กวางกึ่งกลางเหนือข้อความสลับ ใช้ SVG, อัตราส่วน และ token `brand-accent` เดียวกับแถบด้านบน ปรับขนาดตามจอและลดช่องว่างด้านบนเพื่อให้ภาพกับข้อความสมดุล; ตามคำขอเพิ่มเติม ป้าย “เวอร์ชัน Demo” อยู่ทางขวาล่างของกวางพร้อมระยะห่าง และย่อป้ายบนมือถือ
+- ตรวจ local Chrome ที่ 1440/390/320px, โหมดสว่าง/มืด, React state และ reduced motion; สังเกตข้อความครบหนึ่งรอบ 6 คำโดยไม่มีคำเกี่ยวกับแผนการจัดการเรียนรู้ ป้ายไม่ล้นจอ; TypeScript, design-token lint และ Next.js compilation/runtime checks ผ่าน ไม่รัน full unit suite หรือ production build สำหรับการแก้ copy/layout นี้
+- แสดงให้ตรวจบน localhost เท่านั้นตามคำสั่งเจ้าของ ยังไม่ push หรือ deploy และไม่มี migration
 
 ### Sync เว็บจริงกับ local และแก้สร้างคลังฝึก — 14 ตุลาคม 2026
 
@@ -1939,7 +2025,7 @@ Physical iPad UAT ของ candidate `r7` ยืนยันแล้วว่�
 ### Landing page — Demo
 
 - metadata และ badge ระบุ Demo
-- hero ปัจจุบันล็อกคำว่า “ก่อการเรียนรู้ โดยครู” และยังไม่ใช้แนวคิดคำกลางแบบสลับ
+- hero ใช้แนวคิด “ก่อ…โดยครู” โดยสลับคำกลาง: การเรียนรู้, ข้อสอบ, ห้องเรียน, แบบฝึกหัด, การจัดการเรียนรู้ และวิจัยการศึกษา; เคารพ `prefers-reduced-motion` และมีโลโก้กวางเหนือข้อความใน local preview วันที่ 14 ตุลาคม 2026
 - `InteractiveDemo` มีอยู่ใน components แต่หน้าแรกปัจจุบัน render เฉพาะ navbar และ hero
 
 ## Future

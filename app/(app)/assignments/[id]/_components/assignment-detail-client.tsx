@@ -1,5 +1,6 @@
 'use client'
 
+import { WorkTypeBadge } from '@/components/assignments/work-type'
 import { useCallback, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -184,7 +185,7 @@ export function AssignmentDetailClient({
           <Badge variant="secondary" className={statusMeta.color}>
             <span aria-hidden="true" className={`size-1.5 rounded-full ${statusMeta.dot}`} />{statusMeta.label}
           </Badge>
-          <Badge variant="outline">{assignmentTypeLabel}</Badge>
+          <WorkTypeBadge type={a.type} />
           {a.secure_browser_mode === 'seb_required' && <Badge variant="outline" className="border-success/40 bg-success/10 text-success"><LockKeyhole /> Safe Exam Browser</Badge>}
           {a.android_exam_mode === 'monitored' && <Badge variant="warning"><Smartphone /> Android ครูอนุมัติรายคน</Badge>}
         </>}

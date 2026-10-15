@@ -1,13 +1,14 @@
 'use client'
 
+import { WorkTypeBadge, WorkTypeIcon } from '@/components/assignments/work-type'
+import { workTypeConfig } from '@/lib/assignment-display'
 import { useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight, ArrowUp, ArrowDown, BookOpenCheck, CheckCircle2, Clock, ListChecks } from 'lucide-react'
+import { ArrowRight, ArrowUp, ArrowDown, CheckCircle2, Clock, ListChecks } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { sortStudentWork, type StudentWorkDirection, type StudentWorkOrder } from '@/lib/student-work-sort'
-import { ClassroomIcon } from '@/components/classrooms/classroom-icon'
 import { coverOf, parseDescription } from '../../classrooms/_components/classroom-meta'
 import { formatThaiDate, formatThaiDateTime } from '@/lib/thai-time'
 import { cn } from '@/lib/utils'
@@ -45,7 +46,7 @@ export function StudentWorkSummary({ data, now = Date.now() }: { data: StudentLe
           <Badge variant="statusWarning">ต้องทำ <strong>{data.pendingWork.length}</strong></Badge>
           <Badge variant="statusDestructive">ใกล้/เลยกำหนด <strong>{data.urgentCount}</strong></Badge>
           <Badge variant="statusSuccess">ส่งแล้ว <strong>{data.doneCount}</strong></Badge>
-          {data.practiceWork.length > 0 && <Badge variant="outline">คลังฝึก <strong>{data.practiceWork.length}</strong></Badge>}
+          {data.practiceWork.length > 0 && <Badge variant="workPractice">คลังฝึก <strong>{data.practiceWork.length}</strong></Badge>}
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-1" role="group" aria-label="เรียงงาน กดตัวเลือกเดิมเพื่อสลับทิศทาง">
           {(['due', 'latest'] as const).map(value => (
@@ -84,6 +85,8 @@ export function StudentWorkSummary({ data, now = Date.now() }: { data: StudentLe
 
 function WorkRow({ work, now }: { work: StudentSummaryItem; now: number }) {
   const isPractice = work.kind === 'practice'
+  const workType = isPractice ? 'practice' : work.type ?? 'exam'
+  const typeConfig = workTypeConfig(workType)
   const meta = parseDescription(work.classroom?.description ?? null)
   const cover = coverOf(meta)
   const due = dueInfo(work.endAt, now)
@@ -98,13 +101,13 @@ function WorkRow({ work, now }: { work: StudentSummaryItem; now: number }) {
     <Card radius="md" interactive className={cn('relative overflow-hidden', work.completed ? 'border-success/35 bg-success/5 ring-1 ring-success/15 shadow-md shadow-success/15' : cover?.surface)} data-work-row data-work-kind={work.kind} data-classroom-id={work.classroom?.id} data-work-id={work.id} data-work-completed={work.completed}>
       <span aria-hidden="true" className={cn('absolute inset-y-0 left-0 w-1', work.completed ? 'bg-success' : cover?.solid ?? 'bg-muted-foreground')} />
       <div className="flex items-center gap-3 py-2.5 pl-4 pr-3">
-        <div className={cn('hidden size-9 shrink-0 items-center justify-center rounded-lg sm:flex', cover ? `${cover.surface} ${cover.text}` : 'bg-muted text-foreground')}>
-          <ClassroomIcon iconKey={meta.iconKey} className="size-5" />
+        <div className={cn('hidden size-9 shrink-0 items-center justify-center rounded-lg sm:flex', typeConfig.bg, typeConfig.text)}>
+          <WorkTypeIcon type={workType} className="size-5" />
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <p className="text-sm font-semibold leading-snug line-clamp-2">{work.title}</p>
-            {isPractice && <Badge variant="outline"><BookOpenCheck aria-hidden="true" />คลังฝึก</Badge>}
+            <WorkTypeBadge type={workType} />
             {work.completed && <Badge variant="statusSuccess"><CheckCircle2 aria-hidden="true" />ส่งแล้ว</Badge>}
             {!isPractice && work.inProgress && <Badge variant="statusWarning">กำลังทำ</Badge>}
           </div>

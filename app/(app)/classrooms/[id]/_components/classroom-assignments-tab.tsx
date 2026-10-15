@@ -3,20 +3,10 @@
 import { useEffect, useId, useMemo, useState, useTransition, type ReactNode } from 'react'
 import Link from 'next/link'
 import {
-  CheckCircle2,
-  BookOpenCheck,
   BarChart3,
   Pencil,
-  ClipboardCheck,
-  Clock,
-  Copy,
-  Eye,
   Folder,
   GripVertical,
-  Grid3x3,
-  RefreshCw,
-  Target,
-  Users,
 } from 'lucide-react'
 import {
   DndContext,
@@ -40,29 +30,22 @@ import {
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
-  verticalListSortingStrategy,
+  rectSortingStrategy,
   type SortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS as DndCSS } from '@dnd-kit/utilities'
 import { toast } from 'sonner'
-import { TeacherAssignmentCardContent, TeacherWorkCard, statusConfig } from './teacher-assignment-card'
-import { TYPE_CFG } from '@/lib/assignment-display'
+import { TeacherAssignmentCardContent, TeacherWorkCard, AssignmentCategoryPicker, statusConfig } from './teacher-assignment-card'
+import { TYPE_CFG, workTypeConfig } from '@/lib/assignment-display'
 import { setAssignmentCategory } from '@/lib/actions/assignment-categories'
 import { reorderAssignmentDisplayOrder } from '@/lib/actions/classrooms'
 import { reorderClassroomWork, setPracticeLibraryCategory } from '@/lib/actions/classroom-work'
-import { assignmentCopyHref } from '@/lib/assignment-creation'
 import {
   moveVisibleAssignmentAfter,
   moveVisibleAssignmentColumn,
   reconcileAssignmentOrder,
 } from '@/lib/assignment-column-order'
-import { SCORE_STRATEGY_LABELS } from '@/lib/scoring'
-import { formatPassingThreshold } from '@/lib/grading'
-import { assignmentSizeLabel } from '@/lib/assignment-size-label'
-import { computeAssignmentProgress } from '@/lib/classroom-progress'
-import { describeGroupTarget } from '@/lib/classroom-groups'
 import {
-  assignmentCategorySelectItems,
   groupAssignmentsByCategory,
   normalizeAssignmentCategoryId,
   UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE,
@@ -72,17 +55,8 @@ import { cn } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 import { AssignmentCreationMenu } from '@/components/assignments/assignment-creation-menu'
 import { AssignmentTypeFilter, type AssignmentTypeFilterValue } from '@/components/assignments/assignment-type-filter'
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { groupPreset } from '@/app/(app)/classrooms/_components/group-colors'
 import { AssignmentCategoryManager } from './assignment-category-manager'
 import { PracticeLibraryListActions } from '@/app/(app)/practice/_components/practice-library-list-actions'
@@ -135,8 +109,6 @@ type ClassroomWorkRow = (ClassroomAssignmentRow & { kind: 'assignment' }) | (
     display_order: number | null
   }
 )
-const PRACTICE_TYPE_CFG = { label: 'คลังฝึก', bg: 'bg-primary/10', text: 'text-primary', icon: BookOpenCheck }
-const workTypeConfig = (type: string) => type === 'practice' ? PRACTICE_TYPE_CFG : TYPE_CFG[type] ?? TYPE_CFG.exam
 
 function SortableAssignmentRow({
   assignmentId,
@@ -247,13 +219,13 @@ function AssignmentCategoryCard({
   return (
     <Card
       ref={setNodeRef}
-      edge="ring"
+      edge="none"
       role="group"
       aria-label={`กลุ่มงาน ${category?.name ?? 'ยังไม่จัดกลุ่ม'} ${assignmentCount} งาน`}
       data-assignment-category-id={category?.id ?? UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE}
       className={cn(
-        'relative overflow-hidden transition-shadow',
-        isDropTarget && '[&_[data-assignment-row]]:bg-transparent',
+        'relative min-w-0 bg-transparent transition-shadow',
+        isDropTarget && 'ring-2 ring-primary/40',
       )}
     >
       {isDropTarget && (
@@ -265,27 +237,27 @@ function AssignmentCategoryCard({
           )}
         />
       )}
-      <div className="relative">
+      <div className="relative flex min-w-0 flex-col gap-2">
         {showHeader && (
-          <div className={cn(
-            'flex items-center gap-2 border-b px-4 py-2.5',
+          <div data-classroom-panel-header={!preset || undefined} className={cn(
+            'flex min-w-0 items-center gap-2 rounded-lg px-3 py-2',
             preset?.surface ?? 'bg-muted/40',
           )}>
             <Folder className={cn('size-4', preset?.text ?? 'text-muted-foreground')} aria-hidden="true" />
-            <h3 className={cn('text-sm font-semibold', preset?.text ?? 'text-muted-foreground')}>
+            <h3 className={cn('min-w-0 break-words text-sm font-semibold', preset?.text ?? 'text-muted-foreground')}>
               {category?.name ?? 'ยังไม่จัดกลุ่ม'}
             </h3>
-            <span className={cn('text-xs', preset?.textMuted ?? 'text-muted-foreground')}>
+            <span className={cn('ml-auto shrink-0 text-xs', preset?.textMuted ?? 'text-muted-foreground')}>
               {assignmentCount} งาน
             </span>
           </div>
         )}
-        <div className={cn('divide-y divide-border', assignmentCount === 0 && 'min-h-24')}>
+        <div className="grid min-w-0 grid-cols-1 items-stretch gap-2 @min-[40rem]/teacher-work:grid-cols-2">
           {assignmentCount === 0 ? (
-            <div className="flex min-h-24 items-center justify-center gap-2 px-4 py-6 text-center text-xs text-muted-foreground">
+            <Card edge="dashed" radius="md" className="col-span-full flex min-h-16 items-center justify-center gap-2 px-3 py-3 text-center text-xs text-muted-foreground">
               <Folder className="size-4 shrink-0" aria-hidden="true" />
               ยังไม่มีงาน · ลากงานมาวางในกลุ่มนี้ได้
-            </div>
+            </Card>
           ) : children}
         </div>
       </div>
@@ -379,7 +351,6 @@ export function ClassroomAssignmentsTab({
     ])))
   }, [workItems, initialCategories])
 
-  const categoryItems = useMemo(() => assignmentCategorySelectItems(categories), [categories])
 
   const rows = useMemo(() => {
     const byId = new Map(workItems.map(assignment => [assignment.id, assignment]))
@@ -482,18 +453,22 @@ export function ClassroomAssignmentsTab({
     const previousCategoryId = normalizeAssignmentCategoryId(categoryByAssignment[assignmentId], categories)
     const previousOrder = rows.map(assignment => assignment.id)
     const categoryChanged = previousCategoryId !== targetCategoryId
+    // Libraries without layout support stay in their existing slots. They
+    // must not disable or become reorder targets for ordinary assignments.
+    const movableRows = layoutBlocked ? rows.filter(work => work.kind === 'assignment') : rows
+    const movableIds = new Set(movableRows.map(work => work.id))
     const visibleIds = filtered
-      .filter(assignment => assignment.category_id === previousCategoryId)
+      .filter(assignment => assignment.category_id === previousCategoryId && movableIds.has(assignment.id))
       .map(assignment => assignment.id)
     let nextOrder = previousOrder
 
     if (categoryChanged) {
       // Cross-group drops always append, even over an existing row or with a type filter.
-      const lastAssignmentId = rows
+      const lastAssignmentId = movableRows
         .filter(assignment => assignment.id !== assignmentId && assignment.category_id === targetCategoryId)
         .at(-1)?.id
       if (lastAssignmentId) {
-        nextOrder = moveVisibleAssignmentAfter(previousOrder, previousOrder, assignmentId, lastAssignmentId)
+        nextOrder = moveVisibleAssignmentAfter(previousOrder, movableRows.map(work => work.id), assignmentId, lastAssignmentId)
       }
     } else if (overData?.type === 'assignment' && assignmentId !== String(event.over.id)) {
       nextOrder = moveVisibleAssignmentColumn(previousOrder, visibleIds, assignmentId, String(event.over.id))
@@ -532,20 +507,13 @@ export function ClassroomAssignmentsTab({
   }
 
   function categoryPicker(work: ClassroomWorkRow) {
-    return <Select
-      items={categoryItems}
-      value={work.category_id ?? UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE}
+    return <AssignmentCategoryPicker
+      title={work.title}
+      value={work.category_id ?? null}
+      categories={categories}
       onValueChange={value => moveToCategory(work.id, value)}
       disabled={isPending || isOrderPending || (work.kind === 'practice' && layoutBlocked)}
-    >
-      <SelectTrigger size="sm" className="w-40 max-w-full" aria-label={`กลุ่มของ ${work.title}`}>
-        <Folder />
-        <SelectValue>{value => categoryItems.find(item => item.value === value)?.label ?? 'ยังไม่จัดกลุ่ม'}</SelectValue>
-      </SelectTrigger>
-      <SelectContent align="end"><SelectGroup>
-        {categoryItems.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
-      </SelectGroup></SelectContent>
-    </Select>
+    />
   }
 
   const assignmentById = new Map(rows.map(assignment => [assignment.id, assignment]))
@@ -567,7 +535,7 @@ export function ClassroomAssignmentsTab({
   }
 
   return (
-    <div className="flex min-w-0 flex-col gap-3" data-classroom-work-list>
+    <div className="@container/teacher-work flex min-w-0 flex-col gap-3 pointer-coarse:[&_[data-slot=button]]:min-h-[44px] pointer-coarse:[&_[data-slot=select-trigger]]:min-h-[44px]" data-classroom-work-list>
       {recentWork && <ClassroomRecentWork result={recentWork} />}
 
       <div className="flex flex-wrap items-center gap-2" data-classroom-work-toolbar>
@@ -587,10 +555,13 @@ export function ClassroomAssignmentsTab({
       {practiceLibraries?.error && <Alert variant="destructive"><AlertTitle>แสดงคลังฝึกไม่สำเร็จ</AlertTitle><AlertDescription>{practiceLibraries.error}</AlertDescription></Alert>}
 
       {filtered.length > 0 && (
-        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
           <GripVertical className="size-3.5 shrink-0" aria-hidden="true" />
-          กดค้างที่ตัวจับแล้วลากขึ้น–ลงเพื่อเรียง หรือวางในกรอบกลุ่มงานเพื่อย้ายกลุ่ม ระบบจะบันทึกให้อัตโนมัติ
-          {(isOrderPending || isPending) && <span className="font-medium text-primary">กำลังบันทึก...</span>}
+          <span className="min-w-0">
+            ลากตัวจับมุมการ์ดเพื่อเรียงลำดับ หรือวางในกลุ่มงานเพื่อย้ายกลุ่ม ระบบจะบันทึกให้อัตโนมัติ
+            {layoutBlocked && ' · คลังฝึกยังย้ายไม่ได้ในขณะนี้'}
+            {(isOrderPending || isPending) && <span className="ml-1 font-medium text-primary">กำลังบันทึก...</span>}
+          </span>
         </p>
       )}
 
@@ -628,7 +599,7 @@ export function ClassroomAssignmentsTab({
                   <SortableContext
                     key={sectionKey}
                     items={section.assignments.map(assignment => assignment.id)}
-                    strategy={sortingWithinCategory ? verticalListSortingStrategy : stationaryAssignmentStrategy}
+                    strategy={sortingWithinCategory ? rectSortingStrategy : stationaryAssignmentStrategy}
                   >
                   <AssignmentCategoryCard
                     category={section.category}
@@ -656,35 +627,38 @@ export function ClassroomAssignmentsTab({
                         disabled={isOrderPending || isPending || layoutBlocked} freezeLayout={!sortingWithinCategory}
                         tone={typeCfg.bg}
                       >
-                        <div className="flex flex-col gap-3 px-2" data-classroom-practice-row>
-                          <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
-                            <Link href={`/practice/${assignment.libraryId}/edit`} className="flex min-w-0 flex-1 items-center gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                              <div className={cn('flex size-8 shrink-0 items-center justify-center rounded-lg', typeCfg.bg)}>
-                                <TypeIcon className={cn('size-4', typeCfg.text)} aria-hidden="true" />
-                              </div>
-                              <div className="min-w-0">
-                                <p className="line-clamp-2 text-sm font-medium leading-snug" title={assignment.title}>{assignment.title}</p>
-                                <p className="mt-0.5 text-xs text-muted-foreground">{assignment.questionCount} ข้อ · ฝึกซ้ำได้ · ไม่มีคะแนน</p>
-                              </div>
-                            </Link>
-                            <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
-                              {categoryPicker(assignment)}
-                              <Badge variant="secondary">คลังฝึก</Badge>
-                              <Badge variant={statusCfg.badge} title={practiceStatus.description}>{statusCfg.label}</Badge>
+                        <div className="flex h-full min-w-0 flex-col gap-1.5" data-classroom-practice-row>
+                          <Link href={`/practice/${assignment.libraryId}/edit`} className="flex min-w-0 items-start gap-2 rounded-lg pr-8 outline-none focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:pr-12">
+                            <div className={cn('flex size-8 shrink-0 items-center justify-center rounded-lg', typeCfg.bg)}>
+                              <TypeIcon className={cn('size-4', typeCfg.text)} aria-hidden="true" />
                             </div>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-1 rounded-xl bg-muted/40 p-1 md:justify-end">
-                            <Button variant="ghost" size="sm" render={<Link href={`/practice/${assignment.libraryId}/progress`} />}>
-                              <BarChart3 data-icon="inline-start" /> ดูความคืบหน้า
-                            </Button>
-                            <Button variant="ghost" size="sm" render={<Link href={`/practice/${assignment.libraryId}/edit`} />}>
-                              <Pencil data-icon="inline-start" /> แก้ไขการตั้งค่า
-                            </Button>
-                            <PracticeLibraryListActions id={assignment.libraryId} title={assignment.title} status={assignment.status} canManage />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                <p className="min-w-0 flex-[1_1_12rem] line-clamp-2 text-sm font-semibold leading-snug" title={assignment.title}>{assignment.title}</p>
+                                <div className="flex shrink-0 items-center gap-1">
+                                  <Badge variant={typeCfg.variant}>คลังฝึก</Badge>
+                                  <Badge variant={statusCfg.badge} title={practiceStatus.description}>{statusCfg.label}</Badge>
+                                </div>
+                              </div>
+                              <p className="mt-1 text-xs text-muted-foreground">{assignment.questionCount} ข้อ · ฝึกซ้ำได้ · ไม่มีคะแนน</p>
+                            </div>
+                          </Link>
+                          <div className="mt-auto flex min-w-0 flex-wrap items-center gap-x-1 gap-y-1 border-t border-border/60 pt-1.5">
+                            {categoryPicker(assignment)}
+                            <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1">
+                              <Button variant="ghost" size="sm" render={<Link href={`/practice/${assignment.libraryId}/progress`} />}>
+                                <BarChart3 data-icon="inline-start" /> ดูความคืบหน้า
+                              </Button>
+                              <Button variant="ghost" size="sm" render={<Link href={`/practice/${assignment.libraryId}/edit`} />}>
+                                <Pencil data-icon="inline-start" /> แก้ไขการตั้งค่า
+                              </Button>
+                              <PracticeLibraryListActions id={assignment.libraryId} title={assignment.title} status={assignment.status} canManage />
+                            </div>
                           </div>
                         </div>
                       </SortableAssignmentRow>
                     }
+
                     return (
                       <SortableAssignmentRow
                         key={assignment.id}

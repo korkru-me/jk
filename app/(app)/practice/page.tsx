@@ -67,7 +67,7 @@ export default async function PracticeLandingPage() {
       <header className="flex min-h-16 flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-bold text-foreground">คลังฝึก</h1>
+            <h1 className="flex items-center gap-2 text-2xl font-bold text-work-practice"><BookOpenCheck className="size-6" aria-hidden="true" />คลังฝึก</h1>
             <Badge variant="outline">ไม่มีคะแนน</Badge>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -75,12 +75,12 @@ export default async function PracticeLandingPage() {
           </p>
         </div>
         {canCreate ? (
-          <Button className="min-h-11" render={<Link href="/practice/new" />}>
+          <Button variant="workPractice" className="min-h-11" render={<Link href="/practice/new" />}>
             <Plus data-icon="inline-start" />
             สร้างคลังฝึก
           </Button>
         ) : (
-          <Button className="min-h-11" disabled title="ต้องมีห้องเรียนรายวิชาที่จัดการได้ก่อน">
+          <Button variant="workPractice" className="min-h-11" disabled title="ต้องมีห้องเรียนรายวิชาที่จัดการได้ก่อน">
             <Plus data-icon="inline-start" />
             สร้างคลังฝึก
           </Button>
@@ -99,7 +99,7 @@ export default async function PracticeLandingPage() {
       ) : items.length === 0 ? (
         <Empty className="min-h-56">
           <EmptyHeader>
-            <EmptyMedia variant="icon"><BookOpenCheck aria-hidden="true" /></EmptyMedia>
+            <EmptyMedia variant="icon"><BookOpenCheck className="text-work-practice" aria-hidden="true" /></EmptyMedia>
             <EmptyTitle>ยังไม่มีคลังฝึก</EmptyTitle>
             <EmptyDescription>
               {canCreate
@@ -109,7 +109,7 @@ export default async function PracticeLandingPage() {
           </EmptyHeader>
           {canCreate && (
             <EmptyContent>
-              <Button className="min-h-11" render={<Link href="/practice/new" />}>สร้างคลังฝึก</Button>
+              <Button variant="workPractice" className="min-h-11" render={<Link href="/practice/new" />}>สร้างคลังฝึก</Button>
             </EmptyContent>
           )}
         </Empty>
@@ -131,6 +131,7 @@ export default async function PracticeLandingPage() {
               >
                 <div className="min-w-0">
                   <div className="flex min-w-0 items-center gap-2">
+                    <BookOpenCheck className="size-4 shrink-0 text-work-practice" aria-hidden="true" />
                     {canManage ? (
                       <Link href={`/practice/${library.id}/edit`} className="min-w-0 flex-1 truncate text-sm font-medium hover:underline">
                         {library.title}
@@ -191,7 +192,7 @@ function StudentPracticeLanding({
       <header className="flex min-h-16 flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-bold text-foreground">คลังฝึก</h1>
+            <h1 className="flex items-center gap-2 text-2xl font-bold text-work-practice"><BookOpenCheck className="size-6" aria-hidden="true" />คลังฝึก</h1>
             <Badge variant="outline">ไม่มีคะแนน</Badge>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -205,7 +206,7 @@ function StudentPracticeLanding({
       ) : items.length === 0 ? (
         <Empty className="min-h-56">
           <EmptyHeader>
-            <EmptyMedia variant="icon"><BookOpenCheck aria-hidden="true" /></EmptyMedia>
+            <EmptyMedia variant="icon"><BookOpenCheck className="text-work-practice" aria-hidden="true" /></EmptyMedia>
             <EmptyTitle>ยังไม่มีคลังฝึกที่เปิดให้ใช้</EmptyTitle>
             <EmptyDescription>
               เมื่อครูเผยแพร่คลังฝึกในห้องเรียนรายวิชา รายการจะปรากฏที่นี่

@@ -32,6 +32,7 @@ import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import { CLASSROOM_NAVIGATION_ICONS } from './classroom-navigation-icons'
 import { ClassroomIcon } from '@/components/classrooms/classroom-icon'
+import { ClassroomTheme } from '@/components/classrooms/classroom-theme'
 
 interface ClassroomContextSidebarProps {
   classroom: Pick<Classroom, 'id' | 'name' | 'description' | 'classroom_type'>
@@ -74,7 +75,7 @@ export function ClassroomContextNavigation({
   const classroomOverviewHref = overviewHref ?? classroomNavigationPath(classroom.id, 'overview')
 
   return (
-    <div className="flex min-w-0 flex-col gap-3">
+    <ClassroomTheme cover={meta.cover} className="flex min-w-0 flex-col gap-3">
       <SidebarButton
         label="ห้องเรียนทั้งหมด"
         variant="ghost"
@@ -198,6 +199,8 @@ export function ClassroomContextNavigation({
                 label={item.label}
                 type="button"
                 variant={selected ? 'navigation' : 'ghost'}
+                data-classroom-navigation
+                data-classroom-selected={selected}
                 className="w-full justify-start"
                 aria-current={selected ? 'page' : undefined}
                 endAdornment={item.key === 'students' ? <Badge variant="secondary">{studentCount}</Badge> : undefined}
@@ -245,6 +248,6 @@ export function ClassroomContextNavigation({
       >
         <LayoutDashboard data-icon="inline-start" />
       </SidebarButton>
-    </div>
+    </ClassroomTheme>
   )
 }

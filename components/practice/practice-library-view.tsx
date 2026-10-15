@@ -1,5 +1,7 @@
 'use client'
 
+import { WorkTypeBadge } from '@/components/assignments/work-type'
+import { ExerciseIcon } from '@/lib/assignment-display'
 import { useRouter } from 'next/navigation'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { isUuid } from '@/lib/practice-library-contracts'
@@ -275,6 +277,7 @@ export function PracticeLibraryView({
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-2">
             <h1 className="min-w-0 flex-1 truncate text-xl font-semibold text-foreground">{library.title}</h1>
+            <WorkTypeBadge type="practice" />
           </div>
           {library.description && (
             <RichText text={library.description} className="line-clamp-1 text-sm text-muted-foreground" />
@@ -285,7 +288,7 @@ export function PracticeLibraryView({
       <section aria-labelledby="my-practice-exercises" className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 id="my-practice-exercises" className="flex min-w-0 items-center gap-1.5 text-sm font-semibold sm:text-base">
-            <Layers className="size-4 shrink-0 text-primary" aria-hidden="true" />แบบฝึกหัดของฉัน
+            <ExerciseIcon className="size-4 shrink-0 text-work-exercise" aria-hidden="true" />แบบฝึกหัดของฉัน
           </h2>
           <div role="group" className="flex flex-wrap items-center gap-1.5" aria-label="โจทย์ที่ปักไว้ทบทวน">
             <Button variant={state.reviewOnly ? 'navigation' : 'outline'} size="sm" className="pointer-coarse:min-h-11" disabled={!pinsReady}
@@ -409,8 +412,8 @@ export function PracticeLibraryView({
             {selectedIds.length > 0 && <Button variant="ghost" size="sm" className="pointer-coarse:min-h-11" disabled={pending} aria-label="ล้างที่เลือก" title="ล้างที่เลือก" onClick={() => updateSelection({})}>
               <X data-icon="inline-start" className="sm:hidden" aria-hidden="true" /><span className="hidden sm:inline">ล้างที่เลือก</span>
             </Button>}
-            {!editing && <Button size="sm" className="pointer-coarse:min-h-11" aria-label="สร้างแบบฝึกหัด" title="สร้างแบบฝึกหัด" disabled={!exercisesReady || selectedIds.length === 0 || pending} onClick={event => { namingTriggerRef.current = event.currentTarget; setNaming(true) }}>
-              <Plus data-icon="inline-start" aria-hidden="true" /><span className="hidden sm:inline">สร้างแบบฝึกหัด</span>
+            {!editing && <Button size="sm" variant="workExercise" className="pointer-coarse:min-h-11" aria-label="สร้างแบบฝึกหัด" title="สร้างแบบฝึกหัด" disabled={!exercisesReady || selectedIds.length === 0 || pending} onClick={event => { namingTriggerRef.current = event.currentTarget; setNaming(true) }}>
+              <ExerciseIcon data-icon="inline-start" aria-hidden="true" /><span className="hidden sm:inline">สร้างแบบฝึกหัด</span>
             </Button>}
           </div>
         </div>
@@ -513,7 +516,7 @@ export function PracticeLibraryView({
           </div>}
           </div>
           <div className="flex min-w-0 shrink-0 flex-wrap gap-2">
-            <Button type="submit" size="sm" className="pointer-coarse:min-h-11" disabled={pending || !title.trim() || selectedIds.length === 0}>{pending ? 'กำลังบันทึก…' : `${editing ? 'บันทึกการแก้ไข' : 'บันทึกแบบฝึกหัด'} ${selectedIds.length} ข้อ`}</Button>
+            <Button type="submit" size="sm" variant="workExercise" className="pointer-coarse:min-h-11" disabled={pending || !title.trim() || selectedIds.length === 0}>{pending ? 'กำลังบันทึก…' : `${editing ? 'บันทึกการแก้ไข' : 'บันทึกแบบฝึกหัด'} ${selectedIds.length} ข้อ`}</Button>
             <Button type="button" variant="outline" size="sm" className="pointer-coarse:min-h-11" disabled={pending} onClick={() => { if (editing) void cancelEdit(); else { setNaming(false); setTitle('') } }}>{editing ? 'ยกเลิกการแก้ไข' : 'ยกเลิก'}</Button>
           </div>
           {error && <p role="alert" className="text-sm text-destructive @min-[44rem]:col-span-2">{error}</p>}

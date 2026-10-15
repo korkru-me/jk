@@ -1,9 +1,9 @@
 'use client'
 
+import { WorkTypeBadge, WorkTypeIcon } from '@/components/assignments/work-type'
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Copy, FileText, BookOpenCheck } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
+import { Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import {
@@ -134,9 +134,9 @@ export function ReuseAssignmentCard({
                   {availableAssignments.map(assignment => (
                     <SelectItem key={assignment.id} value={assignment.id}>
                       <span className="flex w-full min-w-0 items-center gap-2">
-                        {assignment.type === 'practice' ? <BookOpenCheck className="size-4" aria-hidden="true" /> : <FileText className="size-4" aria-hidden="true" />}
+                        <WorkTypeIcon type={assignment.type} className="size-4" />
                         <span className="min-w-0 flex-1 whitespace-normal break-words">{assignment.title}</span>
-                        <Badge variant="secondary">{assignment.type === 'practice' ? 'คลังฝึก' : assignment.type === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'}</Badge>
+                        <WorkTypeBadge type={assignment.type} />
                       </span>
                     </SelectItem>
                   ))}

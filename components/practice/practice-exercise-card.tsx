@@ -1,7 +1,8 @@
 'use client'
 
+import { ExerciseIcon } from '@/lib/assignment-display'
 import Link from 'next/link'
-import { NotebookPen, Pencil, Play } from 'lucide-react'
+import { Pencil, Play } from 'lucide-react'
 import { COVER_PRESETS } from '@/app/(app)/classrooms/_components/classroom-meta'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -39,7 +40,7 @@ export function PracticeExerciseCard({ exercise, settings, selected, disabled, o
         <input type="checkbox" checked={selected} disabled={disabled} onChange={event => onSelect(event.target.checked)} aria-label={`เลือกแบบฝึกหัด ${exercise.title}`} className="accent-primary" />
       </label>
       <Button type="button" variant="ghost" aria-pressed={selected} disabled={disabled} onClick={() => onSelect(!selected)} className="relative h-auto min-w-0 flex-1 flex-col items-start gap-1 whitespace-normal p-0 text-left hover:bg-transparent">
-        <span className="flex min-w-0 items-center gap-1.5"><NotebookPen className="size-4 shrink-0" aria-hidden="true" /><span className="truncate text-sm font-semibold" title={exercise.title}>{exercise.title}</span></span>
+        <span className="flex min-w-0 items-center gap-1.5"><ExerciseIcon className="size-4 shrink-0 text-work-exercise" aria-hidden="true" /><span className="truncate text-sm font-semibold" title={exercise.title}>{exercise.title}</span></span>
         <span className={cn('text-xs', preset.textMuted)}>{exercise.questionIds.length} ข้อ · {settings.questionsPerPage} ข้อต่อหน้า</span>
       </Button>
     </div>
@@ -50,7 +51,7 @@ export function PracticeExerciseCard({ exercise, settings, selected, disabled, o
       </div>
       <div className="flex items-center justify-end gap-1.5">
         <Button variant="ghost" size="icon-sm" className="pointer-coarse:size-11" disabled={disabled} onClick={onEdit} aria-label={`แก้ไข ${exercise.title}`} title="แก้ไขแบบฝึกหัด"><Pencil aria-hidden="true" /></Button>
-        <Button size="sm" variant="navigation" className="pointer-coarse:min-h-11" render={<Link href={startHref} />} aria-label={`เริ่มทำ ${exercise.title}`}><Play data-icon="inline-start" aria-hidden="true" />เริ่มทำ</Button>
+        <Button size="sm" variant="workExercise" className="pointer-coarse:min-h-11" render={<Link href={startHref} />} aria-label={`เริ่มทำ ${exercise.title}`}><Play data-icon="inline-start" aria-hidden="true" />เริ่มทำ</Button>
       </div>
     </div>
   </Card>

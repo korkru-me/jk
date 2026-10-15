@@ -1,3 +1,4 @@
+import { WorkTypeBadge } from '@/components/assignments/work-type'
 import { createClient } from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/auth/server'
 import { fetchBankQuestions, withQuestionPoints } from '@/lib/question-bank'
@@ -105,7 +106,7 @@ export default async function EditAssignmentPage({
 
       <ClassroomWorkHeader kind="assignment" title={a.title}
         classroom={(assignment as unknown as { classrooms: { name: string; description: string | null } | null }).classrooms}
-        badges={<><span className="font-medium">{a.type === 'exam' ? 'ตั้งค่าข้อสอบ' : 'ตั้งค่าแบบฝึกหัด'}</span><Badge variant={a.status === 'published' ? 'statusSuccess' : 'secondary'}>{a.status === 'published' ? 'เผยแพร่แล้ว' : a.status === 'closed' ? 'ปิดแล้ว' : 'ร่าง'}</Badge></>}
+        badges={<><WorkTypeBadge type={a.type} /><Badge variant={a.status === 'published' ? 'statusSuccess' : 'secondary'}>{a.status === 'published' ? 'เผยแพร่แล้ว' : a.status === 'closed' ? 'ปิดแล้ว' : 'ร่าง'}</Badge></>}
         details={[
           { label: 'โจทย์', value: assignmentSizeLabel(a), icon: FileText },
           { label: 'เวลาทำ', value: a.duration_minutes === null ? 'ไม่จำกัด' : `${a.duration_minutes} นาที`, icon: Timer },

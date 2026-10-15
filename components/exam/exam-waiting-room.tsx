@@ -1,5 +1,7 @@
 'use client'
 
+import { WorkTypeBadge } from '@/components/assignments/work-type'
+import { workTypeConfig } from '@/lib/assignment-display'
 import { BRAND_MARK_HEIGHT, BRAND_MARK_URL, BRAND_MARK_WIDTH } from '@/components/brand-mark-data'
 import Image from 'next/image'
 import {
@@ -102,7 +104,7 @@ export function ExamWaitingRoom({ summary, busy, error, code, onCodeChange, onSt
         className="pointer-events-none absolute right-8 top-5 -z-10 hidden h-72 w-auto opacity-5 md:block dark:brightness-0 dark:invert"
       />
       <header className="flex max-w-3xl flex-col gap-1.5 md:pr-52">
-        <p className="text-sm font-medium text-primary">หน้ารอเข้า{room}{summary.accessMode === 'seb' ? ' · Safe Exam Browser' : ''}</p>
+        <p className="flex items-center gap-2 text-sm font-medium"><WorkTypeBadge type={exercise ? 'exercise' : 'exam'} />หน้ารอเข้า{room}{summary.accessMode === 'seb' ? ' · Safe Exam Browser' : ''}</p>
         <h1 className="text-2xl font-semibold leading-tight text-foreground sm:text-3xl">{summary.title}</h1>
         {previewMode && <p className="text-sm leading-5 text-muted-foreground">มุมมองตัวอย่างสำหรับครู · ไม่สร้าง{round} ไม่บันทึกคำตอบหรือคะแนนจริง และไม่ตรวจ{exercise ? `รหัสเข้าทำ${task}จริง` : 'เครื่อง SEB หรือรหัสเข้าทำข้อสอบจริง'}</p>}
       </header>
@@ -179,7 +181,7 @@ export function ExamWaitingRoom({ summary, busy, error, code, onCodeChange, onSt
         <footer className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
           {summary.completedSubmissionId
             ? <a className={buttonVariants({ className: actionClassName })} href={`/submissions/${summary.completedSubmissionId}`}>ดูผล{round}เดิม</a>
-            : <Button type="submit" className={actionClassName} disabled={busy || Boolean(summary.blockedReason) || (summary.requiresAccessCode && !code.trim())}>
+            : <Button type="submit" variant={workTypeConfig(exercise ? 'exercise' : 'exam').variant} className={actionClassName} disabled={busy || Boolean(summary.blockedReason) || (summary.requiresAccessCode && !code.trim())}>
               {busy ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <LogIn data-icon="inline-start" />}
               {busy ? previewMode ? 'กำลังเปิดตัวอย่าง…' : `กำลังตรวจสอบ${round}…`
                 : previewMode ? `เข้า${room}ตัวอย่าง` : summary.expired ? `ตรวจสอบผล${round}เดิม` : active ? `กลับเข้า${room}รอบเดิม`

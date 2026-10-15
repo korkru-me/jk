@@ -243,9 +243,9 @@ export function StudentTable({
       </div>
 
       {/* Table */}
-      <Card edge="ring" className="overflow-x-auto">
+      <Card data-classroom-panel edge="ring" className="overflow-x-auto">
         {/* Header */}
-        <div className={`grid ${GRID_COLS} gap-3 px-4 py-2.5 bg-muted border-b border-border text-xs font-semibold text-muted-foreground uppercase tracking-wide`}>
+        <div data-classroom-panel-header className={`grid ${GRID_COLS} gap-3 px-4 py-2.5 bg-muted border-b border-border text-xs font-semibold text-muted-foreground uppercase tracking-wide`}>
           {canManage && selectionMode && (
             <label className="flex items-center justify-center" title="เลือกนักเรียนที่แสดงทั้งหมด">
               <input

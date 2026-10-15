@@ -1,5 +1,7 @@
 'use client'
 
+import { workTypeConfig } from '@/lib/assignment-display'
+import { WorkTypeIcon } from '@/components/assignments/work-type'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 
 export type AssignmentTypeFilterValue = 'all' | 'exercise' | 'exam' | 'practice'
@@ -33,7 +35,8 @@ export function AssignmentTypeFilter({ value, onValueChange, counts, includePrac
       className="max-w-full flex-wrap rounded-xl bg-muted p-1"
     >
       {OPTIONS.filter(option => includePractice || option.value !== 'practice').map(option => (
-        <ToggleGroupItem key={option.value} value={option.value}>
+        <ToggleGroupItem key={option.value} value={option.value} className={option.value === 'all' ? undefined : workTypeConfig(option.value).toggle}>
+          {option.value !== 'all' && <WorkTypeIcon type={option.value} className="text-current" />}
           {option.label}
           {counts && <span>({counts[option.value] ?? 0})</span>}
         </ToggleGroupItem>

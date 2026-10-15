@@ -161,7 +161,7 @@ function StudentAssignmentCard({ assignment: a, now, href }: { assignment: Stude
             ) : completed ? <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[color-mix(in_oklab,var(--success)_60%,var(--foreground))]" aria-hidden="true" data-work-completed /> : <span className={cn('mt-1 size-2.5 shrink-0 rounded-full', SEVERITY_DOT[severity])} aria-hidden="true" data-work-status-dot={severity} />}
           </div>
           <div className="flex h-5 min-w-0 items-center gap-1.5 text-xs text-foreground/75">
-            <Badge variant="outline" className={cn(type.bg, type.text)}>{type.label}</Badge>
+            <Badge variant={type.variant}>{type.label}</Badge>
             <span className="min-w-0 truncate" title={sizeLabel}>{compactSize}</span>
             {a.duration_minutes != null ? <span className="ml-auto shrink-0">{a.duration_minutes} นาที</span>
               : attemptLabel && <span className="ml-auto shrink-0">{attemptLabel}</span>}

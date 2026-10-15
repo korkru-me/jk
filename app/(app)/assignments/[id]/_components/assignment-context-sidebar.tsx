@@ -1,5 +1,6 @@
 'use client'
 
+import { WorkTypeBadge } from '@/components/assignments/work-type'
 import Link from 'next/link'
 import {
   Activity,
@@ -108,7 +109,7 @@ export function AssignmentContextNavigation({
             <span aria-hidden="true" className={`size-1.5 rounded-full ${statusMeta.dot}`} />
             {statusMeta.label}
           </Badge>
-          <Badge variant="outline">{assignmentTypeLabel}</Badge>
+          <WorkTypeBadge type={a.type} />
         </div>
         <div className="min-w-0">
           <p className="line-clamp-2 font-bold leading-snug text-foreground" title={a.title}>{a.title}</p>

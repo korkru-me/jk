@@ -6,6 +6,12 @@
 
 Answer-backup v2 เพิ่ม optional randomValues ซึ่งมีเฉพาะ numeric map ที่แสดงแล้ว การกู้ร่าง random question ต้องตรงกับ map ปัจจุบัน ร่างเก่าที่ไม่มี map ไม่เอากลับมาปะปน Practice/preview history เป็น optional session storage สำหรับกันเลขซ้ำ ไม่เก็บคำตอบหรือเปลี่ยน event schema ของคลังฝึก
 
+## Question-set colour metadata — 15 October 2026
+
+Colour uses the existing question_sets.description channel, following the classroom metadata approach; no schema, migration, RLS or grants change. A recognized versioned header [korkru:set-theme:v1:<allowed colour>] followed by a newline precedes the teacher's plain description. lib/question-set-theme.ts owns encoding/decoding. Unknown headers and legacy text are preserved as text; composing an already encoded description does not stack headers. Editors, research option DTOs and description search strip the envelope for display/search. The existing portable set descriptor retains the string through export/import and batching, including an empty human description.
+
+Create validates the nine-colour allowlist server-side and persists a random colour if none was selected. Modern edits send a resolved colour with each autosave; legacy callers that omit it read the owner's existing description first and retain its colour. Unthemed legacy folders derive a stable colour from their ID until next saved, avoiding a database backfill or colour changes on navigation. No permission or membership flags are carried in this metadata.
+
 ## Browser presentation settings for personal exercises — 15 October 2026
 
 `korkru:practice-exercise-settings:<owner>:<library>` stores a strict UUID-keyed map of exercise → `{ questionsPerPage: 1|3|5|10, theme: <existing cover preset> }`, limited to 1000 entries. The map carries no answers, correctness, grades, permission flags or resource authority. Unselected colors are drawn once on save; legacy exercises receive stable defaults. Settings remain on this browser even for server-backed groups; no migration or automatic cloud sync is introduced. Run-page answers/math modes/verdicts/flags remain in memory, with scratch work using the existing local IndexedDB policy. Every question fetch/check repeats server resource access regardless of browser membership or preferences
