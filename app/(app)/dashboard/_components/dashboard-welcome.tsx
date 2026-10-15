@@ -32,12 +32,12 @@ export function DashboardWelcome({
   const day = Number(new Intl.DateTimeFormat('en-US', { day: 'numeric', timeZone: THAI_TIME_ZONE }).format(now))
   const greeting = GREETINGS[period][day % GREETINGS[period].length]
   const count = (value: number) => value.toLocaleString('th-TH')
-  const linkClass = 'inline-flex min-h-[44px] min-w-[44px] items-center gap-1.5 rounded-md whitespace-nowrap text-xs text-foreground/80 transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring @min-[30rem]/welcome:text-sm'
+  const linkClass = 'inline-flex min-h-[44px] min-w-[44px] items-center gap-1.5 rounded-md whitespace-nowrap text-xs text-foreground/80 transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring @min-[30rem]/welcome:text-base'
 
   return (
     <Card
       edge="ring"
-      className="@container/welcome relative isolate flex min-h-30 flex-col justify-center overflow-hidden bg-linear-to-r from-primary/8 via-card to-primary/5 px-3 py-2 sm:px-4"
+      className="@container/welcome relative isolate flex min-h-30 flex-col justify-center gap-1 overflow-hidden bg-linear-to-r from-primary/8 via-card to-primary/5 px-4 py-3 sm:px-6"
       data-dashboard-welcome
     >
       <span
@@ -50,23 +50,23 @@ export function DashboardWelcome({
         }}
         data-dashboard-welcome-mark
       />
-      <h1 className="flex flex-wrap items-baseline gap-x-2 text-base leading-snug font-semibold">
+      <h1 className="flex flex-wrap items-baseline gap-x-2 text-xl leading-tight font-bold @min-[30rem]/welcome:gap-x-3 @min-[30rem]/welcome:text-3xl">
         <span>{greeting}</span>
         <span className="min-w-0 break-words text-primary [overflow-wrap:anywhere]">{fullName.trim() || 'คุณครู'}</span>
       </h1>
-      <nav aria-label="สรุปข้อมูลของฉัน" className="flex flex-wrap items-center gap-x-2 @min-[30rem]/welcome:gap-x-5">
+      <nav aria-label="สรุปข้อมูลของฉัน" className="flex flex-wrap items-center gap-x-2 @min-[30rem]/welcome:gap-x-6">
         <Link href="/classrooms" className={linkClass} aria-label={`${count(classroomsCount)} ห้องเรียน นักเรียนรวม ${count(studentsCount)} คน`}>
-          <School aria-hidden="true" className="hidden size-3.5 shrink-0 @min-[16rem]/welcome:block text-tint-1" />
-          <span><strong className="font-semibold">{count(classroomsCount)}</strong> ห้องเรียน</span>
+          <School aria-hidden="true" className="hidden size-3.5 shrink-0 @min-[30rem]/welcome:size-4 @min-[16rem]/welcome:block text-tint-1" />
+          <span><strong className="font-bold">{count(classroomsCount)}</strong> ห้องเรียน</span>
           <span className="hidden text-xs text-muted-foreground @min-[30rem]/welcome:inline">· {count(studentsCount)} คน</span>
         </Link>
         <Link href="/questions" className={linkClass} aria-label={`${count(questionsCount)} โจทย์ในคลัง`}>
-          <BookOpen aria-hidden="true" className="hidden size-3.5 shrink-0 @min-[16rem]/welcome:block text-tint-3" />
-          <span><strong className="font-semibold">{count(questionsCount)}</strong> โจทย์<span className="hidden @min-[30rem]/welcome:inline">ในคลัง</span></span>
+          <BookOpen aria-hidden="true" className="hidden size-3.5 shrink-0 @min-[30rem]/welcome:size-4 @min-[16rem]/welcome:block text-tint-3" />
+          <span><strong className="font-bold">{count(questionsCount)}</strong> โจทย์<span className="hidden @min-[30rem]/welcome:inline">ในคลัง</span></span>
         </Link>
         <Link href="/questions/sets" className={linkClass} aria-label={`${count(setsCount)} แฟ้มโจทย์`}>
-          <Layers aria-hidden="true" className="hidden size-3.5 shrink-0 @min-[16rem]/welcome:block text-primary" />
-          <span><strong className="font-semibold">{count(setsCount)}</strong> แฟ้ม<span className="hidden @min-[30rem]/welcome:inline">โจทย์</span></span>
+          <Layers aria-hidden="true" className="hidden size-3.5 shrink-0 @min-[30rem]/welcome:size-4 @min-[16rem]/welcome:block text-primary" />
+          <span><strong className="font-bold">{count(setsCount)}</strong> แฟ้ม<span className="hidden @min-[30rem]/welcome:inline">โจทย์</span></span>
         </Link>
       </nav>
     </Card>
