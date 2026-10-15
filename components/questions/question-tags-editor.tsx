@@ -17,6 +17,8 @@ interface Props {
   tags: string[]
   /** Tags already used elsewhere in the bank — the suggestion pool. */
   allTags: string[]
+  /** Selection dialogs may show existing tags without offering to add one. */
+  allowAdd?: boolean
 }
 
 /**
@@ -27,7 +29,7 @@ interface Props {
  * deserves. Removal still asks first: the chip is small and sits right against
  * its neighbour, so a stray click is easy.
  */
-export function QuestionTagsEditor({ questionId, tags: serverTags, allTags }: Props) {
+export function QuestionTagsEditor({ questionId, tags: serverTags, allTags, allowAdd = true }: Props) {
   const [tags, setTags] = useState(serverTags)
   const [confirming, setConfirming] = useState<string | null>(null)
   const [addOpen, setAddOpen] = useState(false)
@@ -102,7 +104,7 @@ export function QuestionTagsEditor({ questionId, tags: serverTags, allTags }: Pr
         </span>
       ))}
 
-      <div className="relative">
+      {allowAdd && <div className="relative">
         <Button
           onClick={() => setAddOpen(o => !o)}
           disabled={isPending}
@@ -121,7 +123,7 @@ export function QuestionTagsEditor({ questionId, tags: serverTags, allTags }: Pr
             onAdd={tag => save([...tags, tag], `เพิ่มแท็ก #${tag} แล้ว`)}
           />
         )}
-      </div>
+      </div>}
     </>
   )
 }

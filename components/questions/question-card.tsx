@@ -308,7 +308,7 @@ export function QuestionCard({
                 </span>
               )}
               {!readOnly && !setContext && <QuestionSetBadges sets={sets} showEmpty={detailsLoaded} interactive={!pickerContext} />}
-              {readOnly ? (q.tags ?? []).map(tag => <span key={tag} className="text-xs text-muted-foreground">#{tag}</span>) : <QuestionTagsEditor questionId={q.id} tags={q.tags ?? []} allTags={allTags} />}
+              {readOnly ? (q.tags ?? []).map(tag => <span key={tag} className="text-xs text-muted-foreground">#{tag}</span>) : <QuestionTagsEditor questionId={q.id} tags={q.tags ?? []} allTags={allTags} allowAdd={!pickerContext} />}
             </div>
 
             {/* Title */}

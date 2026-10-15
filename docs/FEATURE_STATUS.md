@@ -1,5 +1,11 @@
 # Feature status
 
+### Picker controls — 15 October 2026 (local preview)
+
+- Removed the selection helper sentence from the add-from-bank dialog. Picker cards hide the add-tag button while retaining existing tags; bank cards keep tag editing.
+- Added select-all for the folder picker. It selects/deselects matching results only, preserves picks outside the current filter, avoids duplicate IDs, shows an indeterminate state for partial selections, and disables itself for empty results. Changes remain staged until confirmation.
+- Synthetic local fixture verified clearing all nine picks, selecting the one easy result, and retaining eight hidden picks after deselecting that filtered result. Existing tags remain, the helper/add-tag button are absent in the dialog, bank add-tag buttons remain, and the dialog fits 390px. TypeScript, token lint, isolated webpack production build and Next MCP passed. No migration, external persistence test, or full unit suite; local-only, not pushed/deployed.
+
 ### ย่อแถบด้านบนคลังฝึกและย้ายคำแนะนำไป Tooltip — 15 ตุลาคม 2026 (local preview)
 
 - ลดปุ่มค้นหา/ดูข้อที่ปักไว้/สร้างแบบฝึกหัดเป็น size sm, ลดความสูง header/แถบเลือกและช่องว่าง; ย้าย label ค้นหาเป็น placeholder “ค้นหาชื่อหรือเนื้อหาโจทย์” กับ “ค้นหาแท็ก” โดยคง accessible label, ลบ helper จำนวนแท็กและแถวจำนวนผลทั้งหมด คงขีดจำกัดการค้นหาและปุ่มล้างตัวกรองตามเดิม

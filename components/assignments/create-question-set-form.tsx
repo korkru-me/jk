@@ -28,7 +28,7 @@ import { TeamShareChips } from '@/components/questions/general-info-section'
 import { QuestionPicker } from '@/components/assignments/question-picker'
 import { SetStructurePanel } from '@/components/questions/set-structure-panel'
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose,
 } from '@/components/ui/dialog'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { normalizeSetSections, type QuestionSetSection } from '@/lib/question-set-sections'
@@ -533,9 +533,6 @@ export function CreateQuestionSetForm({
         <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>เพิ่มโจทย์จากคลัง</DialogTitle>
-            <DialogDescription>
-              ติ๊กเพื่อเลือก แล้วกดยืนยันด้านล่าง — ยังไม่มีอะไรเปลี่ยนจนกว่าจะกดยืนยัน
-            </DialogDescription>
           </DialogHeader>
 
           <QuestionPicker
@@ -543,6 +540,7 @@ export function CreateQuestionSetForm({
             selectedIds={draftIds}
             baselineIds={selectedIds}
             onToggle={toggleDraft}
+            onSelectionChange={setDraftIds}
             search={search}
             onSearchChange={setSearch}
             diffFilter={diffFilter}

@@ -21,6 +21,8 @@ interface Props {
   questions: AssignmentQuestionOption[]
   selectedIds: string[]
   onToggle: (id: string) => void
+  /** Enables bulk selection of matching questions while retaining hidden picks. */
+  onSelectionChange?: (ids: string[]) => void
   search: string
   onSearchChange: (v: string) => void
   diffFilter: string
@@ -56,7 +58,7 @@ interface Props {
 }
 
 export function QuestionPicker({
-  questions, selectedIds, onToggle, search, onSearchChange, diffFilter, onDiffFilterChange,
+  questions, selectedIds, onToggle, onSelectionChange, search, onSearchChange, diffFilter, onDiffFilterChange,
   title = 'เลือกโจทย์', toolbar, banner, showSelectedFooter = true, showHeader = true, surface = 'card',
   baselineIds, collectionNoun = 'แฟ้ม', loadPreviewQuestions, initialCardData,
 }: Props) {
@@ -80,6 +82,17 @@ export function QuestionPicker({
   // Title, body text and tags, word by word — see lib/question-search.
   const filteredQs = filterQuestions(questions, { search, difficulty: diffFilter })
   const hasFilters = search.trim().length > 0 || diffFilter !== 'all'
+  const selectedSet = new Set(selectedIds)
+  const matchingSelectedCount = filteredQs.filter(q => selectedSet.has(q.id)).length
+  const allMatchingSelected = filteredQs.length > 0 && matchingSelectedCount === filteredQs.length
+
+  function toggleAllMatching() {
+    if (!onSelectionChange) return
+    const matchingIds = new Set(filteredQs.map(q => q.id))
+    onSelectionChange(allMatchingSelected
+      ? selectedIds.filter(id => !matchingIds.has(id))
+      : [...selectedIds, ...filteredQs.filter(q => !selectedSet.has(q.id)).map(q => q.id)])
+  }
 
   function clearFilters() {
     onSearchChange('')
@@ -274,6 +287,23 @@ export function QuestionPicker({
         <p className="text-xs text-muted-foreground">
           พบ {filteredQs.length} ข้อ จากทั้งหมด {questions.length} ข้อ
         </p>
+      )}
+
+      {onSelectionChange && (
+        <label className="flex min-h-11 w-fit cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={allMatchingSelected}
+            ref={node => {
+              if (node) node.indeterminate = matchingSelectedCount > 0 && !allMatchingSelected
+            }}
+            onChange={toggleAllMatching}
+            disabled={filteredQs.length === 0}
+            aria-label={hasFilters ? 'เลือกทุกข้อที่ตรงกับตัวกรอง' : 'เลือกทุกข้อ'}
+            className="shrink-0 accent-primary"
+          />
+          <span>เลือกทุกข้อ{hasFilters ? 'ที่ตรงกับตัวกรอง' : ''} ({filteredQs.length} ข้อ)</span>
+        </label>
       )}
 
       <div ref={listRef} className="flex max-h-96 flex-col gap-2 overflow-y-auto p-1">

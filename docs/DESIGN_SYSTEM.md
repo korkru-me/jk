@@ -1,5 +1,9 @@
 # Brand, language และ UI rules
 
+## Folder picker controls — 15 October 2026
+
+The add-from-bank dialog omits its selection helper sentence and add-tag button while retaining existing tag chips. Its select-all checkbox sits above the list and operates on current search/difficulty results, preserving hidden picks, showing partial selection, and disabling itself for empty results. Confirmation still applies the staged selection. Bank cards retain add-tag controls.
+
 ## แถบด้านบนคลังฝึกแบบกระชับ — 15 ตุลาคม 2026
 
 ช่องค้นหาใช้ placeholder “ค้นหาชื่อหรือเนื้อหาโจทย์” และ “ค้นหาแท็ก” พร้อม aria-label เดียวกัน ไม่มี label หรือคำแนะนำจำนวนแท็กซ้ำด้านนอก ปุ่มค้นหา/ดูข้อที่ปักไว้/สร้างแบบฝึกหัดใช้ size sm และแถบเลือกใช้ min-h-7 บน desktop; pointer-coarse คงพื้นที่กด 44px. ข้อความวิธีสร้างและวิธีนับความคืบหน้าอยู่ใน Tooltip ของหัวข้อ “แบบฝึกหัดของฉัน” พร้อมไอคอน CircleHelp เล็ก เปิดด้วย hover/focus และเชื่อม aria-describedby เฉพาะเมื่อเปิด ไม่มีแถว “พบ … ข้อ” ว่างเพิ่มก่อนการ์ด; ปุ่มล้างตัวกรอง/ดูโจทย์ทั้งหมดแสดงเฉพาะเมื่อจำเป็นตามเดิม
