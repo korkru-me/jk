@@ -1,4 +1,4 @@
-# Current-local production synchronization — 15 October 2026
+# Completed production synchronization — 15 October 2026
 
 ## Source and recovery
 
@@ -38,6 +38,10 @@ The expiry migration schedules closure of overdue existing in-progress rounds as
 - Staging migrations 5–7 were applied through exact SQL files and immediately recorded as their original versions with `migration repair --status applied`; no other history was changed.
 - Authenticated Staging practice gate passed using 8 synthetic accounts/1,000 questions, including private exercise creation/edit/pagination, stale-edit rejection, review pin/search/unpin, peer/outsider/browser-spoof denial and persisted work ordering. Cleanup passed for all fixtures.
 - Fixed the pre-existing React missing-key warning by giving slotted server components stable keys. Fresh Next.js runtime session reports no errors. Final TypeScript/token lint/build passed.
-- Production migrations, worker configuration and production deployment are not complete at this checkpoint.
+- Production received and recorded exactly migrations 1–7; the older SEB backlog remains unapplied. Catalog verification confirms all seven versions, private table boundaries, the avatar bucket, both active cron schedules and the expected Vault entry names.
+- Vercel Production `dpl_3sRNCc2vHgSo5ySJ4J9VKaAXWK8K` / `jk-qhncz7otr-korkru-mes-projects.vercel.app` is READY for merged `master` commit `e1ccfc0da449922fe11564d7a78bedc4b42c6045`, via PR #56. Both `www.korkru.com` and `korkru.com` alias this deployment; the apex returns the expected redirect to www. GitHub Vercel status is success.
+- Public Production verification was read-only: home HTTP 200, current deer/Demo hero, no desktop/mobile overflow or browser errors, and icon bytes match the local source. An unauthenticated worker request returned 401 before database access, confirming the configured route remains protected. No real-account submissions or physical-device tests were performed.
+- The original shared local checkout was synchronized with Production in `2dbece2` and pushed on `codex/student-classroom-cards`. Application/component/library/script trees match Production. It retains the exact original local SEB SQL history file without applying it to Production. The original paused PDF viewer, handoff patch and generated TypeScript config changes are unchanged byte-for-byte. The server-only announcement flag is enabled in its ignored local environment.
+- The new private tables intentionally have RLS with no direct browser policies: anon/authenticated SELECT is revoked, and access is through verified server-only RPCs. Staging peer/outsider/browser-spoof tests and Production catalog checks confirm that boundary.
 
-Do not treat this checkpoint as a completed deployment. Update the rollout and verification results here after each authorized stage.
+Deployment is complete. The intentional exclusions are unfinished native SEB rollout and the previously paused local-only files. Recovery points include the pushed original `0bb51b3`, the pre-release Production `df3ec7f`, and the preserved local working patch/archive. No force push or destructive reset was used.

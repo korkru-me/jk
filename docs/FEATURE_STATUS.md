@@ -1,8 +1,8 @@
 # Feature status
 
-## Production synchronization candidate — 15 October 2026
+## Production synchronization completed — 15 October 2026
 
-Current-local UI is preserved in pushed `0bb51b3`; the release branch merges it with Production compatibility and the completed attempt-expiry work. Fixed stable keys on the slotted student classroom components without changing layout. TypeScript/token lint, 275 files / 3,400 tests and final isolated Webpack build pass; fresh Next runtime reports no errors. Staging personal-exercise/pin/order integration and isolation checks passed using 8 synthetic accounts / 1,000 questions, with cleanup verified. Exact rollout, excluded SEB scope and deployment status are tracked in `docs/PRODUCTION_SYNC_20261015.md`.
+Current-local UI is preserved in pushed `0bb51b3`; the release branch merges it with Production compatibility and the completed attempt-expiry work. Fixed stable keys on the slotted student classroom components without changing layout. TypeScript/token lint, 275 files / 3,400 tests and final isolated Webpack build pass; fresh Next runtime reports no errors. Staging personal-exercise/pin/order integration and isolation checks passed using 8 synthetic accounts / 1,000 questions, with cleanup verified. Production is READY at `master` `e1ccfc0` through PR #56; all seven scoped migrations and worker configuration are applied. Public home/icon and desktop/mobile checks pass, and the active localhost source is synchronized. No real-account submissions or physical-device tests were performed. Exact rollout, intentional SEB exclusions, preserved local files and recovery points are tracked in `docs/PRODUCTION_SYNC_20261015.md`.
 
 ### ปิดรอบเมื่อหมดเวลา — ผ่าน Staging ยังไม่เปิดใน Production (14 ตุลาคม 2026)
 
