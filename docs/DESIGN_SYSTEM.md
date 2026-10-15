@@ -1,5 +1,9 @@
 # Brand, language และ UI rules
 
+## Reuse picker and transfer details - 15 October 2026
+
+The source picker includes exercise, exam and feature-enabled practice libraries with type identities, wrapping long menu titles, and container-based columns at 38rem. AssignmentReuseDetails uses formal Thai and separates transferred content/settings from excluded learner history. It switches to practice-specific details when a library is selected. The guidance explicitly distinguishes references to existing bank questions from cloned questions, retained schedules/access codes from the new SEB quit password, and destination recipients from source roster/history. Missing or unsupported questions require explicit removal before saving; they are never silently dropped.
+
 ## การ์ดงานและรายชื่อติดตามในภาพรวมห้องเรียน — 15 ตุลาคม 2026
 
 หน้าภาพรวมวิชาใช้ TeacherWorkCard/TeacherAssignmentCardContent เดียวกับรายการงานครู รวมสีประเภท แถบสถานะ ข้อมูลโจทย์/เกณฑ์ผ่าน/ความคืบหน้า ปุ่มเลือกกลุ่ม และปุ่มดูในมุมนักเรียน ตรวจให้คะแนน ทำสำเนา เรียงหนึ่งงานต่อแถวตามลำดับเร่งด่วนเดิม ไม่มีการลากจัดลำดับในภาพรวม แทนแถว progress bar และปุ่ม outline ของ UI-103 เดิม ขอบเขต canManage และภาพรวมโฮมรูมคงเดิม

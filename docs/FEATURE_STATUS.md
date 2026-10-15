@@ -1,5 +1,11 @@
 # Feature status
 
+## Cross-classroom practice reuse - 15 October 2026
+
+- The reuse hub now merges paginated practice metadata under the feature flag, ordinary RLS and manageable same-organization classroom scope. Query errors remain distinct from an empty list. Practice selections open /practice/new with destination classroom and source copy parameters.
+- The create page verifies actor, source management, destination management and organization before reading ordered source membership. An explicit content/settings-only copyPreset seeds a new form, including false settings; it never provides an edit id/status or carries learner history. The existing create action/invoker RPC remains the write boundary. Ordinary question RLS still governs new references; managing a source library alone does not permit reuse of another teacher's private questions. Missing/unsupported ids remain selected and block saving until explicitly removed.
+- Formal Thai transfer/exclusion details cover assignment and practice fields, question references, schedules, access codes, recipients and SEB quit passwords. The guarded reuse-work fixture exercises three source types, real URLs, copy settings, unchanged draft creation, denied/missing/error cases and 320/390/1440px. TypeScript, token lint, Webpack build and full Vitest (271 files, 3,407 tests) passed. Picker axe checks passed in light/dark. No migration, external database write or authenticated service integration was performed.
+
 ## การ์ดงานในภาพรวมห้องเรียน — 15 ตุลาคม 2026
 
 - ภาพรวมวิชาใช้ surface/content/category picker ร่วมกับรายการงานครู รวมข้อมูลและปุ่มเดิมครบ เรียงหนึ่งงานต่อแถวและคง urgency/audience/การไม่นับฉบับร่างเดิม การย้ายกลุ่มใช้ action ที่ตรวจ owner/co-teacher manage เดิม พร้อมคงค่าก่อนหน้าเมื่อบันทึกล้มเหลว

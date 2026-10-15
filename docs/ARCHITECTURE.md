@@ -1,5 +1,11 @@
 # Architecture
 
+## Practice reuse through the assignment creation hub - 15 October 2026
+
+The reuse picker merges paginated practice metadata from manageable same-organization classrooms under ordinary RLS and the existing feature flag. Practice choices route to the create page with a source library id. The page rechecks source management and destination access/organization, reads ordered membership, and seeds an explicit content/settings-only copyPreset. Existing initialLibrary edit/lifecycle behavior stays separate. Creation uses the existing validated create action and invoker RPC; no GET creates rows, and no learner history or display grouping is copied.
+
+loadPracticeCopyQuestions reuses the request's actor-scoped bank and queries only missing source ids through ordinary question RLS in bounded chunks. Missing/inaccessible/unsupported ids remain in the source selection with explicit blocking metadata, so library management does not grant reuse of another owner's private questions. No new admin query or answer-bearing DTO crosses the client boundary. Guarded fixtures inject in-memory creation/navigation callbacks; route permission and DTO regressions run without external services.
+
 ## Student subject classroom tabs and deadline alerts — 15 October 2026
 
 StudentClassroomView keeps the verified server projections and passes header/announcement/practice/calendar React nodes into StudentClassroomTabs. The shared grid keeps the classroom header and left-aligned TabsList above one dynamic TabsContent, with the calendar beside the header. One AssignmentList preserves its filters while switching announcements on/off; the tab list stays outside its labelled panel. Native history updates only the tab query and preserves other search/hash values. One initialized timestamp drives both classroomWorkAlertCount and AssignmentList; production ticks locally each minute, and focus/visible/pageshow-persisted refreshes the existing authorized route with a 5-second duplicate-event guard. No polling query, read/dismiss storage or new data boundary is introduced.
