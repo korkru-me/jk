@@ -275,14 +275,14 @@ function Section({
   children: React.ReactNode
 }) {
   return (
-    <Card className="h-full overflow-hidden">
-      <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-border">
-        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+    <Card className="h-full overflow-hidden" data-classroom-panel>
+      <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-border" data-classroom-panel-header>
+        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide" data-classroom-heading>
           {title}
           {note && <span className="ml-2 font-normal normal-case">{note}</span>}
         </h2>
         {actionLabel && onAction && (
-          <Button variant="link" size="sm" className="gap-0.5 px-0" onClick={onAction}>
+          <Button variant="link" size="sm" className="gap-0.5 px-0" onClick={onAction} data-classroom-link>
             {actionLabel} <ChevronRight className="w-3 h-3" />
           </Button>
         )}

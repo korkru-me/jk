@@ -244,7 +244,7 @@ export function StudentAbilityTab({
 
   if (students.length === 0) {
     return (
-      <Card className="py-12 text-center text-sm text-muted-foreground">
+      <Card data-classroom-panel className="py-12 text-center text-sm text-muted-foreground">
         ยังไม่มีนักเรียนในห้องนี้ — แชร์รหัสห้องเรียนหรือลิงก์เชิญจากกรอบข้อมูลด้านบน
       </Card>
     )
@@ -252,7 +252,7 @@ export function StudentAbilityTab({
 
   if (usable.length === 0) {
     return (
-      <Card className="py-12 text-center text-sm text-muted-foreground">
+      <Card data-classroom-panel className="py-12 text-center text-sm text-muted-foreground">
         ยังไม่มีงานที่มอบหมายให้ห้องนี้ — เมื่อนักเรียนเริ่มส่งงาน กราฟจะขึ้นที่นี่
       </Card>
     )
@@ -380,13 +380,13 @@ export function StudentAbilityTab({
       )}
 
       {selected.length === 0 ? (
-        <Card edge="dashed" className="flex flex-col items-center gap-3 py-12 text-center">
+        <Card data-classroom-panel edge="dashed" className="flex flex-col items-center gap-3 py-12 text-center">
           <ListChecks aria-hidden="true" className="size-8 text-muted-foreground/50" />
           <p className="text-sm text-muted-foreground">ยังไม่ได้เลือกงาน — เลือกงานที่อยากเปรียบเทียบจากปุ่ม &ldquo;เลือกงาน&rdquo; ด้านบน</p>
           <Button size="sm" onClick={() => changeSelection(usable.map(a => a.id))}>เลือกทุกงาน</Button>
         </Card>
       ) : visible.length === 0 ? (
-        <Card className="flex flex-col items-center gap-3 py-12 text-center">
+        <Card data-classroom-panel className="flex flex-col items-center gap-3 py-12 text-center">
           <p className="text-sm text-muted-foreground">ไม่พบนักเรียนที่ตรงกับ &ldquo;{query}&rdquo;</p>
           <Button size="sm" variant="outline" onClick={() => { setQuery(''); setPage(1) }}>ล้างคำค้น</Button>
         </Card>
@@ -482,7 +482,7 @@ function StudentCard({ student, profile, ability, data, chart, total, onOpen, bu
   const submitted = ability?.submittedCount ?? 0
 
   return (
-    <Card interactive padding="sm" className="relative h-full">
+    <Card data-classroom-panel interactive padding="sm" className="relative h-full">
       <div className="flex items-start gap-2.5">
         <span
           aria-hidden="true"

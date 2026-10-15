@@ -63,6 +63,9 @@ export function AssignmentCreationMenu({
           <Button
             type="button"
             variant={variant}
+            data-classroom-action={variant === 'default' || undefined}
+            data-classroom-navigation={variant === 'primaryGhost' || undefined}
+            data-classroom-selected={active}
             size={size}
             className={cn('pl-3.5 pr-2.5 transition-colors has-data-[icon=inline-start]:pl-3.5 [&_svg:not([class*="size-"])]:size-4', className)}
             aria-label={label}

@@ -1,5 +1,9 @@
 # Architecture
 
+## Classroom interior theme — 15 October 2026
+
+`components/classrooms/classroom-theme.tsx` maps the existing validated cover id to the same nine semantic tokens as COVER_PRESETS; no metadata format, database query, server action, or permission changes. A CSS module applies colour only to explicit data-classroom-* decoration hooks. Teacher detail, its separately rendered contextual sidebar, subject student view, and homeroom student view each mount the scope. Category, urgency and grading palettes are independent. The optional trusted navigationPathname on ClassroomDetailClient keeps the guarded synthetic classroom-themes fixture on its own path; production defaults to /classrooms/:id and retains its existing routing/authorization.
+
 ## Question-set colour flow — 15 October 2026
 
 CreateQuestionSetForm shares ClassroomCoverThemePicker with classrooms. Description text and theme are separate form fields, serialized together by question-set server actions using the existing description column. Theme changes participate in the existing debounced, serialized save queue. An automatic selection in edit mode resolves once in the editor, so subsequent rename or structural saves retain the same colour. Dashboard summaries now include description, allowing the same themed QuestionSetCard on home and the set library; per-set theme variables decorate only folder surfaces/text/icons.

@@ -300,7 +300,7 @@ export function ClassroomStream({
       )}
 
       <div className="flex justify-end">
-        <Button size="sm" className="gap-1.5" disabled={isPending || !canSubmit} onClick={submitPost}>
+        <Button size="sm" className="gap-1.5" disabled={isPending || !canSubmit} onClick={submitPost} data-classroom-action>
           <Send className="w-3.5 h-3.5" /> โพสต์ประกาศ
         </Button>
       </div>
@@ -332,10 +332,10 @@ export function ClassroomStream({
 
   if (isPanel) {
     return (
-      <Card className="overflow-hidden">
+      <Card className="overflow-hidden" data-classroom-panel>
         {/* The board has no tab of its own on either side, so it says what it is. */}
-        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border">
-          <h2 className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border" data-classroom-panel-header>
+          <h2 className="flex items-center gap-1.5 text-sm font-semibold text-foreground" data-classroom-heading>
             <Megaphone className="w-3.5 h-3.5" /> {title}
           </h2>
           <div className="flex shrink-0 items-center gap-3">
@@ -347,6 +347,7 @@ export function ClassroomStream({
                 type="button"
                 size="sm"
                 variant={composerOpen ? 'ghost' : 'default'}
+                data-classroom-action={!composerOpen || undefined}
                 aria-expanded={composerOpen}
                 onClick={() => setComposerOpen(open => !open)}
               >
@@ -675,12 +676,13 @@ function PostCard({
       ref={cardRef}
       padding="md"
       elevation={isPanel ? 'sm' : 'none'}
+      data-classroom-pinned={post.pinned}
       className={cn(
         post.pinned && 'border-primary/30 bg-primary/5',
       )}
     >
       <div className="flex items-start gap-3">
-        <div className={cn(
+        <div data-classroom-icon className={cn(
           'rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold shrink-0',
           isPanel ? 'size-10 text-sm' : 'size-9 text-sm',
         )}>
@@ -690,7 +692,7 @@ function PostCard({
           <div className="flex items-center gap-2 flex-wrap">
             <p className="text-base font-semibold">{authorName}</p>
             {post.pinned && (
-              <Badge variant="outline" className="gap-1 text-primary border-primary/20">
+              <Badge variant="outline" className="gap-1 text-primary border-primary/20" data-classroom-heading data-classroom-panel>
                 <Pin className="w-3 h-3" /> ปักหมุด
               </Badge>
             )}
@@ -711,6 +713,7 @@ function PostCard({
               label={post.pinned ? 'ยกเลิกปักหมุด' : 'ปักหมุดไว้บนสุด'}
               size="sm"
               className={post.pinned ? 'text-primary' : ''}
+              data-classroom-link={post.pinned || undefined}
             >
               {post.pinned ? <PinOff /> : <Pin />}
             </IconButton>

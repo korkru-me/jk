@@ -1,0 +1,63 @@
+.scope {
+  --classroom-ink: color-mix(in oklab, var(--classroom-accent) 60%, var(--foreground));
+  --classroom-edge: color-mix(in oklab, var(--classroom-accent) 25%, var(--border));
+  --classroom-wash: color-mix(in oklab, var(--classroom-accent) 6%, var(--card));
+}
+
+/* Opt-in surfaces keep assignment/category/status colours independent. */
+.scope [data-classroom-panel] {
+  border-color: var(--classroom-edge);
+  --tw-ring-color: var(--classroom-edge);
+}
+
+.scope [data-classroom-panel-header] {
+  background-color: var(--classroom-wash);
+  border-color: var(--classroom-edge);
+  --muted-foreground: color-mix(in oklab, var(--foreground) 75%, var(--card));
+}
+
+.scope [data-classroom-table-header] th {
+  background-color: var(--classroom-wash);
+  border-color: var(--classroom-edge);
+  color: var(--classroom-ink);
+}
+
+.scope [data-classroom-table-header] [data-slot="button"] {
+  color: var(--classroom-ink);
+}
+
+.scope [data-classroom-heading],
+.scope [data-classroom-link] {
+  color: var(--classroom-ink);
+}
+
+.scope [data-classroom-icon] {
+  color: var(--classroom-ink);
+  background: color-mix(in oklab, var(--classroom-accent) 12%, var(--card));
+}
+
+.scope [data-classroom-action] {
+  color: var(--card);
+  background-color: var(--classroom-ink);
+  border-color: var(--classroom-ink);
+}
+
+.scope [data-classroom-action]:hover:not(:disabled) {
+  background-color: color-mix(in oklab, var(--classroom-ink) 88%, var(--foreground));
+}
+
+.scope [data-classroom-navigation]:hover,
+.scope [data-classroom-selected="true"] {
+  color: var(--classroom-ink);
+  background-color: color-mix(in oklab, var(--classroom-accent) 10%, var(--card));
+}
+
+.scope [data-classroom-selected="true"] {
+  border-color: var(--classroom-edge);
+}
+
+.scope [data-classroom-pinned="true"] {
+  border-color: var(--classroom-edge);
+  background-color: var(--classroom-wash);
+  --muted-foreground: color-mix(in oklab, var(--foreground) 75%, var(--card));
+}

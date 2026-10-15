@@ -1,5 +1,12 @@
 # Feature status
 
+## ธีมสีภายในห้องเรียน — 15 ตุลาคม 2026 (local only)
+
+- ตกแต่งหัวข้อ/ไอคอน ขอบและพื้นหัวกรอบ ประกาศปักหมุด avatar ปุ่มหลัก และเมนูห้องเรียนตาม cover เดิม 9 สี รวมกรอบรายชื่อ คะแนน ผู้ช่วยสอน ศักยภาพ และโฮมรูม มุมมองนักเรียนใช้ scope เดียวกัน ไม่เปลี่ยนสีสถานะ/คะแนน/หมวดที่เลือก ไม่เพิ่มความสูงหรือ spacing
+- ตรวจ guarded fixture /exam-screen-lab/classroom-themes และ student-classroom: 1440/390/320px ไม่ล้น สลับรายชื่อ คะแนน ผู้ช่วยสอน งาน และภาพรวมได้ในเส้นทางจำลอง วัดกรอบเปิด/ปิด scope ได้ความสูงต่าง 0px ตรวจทั้ง 9 สีในสว่าง/มืด: คอนทราสต์หัวข้อสว่างต่ำสุด 5.25:1 และปุ่ม 5.45:1; มืดหัวข้อต่ำสุด 7.38:1 และปุ่ม 7.82:1
+- TypeScript ทั้ง isolated/main, lint:tokens, Next MCP compilation/runtime ผ่าน Production build แบบ webpack ผ่าน; Turbopack build ติดข้อจำกัดเครื่องเมื่อ subprocess ของ PostCSS เปิดพอร์ต (Operation not permitted) หลังครั้งแรกดาวน์โหลด Google Fonts ไม่ได้ ใช้ dist แยกจาก dev ทุกครั้ง Axe scoped หลังแก้ข้อความรองไม่พบ violations ในสว่าง/มืด แต่มี incomplete เรื่องภาพปก/ARIA เดิม จึงไม่อ้างรับรอง accessibility ทั้งหน้า
+- ไม่รัน unit suite เพราะไม่มี lib/ตรรกะคำนวณเปลี่ยน ไม่ทดสอบข้อมูลจริง/บริการภายนอก ไม่มี migration ไม่ push/deploy ตามคำสั่งเจ้าของ นำ source ไป main checkout โดยรักษา column widths และ practice-library props ใหม่ของงานอื่นไว้
+
 ## ปุ่มบันทึกข้อมูลแฟ้มโจทย์ — 15 ตุลาคม 2026
 
 เปลี่ยนคำสั่ง “เสร็จสิ้น” เป็น “บันทึก” พร้อมไอคอนและกรอบ outline วางล่างขวาใน Card ข้อมูลแฟ้ม ใช้ finishEditingInfo/คิว autosave และ validation เดิม ไม่เปลี่ยน server action หรือ schema หน้าสร้างยังใช้ปุ่มสร้างเดิม ตรวจ fixture ข้อมูลจำลองที่ 1440/390/320px: ปุ่มอยู่ในกรอบ ไม่มี overflow, พื้นที่กด 44px; กดบันทึกชื่อและเปิดซ้ำได้ TypeScript, lint:tokens, Next compilation/runtime errors ผ่าน ไม่รัน build/unit suite ซ้ำเพราะแก้เฉพาะ copy/ตำแหน่งปุ่ม และไม่ได้ทดสอบฐานข้อมูลภายนอก ไม่มี migration งานเก็บเฉพาะในเครื่องตามเจ้าของสั่ง

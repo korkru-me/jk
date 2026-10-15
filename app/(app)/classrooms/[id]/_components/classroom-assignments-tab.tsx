@@ -303,6 +303,7 @@ function AssignmentCategoryCard({
       role="group"
       aria-label={`กลุ่มงาน ${category?.name ?? 'ยังไม่จัดกลุ่ม'} ${assignmentCount} งาน`}
       data-assignment-category-id={category?.id ?? UNCATEGORIZED_ASSIGNMENT_CATEGORY_VALUE}
+      data-classroom-panel={!preset || undefined}
       className={cn(
         'relative overflow-hidden transition-shadow',
         isDropTarget && '[&_[data-assignment-row]]:bg-transparent',
@@ -319,7 +320,7 @@ function AssignmentCategoryCard({
       )}
       <div className="relative">
         {showHeader && (
-          <div className={cn(
+          <div data-classroom-panel-header={!preset || undefined} className={cn(
             'flex items-center gap-2 border-b px-4 py-2.5',
             preset?.surface ?? 'bg-muted/40',
           )}>

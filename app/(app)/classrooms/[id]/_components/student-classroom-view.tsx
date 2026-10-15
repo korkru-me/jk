@@ -1,3 +1,5 @@
+import { ClassroomTheme } from '@/components/classrooms/classroom-theme'
+import { parseDescription } from '../../_components/classroom-meta'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import { ClassroomStream } from './classroom-stream'
@@ -33,7 +35,7 @@ export function StudentClassroomView({ classroom, teacherName, studentCount, ass
   const calendarEvents = classroomCalendarEvents(assignments, classroom.name).map(event => ({ ...event, href: assignmentHrefs?.[event.id] }))
 
   return (
-    <div className="student-learning-stage @container/subject flex w-full min-w-0 flex-col gap-3 [--student-content-width:calc(100%-15rem)]" data-student-subject>
+    <ClassroomTheme cover={parseDescription(classroom.description).cover} className="student-learning-stage @container/subject flex w-full min-w-0 flex-col gap-3 [--student-content-width:calc(100%-15rem)]" data-student-subject>
       {previewLabel && <p className="text-xs text-muted-foreground">{previewLabel}</p>}
       <Link
         href={backHref}
@@ -56,8 +58,8 @@ export function StudentClassroomView({ classroom, teacherName, studentCount, ass
         maxHeightClass="max-h-[680px]"
         title="ประกาศจากครู"
         trackSeen={trackSeen}
-      /> : <Card padding="sm" className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold">ประกาศจากครู</h2>
+      /> : <Card data-classroom-panel padding="sm" className="flex flex-wrap items-center justify-between gap-2">
+        <h2 data-classroom-heading className="text-sm font-semibold">ประกาศจากครู</h2>
         <p className="text-xs text-muted-foreground">ยังไม่มีประกาศ</p>
       </Card>}
 
@@ -65,7 +67,7 @@ export function StudentClassroomView({ classroom, teacherName, studentCount, ass
 
       {/* Assignments */}
       <section aria-labelledby="classroom-work-heading" className="flex min-w-0 flex-col gap-2.5">
-        <h2 id="classroom-work-heading" className="font-semibold">งานที่มอบหมายในห้องนี้</h2>
+        <h2 data-classroom-heading id="classroom-work-heading" className="font-semibold">งานที่มอบหมายในห้องนี้</h2>
         {assignments.length === 0 ? (
           <Card edge="dashed" padding="md" className="text-center">
             <p className="text-3xl mb-3">📝</p>
@@ -81,6 +83,6 @@ export function StudentClassroomView({ classroom, teacherName, studentCount, ass
         <AssignmentCalendar events={calendarEvents} initialNow={initialNow} scopeLabel={classroom.name} />
       </aside>
       </div>
-    </div>
+    </ClassroomTheme>
   )
 }
