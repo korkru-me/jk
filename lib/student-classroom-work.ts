@@ -1,6 +1,15 @@
 import { groupAssignmentsByCategory, type AssignmentCategory } from './assignment-categories'
 import { isCompleted, type StudentAssignmentRow } from '@/app/(app)/classrooms/[id]/_components/assignment-status'
 import type { CalendarEvent } from '@/app/(app)/dashboard/_components/assignment-calendar'
+import { studentWorkSeverity } from './student-work-status'
+
+/** Count whole-classroom deadlines before presentation filters; opening a task never dismisses it. */
+export function classroomWorkAlertCount(assignments: readonly StudentAssignmentRow[], now: number): number {
+  return new Set(assignments.filter(assignment => {
+    const severity = studentWorkSeverity(assignment.end_at, isCompleted(assignment), now)
+    return severity === 'soon' || severity === 'overdue'
+  }).map(assignment => assignment.id)).size
+}
 
 export function classroomCalendarEvents(assignments: readonly StudentAssignmentRow[], classroomName: string): CalendarEvent[] {
   return assignments.filter(a => a.end_at && Number.isFinite(Date.parse(a.end_at))).map(a => ({

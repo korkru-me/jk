@@ -1,7 +1,5 @@
-import Link from 'next/link'
-import { ChevronLeft } from 'lucide-react'
 import { ClassroomStream } from './classroom-stream'
-import { AssignmentList } from './assignment-list'
+import { StudentClassroomTabs } from './student-classroom-tabs'
 import type { StudentAssignmentRow } from './assignment-status'
 import type { Classroom, ClassroomPost } from '@/lib/types'
 import type { AssignmentCategory } from '@/lib/assignment-categories'
@@ -35,52 +33,22 @@ export function StudentClassroomView({ classroom, teacherName, studentCount, ass
   return (
     <div className="student-learning-stage @container/subject flex w-full min-w-0 flex-col gap-3" data-student-subject>
       {previewLabel && <p className="text-xs text-muted-foreground">{previewLabel}</p>}
-      <Link
-        href={backHref}
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <ChevronLeft className="size-4" /> ห้องเรียนของฉัน
-      </Link>
-
-      <div className="grid items-start gap-4 @min-[46rem]/subject:grid-cols-[minmax(0,1fr)_14rem] @min-[64rem]/subject:grid-cols-[minmax(0,1fr)_16rem]" data-student-subject-grid>
-      <div className="flex min-w-0 flex-col gap-4" data-student-subject-content>
-      <StudentClassroomHeader classroom={classroom} teacherName={teacherName} studentCount={studentCount} />
-
-      {/* Stream — bounded like the teacher's board, so a term of announcements
-          never pushes the งาน a student came here to do off the screen. */}
-      {posts.length > 0 ? <ClassroomStream
-        classroomId={classroom.id}
-        canPost={false}
-        initialPosts={posts}
-        variant="panel"
-        maxHeightClass="max-h-[680px]"
-        title="ประกาศจากครู"
-        trackSeen={trackSeen}
-      /> : <Card padding="sm" className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold">ประกาศจากครู</h2>
-        <p className="text-xs text-muted-foreground">ยังไม่มีประกาศ</p>
-      </Card>}
-
-      {practiceLibraries && <ClassroomPracticeLibraries result={practiceLibraries} studentView classroomDescription={classroom.description} />}
-
-      {/* Assignments */}
-      <section aria-labelledby="classroom-work-heading" className="flex min-w-0 flex-col gap-2.5">
-        <h2 id="classroom-work-heading" className="font-semibold">งานที่มอบหมายในห้องนี้</h2>
-        {assignments.length === 0 ? (
-          <Card edge="dashed" padding="md" className="text-center">
-            <p className="text-3xl mb-3">📝</p>
-            <p className="font-semibold">ยังไม่มีงานที่มอบหมาย</p>
-            <p className="text-sm text-muted-foreground mt-1">ครูจะมอบหมายแบบฝึกหัดหรือข้อสอบให้ที่นี่</p>
-          </Card>
+      <StudentClassroomTabs assignments={assignments} categories={categories} classroomDescription={classroom.description}
+        classroomName={classroom.name} backHref={backHref} assignmentHrefs={assignmentHrefs}
+        initialNow={initialNow ?? new Date().toISOString()} liveTime={initialNow === undefined}
+        header={<StudentClassroomHeader classroom={classroom} teacherName={teacherName} studentCount={studentCount} />}
+        calendar={<AssignmentCalendar events={calendarEvents} initialNow={initialNow} scopeLabel={classroom.name} />}
+        practiceLibraries={practiceLibraries ? <ClassroomPracticeLibraries result={practiceLibraries} studentView classroomDescription={classroom.description} /> : null}
+        announcements={posts.length > 0 ? (
+          <ClassroomStream classroomId={classroom.id} canPost={false} initialPosts={posts}
+            variant="panel" maxHeightClass="max-h-[680px]" title="ประกาศจากครู" trackSeen={trackSeen} />
         ) : (
-          <AssignmentList assignments={assignments} categories={categories} classroomDescription={classroom.description} assignmentHrefs={assignmentHrefs} initialNow={initialNow} />
+          <Card padding="sm" className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold">ประกาศจากครู</h2>
+            <p className="text-xs text-muted-foreground">ยังไม่มีประกาศ</p>
+          </Card>
         )}
-      </section>
-      </div>
-      <aside aria-label={`ปฏิทินงาน ${classroom.name}`} className="min-w-0 self-start @min-[46rem]/subject:sticky @min-[46rem]/subject:top-0" data-sticky-subject-calendar>
-        <AssignmentCalendar events={calendarEvents} initialNow={initialNow} scopeLabel={classroom.name} />
-      </aside>
-      </div>
+      />
     </div>
   )
 }

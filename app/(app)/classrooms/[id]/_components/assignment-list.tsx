@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ArrowRight, BookOpen, CheckCircle2, Clock, Folder, Repeat, SlidersHorizontal, Target } from 'lucide-react'
+import { ArrowRight, BookOpen, CheckCircle2, CircleAlert, Clock, Folder, Repeat, SlidersHorizontal, Target } from 'lucide-react'
 import { TYPE_CFG } from '@/lib/assignment-display'
 import { cn } from '@/lib/utils'
 import { assignmentSizeLabel } from '@/lib/assignment-size-label'
@@ -37,17 +37,18 @@ function dueInfo(endAt: string | null, now: number) {
   return { label: `ส่ง ${formatThaiDate(endAt, { dateStyle: 'short' })}`, variant: studentWorkSeverity(endAt, false, now) === 'soon' ? 'statusWarning' as const : 'outline' as const }
 }
 
-export function AssignmentList({ assignments, categories, classroomDescription, assignmentHrefs, initialNow }: {
+export function AssignmentList({ assignments, categories, classroomDescription, assignmentHrefs, initialNow, now: sharedNow }: {
   assignments: StudentAssignmentRow[]
   categories: AssignmentCategory[]
   classroomDescription?: string | null
   /** Synthetic local previews can route to a read-only fixture detail. */
   assignmentHrefs?: Record<string, string>
   initialNow?: string
+  now?: number
 }) {
   const [statusFilter, setStatusFilter] = useState<StatusFilterKey>('all')
   const [typeFilter, setTypeFilter] = useState<TypeFilterKey>('all')
-  const now = initialNow ? Date.parse(initialNow) : Date.now()
+  const now = sharedNow ?? (initialNow ? Date.parse(initialNow) : Date.now())
   const cover = coverOf(parseDescription(classroomDescription ?? null))
   const pending = assignments.filter(a => !isCompleted(a))
   const done = assignments.filter(isCompleted)
@@ -150,7 +151,11 @@ function StudentAssignmentCard({ assignment: a, cover, now, href }: { assignment
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
             {completed ? <Badge variant="statusSuccess"><CheckCircle2 aria-hidden="true" />ส่งแล้ว</Badge> : state.statusLabel && <Badge variant={state.statusVariant}>{state.statusLabel}</Badge>}
-            {!completed && <Badge variant={due.variant} title={a.end_at ? formatThaiDateTime(a.end_at) : undefined}><Clock aria-hidden="true" />{due.label}</Badge>}
+            {!completed && <Badge variant={due.variant} title={a.end_at ? formatThaiDateTime(a.end_at) : undefined}>
+              {severity === 'soon' || severity === 'overdue'
+                ? <CircleAlert aria-hidden="true" data-work-deadline-alert={severity} />
+                : <Clock aria-hidden="true" />}{due.label}
+            </Badge>}
             {state.score && <span className="text-xs font-semibold">{a.has_in_progress ? 'คะแนนเดิม ' : ''}{state.score.total}/{state.score.max}</span>}
             {state.finished && state.canShowScore && !state.score && <span className={cn('text-xs', completed ? 'text-foreground/75' : 'text-muted-foreground')}>รอครูตรวจ</span>}
             {state.canRetry && <span className="text-xs font-medium text-foreground/75">{a.retry_scope === 'wrong_only' ? 'แก้ข้อที่ยังไม่เต็ม' : 'ลองใหม่ได้'}{state.remaining != null ? ` · เหลือ ${state.remaining} ครั้ง` : ''}</span>}

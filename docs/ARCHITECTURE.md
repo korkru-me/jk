@@ -1,5 +1,11 @@
 # Architecture
 
+## Student subject classroom tabs and deadline alerts — 15 October 2026
+
+StudentClassroomView keeps the verified server projections and passes header/announcement/practice/calendar React nodes into StudentClassroomTabs. The client renders one dynamic TabsContent and one AssignmentList, preserving its filters while switching announcements on/off. Native history updates only the tab query and preserves other search/hash values. One initialized timestamp drives both classroomWorkAlertCount and AssignmentList; production ticks locally each minute, and focus/visible/pageshow-persisted refreshes the existing authorized route with a 5-second duplicate-event guard. No polling query, read/dismiss storage or new data boundary is introduced.
+
+classroomWorkAlertCount counts distinct IDs before list filters and reuses studentWorkSeverity plus isCompleted, so a mere click or failed mastery/streak does not clear a warning. The existing submission/completion server projection remains authoritative. The environment-gated student-classroom fixture has subject posts and synthetic completed/empty states; its completion link changes only fixture props and never starts/submits real work. Subject classroom presentation changes only; the separate homeroom roster/calendar page keeps its existing domain.
+
 ## Student dashboard welcome composition — 15 October 2026
 
 StudentDashboard renders the server-side StudentDashboardWelcome above StudentView inside the existing classrooms anchor. The welcome reuses JoinClassroomForm with the same initial code and Server Action; StudentView's optional showJoinForm defaults true and is false only when the parent hosts that form. There is one form/state boundary, no additional data read, authentication check or mutation path. BRAND_MARK_URL is a decorative CSS mask. The environment-gated student-dashboard fixture adds a synthetic long-name case; its join action still returns mock feedback without database access. Teacher dashboard files and behavior are unchanged by this task.

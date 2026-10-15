@@ -1,5 +1,13 @@
 # Feature status
 
+## ห้องเรียนนักเรียนแยกภาพรวมและงาน พร้อมเตือนกำหนดส่ง — 15 ตุลาคม 2026 (local only)
+
+- ห้องรายวิชาใช้ StudentClassroomTabs: “ภาพรวม” แสดงหัวห้อง ประกาศ คลังฝึก งานและปฏิทินเดิม; “งานที่มอบหมาย” ใช้เนื้อหาเดียวกันโดยไม่แสดงประกาศ ใช้ panel/list instance เดียว ตัวกรองจึงคงอยู่เมื่อสลับหน้า เก็บแท็บใน ?tab=assignments ด้วย native history ไม่ reload หรือ query งานใหม่เมื่อเปลี่ยนแท็บ; Back/reload และ back query ยังทำงาน
+- Badge บนแท็บงานนับ unique assignment ที่ยังไม่ complete และใกล้กำหนดภายใน 48 ชั่วโมงหรือเลยกำหนด ตาม studentWorkSeverity/isCompleted เดิม ไม่หายจากการเปิดงาน กำลังทำ หรือเปลี่ยนตัวกรอง งาน threshold/streak ต้องผ่าน completion gate เช่นเดิม เมื่อไม่มีงานเตือนซ่อน badge และ CircleAlert แทนนาฬิกาเฉพาะป้ายกำหนดของงานที่เตือนทั้งสองแท็บ
+- Tab counter กับการ์ดใช้ now เดียวกัน clock production อัปเดตทุกนาที/กลับมาเห็นหน้า และ refresh verified route เมื่อ focus/visibility return/bfcache โดยไม่สร้าง local read/dismiss flag หรือเก็บ counter ใหม่ ไม่แก้ query, authorization, เวลา attempt หรือการคิดคะแนน
+- Guarded synthetic browser ตรวจ overview มีประกาศ/work ไม่มีประกาศ, filters คงเดิม, URL/Back/keyboard/reload, เปิดงาน count=3 ยังเท่าเดิม แล้วจำลอง complete หนึ่งงานเหลือ 2 และ warning หาย, complete ทุกงาน/empty เหลือ 0, คลังฝึกยังอยู่ ตรวจ 320/900/1440px ไม่ล้น แถบ mobile ยุบ 92.8→44px โดยใช้ปุ่มย้อนกลับไอคอนและ tab padding กระชับ การ์ดตัวอย่างสูง 144.48px เท่าเดิมก่อนเพิ่มไอคอน
+- TypeScript, lint:tokens, 3,399 tests/269 files, isolated webpack build และ Next compilation/runtime ผ่าน React ยืนยัน StudentClassroomTabs/AssignmentList ครั้งเดียว Scoped axe light/dark ไม่พบ violation มี contrast incomplete จึงตรวจภาพร่วม ยังไม่ได้ทดสอบบัญชีจริง การส่งงาน/refresh completion ผ่านฐานจริง หรือ hosted UAT ไม่มี migration/database write/push/deploy งานเก็บ local
+
 ## กรอบต้อนรับนักเรียนรวมช่องเข้าห้องเรียน — 15 ตุลาคม 2026 (local only)
 
 - StudentDashboardWelcome รวมคำทักทาย ชื่อนักเรียน และ JoinClassroomForm เดิมใน Card เดียว พื้น gradient อ่อนและลายกวางจาก BRAND_MARK_URL เดียวกับครู หัวข้อ “ห้องเรียนของฉัน”/จำนวนห้องอยู่ภายนอกใต้กรอบและเหนือกริด ไม่เพิ่มคำอธิบายหรือกรอบฟอร์มซ้อน ปฏิทินยังใช้คอลัมน์ขวาเดิม
