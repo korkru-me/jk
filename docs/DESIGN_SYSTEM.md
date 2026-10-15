@@ -1,5 +1,9 @@
 # Brand, language และ UI rules
 
+## Picker card interaction and density — 15 October 2026
+
+In picker mode, the card frame/content/title toggles selection and only the eye action opens preview. Nested controls and their overlays act independently; the title button exposes its selected state for keyboard use. The plain picker uses gap-2; select-all uses min-h-6 on desktop and min-h-11 for coarse pointers, avoiding a tall empty band above the questions.
+
 ## Folder picker controls — 15 October 2026
 
 The add-from-bank dialog omits its selection helper sentence and add-tag button while retaining existing tag chips. Its select-all checkbox sits above the list and operates on current search/difficulty results, preserving hidden picks, showing partial selection, and disabling itself for empty results. Confirmation still applies the staged selection. Bank cards retain add-tag controls.

@@ -1,5 +1,11 @@
 # Feature status
 
+### Picker card selection and compact select-all — 15 October 2026 (local preview)
+
+- Clicking a picker card's frame, metadata, excerpt or title toggles its selection; preview opens from the eye button only. Checkbox clicks toggle once. Preview/solution controls, tag confirmation controls/backdrops and portalled content do not trigger card selection. Keyboard users retain the native checkbox and the title button with aria-pressed. Bank cards keep their existing preview behavior.
+- Reduced select-all from min-h-11 to min-h-6 on desktop and plain picker gaps from 4 to 2; coarse pointers retain the larger target. At 1200px the row measured 52.8 to 28.8px, and search-to-first-card distance fell from 126.1 to 82.9px. The 390px dialog has no internal horizontal overflow.
+- Synthetic fixture verified title/card selection, checkbox single toggles, eye preview without changing selection, closing preview, and opening/cancelling tag confirmation without selecting or mutating tags. TypeScript and Next MCP compilation/runtime passed. Token lint reports only two concurrent out-of-scope regressions in practice-exercise-card.tsx and practice-question-card.tsx; no changed picker file regressed. No full build/unit suite repeated for this small UI change, no external persistence test or migration, and no push/deploy.
+
 ### ย่อปุ่มบันทึกและพักการตั้งชื่อคลังฝึก — 15 ตุลาคม 2026 (local preview)
 
 - ปุ่มบันทึก/พักการตั้งชื่อ (รวมบันทึก/ยกเลิกขณะแก้ไขที่ใช้ชุดเดียวกัน) ใช้ size sm และ pointer-coarse:min-h-11 เหมือนปุ่มอื่นในคลังฝึก แทน min-h-11 ทุกอุปกรณ์; desktop สูง 33.6px จาก 52.8px

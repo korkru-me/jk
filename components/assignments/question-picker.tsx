@@ -290,7 +290,7 @@ export function QuestionPicker({
       )}
 
       {onSelectionChange && (
-        <label className="flex min-h-11 w-fit cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+        <label className="flex min-h-6 w-fit cursor-pointer items-center gap-2 text-xs text-muted-foreground pointer-coarse:min-h-11">
           <input
             type="checkbox"
             checked={allMatchingSelected}
@@ -401,5 +401,5 @@ function CardSurface({ children }: { children: React.ReactNode }) {
 }
 
 function PlainSurface({ children }: { children: React.ReactNode }) {
-  return <div className="min-w-0 space-y-4">{children}</div>
+  return <div className="flex min-w-0 flex-col gap-2">{children}</div>
 }

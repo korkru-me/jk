@@ -216,8 +216,16 @@ export function QuestionCard({
   return (
     <Card
       edge="ring"
+      onClick={pickerContext ? event => {
+        const target = event.target
+        // Nested controls and portalled viewers handle their own clicks.
+        if (!(target instanceof Element) || !event.currentTarget.contains(target)) return
+        if (target.closest('button, a, input, label, select, textarea, [role="button"], [data-picker-interactive]')) return
+        pickerContext.onSelect()
+      } : undefined}
       className={cn(
         '@container group transition-all hover:shadow-sm',
+        pickerContext && 'cursor-pointer',
         isFlagged ? 'ring-flag/40 hover:ring-flag/60' : 'hover:ring-primary/30',
         pickerContext?.pending === 'add' && 'ring-success/30 bg-success/10',
         pickerContext?.pending === 'remove' && 'ring-destructive/30 bg-destructive/10',
@@ -314,7 +322,8 @@ export function QuestionCard({
             {/* Title */}
             <button
               type="button"
-              onClick={onPreview}
+              onClick={pickerContext ? pickerContext.onSelect : onPreview}
+              aria-pressed={pickerContext?.selected}
               className="text-sm font-semibold text-foreground hover:text-primary transition-colors text-left line-clamp-1 w-full"
             >
               {q.title}
@@ -347,7 +356,7 @@ export function QuestionCard({
           <div className={cn(
             'flex flex-wrap items-center justify-between @md:flex-col @md:items-end @md:justify-start gap-1.5 @md:shrink-0',
             pickerContext && 'col-span-2 min-w-0 max-w-full justify-end',
-          )}>
+          )} data-picker-interactive>
             {/* The two ways to look at a โจทย์: its เฉลย on its own, or the
                 whole of it as a student meets it. Side by side on a wide card,
                 with ดูตัวอย่าง keeping the corner it has always had; stacked

@@ -78,8 +78,8 @@ export function QuestionTagsEditor({ questionId, tags: serverTags, allTags, allo
 
           {confirming === tag && (
             <>
-              <div className="fixed inset-0 z-30" onClick={() => setConfirming(null)} />
-              <Card radius="md" edge="ring" elevation="xl" padding="sm" className="absolute left-0 top-7 z-40 w-60">
+              <div data-picker-interactive className="fixed inset-0 z-30" onClick={() => setConfirming(null)} />
+              <Card data-picker-interactive radius="md" edge="ring" elevation="xl" padding="sm" className="absolute left-0 top-7 z-40 w-60">
                 <p className="text-xs font-semibold text-foreground">
                   ลบแท็ก #{tag} ออกจากโจทย์นี้ใช่ไหม
                 </p>
