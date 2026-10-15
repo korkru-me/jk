@@ -28,6 +28,24 @@ export default async function StudentPracticeLibraryQuestionsPage({
   const state = parsePracticeSearchParams(rawSearch)
   const localReview = isLocalPracticeReviewEnabled(process.env)
   const search = localReview ? { ...state, exerciseId: undefined, reviewOnly: undefined } : state
+
+  if (localReview) {
+    const allState = { q: '', tags: [], page: 1, ignoredTagCount: 0 }
+    const [all, filtered] = await Promise.all([
+      loadPracticeLibraryLocalSnapshot(user.id, id, allState),
+      state.q || state.tags.length ? loadPracticeLibraryLocalSnapshot(user.id, id, search) : null,
+    ])
+    if (all.status !== 'ready' || (filtered && filtered.status !== 'ready')) {
+      const failure = all.status !== 'ready' ? all : filtered!
+      if (failure.status === 'unavailable') return <PracticeAccessState kind="unavailable" returnHref={`/practice/${id}`} />
+      notFound()
+    }
+    if (all.library.requiresAccessCode
+      && !await hasPracticeAccessSession(user.id, id)) redirect(`/practice/${id}`)
+    return <PracticeLocalLibraryView key={`${user.id}:${id}`} library={all.library} items={all.items}
+      matchingIds={(filtered?.items ?? all.items).map(item => item.id)} state={state} storageOwnerId={user.id} />
+  }
+
   const result = await loadPracticeLibrarySearch(user.id, id, search)
 
   if (result.status !== 'ready') {
@@ -38,20 +56,8 @@ export default async function StudentPracticeLibraryQuestionsPage({
   }
   if (result.library.requiresAccessCode
     && !await hasPracticeAccessSession(user.id, id)) redirect(`/practice/${id}`)
-  if (!localReview && result.canonicalPage !== state.page) {
+  if (result.canonicalPage !== state.page) {
     redirect(buildPracticeSearchHref(id, state, { page: result.canonicalPage }))
-  }
-
-  if (localReview) {
-    const allState = { q: '', tags: [], page: 1, ignoredTagCount: 0 }
-    const all = await loadPracticeLibraryLocalSnapshot(user.id, id, allState)
-    const filtered = state.q || state.tags.length
-      ? await loadPracticeLibraryLocalSnapshot(user.id, id, search) : all
-    if (all.status !== 'ready' || filtered.status !== 'ready') {
-      return <PracticeAccessState kind="unavailable" returnHref={`/practice/${id}`} />
-    }
-    return <PracticeLocalLibraryView key={`${user.id}:${id}`} library={result.library} items={all.items}
-      matchingIds={filtered.items.map(item => item.id)} state={state} storageOwnerId={user.id} />
   }
 
   const [groups, pins] = await Promise.all([loadPracticeExercises(user.id, id), loadPracticeReviewPins(user.id, id)])

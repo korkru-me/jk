@@ -1,5 +1,9 @@
 # Architecture
 
+## คลังฝึกลดการโหลดซ้ำ — 15 ตุลาคม 2026
+
+Search ใช้ Next Form `action=""`/`scroll={false}` เพื่อ client navigation แทน native GET document reload. Local route อ่าน all snapshot โดยตรงเพื่อได้ library metadata และทำ filtered snapshot ขนานเฉพาะเมื่อมีคำ/แท็ก ไม่อ่าน page แรกแยกซ้ำก่อน snapshot. ภายใน snapshot หน้าแรกตรวจ student/library/roster ตามเดิม แล้ว private page reader ใช้ authorized library เดียวกันเฉพาะคำขอ/รอบ batch นั้น; แต่ละ RPC ยังตรวจ actor/library ปัจจุบันและมีขอบเขต 24 rows, concurrency สูงสุด 8. ไม่มี cache สิทธิ์หรือข้อมูลส่วนตัวข้าม request; public search ยังตรวจสิทธิ์ใหม่ทุกครั้ง และ snapshot ไม่ส่งผลบางส่วนเมื่อหน้าใดล้มเหลว/total เปลี่ยน/IDs ซ้ำ
+
 ### หน้าทำชุดฝึกส่วนตัว — 15 ตุลาคม 2026
 
 `/practice/[id]/exercises/[exerciseId]/take` ตรวจ Auth, feature flag, published student library และ access-code session ก่อนเปิดหน้ารัน ใน development อ่านชุดจาก local adapter แล้ว intersect สมาชิกกับ authorized metadata snapshot; production อ่านชุดผ่าน owner/library-scoped RPC เดิม. `getPracticeRunQuestion` ตรวจ exact question access และ access session ซ้ำทุกคำขอ แล้วใช้ `preparePracticeRunQuestion` ร่วมกับหน้ารายข้อเพื่อส่งเฉพาะ safe variant, signed receipt และ tool flags ไม่มี raw key/seed

@@ -1,5 +1,9 @@
 # Security และ privacy guardrails
 
+## Request-local practice snapshot reads — 15 October 2026
+
+The optimized development snapshot reuses only the first page's verified actor/library/roster result inside that one call. Its private reader cannot be called by the browser, and every page still uses the actor/library-scoped RPC that repeats current resource authorization. A denied later page or inconsistent totals/IDs rejects the whole snapshot. Public searches and new requests reauthorize independently; no persistent or cross-request authorization cache is introduced. Routes still verify Auth/feature flag and the signed library access-code session before rendering any snapshot; DTOs contain display metadata only. No schema, RLS, RPC grants or grading behavior changed
+
 ## Prepared personal exercise update and pin authorization
 
 Update and pin actions reverify session, exact library/roster and signed access-code session. SQL rechecks those resource relations, exact exercise owner and all selected memberships. Updates serialize with FOR UPDATE and revision checks; stale payloads receive PT409 and are not written. Pins are private per actor/library/question, with no browser table or execute grants. Pinned search uses literal term matching and exact tag AND semantics with 24-row bounds. Local QA uses synthetic browser storage and PGlite only; no live schema or student data was changed.

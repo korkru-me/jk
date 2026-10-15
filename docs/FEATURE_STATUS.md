@@ -1,5 +1,12 @@
 # Feature status
 
+### แก้คลังฝึกรอโหลดซ้ำและค้นหารีโหลดทั้งหน้า — 15 ตุลาคม 2026 (local preview)
+
+- รูปกรอบเทาเป็น `practice/[id]/loading.tsx` ที่แสดงระหว่างรอข้อมูล ไม่ได้สร้าง delay เอง; เปลี่ยนเป็น status Card/ข้อความ/ไอคอนหมุนหนึ่งแถวประมาณ 41px บน 1440/320px ไม่มี overflow และเคารพ reduced motion
+- เปลี่ยน native GET search เป็น Next Form client navigation; browser marker ยืนยัน document เดิมอยู่หลังค้นหาชื่อ/แท็ก ล้างตัวกรองและ Back พร้อมเก็บ selection ที่ซ่อนโดยตัวกรอง และ reset uncontrolled inputs ให้ตรง URL. Local route ไม่อ่านหน้าแรกแยกซ้ำ อ่าน all/filtered snapshots ขนาน; snapshot ลดการตรวจข้อมูล actor/library/roster ซ้ำทุก page โดย reuse ภายในคำขอเดียว แต่ RPC ทุก page ยังตรวจ exact resource ตามเดิม. ตัวอย่าง mock 143 ข้อมี read calls จากเส้นทางเดิม 42 เหลือ 16 (ไม่ใช่การจับเวลาฐานข้อมูลจริง)
+- เพิ่ม 6 server-loader mock tests: จำนวนคำขอ/ขอบเขต actor+library, no secret solution DTO, สิทธิ์ใหม่ในคำขอถัดไป, fail closed เมื่อ RPC หน้าอื่นปฏิเสธหรือ total เปลี่ยน, exact exercise search และ development-only snapshot. Full suite 262 files / 3,367 tests, TypeScript, token lint, isolated webpack production build และ Next compilation/runtime ผ่าน; build ครั้งแรกติด sandbox อ่าน Google Fonts แล้ว retry ด้วย network permission ผ่าน
+- Synthetic practice-library normal/local fixtures และ loading fixture ตรวจ browser/React components จริง; scoped loading WCAG 0 violations/0 incomplete. ยังไม่วัด latency ด้วยบัญชีจริง/Auth-to-DB หรือ hosted persistence; ไม่เปลี่ยน schema/RLS/การตรวจคำตอบ ไม่มี migration และไม่ push/deploy ตาม local-preview scope เดิม
+
 ### รูปแบบเลือกคลังฝึกตรงกับเพิ่มโจทย์จากคลัง — 15 ตุลาคม 2026 (local preview)
 
 - PracticeQuestionCard ใช้พื้นเขียวอ่อนและขอบเดียวกับ pending-add ใน QuestionCard ผ่านไฟล์กลาง `question-card-selection.ts`; รวม click guard เพื่อให้คลิกกรอบ/metadata/ข้อความย่อ/ชื่อเลือกได้เหมือนกันและ controls/portal ทำงานแยก. หมุดคง glow แดงอ่อน ขอบเขียวเมื่อเลือก และกลับขอบแดงเมื่อยกเลิก ไม่เพิ่มความสูง/แก้ layout

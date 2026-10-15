@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import Link from 'next/link'
+import Form from 'next/form'
 import {
   ArrowLeft,
   BookOpenCheck,
@@ -275,8 +276,9 @@ export function PracticeLibraryView({
         radius="md"
         className="flex flex-col gap-2 bg-transparent sm:border sm:border-border sm:bg-card sm:px-3 sm:py-2"
       >
-        <form
-          method="get"
+        <Form
+          action=""
+          scroll={false}
           className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 @min-[44rem]:grid-cols-[minmax(0,1fr)_minmax(12rem,0.55fr)_auto]"
         >
           {Object.entries(searchHiddenFields).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
@@ -284,6 +286,7 @@ export function PracticeLibraryView({
           {state.tags.map(tag => <input key={tag} type="hidden" name="tag" value={tag} />)}
           <div className="col-span-2 min-w-0 @min-[44rem]:col-span-1">
             <Input
+              key={state.q}
               name="q"
               defaultValue={state.q}
               placeholder="ค้นหาชื่อหรือเนื้อหาโจทย์"
@@ -292,6 +295,7 @@ export function PracticeLibraryView({
           </div>
           <div className="min-w-0">
             <Input
+              key={state.tags.join('\u0000')}
               name="tag"
               placeholder={tagLimitReached ? 'ลบแท็กก่อนเพิ่มแท็กใหม่' : 'ค้นหาแท็ก'}
               aria-label="ค้นหาแท็ก"
@@ -307,7 +311,7 @@ export function PracticeLibraryView({
             <Search data-icon="inline-start" aria-hidden="true" />
             <span className="sr-only @min-[44rem]:not-sr-only">ค้นหา</span>
           </Button>
-        </form>
+        </Form>
 
         {state.tags.length > 0 && (
           <div

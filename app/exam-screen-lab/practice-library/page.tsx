@@ -6,6 +6,7 @@ import { isExamScreenLabEnabled } from '@/lib/exam-screen-lab-access'
 import { ShellClient } from '@/components/layout/shell-client'
 import type { BankQuestion } from '@/lib/question-bank'
 import type { AssignmentQuestionSetOption } from '@/components/assignments/create-assignment-form'
+import PracticeLoading from '@/app/(app)/practice/[id]/loading'
 
 export const metadata = { title: 'ทดลองคลังฝึก — KorKru' }
 export const dynamic = 'force-dynamic'
@@ -76,8 +77,8 @@ export default async function PracticeLibraryLabPage({ searchParams }: {
   if (!isExamScreenLabEnabled(process.env)) notFound()
   const { view, shell } = await searchParams
 
-  if (view === 'student' || view === 'local-student' || view === 'run' || view === 'local-run') {
-    const content = <StudentLibraryLab localReview={view === 'local-student' || view === 'local-run'} />
+  if (view === 'student' || view === 'local-student' || view === 'run' || view === 'local-run' || view === 'loading') {
+    const content = view === 'loading' ? <PracticeLoading /> : <StudentLibraryLab localReview={view === 'local-student' || view === 'local-run'} />
     if (shell === 'student') return <ShellClient
       user={{ id: '00000000-0000-4000-8300-000000000099', email: 'student@example.invalid', full_name: 'นักเรียนตัวอย่าง', role: 'student' }}
       initialUnreadCount={0} notificationsEnabled={false} practiceLibraryEnabled
