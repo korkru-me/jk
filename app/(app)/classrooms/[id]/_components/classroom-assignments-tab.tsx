@@ -595,11 +595,13 @@ export function ClassroomAssignmentsTab({
       onValueChange={value => moveToCategory(work.id, value)}
       disabled={isPending || isOrderPending || (work.kind === 'practice' && layoutBlocked)}
     >
-      <SelectTrigger size="sm" className="min-w-0 flex-1" aria-label={`กลุ่มของ ${work.title}`}>
+      <SelectTrigger size="sm" className="w-36 min-w-0 max-w-full shrink-0" aria-label={`กลุ่มของ ${work.title}`} title={`กลุ่มงาน: ${categoryName(work.category_id ?? null)}`}>
         <Folder />
-        <SelectValue>{value => categoryItems.find(item => item.value === value)?.label ?? 'ยังไม่จัดกลุ่ม'}</SelectValue>
+        <SelectValue className="min-w-0">
+          {value => <span className="truncate">{categoryItems.find(item => item.value === value)?.label ?? 'ยังไม่จัดกลุ่ม'}</span>}
+        </SelectValue>
       </SelectTrigger>
-      <SelectContent align="end"><SelectGroup>
+      <SelectContent align="start" alignItemWithTrigger={false} className="w-max max-w-[calc(100vw-2rem)]"><SelectGroup>
         {categoryItems.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
       </SelectGroup></SelectContent>
     </Select>
@@ -717,30 +719,32 @@ export function ClassroomAssignmentsTab({
                         tone={statusCfg.row} status={practiceStatus}
                       >
                         <div className="flex h-full min-w-0 flex-col gap-1.5" data-classroom-practice-row>
-                          <div className="flex min-w-0 flex-col gap-1.5">
-                            <Link href={`/practice/${assignment.libraryId}/edit`} className="flex min-w-0 items-start gap-2 rounded-lg pr-8 outline-none focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:pr-12">
-                              <div className={cn('flex size-8 shrink-0 items-center justify-center rounded-lg', typeCfg.bg)}>
-                                <TypeIcon className={cn('size-4', typeCfg.text)} aria-hidden="true" />
-                              </div>
-                              <div className="min-w-0">
-                                <p className="line-clamp-2 text-sm font-semibold leading-snug" title={assignment.title}>{assignment.title}</p>
-                                <p className="mt-0.5 text-xs text-muted-foreground">{assignment.questionCount} ข้อ · ฝึกซ้ำได้ · ไม่มีคะแนน</p>
-                              </div>
-                            </Link>
-                            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                              {categoryPicker(assignment)}
-                              <Badge variant="secondary">คลังฝึก</Badge>
-                              <Badge variant={statusCfg.badge}>{statusCfg.label}</Badge>
+                          <Link href={`/practice/${assignment.libraryId}/edit`} className="flex min-w-0 items-start gap-2 rounded-lg pr-8 outline-none focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:pr-12">
+                            <div className={cn('flex size-8 shrink-0 items-center justify-center rounded-lg', typeCfg.bg)}>
+                              <TypeIcon className={cn('size-4', typeCfg.text)} aria-hidden="true" />
                             </div>
-                          </div>
-                          <div className="mt-auto flex flex-wrap items-center gap-1 border-t border-border/60 pt-1.5">
-                            <Button variant="ghost" size="sm" render={<Link href={`/practice/${assignment.libraryId}/progress`} />}>
-                              <BarChart3 data-icon="inline-start" /> ดูความคืบหน้า
-                            </Button>
-                            <Button variant="ghost" size="sm" render={<Link href={`/practice/${assignment.libraryId}/edit`} />}>
-                              <Pencil data-icon="inline-start" /> แก้ไขการตั้งค่า
-                            </Button>
-                            <PracticeLibraryListActions id={assignment.libraryId} title={assignment.title} status={assignment.status} canManage />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                <p className="min-w-0 flex-[1_1_12rem] line-clamp-2 text-sm font-semibold leading-snug" title={assignment.title}>{assignment.title}</p>
+                                <div className="flex shrink-0 items-center gap-1">
+                                  <Badge variant="secondary">คลังฝึก</Badge>
+                                  <Badge variant={statusCfg.badge}>{statusCfg.label}</Badge>
+                                </div>
+                              </div>
+                              <p className="mt-1 text-xs text-muted-foreground">{assignment.questionCount} ข้อ · ฝึกซ้ำได้ · ไม่มีคะแนน</p>
+                            </div>
+                          </Link>
+                          <div className="mt-auto flex min-w-0 flex-wrap items-center gap-x-1 gap-y-1 border-t border-border/60 pt-1.5">
+                            {categoryPicker(assignment)}
+                            <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1">
+                              <Button variant="ghost" size="sm" render={<Link href={`/practice/${assignment.libraryId}/progress`} />}>
+                                <BarChart3 data-icon="inline-start" /> ดูความคืบหน้า
+                              </Button>
+                              <Button variant="ghost" size="sm" render={<Link href={`/practice/${assignment.libraryId}/edit`} />}>
+                                <Pencil data-icon="inline-start" /> แก้ไขการตั้งค่า
+                              </Button>
+                              <PracticeLibraryListActions id={assignment.libraryId} title={assignment.title} status={assignment.status} canManage />
+                            </div>
                           </div>
                         </div>
                       </SortableAssignmentRow>
@@ -766,15 +770,20 @@ export function ClassroomAssignmentsTab({
                         status={statusCfg}
                       >
                         <div className="flex h-full min-w-0 flex-col gap-1.5">
-                        <div className="flex min-w-0 flex-col gap-1.5">
                           <Link href={`/assignments/${assignment.id}`} className="flex min-w-0 items-start gap-2 rounded-lg pr-8 outline-none focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:pr-12">
                             <div className={cn('flex size-8 shrink-0 items-center justify-center rounded-lg', typeCfg.bg)}>
                               <TypeIcon className={cn('size-4', typeCfg.text)} />
                             </div>
-                            <div className="min-w-0">
-                              <p className="line-clamp-2 text-sm font-semibold leading-snug text-foreground" title={assignment.title}>
-                                {assignment.title}
-                              </p>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                <p className="min-w-0 flex-[1_1_12rem] line-clamp-2 text-sm font-semibold leading-snug text-foreground" title={assignment.title}>
+                                  {assignment.title}
+                                </p>
+                                <div className="flex shrink-0 items-center gap-1">
+                                  <Badge variant="secondary" className={cn(typeCfg.bg, typeCfg.text)}>{typeCfg.label}</Badge>
+                                  <Badge variant={statusCfg.badge}>{statusCfg.label}</Badge>
+                                </div>
+                              </div>
                               <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
                                 <span className="text-xs text-muted-foreground">{assignmentSizeLabel(assignment)}</span>
                                 {assignment.group_ids && (
@@ -827,47 +836,39 @@ export function ClassroomAssignmentsTab({
                             </div>
                           </Link>
 
-                          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                          <div className="mt-auto flex min-w-0 flex-wrap items-center gap-x-1 gap-y-1 border-t border-border/60 pt-1.5">
                             {categoryPicker(assignment)}
-                            <span className={cn('whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium', typeCfg.bg, typeCfg.text)}>
-                              {typeCfg.label}
-                            </span>
-                            <Badge variant={statusCfg.badge}>
-                              {statusCfg.label}
-                            </Badge>
+                            <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                render={(
+                                  <Link
+                                    href={`/assignments/${assignment.id}/preview`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    aria-label={`ดู ${assignment.title} ในมุมนักเรียน`}
+                                    title="เปิดตัวอย่างในมุมนักเรียน"
+                                  />
+                                )}
+                              >
+                                <Eye data-icon="inline-start" />
+                                ดูในมุมนักเรียน
+                              </Button>
+                              <Button variant="ghost" size="sm" render={<Link href={gradeHref} />}>
+                                <ClipboardCheck data-icon="inline-start" />
+                                ตรวจให้คะแนน
+                                {pendingReview > 0 && <span className="text-xs font-semibold text-foreground">{pendingReview}</span>}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                render={<Link href={assignmentCopyHref(classroomId, assignment.id)} />}
+                              >
+                                <Copy data-icon="inline-start" /> ทำสำเนา
+                              </Button>
+                            </div>
                           </div>
-                        </div>
-
-                        <div className="mt-auto flex flex-wrap items-center gap-1 border-t border-border/60 pt-1.5">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            render={(
-                              <Link
-                                href={`/assignments/${assignment.id}/preview`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                aria-label={`ดู ${assignment.title} ในมุมนักเรียน`}
-                                title="เปิดตัวอย่างในมุมนักเรียน"
-                              />
-                            )}
-                          >
-                            <Eye data-icon="inline-start" />
-                            ดูในมุมนักเรียน
-                          </Button>
-                          <Button variant="ghost" size="sm" render={<Link href={gradeHref} />}>
-                            <ClipboardCheck data-icon="inline-start" />
-                            ตรวจให้คะแนน
-                            {pendingReview > 0 && <span className="text-xs font-semibold text-foreground">{pendingReview}</span>}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            render={<Link href={assignmentCopyHref(classroomId, assignment.id)} />}
-                          >
-                            <Copy data-icon="inline-start" /> ทำสำเนา
-                          </Button>
-                        </div>
                         </div>
                       </SortableAssignmentRow>
                     )

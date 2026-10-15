@@ -1,5 +1,11 @@
 # Feature status
 
+## Two-row teacher work card layout - 15 October 2026 (local only)
+
+- Combined the category selector and all existing actions in one compact footer, with a bounded 9rem selector and the type/status badges beside the title. Cards still fill the room width in at most two columns. Narrow cards wrap controls to preserve readable labels and access.
+- At 1440px, ordinary sample cards are about 115px tall (previously 151px); mixed rows with a practice menu are about 134px (previously 169px). All 22 action links remain present. Checked 320/390/1024/1440px without horizontal overflow or clipped controls, category selection, keyboard reorder and mouse drag into an empty category using the in-memory fixture.
+- TypeScript, token lint, Next compilation/runtime and a separate webpack production build passed; scoped axe found zero violations/incomplete checks. No lib changes, so unit tests were not repeated. No real-data persistence tests, migration, push or deployment; changes remain local by owner request.
+
 ## Two-column compact work cards and drag fix - 15 October 2026 (local only)
 
 - The latest owner revision uses at most two work cards per row, fills the classroom's available width, and reduces vertical padding/gaps. Sample cards at 1440px measure about 151-172px compared with the previous 204-209px. At 1920px the room scope measures about 1555px with no right-side unused gutter.
