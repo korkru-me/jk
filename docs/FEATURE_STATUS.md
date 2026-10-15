@@ -1,5 +1,10 @@
 # Feature status
 
+### Browser tab deer legibility — 15 October 2026 (local preview)
+
+- Enlarged the browser favicon artwork from 86% to 96% of its canvas and added a rounded 16-unit black outline, with viewBox padding to keep antler tips intact. The shared deer SVG, in-page logos and Apple touch icon are unchanged. Regenerate with `node scripts/build-brand-icons.mjs`.
+- Verified 16/32px previews, a Chrome request to the generated icon URL (HTTP 200, 512×512), generator syntax, design-token lint and Next.js compilation/runtime checks. SHA-256 checks confirm the Apple icon and shared SVG are unchanged. No TypeScript changes, full build, unit suite or migrations; local preview only, preserving the existing no-push/deploy scope.
+
 ### Picker card selection and compact select-all — 15 October 2026 (local preview)
 
 - Clicking a picker card's frame, metadata, excerpt or title toggles its selection; preview opens from the eye button only. Checkbox clicks toggle once. Preview/solution controls, tag confirmation controls/backdrops and portalled content do not trigger card selection. Keyboard users retain the native checkbox and the title button with aria-pressed. Bank cards keep their existing preview behavior.
