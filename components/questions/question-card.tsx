@@ -23,6 +23,7 @@ import { SubQuestionCountBadge } from './sub-question-count-badge'
 import { QuestionSetBadges, type QuestionSetRef } from './question-set-badges'
 import { QuestionSectionBadges } from './question-section-badges'
 import { SolutionButton } from './solution-button'
+import { isQuestionCardSelectionClick, QUESTION_CARD_SELECTION_CLASSES } from './question-card-selection'
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
 } from '@/components/ui/dropdown-menu'
@@ -217,19 +218,15 @@ export function QuestionCard({
     <Card
       edge="ring"
       onClick={pickerContext ? event => {
-        const target = event.target
-        // Nested controls and portalled viewers handle their own clicks.
-        if (!(target instanceof Element) || !event.currentTarget.contains(target)) return
-        if (target.closest('button, a, input, label, select, textarea, [role="button"], [data-picker-interactive]')) return
-        pickerContext.onSelect()
+        if (isQuestionCardSelectionClick(event)) pickerContext.onSelect()
       } : undefined}
       className={cn(
         '@container group transition-all hover:shadow-sm',
         pickerContext && 'cursor-pointer',
         isFlagged ? 'ring-flag/40 hover:ring-flag/60' : 'hover:ring-primary/30',
-        pickerContext?.pending === 'add' && 'ring-success/30 bg-success/10',
-        pickerContext?.pending === 'remove' && 'ring-destructive/30 bg-destructive/10',
-        pickerContext?.selected && !pickerContext.pending && 'ring-primary/50 bg-primary/10',
+        pickerContext?.pending === 'add' && QUESTION_CARD_SELECTION_CLASSES.add,
+        pickerContext?.pending === 'remove' && QUESTION_CARD_SELECTION_CLASSES.remove,
+        pickerContext?.selected && !pickerContext.pending && QUESTION_CARD_SELECTION_CLASSES.selected,
       )}
     >
       {/* Flagged banner */}

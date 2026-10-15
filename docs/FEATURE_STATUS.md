@@ -1,5 +1,11 @@
 # Feature status
 
+### รูปแบบเลือกคลังฝึกตรงกับเพิ่มโจทย์จากคลัง — 15 ตุลาคม 2026 (local preview)
+
+- PracticeQuestionCard ใช้พื้นเขียวอ่อนและขอบเดียวกับ pending-add ใน QuestionCard ผ่านไฟล์กลาง `question-card-selection.ts`; รวม click guard เพื่อให้คลิกกรอบ/metadata/ข้อความย่อ/ชื่อเลือกได้เหมือนกันและ controls/portal ทำงานแยก. หมุดคง glow แดงอ่อน ขอบเขียวเมื่อเลือก และกลับขอบแดงเมื่อยกเลิก ไม่เพิ่มความสูง/แก้ layout
+- Synthetic browser ตรวจทั้ง practice-library และ question-sets fixtures: title/frame/checkbox toggle, Space เลือกโดยไม่ navigate, หมุด/เปิดปิดเฉลยไม่เปลี่ยนการเลือก, pending add/remove/selected ของ picker เดิม, React components จริง, 1440/320px ไม่ล้น และโหมดสว่าง/มืด. Computed selected background ตรงกับ picker pending-add; WCAG scoped selected card 0 violations/0 incomplete. TypeScript, token lint และ Next compilation/runtime ผ่าน
+- ไม่เปลี่ยน lib/schema/สิทธิ์/การบันทึก จึงไม่รัน full unit suite หรือ production build ซ้ำสำหรับ UI change นี้ ไม่ทดสอบบัญชีจริง/hosted persistence และไม่มี migration. เก็บ local commit ใน `codex/student-classroom-cards` ไม่ push/deploy ตาม preview scope เดิม
+
 ### ชุดฝึกนักเรียนแบบมีธีม ป๊อปอัป และหน้าเริ่มทำ — 15 ตุลาคม 2026 (local preview)
 
 - ปุ่มรายข้อใช้ “ฝึกทำ” + Target, คลิกชื่อ/การ์ดชุดเพื่อเลือกแทน navigate และข้อที่ปักหมุดมีขอบ/glow แดงอ่อน. การ์ดชุดเป็นลายสมุด/ดินสอ/เส้นทางฝึกที่วาดใหม่ มี checkbox, ความคืบหน้า ไอคอนแก้เล็กและปุ่มเริ่มทำ; ตามคำขอเพิ่ม แสดงสามคอลัมน์ตั้งแต่พื้นที่ 44rem และรวม footer แถวเดียว สูง 143→113px ที่ 1440px, 320px หนึ่งคอลัมน์ไม่ล้น

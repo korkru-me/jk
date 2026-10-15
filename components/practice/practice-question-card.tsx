@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { SolutionButton } from '@/components/questions/solution-button'
+import { isQuestionCardSelectionClick, QUESTION_CARD_SELECTION_CLASSES } from '@/components/questions/question-card-selection'
 import { TYPE_LABEL, DIFF_META } from '@/lib/question-display'
 import type { PracticeQuestionListItem } from '@/lib/practice-question-access.server'
 import { cn } from '@/lib/utils'
@@ -22,7 +23,9 @@ export function PracticeQuestionCard({ item, href, selected, onSelect, selection
 }) {
   const difficulty = item.difficulty ? DIFF_META[item.difficulty] : undefined
   return (
-    <Card edge="ring" radius="md" padding="none" className={cn('@container h-full px-3 py-2 transition-shadow hover:shadow-sm', selected && 'ring-primary/50', pinned && 'ring-destructive/25 shadow-[0_0_0.8rem_color-mix(in_oklab,var(--destructive)_18%,transparent)]')}>
+    <Card edge="ring" radius="md" padding="none" onClick={event => {
+      if (!selectionDisabled && isQuestionCardSelectionClick(event)) onSelect(!selected)
+    }} className={cn('@container h-full px-3 py-2 transition-shadow hover:shadow-sm', !selectionDisabled && 'cursor-pointer hover:ring-primary/30', pinned && 'shadow-[0_0_0.8rem_color-mix(in_oklab,var(--destructive)_18%,transparent)]', pinned && !selected && 'ring-destructive/25', selected && QUESTION_CARD_SELECTION_CLASSES.add)}>
       <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-2 @sm:grid-cols-[auto_minmax(0,1fr)_auto]">
         <label className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-lg focus-within:ring-2 focus-within:ring-ring pointer-coarse:size-11">
           <input type="checkbox" checked={selected} disabled={selectionDisabled}
@@ -41,7 +44,7 @@ export function PracticeQuestionCard({ item, href, selected, onSelect, selection
                 {item.attemptCount > 0 ? `ตอบแล้ว ${item.attemptCount} ครั้ง` : 'ยังไม่เคยตอบ'}
               </span>
             </div>
-            <Button type="button" variant="ghost" disabled={selectionDisabled} aria-pressed={selected} onClick={() => onSelect(!selected)} title={item.title} className="h-auto justify-start whitespace-normal p-0 text-left font-semibold hover:bg-transparent">
+            <Button type="button" variant="ghost" disabled={selectionDisabled} aria-pressed={selected} onClick={() => onSelect(!selected)} title={item.title} className="h-auto justify-start whitespace-normal p-0 text-left font-semibold hover:bg-transparent hover:text-primary">
               <span className="line-clamp-2 @lg:line-clamp-1">{item.title}</span>
             </Button>
             {item.excerpt && <p className="line-clamp-2 text-xs text-muted-foreground @lg:line-clamp-1">{item.excerpt}</p>}
