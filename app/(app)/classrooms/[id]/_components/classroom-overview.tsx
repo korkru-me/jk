@@ -12,6 +12,9 @@ import { SEVERITY_BADGE } from '@/lib/calendar-display'
 import { summarizeClassroomProgress, isDueBy, type AssignmentProgress, type ProgressSubmission } from '@/lib/classroom-progress'
 import type { ClassroomPost } from '@/lib/types'
 import type { HomeroomAssignmentRow } from '@/lib/homeroom-data'
+import type { AssignmentCategory } from '@/lib/assignment-categories'
+import type { StudentProfileRow } from './homeroom-overview'
+import { TeacherAssignmentCard } from './teacher-assignment-card'
 import type { ClassroomAssignmentRow } from './classroom-assignments-tab'
 
 /** The tabs this overview can hand the teacher off to. */
@@ -23,6 +26,11 @@ interface Props {
   classroomId: string
   isHomeroom: boolean
   students: OverviewStudent[]
+  studentProfiles?: Record<string, Pick<StudentProfileRow, 'grade_level' | 'section_number' | 'student_code'>>
+  categories?: AssignmentCategory[]
+  groupNameById?: Map<string, string>
+  pendingReviewByAssignment?: Record<string, number>
+  onSetAssignmentCategory?: (assignmentId: string, categoryId: string | null) => Promise<{ ok: boolean; error?: string }>
   /** Subject rooms only — every งาน linked here, drafts included. */
   assignments: ClassroomAssignmentRow[]
   /** Homeroom rooms only — งาน the roster has in their subject rooms. */
@@ -77,9 +85,11 @@ function rateTone(rate: number): string {
 export function ClassroomOverview({
   classroomId, isHomeroom, students, assignments, homeroomAssignments, submissions,
   posts, seenByPost, crossPostTargets, canManage, audienceByAssignment, onNavigate,
+  studentProfiles = {}, categories = [], groupNameById, pendingReviewByAssignment, onSetAssignmentCategory,
 }: Props) {
   const now = Date.now()
   const studentIds = students.map(s => s.id)
+  const assignmentById = new Map(assignments.map(a => [a.id, a]))
   const nameById = new Map(students.map(s => [s.id, s.full_name]))
 
   // Only งาน that reached the students counts towards anyone's rate — a draft
@@ -166,11 +176,11 @@ export function ClassroomOverview({
   // assign — showing them those panels empty would read as "this room has no
   // work", which is an authorization boundary dressed up as an empty state.
   if (!canManage) {
-    return <div className="space-y-5">{announcements}</div>
+    return <div className="@container/overview flex min-w-0 flex-col gap-4">{announcements}</div>
   }
 
   return (
-    <div className="space-y-5">
+    <div className="@container/overview flex min-w-0 flex-col gap-4">
       {announcements}
 
       {/* The contextual sidebar already owns navigation actions. Homeroom's
@@ -188,7 +198,7 @@ export function ClassroomOverview({
         </div>
       )}
 
-      <div className="grid gap-5 xl:grid-cols-2">
+      <div className="grid min-w-0 items-start gap-4 @min-[56rem]/overview:grid-cols-[minmax(0,1fr)_20rem]" data-classroom-overview-panels>
         {/* ── Assignment progress ─────────────────────────────────────── */}
         <div className="min-w-0">
           <Section
@@ -218,13 +228,26 @@ export function ClassroomOverview({
             ) : (
               /* Bounded like the announcement board: a room with thirty งาน
                  scrolls inside its own frame instead of burying the page. */
-              <div className="max-h-[420px] overflow-y-auto divide-y divide-border">
-                {ordered.map(item => (
+              <div className={cn("max-h-[420px] overflow-y-auto", isHomeroom ? "divide-y divide-border" : "flex flex-col gap-2 p-3 pointer-coarse:[&_[data-slot=button]]:min-h-11 pointer-coarse:[&_[data-slot=select-trigger]]:min-h-11")} data-overview-assignments>
+                {ordered.map(item => isHomeroom ? (
                   <AssignmentRow
                     key={item.id}
                     item={item}
-                    studentCount={(isHomeroom ? null : audienceByAssignment?.get(item.id)?.size) ?? students.length}
+                    studentCount={students.length}
                     now={now}
+                  />
+                ) : (
+                  <TeacherAssignmentCard
+                    key={item.id}
+                    assignment={assignmentById.get(item.id)!}
+                    classroomId={classroomId}
+                    submissions={submissions}
+                    studentCount={students.length}
+                    audience={audienceByAssignment?.get(item.id)}
+                    groupNameById={groupNameById}
+                    pendingReview={pendingReviewByAssignment?.[item.id]}
+                    categories={categories}
+                    onSetAssignmentCategory={onSetAssignmentCategory}
                   />
                 ))}
               </div>
@@ -245,16 +268,26 @@ export function ClassroomOverview({
                 {summary.dueAssignmentCount === 0 ? 'ยังไม่มีงานที่ครบกำหนด' : 'ทุกคนส่งงานที่ครบกำหนดแล้ว'}
               </p>
             ) : (
-              <div className="px-4 py-3 space-y-2">
-                {behind.map(p => (
-                  <div key={p.studentId} className="flex items-center gap-2">
-                    <p className="w-28 shrink-0 truncate text-sm text-foreground">{nameById.get(p.studentId)}</p>
-                    <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-                      <div className={cn('h-full rounded-full', rateTone(p.rate))} style={{ width: `${p.rate}%` }} />
+              <div className="flex flex-col gap-3 px-4 py-3" data-overview-follow-up>
+                {behind.map(p => {
+                  const profile = studentProfiles[p.studentId]
+                  return (
+                    <div key={p.studentId} className="flex min-w-0 flex-col gap-1">
+                      <p className="min-w-0 break-words text-sm font-medium text-foreground">{nameById.get(p.studentId)}</p>
+                      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+                        <span>ชั้น {profile?.grade_level || '—'}</span>
+                        <span>ห้อง {profile?.section_number ?? '—'}</span>
+                        <span className="break-all">รหัส {profile?.student_code || '—'}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label={`ความคืบหน้าของ ${nameById.get(p.studentId)}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={p.rate}>
+                          <div className={cn('h-full rounded-full', rateTone(p.rate))} style={{ width: `${p.rate}%` }} />
+                        </div>
+                        <span className="shrink-0 text-right text-xs text-muted-foreground">{p.submitted}/{p.total}</span>
+                      </div>
                     </div>
-                    <span className="w-12 shrink-0 text-right text-xs text-muted-foreground">{p.submitted}/{p.total}</span>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </Section>
@@ -275,8 +308,8 @@ function Section({
   children: React.ReactNode
 }) {
   return (
-    <Card className="h-full overflow-hidden">
-      <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-border">
+    <Card className="min-w-0 overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-4 py-2.5 border-b border-border">
         <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
           {title}
           {note && <span className="ml-2 font-normal normal-case">{note}</span>}

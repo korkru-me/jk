@@ -268,6 +268,12 @@ export function ClassroomGroupsLabClient({
         classroomId={CLASSROOM_ID}
         isHomeroom={false}
         students={roster.slice(0, 3)}
+        studentProfiles={profiles}
+        categories={LAB_CATEGORIES}
+        onSetAssignmentCategory={async () => {
+          await wait()
+          return fail ? { ok: false, error: '(ห้องทดลอง) ย้ายกลุ่มไม่สำเร็จ' } : { ok: true }
+        }}
         assignments={LAB_ASSIGNMENTS}
         homeroomAssignments={[]}
         submissions={[]}
@@ -315,7 +321,7 @@ export function ClassroomGroupsLabClient({
   }
 
   if (overviewOnly) {
-    return <div className="mx-auto max-w-5xl p-4 sm:p-6">{overviewFixture}</div>
+    return <div className="w-full min-w-0 p-4 sm:p-6">{overviewFixture}</div>
   }
 
   return (

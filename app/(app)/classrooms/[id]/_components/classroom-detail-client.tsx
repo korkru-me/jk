@@ -318,6 +318,10 @@ export function ClassroomDetailClient({
             classroomId={classroom.id}
             isHomeroom={isHomeroom}
             students={students}
+            studentProfiles={studentProfiles}
+            categories={assignmentCategories}
+            groupNameById={groupNameById}
+            pendingReviewByAssignment={pendingReviewByAssignment}
             assignments={classroomAssignments}
             homeroomAssignments={homeroomAssignments}
             submissions={isHomeroom ? homeroomSubmissions : classroomSubmissions}
