@@ -6,7 +6,6 @@ import {
   ChevronLeft,
   ClipboardCheck,
   Eye,
-  FileClock,
   FileText,
   LayoutDashboard,
   Pencil,
@@ -247,15 +246,6 @@ export function AssignmentContextNavigation({
               className="w-full justify-start"
             >
               <Radio data-icon="inline-start" />
-            </SidebarButton>
-            <SidebarButton
-              label="รายงานคุมสอบ"
-              size="sm"
-              variant="ghost"
-              render={<Link href={`/assignments/${a.id}/proctor/report`} onClick={onClose} />}
-              className="w-full justify-start"
-            >
-              <FileClock data-icon="inline-start" />
             </SidebarButton>
           </>
         )}

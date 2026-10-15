@@ -1,8 +1,8 @@
 import 'server-only'
 
-import { createClient } from '@/lib/supabase/server'
+import type { createClient } from '@/lib/supabase/server'
 
-export interface ManagedProctorReportAssignment {
+export interface ManagedProctorAssignment {
   id: string
   title: string
   created_by: string
@@ -10,6 +10,10 @@ export interface ManagedProctorReportAssignment {
   mode: string
   type: string
   proctoring_enabled: boolean
+  fullscreen_required: boolean
+  block_clipboard: boolean
+  secure_browser_mode: string
+  android_exam_mode: string
   classrooms: { name: string } | { name: string }[] | null
 }
 
@@ -23,21 +27,21 @@ type SessionSupabaseClient = Awaited<ReturnType<typeof createClient>>
  * therefore only the first non-disclosure boundary; the owner/co-teacher/
  * super-admin check below is deliberately explicit before any admin lookup.
  */
-export async function getManagedProctorReportAssignment(
+export async function getManagedProctorAssignment(
   supabase: SessionSupabaseClient,
   userId: string,
   assignmentId: string,
-): Promise<ManagedProctorReportAssignment | null> {
+): Promise<ManagedProctorAssignment | null> {
   const normalizedAssignmentId = assignmentId.toLowerCase()
   const { data: assignment, error: assignmentError } = await supabase
     .from('assignments')
-    .select('id, title, created_by, status, mode, type, proctoring_enabled, classrooms(name)')
+    .select('id, title, created_by, status, mode, type, proctoring_enabled, fullscreen_required, block_clipboard, secure_browser_mode, android_exam_mode, classrooms(name)')
     .eq('id', normalizedAssignmentId)
     .maybeSingle()
 
   if (assignmentError || !assignment) return null
   if (assignment.created_by === userId) {
-    return assignment as ManagedProctorReportAssignment
+    return assignment as ManagedProctorAssignment
   }
 
   const [coTeachingResult, superAdminResult] = await Promise.all([
@@ -52,5 +56,5 @@ export async function getManagedProctorReportAssignment(
   const canManage = superAdminResult.data === true
     || coTeachingAssignmentIds.includes(normalizedAssignmentId)
 
-  return canManage ? assignment as ManagedProctorReportAssignment : null
+  return canManage ? assignment as ManagedProctorAssignment : null
 }

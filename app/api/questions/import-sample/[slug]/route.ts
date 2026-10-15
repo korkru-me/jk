@@ -1,5 +1,5 @@
 import { getAuthUser } from '@/lib/auth/server'
-import { encodeRfc5987Filename } from '@/lib/exam-proctor-report'
+import { encodeRfc5987Filename } from '@/lib/download-filename'
 import { findProfile } from '@/lib/docx-import/profiles'
 import { packSampleDocx, sampleFileName } from '@/lib/docx-import/sample-docx'
 

@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { AlertTriangle, ArrowLeft } from 'lucide-react'
 import { getAuthUser } from '@/lib/auth/server'
+import { loadProctorSessions } from '@/lib/exam-proctor-history'
+import { getManagedProctorAssignment } from '@/lib/exam-proctor-access.server'
 import type { AndroidApprovalView } from '@/lib/actions/android-exam'
 import {
   PROCTOR_RECENT_EVENT_LIMIT,
@@ -42,15 +44,9 @@ export default async function ProctorPage({ params }: { params: Promise<{ id: st
   if (!user) redirect('/login')
 
   const supabase = await createClient()
-  const { data: assignment } = await supabase
-    .from('assignments')
-    .select('id, title, mode, type, proctoring_enabled, fullscreen_required, block_clipboard, secure_browser_mode, android_exam_mode, classrooms(name)')
-    .eq('id', id)
-    .maybeSingle()
-
-  // The assignment RLS policy is the authorization boundary for owners and
-  // co-teachers with manage/admin permission. Do not reveal whether another
-  // teacher's assignment exists.
+  const assignment = await getManagedProctorAssignment(supabase, user.id, id)
+  // A published row may be readable by students. Evidence requires the exact
+  // assignment-management check before roster/name queries or rendering.
   if (!assignment) notFound()
 
   const { data: links, error: linksError } = await supabase
@@ -77,11 +73,7 @@ export default async function ProctorPage({ params }: { params: Promise<{ id: st
       .select('id, student_id, status, started_at, submitted_at, attempt_number')
       .eq('assignment_id', id)
       .order('attempt_number', { ascending: false }),
-    supabase
-      .from('exam_proctor_sessions')
-      .select('*')
-      .eq('assignment_id', id)
-      .order('last_seen_at', { ascending: false }),
+    loadProctorSessions(supabase, id),
     supabase
       .from('exam_proctor_events')
       .select('*')
