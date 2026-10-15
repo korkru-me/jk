@@ -1,6 +1,8 @@
 # Security และ privacy guardrails
 
-การปิดรอบ (`20261014072745`, apply เฉพาะ Staging): RPC เป็น SECURITY INVOKER, `search_path = ''` และ revoke PUBLIC/anon/authenticated Student action ใช้ Auth ที่ตรวจแล้วและ exact owned row โดย SQL ตรวจ owner/expiry ก่อน forced closure Trigger คำตอบ/วิธีทำใช้ row lock เดียวกับการปิดและปฏิเสธ late writes ระหว่าง cron ticks เขียนคะแนนแบบ atomic และส่ง receipt ที่ไม่มีคะแนนซ่อน Global worker ต้องผ่าน constant-time secret comparison แยก environment Vault dispatch ใช้โดย postgres cron เท่านั้น ไม่เปิดให้ browser/service-role worker อ่าน Responses มีเฉพาะยอดรวม ไม่พิมพ์ข้อมูลนักเรียนหรือ key และไม่ใช้ credential ของ Staging ใน Production
+สถานะ 15 ตุลาคม 2026: งานคลังฝึก/ชุดฝึกส่วนตัว/ปักทบทวน รูปโปรไฟล์ รับทราบประกาศ และปิดรอบเมื่อหมดเวลาเผยแพร่ Production แล้วตาม `docs/PRODUCTION_SYNC_20261015.md`; ข้อความ local-only/prepared ในบันทึกเฟสก่อนหน้าบอกสถานะขณะพัฒนา ส่วน native SEB ที่ยังพักไว้ไม่ได้เปิดเพิ่ม
+
+การปิดรอบ (`20261014072745`, apply ทั้ง Staging และ Production แล้ว 15 ตุลาคม 2026): RPC เป็น SECURITY INVOKER, `search_path = ''` และ revoke PUBLIC/anon/authenticated Student action ใช้ Auth ที่ตรวจแล้วและ exact owned row โดย SQL ตรวจ owner/expiry ก่อน forced closure Trigger คำตอบ/วิธีทำใช้ row lock เดียวกับการปิดและปฏิเสธ late writes ระหว่าง cron ticks เขียนคะแนนแบบ atomic และส่ง receipt ที่ไม่มีคะแนนซ่อน Global worker ต้องผ่าน constant-time secret comparison แยก environment Vault dispatch ใช้โดย postgres cron เท่านั้น ไม่เปิดให้ browser/service-role worker อ่าน Responses มีเฉพาะยอดรวม ไม่พิมพ์ข้อมูลนักเรียนหรือ key และไม่ใช้ credential ของ Staging ใน Production
 
 ## Reset numeric variants safely — 15 October 2026
 

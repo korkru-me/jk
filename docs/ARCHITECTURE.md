@@ -1,6 +1,8 @@
 # Architecture
 
-รอบที่กำหนดเวลา (14 ตุลาคม 2026) แยกการปิดรับออกจากการตรวจคะแนน: DB cron/write trigger ล็อกรอบที่หมดเวลาทั้งที่ไม่มี browser จากนั้น evaluator TypeScript เดิมตรวจคำตอบที่ล็อกไว้ Claim/commit RPC ใช้ submission row lock กับ revision fence และเผยแพร่คะแนนแบบ atomic งาน POST ที่ตรวจ secret รับการเรียกผ่าน pg_net/Vault ส่วน browser recovery เป็น fallback เฉพาะเจ้าของรอบและเรียกซ้ำได้ GET/prefetch ยังไม่เริ่มหรือให้คะแนนรอบ ต้องมี migration `20261014072745` และตั้ง worker ก่อน rollout; ผ่าน Staging แล้วแต่ยังไม่เปลี่ยน Production
+สถานะ 15 ตุลาคม 2026: งานคลังฝึก/ชุดฝึกส่วนตัว/ปักทบทวน รูปโปรไฟล์ รับทราบประกาศ และปิดรอบเมื่อหมดเวลาเผยแพร่ Production แล้วตาม `docs/PRODUCTION_SYNC_20261015.md`; ข้อความ local-only/prepared ในบันทึกเฟสก่อนหน้าบอกสถานะขณะพัฒนา ส่วน native SEB ที่ยังพักไว้ไม่ได้เปิดเพิ่ม
+
+รอบที่กำหนดเวลา (14 ตุลาคม 2026) แยกการปิดรับออกจากการตรวจคะแนน: DB cron/write trigger ล็อกรอบที่หมดเวลาทั้งที่ไม่มี browser จากนั้น evaluator TypeScript เดิมตรวจคำตอบที่ล็อกไว้ Claim/commit RPC ใช้ submission row lock กับ revision fence และเผยแพร่คะแนนแบบ atomic งาน POST ที่ตรวจ secret รับการเรียกผ่าน pg_net/Vault ส่วน browser recovery เป็น fallback เฉพาะเจ้าของรอบและเรียกซ้ำได้ GET/prefetch ยังไม่เริ่มหรือให้คะแนนรอบ ต้องมี migration `20261014072745` และตั้ง worker ก่อน rollout; ผ่าน Staging และเผยแพร่ Production พร้อม worker เมื่อ 15 ตุลาคม 2026 ผ่าน PR #56
 
 ## Practice management workspace — 15 October 2026 (local only)
 

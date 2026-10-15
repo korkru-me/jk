@@ -1,6 +1,8 @@
 # Data model และ invariants
 
-การปิดรอบ (`20261014072745`, apply เฉพาะ Staging): `submissions.closed_at` หยุดคำตอบ/วิธีทำ, `close_reason` เป็น `manual|time_limit|close_time`, `answer_revision` ตรวจข้อมูลที่เปลี่ยนระหว่างยืนยันส่ง และ `missing_work_evidence` แจ้งหลักฐานที่ไม่ครบ รอบที่ปิดอาจยังเป็น `in_progress` ขณะรอตรวจโดยไม่เผยแพร่คะแนนชั่วคราว Commit คะแนนตั้ง `submitted_at = closed_at` กับ `status = submitted` ใน transaction เดียว การเรียกซ้ำไม่ทับผลที่เสร็จหรือครูแก้แล้ว ใช้สเกลคะแนนและช่วงสีเดิม
+สถานะ 15 ตุลาคม 2026: งานคลังฝึก/ชุดฝึกส่วนตัว/ปักทบทวน รูปโปรไฟล์ รับทราบประกาศ และปิดรอบเมื่อหมดเวลาเผยแพร่ Production แล้วตาม `docs/PRODUCTION_SYNC_20261015.md`; ข้อความ local-only/prepared ในบันทึกเฟสก่อนหน้าบอกสถานะขณะพัฒนา ส่วน native SEB ที่ยังพักไว้ไม่ได้เปิดเพิ่ม
+
+การปิดรอบ (`20261014072745`, apply ทั้ง Staging และ Production แล้ว 15 ตุลาคม 2026): `submissions.closed_at` หยุดคำตอบ/วิธีทำ, `close_reason` เป็น `manual|time_limit|close_time`, `answer_revision` ตรวจข้อมูลที่เปลี่ยนระหว่างยืนยันส่ง และ `missing_work_evidence` แจ้งหลักฐานที่ไม่ครบ รอบที่ปิดอาจยังเป็น `in_progress` ขณะรอตรวจโดยไม่เผยแพร่คะแนนชั่วคราว Commit คะแนนตั้ง `submitted_at = closed_at` กับ `status = submitted` ใน transaction เดียว การเรียกซ้ำไม่ทับผลที่เสร็จหรือครูแก้แล้ว ใช้สเกลคะแนนและช่วงสีเดิม
 
 ## Numeric variant transition — 15 ตุลาคม 2026
 
