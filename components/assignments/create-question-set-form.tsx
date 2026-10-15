@@ -417,20 +417,16 @@ export function CreateQuestionSetForm({
                 : 'รวมโจทย์จากคลังไว้ในแฟ้มเพื่อใช้ซ้ำ'}
             </p>
           </div>
-          {initialSet && (
+          {initialSet && !editingInfo && (
             <div className="flex w-full shrink-0 justify-end sm:w-auto">
               <Button
                 type="button"
-                variant={editingInfo ? 'ghost' : 'outline'}
+                variant="outline"
                 size="sm"
-                onClick={() => editingInfo ? finishEditingInfo() : setEditingInfo(true)}
+                onClick={() => setEditingInfo(true)}
               >
-                {editingInfo ? 'เสร็จสิ้น' : (
-                  <>
-                    <Pencil data-icon="inline-start" />
-                    แก้ไข
-                  </>
-                )}
+                <Pencil data-icon="inline-start" />
+                แก้ไข
               </Button>
             </div>
           )}
@@ -540,6 +536,14 @@ export function CreateQuestionSetForm({
               </Field>
             </div>
           </FieldGroup>
+          {initialSet && (
+            <div className="mt-3 flex justify-end">
+              <Button type="button" variant="outline" className="min-h-[44px]" onClick={finishEditingInfo}>
+                <Save data-icon="inline-start" />
+                บันทึก
+              </Button>
+            </div>
+          )}
         </Card>
       )}
 
