@@ -145,7 +145,6 @@ function SortableAssignmentRow({
   disabled,
   freezeLayout,
   tone,
-  status,
   children,
 }: {
   assignmentId: string
@@ -154,7 +153,6 @@ function SortableAssignmentRow({
   disabled: boolean
   freezeLayout: boolean
   tone: string
-  status: Omit<ReturnType<typeof statusConfig>, 'description'> & { description: string }
   children: ReactNode
 }) {
   const {
@@ -175,7 +173,6 @@ function SortableAssignmentRow({
     <TeacherWorkCard
       ref={setNodeRef}
       tone={tone}
-      status={status}
       style={{
         transform: isDragging || freezeLayout ? undefined : DndCSS.Transform.toString(transform),
         transition: freezeLayout ? undefined : transition,
@@ -657,7 +654,7 @@ export function ClassroomAssignmentsTab({
                       return <SortableAssignmentRow key={assignment.id}
                         assignmentId={assignment.id} categoryId={assignment.category_id} title={assignment.title}
                         disabled={isOrderPending || isPending || layoutBlocked} freezeLayout={!sortingWithinCategory}
-                        tone={cn(statusCfg.row, typeCfg.bg)} status={practiceStatus}
+                        tone={typeCfg.bg}
                       >
                         <div className="flex flex-col gap-3 px-2" data-classroom-practice-row>
                           <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
@@ -673,7 +670,7 @@ export function ClassroomAssignmentsTab({
                             <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
                               {categoryPicker(assignment)}
                               <Badge variant="secondary">คลังฝึก</Badge>
-                              <Badge variant={statusCfg.badge}>{statusCfg.label}</Badge>
+                              <Badge variant={statusCfg.badge} title={practiceStatus.description}>{statusCfg.label}</Badge>
                             </div>
                           </div>
                           <div className="flex flex-wrap items-center gap-1 rounded-xl bg-muted/40 p-1 md:justify-end">
@@ -696,8 +693,7 @@ export function ClassroomAssignmentsTab({
                         title={assignment.title}
                         disabled={isOrderPending || isPending}
                         freezeLayout={!sortingWithinCategory}
-                        tone={cn(statusCfg.row, typeCfg.bg)}
-                        status={statusCfg}
+                        tone={typeCfg.bg}
                       >
                         <TeacherAssignmentCardContent
                           assignment={assignment}

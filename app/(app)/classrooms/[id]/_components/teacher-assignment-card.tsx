@@ -8,7 +8,6 @@ import { toast } from 'sonner'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { TYPE_CFG } from '@/lib/assignment-display'
@@ -27,22 +26,16 @@ const STATUS_CFG = {
     label: 'ฉบับร่าง',
     description: 'ยังไม่แสดงให้นักเรียนเห็น จนกว่าครูจะเผยแพร่งานชุดนี้',
     badge: 'statusWarning',
-    dot: 'bg-warning',
-    row: 'border-l-warning',
   },
   published: {
     label: 'เผยแพร่แล้ว',
     description: 'นักเรียนที่ได้รับมอบหมายสามารถเปิดและทำงานชุดนี้ได้',
     badge: 'statusSuccess',
-    dot: 'bg-success',
-    row: 'border-l-success',
   },
   closed: {
     label: 'ปิดแล้ว',
     description: 'ปิดรับการทำงานแล้ว นักเรียนจึงเริ่มทำรอบใหม่ไม่ได้',
     badge: 'statusDestructive',
-    dot: 'bg-destructive',
-    row: 'border-l-destructive',
   },
 } as const
 
@@ -51,36 +44,15 @@ export function statusConfig(status: string) {
 }
 
 /** Shared surface for the overview and sortable work list. */
-export function TeacherWorkCard({ tone, status, dragHandle, children, className, ...props }: ComponentProps<typeof Card> & {
+export function TeacherWorkCard({ tone, dragHandle, children, className, ...props }: ComponentProps<typeof Card> & {
   tone: string
-  status: Omit<ReturnType<typeof statusConfig>, 'description'> & { description: string }
   dragHandle?: ReactNode
 }) {
   return (
     <Card {...props} radius="md" data-assignment-row className={cn(
-      'relative flex h-full min-w-0 shrink-0 overflow-hidden border-l-4 px-3 py-2 transition-[background-color,box-shadow,opacity] [&_.text-muted-foreground]:text-foreground/75',
+      'relative flex h-full min-w-0 shrink-0 overflow-hidden px-3 py-2 transition-[background-color,box-shadow,opacity] [&_.text-muted-foreground]:text-foreground/75',
       tone, className,
     )}>
-      <HoverCard>
-        <HoverCardTrigger
-          delay={140}
-          closeDelay={80}
-          render={(
-            <button
-              type="button"
-              aria-label={`สถานะ ${status.label}: ${status.description}`}
-              className="absolute inset-y-0 left-0 w-3 cursor-help outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-            />
-          )}
-        />
-        <HoverCardContent side="right" align="start">
-          <div className="flex items-center gap-2">
-            <span className={cn('size-2.5 shrink-0 rounded-full', status.dot)} aria-hidden="true" />
-            <p className="font-semibold text-foreground">สถานะ: {status.label}</p>
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">{status.description}</p>
-        </HoverCardContent>
-      </HoverCard>
       {dragHandle}
       <div className="flex min-w-0 flex-1 flex-col">{children}</div>
     </Card>
@@ -125,7 +97,7 @@ export function TeacherAssignmentCardContent({
             </p>
             <div className="flex shrink-0 items-center gap-1">
               <Badge variant={typeVariant}>{typeCfg.label}</Badge>
-              <Badge variant={statusCfg.badge}>{statusCfg.label}</Badge>
+              <Badge variant={statusCfg.badge} title={statusCfg.description}>{statusCfg.label}</Badge>
             </div>
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -249,7 +221,6 @@ export function TeacherAssignmentCard({ categories, onSetAssignmentCategory, ...
   const [pending, startTransition] = useTransition()
   const source = assignment.category_id ?? null
   const categoryId = savedCategory?.source === source ? savedCategory.value : source
-  const status = statusConfig(assignment.status)
   const type = TYPE_CFG[assignment.type] ?? TYPE_CFG.exam
   function move(value: string | null) {
     if (value === null) return
@@ -268,7 +239,7 @@ export function TeacherAssignmentCard({ categories, onSetAssignmentCategory, ...
       }
     })
   }
-  return <TeacherWorkCard status={status} tone={cn(status.row, type.bg)}>
+  return <TeacherWorkCard tone={type.bg}>
     <TeacherAssignmentCardContent {...props} categoryPicker={<AssignmentCategoryPicker title={assignment.title} value={categoryId} categories={categories} disabled={pending} onValueChange={move} />} />
   </TeacherWorkCard>
 }
