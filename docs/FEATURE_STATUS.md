@@ -1,5 +1,10 @@
 # Feature status
 
+### ย่อปุ่มบันทึกและพักการตั้งชื่อคลังฝึก — 15 ตุลาคม 2026 (local preview)
+
+- ปุ่มบันทึก/พักการตั้งชื่อ (รวมบันทึก/ยกเลิกขณะแก้ไขที่ใช้ชุดเดียวกัน) ใช้ size sm และ pointer-coarse:min-h-11 เหมือนปุ่มอื่นในคลังฝึก แทน min-h-11 ทุกอุปกรณ์; desktop สูง 33.6px จาก 52.8px
+- Browser fixture ตรวจ 1440/320px ปุ่มขนาดเท่ากัน ไม่มี horizontal overflow และเปิดฟอร์มตั้งชื่อได้; TypeScript, token lint และ Next runtime ผ่าน ไม่รัน unit suite/build ซ้ำสำหรับการเปลี่ยนขนาดสองปุ่ม ไม่มี migration/database writes/hosted persistence test; local commit บน `codex/student-classroom-cards` ไม่ push/deploy ตามขอบเขต preview เดิม
+
 ### Picker controls — 15 October 2026 (local preview)
 
 - Removed the selection helper sentence from the add-from-bank dialog. Picker cards hide the add-tag button while retaining existing tags; bank cards keep tag editing.

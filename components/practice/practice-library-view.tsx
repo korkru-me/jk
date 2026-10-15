@@ -406,8 +406,8 @@ export function PracticeLibraryView({
             </ol>
           </div>}
           <div className="flex flex-wrap gap-2">
-            <Button type="submit" className="min-h-11" disabled={pending || !title.trim() || selectedIds.length === 0}>{pending ? 'กำลังบันทึก…' : `${editing ? 'บันทึกการแก้ไข' : 'บันทึกแบบฝึกหัด'} ${selectedIds.length} ข้อ`}</Button>
-            <Button type="button" variant="outline" className="min-h-11" disabled={pending} onClick={() => editing ? void cancelEdit() : setNaming(false)}>{editing ? 'ยกเลิกการแก้ไข' : 'พักการตั้งชื่อ'}</Button>
+            <Button type="submit" size="sm" className="pointer-coarse:min-h-11" disabled={pending || !title.trim() || selectedIds.length === 0}>{pending ? 'กำลังบันทึก…' : `${editing ? 'บันทึกการแก้ไข' : 'บันทึกแบบฝึกหัด'} ${selectedIds.length} ข้อ`}</Button>
+            <Button type="button" variant="outline" size="sm" className="pointer-coarse:min-h-11" disabled={pending} onClick={() => editing ? void cancelEdit() : setNaming(false)}>{editing ? 'ยกเลิกการแก้ไข' : 'พักการตั้งชื่อ'}</Button>
           </div>
           {error && <p role="alert" className="text-sm text-destructive @min-[44rem]:col-span-2">{error}</p>}
           {conflict && <Button type="button" variant="outline" className="min-h-11" onClick={async () => {
