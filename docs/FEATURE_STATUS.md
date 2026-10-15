@@ -1,5 +1,13 @@
 # Feature status
 
+### แก้หน้าต่างแก้ไขชุดฝึกและแยกตัวกรองแท็ก — 15 ตุลาคม 2026 (local preview)
+
+- จำลองแก้ชุด 61 ข้อชื่อยาวแล้วพบ dialog 448px มี scrollWidth 2369px ทำให้ฟอร์มล้น; เปลี่ยนโครงสร้างเป็น flex/min-w-0 จำกัด body/สมาชิกให้เลื่อนภายในและคง footer. Desktop กรอบ 512px มี scrollWidth 512px; 320×700px กรอบ 288px ไม่มี horizontal overflow ปุ่มบันทึก/ยกเลิกอยู่ใน viewport และเลื่อนถึงสมาชิกสุดท้ายได้
+- นำป้าย “ตรวจโลคอล · ชุดฝึกและหมุดเก็บในเบราว์เซอร์นี้ ยังไม่ซิงก์ข้ามอุปกรณ์” ออกตามคำขอ โดยไม่เปลี่ยนการเก็บข้อมูล. เรียงหัวเรื่องหน้า → แบบฝึกหัดของฉัน/การ์ดชุด → สร้างแบบฝึกหัด/Tooltip ภาษาทางการ → ค้นหา/ตัวกรอง → แถบเลือก/โจทย์ คงสามคอลัมน์ของการ์ดชุดบนจอกว้าง
+- Plus “เพิ่มตัวกรองแท็ก” เปิด disclosure กรอกแท็กแล้วเพิ่มได้ทันที แยกจากค้นหาโจทย์; ใช้ชิปนำออก เงื่อนไข AND คง query/selection และ client navigation. ปิดหลังเพิ่ม/คลิกนอก/Escape, focus กลับ trigger จาก Escape, ป้องกันช่องว่าง/แท็กซ้ำ และหยุดเพิ่มเมื่อครบ 20 แท็กโดยค้นหาโจทย์ได้ตามเดิม
+- Synthetic normal/local browser fixtures ตรวจ dialog 61 ข้อ/ชื่อไม่มีช่องว่าง, เลื่อนรายการและ footer บนมือถือ, ยกเลิกหลังเปลี่ยน page size แล้วกลับไปแก้ต่อคงร่าง, สร้าง/แก้ชื่อ/ธีม/page size/นำสมาชิกออก/คงหลัง reload, เพิ่ม/ซ้ำ/หลายแท็ก/นำออก/เงื่อนไข AND, query ร่วมแท็ก/ไม่ reload document, Tooltip และลำดับหัวข้อ, จอ 1440/320px. TypeScript, token lint, isolated webpack production build และ Next compilation/runtime ผ่าน; scoped filter WCAG 0 violations/0 incomplete ส่วน dialog 61 ข้อ 0 violations แต่ contrast incomplete ในแถวที่ scroll clipping จึงตรวจภาพ/การเลื่อนร่วม ไม่อ้างรับรองทุกกรณี
+- ไม่แก้ lib/schema/RLS/grading จึงไม่รัน full unit suite ซ้ำ ไม่มี migration หรือการทดสอบบัญชีจริง/hosted persistence. เก็บ local commit บน `codex/student-classroom-cards` ไม่ push/deploy ตามขอบเขตเดิม
+
 ### แก้คลังฝึกรอโหลดซ้ำและค้นหารีโหลดทั้งหน้า — 15 ตุลาคม 2026 (local preview)
 
 - รูปกรอบเทาเป็น `practice/[id]/loading.tsx` ที่แสดงระหว่างรอข้อมูล ไม่ได้สร้าง delay เอง; เปลี่ยนเป็น status Card/ข้อความ/ไอคอนหมุนหนึ่งแถวประมาณ 41px บน 1440/320px ไม่มี overflow และเคารพ reduced motion

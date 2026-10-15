@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { PracticeLibraryView } from '@/components/practice/practice-library-view'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   changeLocalPracticeExercise, changeLocalPracticePin, EMPTY_PRACTICE_LOCAL_REVIEW,
   localPracticeExercises, practiceLocalReviewSchema, type PracticeLocalReview,
@@ -58,9 +57,6 @@ export function PracticeLocalLibraryView({ library, items, matchingIds, state, s
   const page = Math.min(state.page, totalPages)
   const missingGroup = ready && state.exerciseId && !active
   return <div className="flex min-w-0 w-full flex-col gap-2">
-    <Alert className="w-full px-3 py-2 text-xs">
-      <AlertDescription>ตรวจโลคอล · ชุดฝึกและหมุดเก็บในเบราว์เซอร์นี้ ยังไม่ซิงก์ข้ามอุปกรณ์</AlertDescription>
-    </Alert>
     {storageError && <p role="alert" className="w-full text-sm text-destructive">ยังอ่านข้อมูลแบบฝึกหัดในเบราว์เซอร์ไม่ได้ กรุณาตรวจการอนุญาตพื้นที่จัดเก็บแล้วโหลดหน้าใหม่</p>}
     {missingGroup && <p role="alert" className="w-full text-sm text-muted-foreground">ไม่พบชุดนี้ในเบราว์เซอร์นี้ เลือกชุดจากแบบฝึกหัดของฉันหรือกลับไปดูโจทย์ทั้งหมดได้</p>}
     {!ready && !storageError ? <p role="status" className="w-full text-sm text-muted-foreground">กำลังโหลดแบบฝึกหัดที่บันทึกในเบราว์เซอร์…</p> : <PracticeLibraryView library={library} items={missingGroup ? [] : visible.slice((page - 1) * PRACTICE_PAGE_SIZE, page * PRACTICE_PAGE_SIZE)}

@@ -44,6 +44,7 @@ import { defaultPracticeExerciseSettings, readPracticeExerciseSettings, writePra
 import { Field, FieldLabel, FieldGroup } from '@/components/ui/field'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { createPracticeExercise, updatePracticeExercise, setPracticeReviewPin, getPracticeAttachedSolution } from '@/lib/actions/practice-exercises'
 import { PRACTICE_EXERCISE_MAX_QUESTIONS, type PracticeExercise } from '@/lib/practice-exercises'
 import type {
@@ -108,6 +109,21 @@ export function PracticeLibraryView({
   const [selected, setSelected] = useState<Record<string, string>>({})
   const [naming, setNaming] = useState(false)
   const [exerciseHelpOpen, setExerciseHelpOpen] = useState(false)
+  const [tagFilterOpen, setTagFilterOpen] = useState(false)
+  const tagFilterRef = useRef<HTMLDivElement>(null)
+  const tagFilterButtonRef = useRef<HTMLButtonElement>(null)
+  const tagFilterInputRef = useRef<HTMLInputElement>(null)
+  useEffect(() => { setTagFilterOpen(false) }, [state.tags.join('\u0000')])
+  useEffect(() => {
+    if (!tagFilterOpen) return
+    tagFilterInputRef.current?.focus()
+    const closeOutside = (event: PointerEvent) => {
+      if (event.target instanceof Element && (!tagFilterRef.current?.contains(event.target)
+        || !event.target.closest('[data-practice-tag-filter]'))) setTagFilterOpen(false)
+    }
+    document.addEventListener('pointerdown', closeOutside, true)
+    return () => document.removeEventListener('pointerdown', closeOutside, true)
+  }, [tagFilterOpen])
   const [title, setTitle] = useState('')
   const [questionsPerPage, setQuestionsPerPage] = useState<PracticeExerciseSettings['questionsPerPage']>(1)
   const [theme, setTheme] = useState('')
@@ -195,8 +211,10 @@ export function PracticeLibraryView({
     rememberEdit(group, group.title)
   }
   async function cancelEdit() {
-    const changed = editing && (title.trim() !== editing.title || JSON.stringify(selectedIds) !== JSON.stringify(editing.questionIds))
-    if (changed && !await confirm({ title: 'ยกเลิกการแก้ไข?', description: 'ชื่อและรายการโจทย์ที่เปลี่ยนไว้จะไม่ถูกบันทึก แบบฝึกหัดเดิมและประวัติการตอบยังอยู่', confirmLabel: 'ยกเลิกการแก้ไข', cancelLabel: 'แก้ไขต่อ' })) return
+    const originalSettings = editing ? exerciseSettings[editing.id] ?? defaultPracticeExerciseSettings(editing.id) : null
+    const changed = editing && (title.trim() !== editing.title || JSON.stringify(selectedIds) !== JSON.stringify(editing.questionIds)
+      || questionsPerPage !== originalSettings?.questionsPerPage || theme !== originalSettings?.theme)
+    if (changed && !await confirm({ title: 'ยกเลิกการแก้ไข?', description: 'ชื่อ รายการโจทย์ และการตั้งค่าที่เปลี่ยนไว้จะไม่ถูกบันทึก แบบฝึกหัดเดิมและประวัติการตอบยังอยู่', confirmLabel: 'ยกเลิกการแก้ไข', cancelLabel: 'แก้ไขต่อ' })) return
     clearEditor()
   }
   function saveExercise(event: React.FormEvent) {
@@ -270,89 +288,10 @@ export function PracticeLibraryView({
         </div>
       </header>
 
-      {!activeExercise && <Card
-        edge="none"
-        padding="none"
-        radius="md"
-        className="flex flex-col gap-2 bg-transparent sm:border sm:border-border sm:bg-card sm:px-3 sm:py-2"
-      >
-        <Form
-          action=""
-          scroll={false}
-          className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 @min-[44rem]:grid-cols-[minmax(0,1fr)_minmax(12rem,0.55fr)_auto]"
-        >
-          {Object.entries(searchHiddenFields).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
-          {state.reviewOnly && <input type="hidden" name="review" value="1" />}
-          {state.tags.map(tag => <input key={tag} type="hidden" name="tag" value={tag} />)}
-          <div className="col-span-2 min-w-0 @min-[44rem]:col-span-1">
-            <Input
-              key={state.q}
-              name="q"
-              defaultValue={state.q}
-              placeholder="ค้นหาชื่อหรือเนื้อหาโจทย์"
-              aria-label="ค้นหาชื่อหรือเนื้อหาโจทย์"
-            />
-          </div>
-          <div className="min-w-0">
-            <Input
-              key={state.tags.join('\u0000')}
-              name="tag"
-              placeholder={tagLimitReached ? 'ลบแท็กก่อนเพิ่มแท็กใหม่' : 'ค้นหาแท็ก'}
-              aria-label="ค้นหาแท็ก"
-              maxLength={80}
-              disabled={tagLimitReached}
-            />
-          </div>
-          <Button
-            type="submit"
-            size="sm"
-            className="pointer-coarse:min-h-11"
-          >
-            <Search data-icon="inline-start" aria-hidden="true" />
-            <span className="sr-only @min-[44rem]:not-sr-only">ค้นหา</span>
-          </Button>
-        </Form>
-
-        {state.tags.length > 0 && (
-          <div
-            role="group"
-            className="flex min-w-0 items-center gap-1.5 overflow-x-auto pb-1"
-            aria-label="แท็กที่ต้องมีทั้งหมด เลื่อนไปด้านข้างเพื่อดูเพิ่มเติม"
-          >
-            <span className="text-xs text-muted-foreground">ต้องมีทุกแท็ก:</span>
-            {state.tags.map(tag => (
-              <Badge
-                key={tag}
-                variant="outline"
-                className="shrink-0 pointer-coarse:min-h-11"
-                render={<Link href={libraryHrefBuilder(library.id, state, {
-                  tags: state.tags.filter(value => value !== tag),
-                  page: 1,
-                })} />}
-                aria-label={`เอาแท็ก ${tag} ออก`}
-              >
-                {tag}
-                <X data-icon="inline-end" aria-hidden="true" />
-              </Badge>
-            ))}
-          </div>
-        )}
-      </Card>}
-
       <section aria-labelledby="my-practice-exercises" className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 id="my-practice-exercises" className="min-w-0 text-sm font-semibold sm:text-base">
-            <Tooltip open={exerciseHelpOpen} onOpenChange={setExerciseHelpOpen}>
-              <TooltipTrigger aria-describedby={exerciseHelpOpen ? 'practice-exercise-help' : undefined} className="flex items-center gap-1.5 rounded-lg py-1 outline-none focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:min-h-11">
-                <Layers className="size-4 shrink-0 text-primary" aria-hidden="true" />
-                แบบฝึกหัดของฉัน
-                <CircleHelp className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />
-              </TooltipTrigger>
-              <TooltipContent id="practice-exercise-help" role="tooltip" side="bottom" align="start" className="flex-col items-start">
-                <p>ติ๊กเลือกโจทย์ด้านล่าง แล้วตั้งชื่อเพื่อสร้างแบบฝึกหัดของตัวเอง</p>
-                {exercises.length > 0 && <p>นับข้อที่กดตรวจคำตอบอย่างน้อยหนึ่งครั้ง รวมการตอบก่อนสร้างแบบฝึกหัด</p>}
-              </TooltipContent>
-            </Tooltip>
+          <h2 id="my-practice-exercises" className="flex min-w-0 items-center gap-1.5 text-sm font-semibold sm:text-base">
+            <Layers className="size-4 shrink-0 text-primary" aria-hidden="true" />แบบฝึกหัดของฉัน
           </h2>
           <div role="group" className="flex flex-wrap items-center gap-1.5" aria-label="โจทย์ที่ปักไว้ทบทวน">
             <Button variant={state.reviewOnly ? 'navigation' : 'outline'} size="sm" className="pointer-coarse:min-h-11" disabled={!pinsReady}
@@ -383,6 +322,70 @@ export function PracticeLibraryView({
             startHref={exerciseHrefBuilder(library.id, exercise.id)} />)}
         </div>}
       </section>
+
+      <h2 id="create-practice-exercise" aria-label="สร้างแบบฝึกหัด" className="min-w-0 text-sm font-semibold sm:text-base">
+        <Tooltip open={exerciseHelpOpen} onOpenChange={setExerciseHelpOpen}>
+          <TooltipTrigger aria-label="วิธีสร้างแบบฝึกหัด" aria-describedby={exerciseHelpOpen ? 'practice-exercise-help' : undefined} className="flex items-center gap-1.5 rounded-lg py-1 outline-none focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:min-h-11">
+            สร้างแบบฝึกหัด
+            <CircleHelp className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />
+          </TooltipTrigger>
+          <TooltipContent id="practice-exercise-help" role="tooltip" side="bottom" align="start" className="max-w-80">
+            เลือกโจทย์ที่ต้องการจากรายการด้านล่าง จากนั้นกดปุ่ม “สร้างแบบฝึกหัด” เพื่อกำหนดชื่อ จำนวนโจทย์ต่อหน้า และธีมสี โดยสามารถเลือกโจทย์ข้ามหน้าและใช้ตัวกรองแท็กเพื่อจำกัดรายการโจทย์ได้
+          </TooltipContent>
+        </Tooltip>
+      </h2>
+
+      {!activeExercise && <Card
+        edge="none" padding="none" radius="md"
+        className="flex min-w-0 flex-col gap-2 bg-transparent sm:border sm:border-border sm:bg-card sm:px-3 sm:py-2"
+      >
+        <Collapsible ref={tagFilterRef} open={tagFilterOpen} onOpenChange={setTagFilterOpen} className="min-w-0">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <Form action="" scroll={false} className="flex min-w-0 flex-1 items-center gap-2">
+              {Object.entries(searchHiddenFields).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
+              {state.reviewOnly && <input type="hidden" name="review" value="1" />}
+              {state.tags.map(tag => <input key={tag} type="hidden" name="tag" value={tag} />)}
+              <Input key={state.q} name="q" defaultValue={state.q} placeholder="ค้นหาชื่อหรือเนื้อหาโจทย์" aria-label="ค้นหาชื่อหรือเนื้อหาโจทย์" className="min-w-0 flex-1" />
+              <Button type="submit" size="sm" className="shrink-0 pointer-coarse:min-h-11" aria-label="ค้นหาโจทย์">
+                <Search data-icon="inline-start" aria-hidden="true" /><span className="hidden sm:inline">ค้นหา</span>
+              </Button>
+            </Form>
+            <CollapsibleTrigger ref={tagFilterButtonRef} disabled={tagLimitReached} data-practice-tag-filter render={<Button type="button" variant="outline" size="sm" className="shrink-0 pointer-coarse:min-h-11" disabled={tagLimitReached} />}
+              aria-label="เพิ่มตัวกรองแท็ก" title={tagLimitReached ? 'ครบจำนวนตัวกรองแท็ก กรุณานำตัวกรองเดิมออกก่อน' : 'เพิ่มตัวกรองแท็ก'}>
+              <Plus data-icon="inline-start" aria-hidden="true" /><span className="hidden sm:inline">เพิ่มตัวกรองแท็ก</span><span className="sm:hidden">แท็ก</span>
+            </CollapsibleTrigger>
+          </div>
+          <CollapsibleContent data-practice-tag-filter className="min-w-0 pt-2" onKeyDown={event => {
+            if (event.key === 'Escape') { event.stopPropagation(); setTagFilterOpen(false); tagFilterButtonRef.current?.focus() }
+          }}>
+            <Form action="" scroll={false} className="flex min-w-0 items-center gap-2" onSubmit={event => {
+              const tag = (tagFilterInputRef.current?.value ?? '').replace(/\s+/g, ' ').trim()
+              if (!tag) { event.preventDefault(); toast.error('กรุณาระบุแท็กที่ต้องการกรอง'); return }
+              if (state.tags.some(value => value.toLocaleLowerCase('th-TH') === tag.toLocaleLowerCase('th-TH'))) {
+                event.preventDefault(); setTagFilterOpen(false); tagFilterButtonRef.current?.focus(); toast.info('ใช้ตัวกรองแท็กนี้อยู่แล้ว')
+              }
+            }}>
+              {Object.entries(searchHiddenFields).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
+              <input type="hidden" name="q" value={state.q} />
+              {state.reviewOnly && <input type="hidden" name="review" value="1" />}
+              {state.tags.map(tag => <input key={tag} type="hidden" name="tag" value={tag} />)}
+              <Input key={state.tags.join('\u0000')} ref={tagFilterInputRef} name="tag" required maxLength={80} placeholder="ระบุแท็กที่ต้องการกรอง" aria-label="แท็กสำหรับกรองโจทย์" className="min-w-0 flex-1" disabled={tagLimitReached} />
+              <Button type="submit" size="sm" className="shrink-0 pointer-coarse:min-h-11" disabled={tagLimitReached}>
+                <Plus data-icon="inline-start" aria-hidden="true" />เพิ่มตัวกรอง
+              </Button>
+            </Form>
+          </CollapsibleContent>
+        </Collapsible>
+        {state.tags.length > 0 && <div role="group" className="flex min-w-0 flex-wrap items-center gap-1.5" aria-label="ตัวกรองแท็กที่ต้องมีทั้งหมด">
+          <span className="text-xs text-muted-foreground">แท็กที่ต้องมี:</span>
+          {state.tags.map(tag => <Badge key={tag} variant="outline" className="max-w-full pointer-coarse:min-h-11"
+            render={<Link href={libraryHrefBuilder(library.id, state, { tags: state.tags.filter(value => value !== tag), page: 1 })} />}
+            aria-label={`นำตัวกรองแท็ก ${tag} ออก`}>
+            <span className="truncate">{tag}</span><X data-icon="inline-end" aria-hidden="true" />
+          </Badge>)}
+        </div>}
+      </Card>}
+
 
       <Card radius="md" padding="none" className="flex flex-col gap-2 px-3 py-1.5">
         {editing && <div className="flex flex-wrap items-center justify-between gap-2">
@@ -442,7 +445,7 @@ export function PracticeLibraryView({
               <EmptyTitle>{state.reviewOnly ? 'ยังไม่มีโจทย์ที่ปักไว้ตามตัวกรองนี้' : hasFilters ? 'ไม่พบโจทย์ตามตัวกรองนี้' : 'คลังนี้ยังไม่มีโจทย์'}</EmptyTitle>
               <EmptyDescription>
                 {state.reviewOnly ? 'กดปักไว้ทบทวนบนการ์ดโจทย์ แล้วกลับมาดูได้ที่นี่' : hasFilters
-                  ? 'ลองลดจำนวนแท็กหรือเปลี่ยนคำค้น แล้วค้นหาอีกครั้ง'
+                  ? 'ลองนำตัวกรองแท็กออกหรือเปลี่ยนคำค้น'
                   : 'เมื่อครูเพิ่มโจทย์และเผยแพร่แล้ว รายการจะปรากฏตรงนี้'}
               </EmptyDescription>
             </EmptyHeader>
@@ -481,12 +484,13 @@ export function PracticeLibraryView({
         } else if (editing) void cancelEdit()
         else { setNaming(false); setTitle('') }
       }}>
-        <DialogContent className="sm:max-w-md" initialFocus={editorRef} finalFocus={namingTriggerRef}>
-          <DialogHeader>
+        <DialogContent className="flex min-w-0 flex-col gap-3 overflow-hidden sm:max-w-lg" initialFocus={editorRef} finalFocus={namingTriggerRef}>
+          <DialogHeader className="min-w-0 pr-8">
             <DialogTitle>{editing ? 'แก้ไขแบบฝึกหัดของฉัน' : 'สร้างแบบฝึกหัดของฉัน'}</DialogTitle>
             <DialogDescription>{selectedIds.length} ข้อที่เลือก · ไม่เลือกสี ระบบจะสุ่มให้</DialogDescription>
           </DialogHeader>
-          <form onSubmit={saveExercise} className="flex flex-col gap-3">
+          <form onSubmit={saveExercise} className="flex min-h-0 min-w-0 flex-col gap-3 overflow-hidden">
+          <div className="flex min-h-0 min-w-0 flex-col gap-3 overflow-y-auto px-1 py-1" role="region" aria-label="การตั้งค่าแบบฝึกหัด" tabIndex={0}>
           <FieldGroup className="min-w-0"><Field className="gap-1" data-invalid={Boolean(error)}>
             <FieldLabel htmlFor="practice-exercise-name">ชื่อแบบฝึกหัด</FieldLabel>
             <Input ref={editorRef} id="practice-exercise-name" value={title} maxLength={120} required autoFocus disabled={pending}
@@ -500,12 +504,12 @@ export function PracticeLibraryView({
             </NativeSelect>
           </Field></FieldGroup>
           <ClassroomCoverThemePicker value={theme} onValueChange={setTheme} disabled={pending} allowAuto />
-          {editing && <div className="flex flex-col gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => { rememberEdit(editing, title); setNaming(false) }}>เลือกโจทย์เพิ่มจากคลัง</Button>
-            <ol className="flex max-h-60 flex-col gap-1 overflow-y-auto" aria-label="โจทย์ที่เลือกในแบบฝึกหัด">
-              {selectedIds.map(id => <li key={id} className="flex items-center justify-between gap-2">
-                <span className="min-w-0 truncate text-sm">{selected[id]}</span>
-                <Button type="button" variant="ghost" className="min-h-11 shrink-0" disabled={pending}
+          {editing && <div className="flex min-w-0 flex-col gap-2">
+            <Button type="button" variant="outline" size="sm" className="w-full whitespace-normal" onClick={() => { rememberEdit(editing, title); setNaming(false) }}>เลือกโจทย์เพิ่มจากคลัง</Button>
+            <ol className="flex max-h-[min(15rem,30dvh)] min-w-0 flex-col gap-1 overflow-x-hidden overflow-y-auto" aria-label="โจทย์ที่เลือกในแบบฝึกหัด">
+              {selectedIds.map(id => <li key={id} className="flex min-w-0 items-center justify-between gap-2">
+                <span className="min-w-0 flex-1 truncate text-sm" title={selected[id]}>{selected[id]}</span>
+                <Button type="button" variant="ghost" size="sm" className="shrink-0 pointer-coarse:min-h-11" disabled={pending}
                   aria-label={`เอา ${selected[id]} ออกจากแบบฝึกหัด`}
                   onClick={() => { const next = { ...selected }; delete next[id]; updateSelection(next) }}>
                   <Minus data-icon="inline-start" aria-hidden="true" />เอาออก
@@ -513,7 +517,8 @@ export function PracticeLibraryView({
               </li>)}
             </ol>
           </div>}
-          <div className="flex flex-wrap gap-2">
+          </div>
+          <div className="flex min-w-0 shrink-0 flex-wrap gap-2">
             <Button type="submit" size="sm" className="pointer-coarse:min-h-11" disabled={pending || !title.trim() || selectedIds.length === 0}>{pending ? 'กำลังบันทึก…' : `${editing ? 'บันทึกการแก้ไข' : 'บันทึกแบบฝึกหัด'} ${selectedIds.length} ข้อ`}</Button>
             <Button type="button" variant="outline" size="sm" className="pointer-coarse:min-h-11" disabled={pending} onClick={() => { if (editing) void cancelEdit(); else { setNaming(false); setTitle('') } }}>{editing ? 'ยกเลิกการแก้ไข' : 'ยกเลิก'}</Button>
           </div>
