@@ -1,5 +1,11 @@
 # Brand, language และ UI rules
 
+## Student work status dots and classroom top edge — 15 October 2026
+
+การ์ดงานในห้องเรียนนักเรียนใช้จุดสถานะที่มุมขวาบนแทนแถบซ้ายและลูกศร: ใกล้กำหนดสี warning, รอทำสี primary, ส่งแล้วสี success ตาม studentWorkSeverity และ SEVERITY_DOT เดียวกับ legend/ปฏิทิน งานเลยกำหนดคง CircleAlert สี destructive และ pulse เดิมที่หยุดเมื่อ prefers-reduced-motion เปิดอยู่ ใช้คำอธิบายสถานะบนลิงก์/tooltip เดิมและป้ายข้อความด้านล่างร่วมด้วย ไม่มีแถวหรือความสูงใหม่ คงพื้นสีประเภทและขอบสำเร็จ การ์ดคลังฝึกนักเรียนถอดแถบสีซ้ายเช่นกัน แต่ไม่เพิ่มจุดสถานะงานที่คลังฝึกไม่มี ส่วนแถบ publish status มุมครูเป็นคนละความหมายและคงเดิม
+
+ห้องเรียนนักเรียนทั้งรายวิชาและครูที่ปรึกษาไม่มีแถวย้อนกลับ “ห้องเรียนของฉัน” เหนือหัวห้องอีกต่อไป ถอดทั้งแถวพร้อม gap ให้หัวห้อง ปฏิทิน และส่วนต่อจากนั้นขยับขึ้นร่วมกัน ใช้ระยะจาก shell เดิม ไม่เพิ่ม placeholder ชดเชยพื้นที่
+
 ## Reuse picker and transfer details - 15 October 2026
 
 The source picker includes exercise, exam and feature-enabled practice libraries with type identities, wrapping long menu titles, and container-based columns at 38rem. AssignmentReuseDetails uses formal Thai and separates transferred content/settings from excluded learner history. It switches to practice-specific details when a library is selected. The guidance explicitly distinguishes references to existing bank questions from cloned questions, retained schedules/access codes from the new SEB quit password, and destination recipients from source roster/history. Missing or unsupported questions require explicit removal before saving; they are never silently dropped.

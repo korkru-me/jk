@@ -1,5 +1,4 @@
-import Link from 'next/link'
-import { ChevronLeft, Users } from 'lucide-react'
+import { Users } from 'lucide-react'
 import { ClassroomStream } from './classroom-stream'
 import { AssignmentCalendar, type CalendarEvent } from '@/app/(app)/dashboard/_components/assignment-calendar'
 import type { Classroom, ClassroomPost } from '@/lib/types'
@@ -14,7 +13,6 @@ interface Props {
   classmates: HomeroomClassmate[]
   calendarEvents: CalendarEvent[]
   posts: ClassroomPost[]
-  backHref?: string
   trackSeen?: boolean
   initialNow?: string
   previewLabel?: string
@@ -22,14 +20,11 @@ interface Props {
 
 export function HomeroomStudentView({
   classroom, teacherName, studentCount, classmates,
-  calendarEvents, posts, backHref = '/dashboard#classrooms', trackSeen = true, initialNow, previewLabel,
+  calendarEvents, posts, trackSeen = true, initialNow, previewLabel,
 }: Props) {
   return (
     <div className="student-learning-stage @container/homeroom flex w-full min-w-0 flex-col gap-3" data-student-homeroom>
       {previewLabel && <p className="text-xs text-muted-foreground">{previewLabel}</p>}
-      <Link href={backHref} className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground">
-        <ChevronLeft className="size-4" aria-hidden="true" /> ห้องเรียนของฉัน
-      </Link>
       <div className="grid items-start gap-4 @min-[46rem]/homeroom:grid-cols-[minmax(0,1fr)_14rem] @min-[64rem]/homeroom:grid-cols-[minmax(0,1fr)_16rem]" data-student-homeroom-grid>
         <div className="flex min-w-0 flex-col gap-4" data-student-homeroom-content>
           <StudentClassroomHeader classroom={classroom} teacherName={teacherName} studentCount={studentCount} />

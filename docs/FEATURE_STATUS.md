@@ -1,5 +1,12 @@
 # Feature status
 
+## Student work status dots and classroom top edge — 15 October 2026 (local only)
+
+- การ์ดงานนักเรียนในทั้งภาพรวม/งานที่มอบหมายถอดแถบสถานะซ้ายและลูกศรมุมขวา ใช้จุดสี warning/primary/success ที่มุมขวาบนตามสถานะเดิม งานเลยกำหนดใช้เครื่องหมายตกใจแดง pulse เดิม พร้อมรองรับ reduced motion ไม่เปลี่ยนกติกาวันกำหนดส่ง completion gate คะแนน และตัวเลขงานค้างส่ง การ์ดคลังฝึกนักเรียนไม่มีแถบสีซ้ายและไม่สมมติสถานะส่งงานให้คลังฝึก
+- ถอดลิงก์ย้อนกลับห้องเรียนของฉันและแถวทั้งหมดทั้งห้องรายวิชา/ครูที่ปรึกษา รวม prop ที่เลิกใช้และตัวอย่าง local ทำให้หัวห้องและปฏิทินขึ้นพร้อมกัน ทางย้อนกลับของครูไม่เปลี่ยน
+- ตรวจ local fixture 1440/320px: ทั้งสี่สถานะตรงกับ legend, ไม่มีแถบซ้าย/ลูกศร, ตัวกรองต้องทำคงอยู่เมื่อสลับแท็บ, ทั้งสองหน้าห้องเรียนไม่มีลิงก์ย้อนกลับและไม่มี overflow; ความสูงการ์ดตัวอย่างห้ารายการแรกเท่าเดิม หัวห้องรายวิชาขึ้นประมาณ 58px และห้องที่ปรึกษาขึ้นประมาณ 34px ใน viewport ที่วัด ตรวจ scoped axe ของการ์ดทั้งสว่าง/มืดไม่พบ violation/incomplete และ reduced motion หยุด pulse
+- TypeScript, lint:tokens และ isolated Webpack production build ผ่าน เป็นการปรับการแสดงผลจึงไม่รัน unit suite ซ้ำ ไม่มี migration ไม่ทดสอบบัญชีจริงหรือเขียนฐานข้อมูล งานเก็บ local ไม่ push/deploy
+
 ## Cross-classroom practice reuse - 15 October 2026
 
 - The reuse hub now merges paginated practice metadata under the feature flag, ordinary RLS and manageable same-organization classroom scope. Query errors remain distinct from an empty list. Practice selections open /practice/new with destination classroom and source copy parameters.

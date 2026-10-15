@@ -108,7 +108,6 @@ export default async function ClassroomDetailPage({
           classmates={classmates}
           calendarEvents={calendarEvents}
           posts={posts}
-          backHref={backHrefFromSearchParams(sp, '/dashboard#classrooms')}
         />
       )
     }
@@ -237,7 +236,6 @@ export default async function ClassroomDetailPage({
         categories={(assignmentCategoryRows ?? []) as AssignmentCategory[]}
         posts={posts}
         practiceLibraries={practiceLibraries}
-        backHref={backHrefFromSearchParams(sp, '/dashboard#classrooms')}
       />
     )
   }

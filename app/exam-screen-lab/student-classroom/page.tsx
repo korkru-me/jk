@@ -100,13 +100,13 @@ export default async function StudentClassroomLabPage({ searchParams }: { search
         classmates={scenario === 'homeroom-empty' ? [] : classmates}
         calendarEvents={scenario === 'homeroom-empty' ? [] : [...classroomCalendarEvents(ASSIGNMENTS, ROOM.name).map(event => ({ ...event, href: assignmentHrefs[event.id] })), { id: 'lab-other-subject', title: 'ใบงานคณิตศาสตร์จากอีกห้อง', classroomName: 'คณิตศาสตร์ 1', endAt: '2026-10-15T16:00:00+07:00', done: false, submissionId: null, href: '/exam-screen-lab/student-dashboard' }]}
         posts={scenario === 'homeroom-empty' ? [] : posts} trackSeen={false} initialNow={NOW}
-        previewLabel="ตัวอย่างสำหรับตรวจหน้าตา · ห้องเรียน ประกาศ และเพื่อนร่วมชั้นจำลอง" backHref="/exam-screen-lab/student-dashboard#classrooms" />
+        previewLabel="ตัวอย่างสำหรับตรวจหน้าตา · ห้องเรียน ประกาศ และเพื่อนร่วมชั้นจำลอง" />
     </ShellClient>
   }
   return (
     <ShellClient user={USER} initialUnreadCount={0} notificationsEnabled={false}>
         {selected && <Card id="preview-work" padding="md" className="flex scroll-mt-20 flex-col gap-2"><h2 className="font-semibold">{selected.title}</h2><p className="text-sm text-muted-foreground">เปิดการ์ดงานแล้ว · รายละเอียดจำลองสำหรับตรวจการกดทั้งกรอบ ไม่มีการเริ่มทำหรือส่งงานจริง</p><Link href={`/exam-screen-lab/student-classroom?complete=${encodeURIComponent(selected.id)}&tab=assignments`} className="text-sm text-primary hover:underline">จำลองทำงานเสร็จ</Link><Link href="/exam-screen-lab/student-classroom" className="text-sm text-primary hover:underline">กลับรายการงาน</Link></Card>}
-        <StudentClassroomView classroom={classroom} teacherName="ครูผู้สอนจำลอง" studentCount={3} assignments={assignments} categories={scenario === 'empty' ? [] : CATEGORIES} posts={subjectPosts} practiceLibraries={practiceLibraries} trackSeen={false} backHref="/exam-screen-lab/student-dashboard#classrooms" assignmentHrefs={assignmentHrefs} initialNow={NOW} previewLabel="ตัวอย่างสำหรับตรวจหน้าตา · ห้องเรียนและงานจำลอง" />
+        <StudentClassroomView classroom={classroom} teacherName="ครูผู้สอนจำลอง" studentCount={3} assignments={assignments} categories={scenario === 'empty' ? [] : CATEGORIES} posts={subjectPosts} practiceLibraries={practiceLibraries} trackSeen={false} assignmentHrefs={assignmentHrefs} initialNow={NOW} previewLabel="ตัวอย่างสำหรับตรวจหน้าตา · ห้องเรียนและงานจำลอง" />
     </ShellClient>
   )
 }

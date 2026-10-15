@@ -19,7 +19,6 @@ interface Props {
   assignments: StudentAssignmentRow[]
   categories: AssignmentCategory[]
   posts: ClassroomPost[]
-  backHref?: string
   trackSeen?: boolean
   assignmentHrefs?: Record<string, string>
   initialNow?: string
@@ -27,14 +26,14 @@ interface Props {
   previewLabel?: string
 }
 
-export function StudentClassroomView({ classroom, teacherName, studentCount, assignments, categories, posts, backHref = '/dashboard#classrooms', trackSeen = true, assignmentHrefs, initialNow, practiceLibraries, previewLabel }: Props) {
+export function StudentClassroomView({ classroom, teacherName, studentCount, assignments, categories, posts, trackSeen = true, assignmentHrefs, initialNow, practiceLibraries, previewLabel }: Props) {
   const calendarEvents = classroomCalendarEvents(assignments, classroom.name).map(event => ({ ...event, href: assignmentHrefs?.[event.id] }))
 
   return (
     <div className="student-learning-stage @container/subject flex w-full min-w-0 flex-col gap-3" data-student-subject>
       {previewLabel && <p className="text-xs text-muted-foreground">{previewLabel}</p>}
       <StudentClassroomTabs assignments={assignments} categories={categories} classroomDescription={classroom.description}
-        classroomName={classroom.name} backHref={backHref} assignmentHrefs={assignmentHrefs}
+        classroomName={classroom.name} assignmentHrefs={assignmentHrefs}
         initialNow={initialNow ?? new Date().toISOString()} liveTime={initialNow === undefined}
         header={<StudentClassroomHeader classroom={classroom} teacherName={teacherName} studentCount={studentCount} />}
         calendar={<AssignmentCalendar events={calendarEvents} initialNow={initialNow} scopeLabel={classroom.name} />}

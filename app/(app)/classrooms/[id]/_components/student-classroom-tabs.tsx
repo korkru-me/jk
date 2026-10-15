@@ -1,9 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ChevronLeft } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -14,14 +12,13 @@ import type { AssignmentCategory } from '@/lib/assignment-categories'
 import type { StudentAssignmentRow } from './assignment-status'
 import { AssignmentList } from './assignment-list'
 
-export function StudentClassroomTabs({ assignments, categories, classroomDescription, classroomName, backHref,
+export function StudentClassroomTabs({ assignments, categories, classroomDescription, classroomName,
   assignmentHrefs, initialNow, liveTime, header, announcements, practiceLibraries, calendar,
 }: {
   assignments: StudentAssignmentRow[]
   categories: AssignmentCategory[]
   classroomDescription: string | null
   classroomName: string
-  backHref: string
   assignmentHrefs?: Record<string, string>
   initialNow: string
   liveTime: boolean
@@ -74,11 +71,6 @@ export function StudentClassroomTabs({ assignments, categories, classroomDescrip
       else url.searchParams.set('tab', value)
       window.history.pushState(null, '', `${url.pathname}${url.search}${url.hash}`)
     }} className="min-w-0 gap-3" data-student-classroom-tabs>
-      <div className="flex min-w-0 items-center">
-        <Link href={backHref} aria-label="ห้องเรียนของฉัน" title="ห้องเรียนของฉัน" className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground @min-[34rem]/subject:min-w-0">
-          <ChevronLeft className="size-4" aria-hidden="true" /><span className="hidden @min-[34rem]/subject:inline">ห้องเรียนของฉัน</span>
-        </Link>
-      </div>
       <div className="grid items-start gap-4 @min-[46rem]/subject:grid-cols-[minmax(0,1fr)_14rem] @min-[64rem]/subject:grid-cols-[minmax(0,1fr)_16rem]" data-student-subject-grid>
         <div className="flex min-w-0 flex-col gap-3" data-student-subject-content>
           {header}
