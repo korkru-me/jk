@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import {
   CheckCircle2, CircleDashed, MinusCircle, XCircle, AlertTriangle,
-  MessageSquare, Trash2, ChevronDown, ChevronUp, Printer, IdCard, Info,
+  MessageSquare, Trash2, ChevronDown, ChevronUp, IdCard, Info,
 } from 'lucide-react'
 import { computePassed } from '@/lib/grading'
 import { selectOfficialAttempt } from '@/lib/scoring'
@@ -227,16 +227,6 @@ export function HomeroomOverview({ classroomId, students, assignments, submissio
 
   return (
     <div className="space-y-5">
-      <div className="flex justify-end">
-        <Link
-          href={`/classrooms/${classroomId}/report`}
-          target="_blank"
-          className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-muted-foreground px-3 py-1.5 rounded-lg hover:bg-muted border border-border transition-colors"
-        >
-          <Printer className="w-3.5 h-3.5" /> พิมพ์รายงานผู้ปกครอง
-        </Link>
-      </div>
-
       {assignments.length === 0 ? (
         <Card edge="ring" className="py-10 text-center text-sm text-muted-foreground">
           ยังไม่มีการบ้านจากห้องเรียนวิชาของนักเรียนกลุ่มนี้

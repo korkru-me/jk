@@ -38,6 +38,7 @@ export default async function ClassroomGroupsLabPage({
     <ClassroomGroupsLabClient
       scenario={picked}
       fail={(Array.isArray(fail) ? fail[0] : fail) === '1'}
+      homeroomOnly={(Array.isArray(view) ? view[0] : view) === 'homeroom'}
       overviewOnly={(Array.isArray(view) ? view[0] : view) === 'overview'}
       workOnly={(Array.isArray(view) ? view[0] : view) === 'work'}
     />

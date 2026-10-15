@@ -6,7 +6,7 @@ import type { GroupState } from '@/app/(app)/classrooms/[id]/_components/breakou
 import {
   ClassroomPeopleTabs, type PeopleView,
 } from '@/app/(app)/classrooms/[id]/_components/classroom-people-tabs'
-import type { StudentProfileRow } from '@/app/(app)/classrooms/[id]/_components/homeroom-overview'
+import { HomeroomOverview, type StudentProfileRow } from '@/app/(app)/classrooms/[id]/_components/homeroom-overview'
 import {
   ClassroomAssignmentsTab,
   type ClassroomAssignmentRow,
@@ -155,11 +155,13 @@ export function ClassroomGroupsLabClient({
   scenario,
   fail,
   overviewOnly = false,
+  homeroomOnly = false,
   workOnly = false,
 }: {
   scenario: GroupsLabScenario
   fail: boolean
   overviewOnly?: boolean
+  homeroomOnly?: boolean
   workOnly?: boolean
 }) {
   const seed = useMemo(() => initial(scenario), [scenario])
@@ -315,6 +317,14 @@ export function ClassroomGroupsLabClient({
       }}
     />
   )
+
+  if (homeroomOnly) return <main className="flex flex-col gap-4 p-4 sm:p-6">
+    <p className="text-xs text-muted-foreground">Homeroom presentation fixture · synthetic data only</p>
+    <ClassroomOverview classroomId={CLASSROOM_ID} isHomeroom students={[]} assignments={[]}
+      homeroomAssignments={[]} submissions={[]} posts={[]} seenByPost={{}} crossPostTargets={[]}
+      canManage onNavigate={() => undefined} />
+    <HomeroomOverview classroomId={CLASSROOM_ID} students={[]} assignments={[]} submissions={[]} notes={[]} profiles={{}} />
+  </main>
 
   if (workOnly) {
     return <div className="mx-auto w-full min-w-0 max-w-7xl p-4 sm:p-6">{workFixture}</div>

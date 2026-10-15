@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { ChevronRight, Eye, Printer } from 'lucide-react'
+import { ChevronRight, Eye } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { AssignmentCreationMenu } from '@/components/assignments/assignment-creation-menu'
 import { ClassroomStream } from './classroom-stream'
@@ -182,21 +182,6 @@ export function ClassroomOverview({
   return (
     <div className="@container/overview flex min-w-0 flex-col gap-4">
       {announcements}
-
-      {/* The contextual sidebar already owns navigation actions. Homeroom's
-          printable parent report stays here because it is a page-specific
-          export, not another destination in that navigation. */}
-      {isHomeroom && (
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href={`/classrooms/${classroomId}/report`}
-            target="_blank"
-            className={cn(buttonVariants({ variant: 'outline', size: 'lg' }), 'gap-1.5')}
-          >
-            <Printer className="w-4 h-4" /> พิมพ์รายงานผู้ปกครอง
-          </Link>
-        </div>
-      )}
 
       <div className="grid min-w-0 items-start gap-4 @min-[56rem]/overview:grid-cols-[minmax(0,1fr)_20rem]" data-classroom-overview-panels>
         {/* ── Assignment progress ─────────────────────────────────────── */}

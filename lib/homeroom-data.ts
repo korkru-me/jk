@@ -24,8 +24,8 @@ export interface HomeroomSubmissionRow {
 }
 
 // A homeroom classroom has no assignments of its own — it monitors whatever
-// the roster's students are assigned in their *subject* classrooms. Shared
-// by the classroom detail page and the printable parent report page.
+// the roster's students are assigned in their *subject* classrooms. Used by
+// the classroom detail page for the overview and homework panels.
 export async function getHomeroomAggregate(
   admin: ReturnType<typeof createAdminClient>,
   homeroomClassroomId: string,
