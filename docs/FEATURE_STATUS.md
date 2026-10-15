@@ -1,5 +1,12 @@
 # Feature status
 
+### ปฏิทินนักเรียนชิดขอบขวาและขยายพื้นที่ — 15 ตุลาคม 2026 (local preview)
+
+- Dashboard ห้องรายวิชา และโฮมรูมใช้ความกว้าง main เต็ม: เนื้อหา 1fr + ปฏิทิน 14rem เมื่อ container ≥46rem และ 16rem เมื่อ ≥64rem. นำ max-width ซ้อนของ Card กับ notification-anchor เฉพาะ student-learning-stage ออก; ตอนย่อ/ขยาย sidebar ขอบขวาปฏิทินคงที่ และจอแคบเรียงหนึ่งคอลัมน์เต็มพื้นที่
+- ที่ fixture 1440px/sidebar เต็ม ช่องว่างเกินขอบเนื้อหาขวา 52.2→0px ปฏิทิน 224→256px เนื้อหา 779.8→800px และปฏิทินสูง 312.2→283.4px เพราะ legend อยู่แถวเดียว. ตรวจทั้งสามหน้าที่ 320/768/1280px, เพิ่ม 1440/1920px และ sidebar ย่อ/เต็ม ไม่มี horizontal overflow และขอบขวาตรง main padding ทุกกรณี
+- Synthetic Chrome ตรวจ sticky scroll, วันมี 12 งาน/hover details ไม่ล้น, ขยายปฏิทิน, เดือนถัดไป/วันนี้/ปิด และ React StudentDashboard/AssignmentCalendar จริง. TypeScript, token lint, isolated webpack production build และ Next compilation/runtime ผ่าน; scoped calendar WCAG 0 violations มี contrast incomplete ที่ตรวจภาพร่วม ไม่อ้างการรับรองทุกกรณี
+- เปลี่ยน layout เท่านั้น ไม่รัน full unit suite ซ้ำ ไม่มี migration/การเปลี่ยนข้อมูลหรือ hosted-account test; เก็บ local commit บน `codex/student-classroom-cards` ไม่ push/deploy ตาม scope เดิม
+
 ### แก้หน้าต่างแก้ไขชุดฝึกและแยกตัวกรองแท็ก — 15 ตุลาคม 2026 (local preview)
 
 - จำลองแก้ชุด 61 ข้อชื่อยาวแล้วพบ dialog 448px มี scrollWidth 2369px ทำให้ฟอร์มล้น; เปลี่ยนโครงสร้างเป็น flex/min-w-0 จำกัด body/สมาชิกให้เลื่อนภายในและคง footer. Desktop กรอบ 512px มี scrollWidth 512px; 320×700px กรอบ 288px ไม่มี horizontal overflow ปุ่มบันทึก/ยกเลิกอยู่ใน viewport และเลื่อนถึงสมาชิกสุดท้ายได้

@@ -35,11 +35,11 @@ export function StudentDashboard({ user, data, calendarNow, recentPosts, initial
   const greeting = hour < 12 ? 'สวัสดีตอนเช้า' : hour < 17 ? 'สวัสดีตอนบ่าย' : 'สวัสดีตอนเย็น'
 
   return (
-    <div className="student-learning-stage @container/learning flex w-full min-w-0 flex-col gap-3 [--student-content-width:calc(100%-15rem)]" data-student-dashboard>
+    <div className="student-learning-stage @container/learning flex w-full min-w-0 flex-col gap-3" data-student-dashboard>
       <h1 className="sr-only">พื้นที่เรียนรู้ของฉัน</h1>
       <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-base font-medium"><span>{greeting} 👋</span><span className="text-lg font-bold text-primary">{user.full_name}</span></p>
       {previewLabel && <p className="text-xs text-muted-foreground">{previewLabel}</p>}
-      <div className="grid items-start gap-4 @min-[46rem]/learning:grid-cols-[minmax(0,var(--student-content-width))_minmax(0,1fr)]" data-student-learning-grid>
+      <div className="grid items-start gap-4 @min-[46rem]/learning:grid-cols-[minmax(0,1fr)_14rem] @min-[64rem]/learning:grid-cols-[minmax(0,1fr)_16rem]" data-student-learning-grid>
         <div className="flex min-w-0 flex-col gap-6">
           <section id="classrooms" aria-labelledby="student-classrooms-heading" className="scroll-mt-20">
             <StudentView classrooms={data.classrooms} pendingCountMap={data.pendingCountMap} initialJoinCode={initialJoinCode} joinAction={joinAction} embedded backHref={backHref} />

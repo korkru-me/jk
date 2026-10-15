@@ -165,7 +165,7 @@ export function AssignmentCalendar({ events, initialNow, scopeLabel }: { events:
 
   return (
     <Dialog open={expanded} onOpenChange={open => { setExpanded(open); setPreviewDay(null) }}>
-      <Card padding="sm" className="flex w-full max-w-[14rem] flex-col gap-1" data-assignment-calendar>
+      <Card padding="sm" className="flex w-full min-w-0 flex-col gap-1" data-assignment-calendar>
         <div className="flex items-center justify-between gap-2">
           <h2 className="flex items-center gap-1.5 text-xs font-semibold"><CalendarDays className="size-3.5 text-primary" aria-hidden="true" /> ปฏิทินส่งงาน</h2>
           <DialogTrigger render={<Button type="button" variant="ghost" size="icon-xs" aria-label="ขยายปฏิทินทั้งเดือน" />}><Maximize2 /></DialogTrigger>

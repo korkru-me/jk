@@ -25,12 +25,12 @@ export function HomeroomStudentView({
   calendarEvents, posts, backHref = '/dashboard#classrooms', trackSeen = true, initialNow, previewLabel,
 }: Props) {
   return (
-    <div className="student-learning-stage @container/homeroom flex w-full min-w-0 flex-col gap-3 [--student-content-width:calc(100%-15rem)]" data-student-homeroom>
+    <div className="student-learning-stage @container/homeroom flex w-full min-w-0 flex-col gap-3" data-student-homeroom>
       {previewLabel && <p className="text-xs text-muted-foreground">{previewLabel}</p>}
       <Link href={backHref} className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground">
         <ChevronLeft className="size-4" aria-hidden="true" /> ห้องเรียนของฉัน
       </Link>
-      <div className="grid items-start gap-4 @min-[46rem]/homeroom:grid-cols-[minmax(0,var(--student-content-width))_minmax(0,1fr)]" data-student-homeroom-grid>
+      <div className="grid items-start gap-4 @min-[46rem]/homeroom:grid-cols-[minmax(0,1fr)_14rem] @min-[64rem]/homeroom:grid-cols-[minmax(0,1fr)_16rem]" data-student-homeroom-grid>
         <div className="flex min-w-0 flex-col gap-4" data-student-homeroom-content>
           <StudentClassroomHeader classroom={classroom} teacherName={teacherName} studentCount={studentCount} />
           <ClassroomStream classroomId={classroom.id} canPost={false} initialPosts={posts} variant="panel"
