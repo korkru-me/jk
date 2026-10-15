@@ -56,7 +56,11 @@ export default async function StudentClassroomLabPage({ searchParams }: { search
   const classroom = scenario === 'legacy' ? { ...ROOM, description: 'ห้องเรียนเดิมที่ยังไม่ได้เลือกสีปก' }
     : scenario?.startsWith('homeroom') ? { ...ROOM, name: 'ม.4/1', classroom_type: 'homeroom' as const, description: composeDescription({ ...EMPTY_META, cover: 'green', coverPattern: 'social-studies', gradeLevel: 'ม.4/1', academicTerm: '1/2569' }) }
     : ROOM
-  const assignments = (scenario === 'empty' ? [] : ASSIGNMENTS).map(assignment => scenario === 'completed' || assignment.id === complete ? {
+  const sampleAssignments = scenario === 'overdue-many' ? [...ASSIGNMENTS, ...Array.from({ length: 9 }, (_, index) => ({
+    ...BASE, id: `lab-overdue-${index}`, passing_type: null,
+    title: index === 0 ? 'แบบฝึกหัดทบทวนหลักการเคลื่อนที่และพลังงาน'.repeat(5) : `งานค้างส่งตัวอย่าง ${index + 1}`,
+  }))] : ASSIGNMENTS
+  const assignments = (scenario === 'empty' ? [] : sampleAssignments).map(assignment => scenario === 'completed' || assignment.id === complete ? {
     ...assignment, completion_reached: true, has_in_progress: false, attempts_used: Math.max(1, assignment.attempts_used),
     submission: { id: `lab-completed-${assignment.id}`, status: 'graded', total_score: null, max_score: 10 },
   } : assignment)

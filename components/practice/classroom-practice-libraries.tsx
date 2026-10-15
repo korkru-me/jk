@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ArrowRight, BookOpen, BookOpenCheck, Repeat } from 'lucide-react'
+import { BookOpen, BookOpenCheck, Folder, Repeat } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
@@ -8,6 +8,7 @@ import { PracticeLibraryListActions } from '@/app/(app)/practice/_components/pra
 import { PRACTICE_LIBRARY_STATUS_LABELS } from '@/app/(app)/practice/_lib/teacher-contract'
 import type { ClassroomPracticeLibrariesResult } from '@/lib/classroom-practice-libraries'
 import { coverOf, parseDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
+import { groupPreset } from '@/app/(app)/classrooms/_components/group-colors'
 import { cn } from '@/lib/utils'
 
 export function ClassroomPracticeLibraries({
@@ -22,11 +23,13 @@ export function ClassroomPracticeLibraries({
   classroomDescription?: string | null
 }) {
   const cover = coverOf(parseDescription(classroomDescription ?? null))
+  const practiceGroup = groupPreset('purple')
 
   return (
-    <section aria-labelledby="classroom-practice-heading" className="@container flex min-w-0 flex-col gap-2.5" data-classroom-practice-libraries>
-      <div className="flex flex-wrap items-center gap-2">
-        <h2 id="classroom-practice-heading" className="font-semibold">คลังฝึก</h2>
+    <section aria-labelledby="classroom-practice-heading" className={cn('@container flex min-w-0 flex-col', studentView ? 'gap-2' : 'gap-2.5')} data-classroom-practice-libraries>
+      <div className={cn('flex min-w-0 items-center gap-2', studentView ? `rounded-lg px-3 py-2 ${practiceGroup.surface}` : 'flex-wrap')}>
+        {studentView && <Folder className={cn('size-4 shrink-0', practiceGroup.text)} aria-hidden="true" />}
+        <h2 id="classroom-practice-heading" className={cn(studentView ? `min-w-0 break-words text-sm font-bold ${practiceGroup.text}` : 'font-semibold')}>คลังฝึก</h2>
         {!studentView && <Badge variant="outline">ไม่มีคะแนน</Badge>}
         {!studentView && !result.error && <span className="text-xs text-muted-foreground">{result.items.length} คลัง</span>}
       </div>
@@ -60,10 +63,7 @@ export function ClassroomPracticeLibraries({
                     <BookOpenCheck className="size-4" aria-hidden="true" />
                   </span>
                   <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                    <div className="flex min-w-0 items-start gap-2">
-                      <p className="min-w-0 flex-1 line-clamp-2 break-words text-sm font-semibold leading-snug" title={item.title}>{item.title}</p>
-                      <ArrowRight className="mt-0.5 size-3.5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden="true" />
-                    </div>
+                    <p className="min-w-0 line-clamp-2 break-words text-sm font-semibold leading-snug" title={item.title}>{item.title}</p>
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                       <span className={cn('font-medium', cover?.textMuted ?? 'text-foreground/75')}>คลังฝึก</span>
                       <span className="flex items-center gap-1"><BookOpen className="size-3" aria-hidden="true" />{item.questionCount} ข้อ</span>

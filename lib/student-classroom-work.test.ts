@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { classroomCalendarEvents, classroomWorkAlertCount, orderStudentClassroomWork } from './student-classroom-work'
+import { classroomCalendarEvents, classroomOverdueWork, classroomWorkAlertCount, orderStudentClassroomWork } from './student-classroom-work'
 import type { StudentAssignmentRow } from '@/app/(app)/classrooms/[id]/_components/assignment-status'
 import type { AssignmentCategory } from './assignment-categories'
 
@@ -8,25 +8,32 @@ const base: StudentAssignmentRow = { id: 'base', title: 'งาน', question_id
 const row = (id: string, group: string | null, done = false): StudentAssignmentRow => ({ ...base, id, category_id: group, submission: done ? { id: `sub-${id}`, status: 'submitted', total_score: null, max_score: 10 } : null })
 const all = [row('done-only', 'finished', true), row('mixed-done', 'mixed', true), row('mixed-first', 'mixed'), row('mixed-second', 'mixed'), row('pending-only', 'pending')]
 describe('student classroom work ordering and calendar projection', () => {
-  it('counts unfinished overdue/within-48-hour work once, independently of list filters', () => {
+  it('lists only unsubmitted overdue work once in teacher order, excluding upcoming/exact deadlines', () => {
     const now = Date.parse('2026-10-15T10:00:00+07:00')
     const overdue = { ...base, id: 'overdue' }
     const soon = { ...base, id: 'soon', end_at: new Date(now + 2 * 86400000 - 1).toISOString() }
-    expect(classroomWorkAlertCount([overdue, overdue, soon,
+    const work = [overdue, overdue, soon,
+      { ...base, id: 'exact', end_at: new Date(now).toISOString() },
+      { ...base, id: 'just-overdue', end_at: new Date(now - 1).toISOString() },
       { ...base, id: 'later', end_at: new Date(now + 2 * 86400000).toISOString() },
       { ...base, id: 'no-date', end_at: null }, { ...base, id: 'invalid', end_at: 'invalid' },
       row('finished', null, true),
-    ], now)).toBe(2)
+    ]
+    expect(classroomOverdueWork(work, now).map(a => a.id)).toEqual(['overdue', 'just-overdue'])
+    expect(classroomWorkAlertCount(work, now)).toBe(2)
     expect(classroomWorkAlertCount([], now)).toBe(0)
+    expect(classroomOverdueWork([], now)).toEqual([])
   })
-  it('keeps alerts while opened/in progress or failing mastery, and clears only on completion', () => {
+  it('keeps drafts in the reminder and clears submitted/graded work regardless of passing conditions', () => {
     const now = Date.parse('2026-10-15T10:00:00+07:00')
     expect(classroomWorkAlertCount([{ ...base, has_in_progress: true }], now)).toBe(1)
+    expect(classroomWorkAlertCount([{ ...row('draft', null, true), submission: { id: 'draft', status: 'in_progress', total_score: null, max_score: 10 }, completion_reached: true }], now)).toBe(1)
     const failed = { ...row('mastery', null, true), passing_type: 'percent' as const, passing_value: 70, completion_reached: false }
-    expect(classroomWorkAlertCount([failed], now)).toBe(1)
+    expect(classroomWorkAlertCount([failed], now)).toBe(0)
+    expect(classroomWorkAlertCount([{ ...failed, has_in_progress: true, submission: { ...failed.submission!, status: 'graded' } }], now)).toBe(0)
     expect(classroomWorkAlertCount([{ ...failed, completion_reached: true }], now)).toBe(0)
     const streak = { ...failed, passing_type: null, completion_rule: 'streak', streak_target: 5 }
-    expect(classroomWorkAlertCount([streak], now)).toBe(1)
+    expect(classroomWorkAlertCount([streak], now)).toBe(0)
     expect(classroomWorkAlertCount([{ ...streak, completion_reached: true }], now)).toBe(0)
   })
   it('moves completed work and fully completed groups last while preserving pending order', () => {
