@@ -125,7 +125,7 @@ export function TeacherDashboard({
         emptyText="ยังไม่มีห้องเรียน"
         emptyAction={{ href: '/classrooms/new', label: 'สร้างห้องเรียนแรก' }}
       >
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {classrooms.map(classroom => (
             <div key={classroom.id} data-dashboard-classroom-card>
               <ClassroomCard
