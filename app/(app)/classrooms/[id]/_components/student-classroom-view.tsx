@@ -61,7 +61,7 @@ export function StudentClassroomView({ classroom, teacherName, studentCount, ass
         <p className="text-xs text-muted-foreground">ยังไม่มีประกาศ</p>
       </Card>}
 
-      {practiceLibraries && <ClassroomPracticeLibraries result={practiceLibraries} studentView />}
+      {practiceLibraries && <ClassroomPracticeLibraries result={practiceLibraries} studentView classroomDescription={classroom.description} />}
 
       {/* Assignments */}
       <section aria-labelledby="classroom-work-heading" className="flex min-w-0 flex-col gap-2.5">

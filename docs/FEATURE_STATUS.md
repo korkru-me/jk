@@ -1,5 +1,11 @@
 # Feature status
 
+## คลังฝึกเป็นการ์ดเหมือนงานที่มอบหมาย — 15 ตุลาคม 2026 (local preview)
+
+- ห้องเรียนนักเรียนเปลี่ยนคลังฝึกจากแถวเต็มความกว้างเป็นการ์ดแยก 1/2/3 คอลัมน์ตามพื้นที่จริง ใช้ขนาดกรอบ ระยะ ไอคอนสีธีมห้อง ลูกศร และ focus แบบงานที่มอบหมาย กดทั้งกรอบเข้าหน้ารอเดิม พร้อมจำนวนข้อ/ไม่มีคะแนน/ฝึกซ้ำได้ ไม่เปลี่ยนข้อมูลหรือการจัดการของครู
+- เพิ่ม synthetic scenarios practice-one/many/empty/error ใน student-classroom lab ตรวจ Chrome ที่ 320/768/1024/1440/1920px: ความกว้างการ์ดเท่างานที่มอบหมายทุกขนาด ไม่มี overflow รวมชื่อไทยยาวและชื่ออังกฤษไม่เว้นวรรค ที่ 1440px จากแถวกว้าง 798px/สูง 76.8px เป็นการ์ดกว้าง 260.3px; หลายคลังสูงตามชื่อที่ยาวที่สุดในแถว (123.7px) ไม่ตั้งความสูงเกินจำเป็น
+- ตรวจ keyboard focus ring, link ปลายทาง, empty/error, React production components และ scoped WCAG audit 0 violations ผ่าน TypeScript, token lint, isolated webpack production build และ Next compilation/runtime; ไม่รัน unit suite หรือ hosted-account/ฐานข้อมูล เพราะเป็น presentation-only ไม่มี migration เก็บ local ตาม scope เดิม ไม่ push/deploy
+
 ### ปฏิทินนักเรียนชิดขอบขวาและขยายพื้นที่ — 15 ตุลาคม 2026 (local preview)
 
 - Dashboard ห้องรายวิชา และโฮมรูมใช้ความกว้าง main เต็ม: เนื้อหา 1fr + ปฏิทิน 14rem เมื่อ container ≥46rem และ 16rem เมื่อ ≥64rem. นำ max-width ซ้อนของ Card กับ notification-anchor เฉพาะ student-learning-stage ออก; ตอนย่อ/ขยาย sidebar ขอบขวาปฏิทินคงที่ และจอแคบเรียงหนึ่งคอลัมน์เต็มพื้นที่

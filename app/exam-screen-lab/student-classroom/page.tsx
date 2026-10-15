@@ -10,6 +10,7 @@ import { buildHomeroomClassmates } from '@/lib/student-homeroom-classmates'
 import type { Classroom, ClassroomPost } from '@/lib/types'
 import type { AssignmentCategory } from '@/lib/assignment-categories'
 import { classroomCalendarEvents } from '@/lib/student-classroom-work'
+import type { ClassroomPracticeLibrariesResult } from '@/lib/classroom-practice-libraries'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'ห้องเรียนนักเรียน · ตัวอย่าง — KorKru' }
@@ -56,6 +57,17 @@ export default async function StudentClassroomLabPage({ searchParams }: { search
     : scenario?.startsWith('homeroom') ? { ...ROOM, name: 'ม.4/1', classroom_type: 'homeroom' as const, description: composeDescription({ ...EMPTY_META, cover: 'green', coverPattern: 'social-studies', gradeLevel: 'ม.4/1', academicTerm: '1/2569' }) }
     : ROOM
   const assignments = scenario === 'empty' ? [] : ASSIGNMENTS
+  const practiceLibraries: ClassroomPracticeLibrariesResult | undefined = scenario?.startsWith('practice') ? {
+    error: scenario === 'practice-error' ? 'ข้อผิดพลาดจำลองสำหรับตรวจการแสดงผล' : null,
+    items: scenario === 'practice-empty' ? [] : [
+      { id: 'lab-practice-1', title: 'ทดสอบคลังฝึกนะ', status: 'published', questionCount: 143 },
+      ...(scenario === 'practice-one' ? [] : [
+        { id: 'lab-practice-2', title: 'ทบทวนแรงและกฎการเคลื่อนที่ของนิวตันสำหรับนักเรียนที่ต้องการฝึกฝนเพิ่มเติม', status: 'published' as const, questionCount: 24 },
+        { id: 'lab-practice-3', title: 'งานและพลังงาน', status: 'published' as const, questionCount: 0 },
+        { id: 'lab-practice-4', title: 'LongPracticeLibraryTitle'.repeat(8), status: 'published' as const, questionCount: 500 },
+      ]),
+    ],
+  } : undefined
   const selected = assignments.find(a => a.id === work)
   const assignmentHrefs = Object.fromEntries(assignments.map(a => [a.id, `/exam-screen-lab/student-classroom?work=${encodeURIComponent(a.id)}#preview-work`]))
   if (classroom.classroom_type === 'homeroom') {
@@ -81,7 +93,7 @@ export default async function StudentClassroomLabPage({ searchParams }: { search
   return (
     <ShellClient user={USER} initialUnreadCount={0} notificationsEnabled={false}>
         {selected && <Card id="preview-work" padding="md" className="flex scroll-mt-20 flex-col gap-2"><h2 className="font-semibold">{selected.title}</h2><p className="text-sm text-muted-foreground">เปิดการ์ดงานแล้ว · รายละเอียดจำลองสำหรับตรวจการกดทั้งกรอบ ไม่มีการเริ่มทำหรือส่งงานจริง</p><Link href="/exam-screen-lab/student-classroom" className="text-sm text-primary hover:underline">กลับรายการงาน</Link></Card>}
-        <StudentClassroomView classroom={classroom} teacherName="ครูผู้สอนจำลอง" studentCount={3} assignments={assignments} categories={scenario === 'empty' ? [] : CATEGORIES} posts={[]} trackSeen={false} backHref="/exam-screen-lab/student-dashboard#classrooms" assignmentHrefs={assignmentHrefs} initialNow={NOW} previewLabel="ตัวอย่างสำหรับตรวจหน้าตา · ห้องเรียนและงานจำลอง" />
+        <StudentClassroomView classroom={classroom} teacherName="ครูผู้สอนจำลอง" studentCount={3} assignments={assignments} categories={scenario === 'empty' ? [] : CATEGORIES} posts={[]} practiceLibraries={practiceLibraries} trackSeen={false} backHref="/exam-screen-lab/student-dashboard#classrooms" assignmentHrefs={assignmentHrefs} initialNow={NOW} previewLabel="ตัวอย่างสำหรับตรวจหน้าตา · ห้องเรียนและงานจำลอง" />
     </ShellClient>
   )
 }
