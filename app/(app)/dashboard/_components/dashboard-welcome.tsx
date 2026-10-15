@@ -20,7 +20,7 @@ interface Props {
   now?: Date
 }
 
-/** Two compact rows; decoration never contributes to the card's height. */
+/** Match a classroom card: h-16 cover + min-h-14 body; allow long names to grow. */
 export function DashboardWelcome({
   fullName, classroomsCount, studentsCount, questionsCount, setsCount, now = new Date(),
 }: Props) {
@@ -37,12 +37,12 @@ export function DashboardWelcome({
   return (
     <Card
       edge="ring"
-      className="@container/welcome relative isolate overflow-hidden bg-linear-to-r from-primary/8 via-card to-primary/5 px-3 py-2 sm:px-4"
+      className="@container/welcome relative isolate flex min-h-30 flex-col justify-center overflow-hidden bg-linear-to-r from-primary/8 via-card to-primary/5 px-3 py-2 sm:px-4"
       data-dashboard-welcome
     >
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute inset-y-1 right-3 -z-10 bg-brand-accent/12 sm:right-6"
+        className="pointer-events-none absolute inset-y-3 right-3 -z-10 bg-brand-accent/12 sm:right-6"
         style={{
           WebkitMask: `url('${BRAND_MARK_URL}') center / contain no-repeat`,
           mask: `url('${BRAND_MARK_URL}') center / contain no-repeat`,
