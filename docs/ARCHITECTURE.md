@@ -1,5 +1,11 @@
 # Architecture
 
+## ส่งคำตอบชุดฝึกและสรุปผลเฉพาะรอบ — 15 ตุลาคม 2026
+
+PracticeExerciseRunner จัด registry ของ PracticeQuestionHandle บน panel ที่โหลดและคง mount ไว้ การส่งตรวจเรียงเฉพาะข้อที่มีคำตอบแต่ยังไม่มี verdict โดยเรียก check เดิมของแต่ละ panel จึงใช้ safe receipt, math modes, การตรวจสิทธิ์ และ retry idempotency envelope เดิม ไม่มี submitSubmission หรือ grading client-side เพิ่ม ข้อที่ตรวจแล้วไม่ส่งซ้ำเมื่อเปิดสรุป ส่วน error หยุดการส่ง แสดงข้อที่ต้องแก้ และไม่เปิดผลสำเร็จ
+
+PracticeExerciseSummary ใช้ snapshot ของสถานะเมื่อส่งครบ และ practiceRunSummary นับผลรายข้อโดย intersect กับสมาชิกชุดเท่านั้น ไม่มีการสร้าง Submission เก็บคำตอบ/ผลถูกผิด/คะแนนใหม่ หรือเปลี่ยน schema accepted-check event ยังคงเป็น metadata ตาม action เดิม การทบทวนซ่อนสรุปแล้วเปิด panel เดิม จึงคงร่างในหน่วยความจำ; ออกจากหน้าหรือ reload ไม่รับรองการกู้ร่าง/ผลสรุป เกณฑ์ hasStudentAnswer แยกเป็น helper ร่วมกับ ExamClient สำหรับสี/จำนวนคำตอบ โดยไม่เปลี่ยน evaluator หรือผลคะแนนงาน
+
 ## คลังฝึกลดการโหลดซ้ำ — 15 ตุลาคม 2026
 
 Search ใช้ Next Form `action=""`/`scroll={false}` เพื่อ client navigation แทน native GET document reload. Local route อ่าน all snapshot โดยตรงเพื่อได้ library metadata และทำ filtered snapshot ขนานเฉพาะเมื่อมีคำ/แท็ก ไม่อ่าน page แรกแยกซ้ำก่อน snapshot. ภายใน snapshot หน้าแรกตรวจ student/library/roster ตามเดิม แล้ว private page reader ใช้ authorized library เดียวกันเฉพาะคำขอ/รอบ batch นั้น; แต่ละ RPC ยังตรวจ actor/library ปัจจุบันและมีขอบเขต 24 rows, concurrency สูงสุด 8. ไม่มี cache สิทธิ์หรือข้อมูลส่วนตัวข้าม request; public search ยังตรวจสิทธิ์ใหม่ทุกครั้ง และ snapshot ไม่ส่งผลบางส่วนเมื่อหน้าใดล้มเหลว/total เปลี่ยน/IDs ซ้ำ

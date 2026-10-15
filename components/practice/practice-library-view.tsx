@@ -10,7 +10,6 @@ import Link from 'next/link'
 import Form from 'next/form'
 import {
   ArrowLeft,
-  BookOpenCheck,
   ChevronLeft,
   ChevronRight,
   Search,
@@ -276,11 +275,6 @@ export function PracticeLibraryView({
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-2">
             <h1 className="min-w-0 flex-1 truncate text-xl font-semibold text-foreground">{library.title}</h1>
-            <Badge role="status" variant="secondary" aria-label="แบบฝึกเอง ไม่มีคะแนน">
-              <BookOpenCheck data-icon="inline-start" aria-hidden="true" />
-              <span className="sm:hidden">ไม่มีคะแนน</span>
-              <span className="hidden sm:inline">ฝึกเอง · ไม่มีคะแนน</span>
-            </Badge>
           </div>
           {library.description && (
             <RichText text={library.description} className="line-clamp-1 text-sm text-muted-foreground" />

@@ -1,7 +1,6 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { BookOpenCheck, KeyRound, ListChecks, LogIn, Search, ShieldCheck } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { RichText } from '@/components/ui/rich-text'
@@ -44,7 +43,6 @@ export function PracticeWaitingRoom({
       <header className="flex max-w-3xl flex-col gap-1.5 md:pr-52">
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-sm font-medium text-primary">หน้ารอเข้าคลังฝึก</p>
-          <Badge variant="secondary">ฝึกเอง · ไม่มีคะแนน</Badge>
         </div>
         <h1 className="text-2xl font-semibold leading-tight text-foreground sm:text-3xl">
           {library.title}
@@ -95,7 +93,7 @@ export function PracticeWaitingRoom({
         <ul className="grid list-disc gap-x-8 gap-y-2 pl-5 text-sm text-muted-foreground md:grid-cols-2">
           <li>เลือกโจทย์จากคลังและกลับมาฝึกซ้ำได้ตามต้องการ</li>
           <li>ระบบนับเฉพาะจำนวนครั้งที่กดตรวจในแต่ละข้อ เพื่อให้ครูเห็นความก้าวหน้า</li>
-          <li>การเข้าคลังฝึกไม่สร้างรอบทำงาน ไม่จำกัดเวลา และไม่มีการส่งงาน</li>
+          <li>ไม่จำกัดเวลา เมื่อสร้างแบบฝึกหัดแล้ว สามารถส่งคำตอบเพื่อดูสรุปผลการฝึกได้</li>
           <li>ผลตรวจมีไว้ช่วยฝึกตนเอง ไม่ถูกนำไปคิดคะแนนหรือจัดอันดับ</li>
         </ul>
       </section>

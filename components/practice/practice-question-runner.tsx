@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { lazy, Suspense, useState, useTransition, useEffect } from 'react'
+import { lazy, Suspense, useState, useTransition, useEffect, useImperativeHandle, useRef, type Ref } from 'react'
 import {
   ArrowLeft,
   Calculator,
@@ -28,11 +28,18 @@ import type { MathInputModes } from '@/lib/math/input-mode'
 import type { MathInputMode } from '@/lib/types'
 import { DEFAULT_FINGER_INPUT_MODE, type FingerInputMode } from '@/lib/drawing-board-input'
 import { cn } from '@/lib/utils'
+import { hasStudentAnswer } from '@/lib/student-answer-state'
+
+export interface PracticeQuestionHandle {
+  check: () => Promise<PracticeFeedback['verdict'] | null>
+}
 
 const ScientificCalculator = lazy(() => import('@/components/exam/scientific-calculator'))
 const Scratchpad = lazy(() => import('@/components/exam/scratchpad'))
 
 interface PracticeQuestionRunnerProps {
+  ref?: Ref<PracticeQuestionHandle>
+  disabled?: boolean
   libraryId: string
   libraryTitle: string
   question: SafeExamAnswer
@@ -182,6 +189,8 @@ function FeedbackPanel({ feedback }: { feedback: PracticeFeedback }) {
 }
 
 export function PracticeQuestionRunner({
+  ref,
+  disabled = false,
   libraryId,
   libraryTitle,
   question: originalQuestion,
@@ -215,12 +224,16 @@ export function PracticeQuestionRunner({
   const [scratchpadLoaded, setScratchpadLoaded] = useState(false)
   const [showScratchpad, setShowScratchpad] = useState(false)
   const [fingerInputMode, setFingerInputMode] = useState<FingerInputMode>(DEFAULT_FINGER_INPUT_MODE)
-  const [pending, startTransition] = useTransition()
+  const [refreshing, startTransition] = useTransition()
+  const [checking, setChecking] = useState(false)
+  const checkingRef = useRef(false)
+  const pending = checking || refreshing || disabled
   const question = renderedQuestion(originalQuestion)
   useEffect(() => {
     if (calculatorResult?.questionId === originalQuestion.question_id) changeAnswer(calculatorResult.value)
   }, [calculatorResult?.nonce])
-  useEffect(() => { onProgress?.(question.question_id, Boolean(answer.trim()), feedback?.verdict) }, [answer, feedback?.verdict, question.question_id, onProgress])
+  useEffect(() => { onProgress?.(question.question_id, hasStudentAnswer(answer), feedback?.verdict) }, [answer, feedback?.verdict, question.question_id, onProgress])
+  useImperativeHandle(ref, () => ({ check: async () => feedback?.verdict ?? await check() }))
   const embedsQuestionText = question.questions.question_type === 'true_false'
     || question.questions.question_type === 'fill_blank'
     || (question.questions.question_type === 'written'
@@ -240,7 +253,10 @@ export function PracticeQuestionRunner({
     setRetry(null)
   }
 
-  function check() {
+  async function check(): Promise<PracticeFeedback['verdict'] | null> {
+    if (checkingRef.current || refreshing || refreshRequired) return null
+    checkingRef.current = true
+    setChecking(true)
     const mathInputModesKey = JSON.stringify(mathInputModes)
     const envelope = retry?.answer === answer && retry.mathInputModesKey === mathInputModesKey
       ? retry
@@ -252,30 +268,33 @@ export function PracticeQuestionRunner({
         }
     setRetry(envelope)
     setError(null)
-    startTransition(async () => {
-      try {
-        const result = await checkAction({
-          libraryId,
-          questionId: question.question_id,
-          idempotencyKey: envelope.idempotencyKey,
-          variantReceipt,
-          answer: envelope.answer,
-          mathInputModes: envelope.mathInputModes,
-        })
-        if (!result.ok) {
-          setError(result.error)
-          if (result.refreshRequired) setRefreshRequired(true)
-          if (result.retryable === false) setRetry(null)
-          return
-        }
-        setFeedback(result.feedback)
-        setRetry(null)
-      } catch {
-        // Keep the same UUID for a retry: the server may have completed the
-        // metadata insert even when the response was interrupted.
-        setError('การเชื่อมต่อสะดุด กรุณากดตรวจคำตอบอีกครั้ง')
+    try {
+      const result = await checkAction({
+        libraryId,
+        questionId: question.question_id,
+        idempotencyKey: envelope.idempotencyKey,
+        variantReceipt,
+        answer: envelope.answer,
+        mathInputModes: envelope.mathInputModes,
+      })
+      if (!result.ok) {
+        setError(result.error)
+        if (result.refreshRequired) setRefreshRequired(true)
+        if (result.retryable === false) setRetry(null)
+        return null
       }
-    })
+      setFeedback(result.feedback)
+      setRetry(null)
+      return result.feedback.verdict
+    } catch {
+      // Keep the same UUID for a retry: the server may have completed the
+      // metadata insert even when the response was interrupted.
+      setError('การเชื่อมต่อสะดุด กรุณากดตรวจคำตอบอีกครั้ง')
+      return null
+    } finally {
+      checkingRef.current = false
+      setChecking(false)
+    }
   }
 
   function tryAgain() {
@@ -306,10 +325,6 @@ export function PracticeQuestionRunner({
           <p className="truncate text-xs text-muted-foreground">{libraryTitle}</p>
           <div className="flex min-w-0 items-center gap-2">
             <h1 className="min-w-0 flex-1 truncate text-lg font-semibold text-foreground">{question.questions.title}</h1>
-            <Badge role="status" variant="secondary" aria-label="แบบฝึกเอง ไม่มีคะแนน">
-              <span className="sm:hidden">ไม่มีคะแนน</span>
-              <span className="hidden sm:inline">ฝึกเอง · ไม่มีคะแนน</span>
-            </Badge>
           </div>
         </div>
       </header>}
@@ -362,12 +377,12 @@ export function PracticeQuestionRunner({
           <PracticeAnswerInput question={question} value={answer} onChange={changeAnswer} mathInputModes={mathInputModes} onMathInputModeChange={changeMathInputMode} disabled={pending} />
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" size="sm" onClick={check} disabled={pending || refreshRequired} className="pointer-coarse:min-h-11">
-              {pending ? <LoaderCircle className="animate-spin" data-icon="inline-start" aria-hidden="true" /> : <CheckCircle2 data-icon="inline-start" aria-hidden="true" />}
-              {pending ? 'กำลังตรวจ…' : 'ตรวจคำตอบ'}
+            <Button type="button" size="sm" onClick={() => void check()} disabled={pending || refreshRequired} className="pointer-coarse:min-h-11">
+              {checking ? <LoaderCircle className="animate-spin" data-icon="inline-start" aria-hidden="true" /> : <CheckCircle2 data-icon="inline-start" aria-hidden="true" />}
+              {checking ? 'กำลังตรวจ…' : 'ตรวจคำตอบ'}
             </Button>
             {(feedback || error) && <Button type="button" size="sm" variant="outline" onClick={tryAgain} disabled={pending} className="pointer-coarse:min-h-11">
-              <RotateCcw data-icon="inline-start" aria-hidden="true" />{refreshRequired ? 'โหลดโจทย์ใหม่' : changesOnRefresh ? 'สุ่มโจทย์ใหม่' : 'ลองอีกครั้ง'}
+              <RotateCcw data-icon="inline-start" aria-hidden="true" />{refreshRequired ? 'โหลดโจทย์ใหม่' : 'ทำใหม่'}
             </Button>}
           </div>
         </div>

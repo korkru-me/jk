@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { parsePracticeSearchParams, buildPracticeSearchHref, buildPracticeQuestionHref, practiceSearchTerms } from '@/lib/practice-search'
 import { PracticeLibraryView } from '@/components/practice/practice-library-view'
@@ -16,6 +16,10 @@ const items: PracticeQuestionListItem[] = [
   { id: ids[1], title: 'โมเมนต์ หาขนาดโมเมนต์ของแรง (มี 2 ข้อย่อย)', excerpt: 'แรงกระทำที่ปลายคาน จงหาโมเมนต์ของแรงและทิศทางการหมุน', questionType: 'written', difficulty: 'hard', subject: 'ฟิสิกส์', tags: ['สมดุล'], position: 1, attemptCount: 0 },
   { id: ids[2], title: 'งานและพลังงานของวัตถุบนพื้นเอียงที่มีแรงเสียดทาน', excerpt: 'จงอธิบายความสัมพันธ์ระหว่างงานและพลังงาน พร้อมคำนวณงานของแรงเสียดทาน', questionType: 'mcq', difficulty: 'easy', subject: 'ฟิสิกส์', tags: ['พลังงาน', 'แท็กชื่อยาวสำหรับทดสอบการแสดงผลบนโทรศัพท์มือถือ'], position: 2, attemptCount: 0 },
 ]
+const runItems = [...items, ...Array.from({ length: 58 }, (_, index): PracticeQuestionListItem => ({
+  ...items[index % items.length], id: `00000000-0000-4000-8200-${String(index + 4).padStart(12, '0')}`,
+  title: `โจทย์ฝึกจำลองข้อ ${index + 4}`, position: index + 3,
+}))]
 
 const STORAGE_KEY = 'student-practice-library-lab:v2'
 const example: PracticeExercise = {
@@ -25,7 +29,7 @@ const example: PracticeExercise = {
 
 const labLibrary = { id: '00000000-0000-4000-8300-000000000001', classroomId: '00000000-0000-4000-8300-000000000002', title: 'ทดสอบคลังฝึกนะ', description: null, revealAnswerKey: true, requiresAccessCode: false, calculatorEnabled: true, scratchpadEnabled: true, shuffleOptions: true }
 const labQuestionLoader: PracticeRunQuestionLoader = async (_libraryId, questionId) => {
-  const item = items.find(item => item.id === questionId)
+  const item = runItems.find(item => item.id === questionId)
   if (!item) return { ok: false, error: 'ไม่พบโจทย์ทดลอง' }
   return { ok: true, data: { variantReceipt: `synthetic-${questionId}`, changesOnRefresh: false, calculatorEnabled: true, scratchpadEnabled: true,
     question: { id: questionId, question_id: questionId, random_values: {}, student_answer: null, work_images: null, math_input_modes: {},
@@ -35,8 +39,8 @@ const labQuestionLoader: PracticeRunQuestionLoader = async (_libraryId, question
 }
 const labCheckAnswer: PracticeRunAnswerAction = async input => {
   if (!input || typeof input !== 'object' || !('answer' in input) || typeof input.answer !== 'string') return { ok: false, error: 'ข้อมูลไม่ถูกต้อง' }
-  const correct = input.answer === '5' || input.answer === '0'
-  return { ok: true, feedback: { verdict: correct ? 'correct' : 'wrong', revealed: false, rows: [{ student: input.answer, status: correct ? 'correct' : 'wrong' }], note: 'ผลตรวจข้อมูลจำลองในห้องทดลอง' } }
+  const correct = input.answer === '5' || input.answer === '0' || input.answer === 'MCQ:0'
+  return { ok: true, feedback: { verdict: correct ? 'correct' : input.answer === '7' ? 'partial' : input.answer === '9' ? 'pending' : 'wrong', revealed: false, rows: [{ student: input.answer, status: correct ? 'correct' : input.answer === '9' ? 'pending' : 'wrong' }], note: 'ผลตรวจข้อมูลจำลองในห้องทดลอง' } }
 }
 
 export function StudentLibraryLab({ localReview = false }: { localReview?: boolean }) {
@@ -47,6 +51,14 @@ export function StudentLibraryLab({ localReview = false }: { localReview?: boole
   const [exercises, setExercises] = useState<PracticeExercise[]>([example])
   const [pins, setPins] = useState<string[]>([])
   const [ready, setReady] = useState(false)
+  const failedCheck = useRef(false)
+  const checkAnswer = useCallback<PracticeRunAnswerAction>(async input => {
+    if (params.get('check') === 'fail-once' && !failedCheck.current) {
+      failedCheck.current = true
+      return { ok: false, error: 'การเชื่อมต่อขัดข้องจำลอง กรุณาลองอีกครั้ง' }
+    }
+    return labCheckAnswer(input)
+  }, [params])
   useEffect(() => {
     try {
       const saved: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null')
@@ -83,11 +95,12 @@ export function StudentLibraryLab({ localReview = false }: { localReview?: boole
   if (params.get('view') === 'run' || params.get('view') === 'local-run' || preview) {
     if (!ready) return <p role="status">กำลังเปิดแบบฝึกหัด…</p>
     const single = preview ? { id: preview.id, title: preview.title, questionIds: [preview.id], revision: 1, attemptedCount: preview.attemptCount ? 1 : 0, questionTitles: { [preview.id]: preview.title } } : undefined
-    const group = single ?? exercises.find(group => group.id === state.exerciseId)
+    const group = params.get('count') === '61' ? { ...example, questionIds: runItems.map(item => item.id), questionTitles: Object.fromEntries(runItems.map(item => [item.id, item.title])) }
+      : single ?? exercises.find(group => group.id === (state.exerciseId ?? example.id))
     const library = params.get('tools') === 'off' ? { ...labLibrary, calculatorEnabled: false, scratchpadEnabled: false } : labLibrary
     return <PracticeExerciseRunner library={library} exerciseId={single?.id ?? state.exerciseId ?? example.id} storageOwnerId={localReview ? 'synthetic-local-review' : 'synthetic-lab'}
       exercise={group} localItems={items} localReview={localReview && !single} returnHref={`/exam-screen-lab/practice-library?view=${localReview ? 'local-student' : 'student'}${withShell ? '&shell=student' : ''}`}
-      questionLoader={labQuestionLoader} checkAction={labCheckAnswer} />
+      questionLoader={labQuestionLoader} checkAction={checkAnswer} />
   }
   if (localReview) return <PracticeLocalLibraryView
     library={{ id: '00000000-0000-4000-8300-000000000001', classroomId: '00000000-0000-4000-8300-000000000002', title: 'ทดสอบคลังฝึกนะ', description: null, revealAnswerKey: true, requiresAccessCode: false, calculatorEnabled: true, scratchpadEnabled: true, shuffleOptions: true }}

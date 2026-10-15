@@ -37,7 +37,7 @@ export function ExamQuestionNavigation({ items, touchFriendly = false, onNavigat
           variant="ghost"
           size="icon"
           onClick={() => onNavigate(index)}
-          aria-label={`ไปข้อ ${index + 1}${item.current ? ' · ข้อปัจจุบัน' : ''}${item.answered ? ' · ตอบแล้ว' : ' · ยังไม่ตอบ'}${item.flagged ? ' · ปักธงสำหรับทบทวน' : ''}`}
+          aria-label={`ไปข้อ ${index + 1}${item.current ? ' · ข้อปัจจุบัน' : ''}${item.answered ? ' · ตอบแล้ว' : ' · ยังไม่ตอบ'}${item.verdict ? ` · ${item.verdict === 'correct' ? 'ตรวจแล้วถูก' : item.verdict === 'wrong' ? 'ตรวจแล้วยังไม่ถูก' : item.verdict === 'partial' ? 'ถูกบางส่วน' : 'รอตรวจ'}` : ''}${item.flagged ? ' · ปักธงสำหรับทบทวน' : ''}`}
           aria-current={item.current ? 'page' : undefined}
           data-exam-navigation-item
           data-answer-state={item.verdict ?? (item.answered ? 'answered' : 'unanswered')}

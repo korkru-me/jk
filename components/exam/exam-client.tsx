@@ -17,6 +17,7 @@ import type { AnswerFeedback } from '@/lib/answer-feedback'
 import { isInstantCheckable } from '@/lib/grading'
 import { useAnswerAutosave } from '@/hooks/use-answer-autosave'
 import { resolveAnswerAutosaveStatus } from '@/lib/exam-autosave-policy'
+import { hasStudentAnswer } from '@/lib/student-answer-state'
 import { useTabSwitchGuard } from '@/hooks/use-tab-switch-guard'
 import { useFullscreenGuard } from '@/hooks/use-fullscreen-guard'
 import { useExamTimer } from '@/hooks/use-exam-timer'
@@ -1157,17 +1158,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   // ── Derived values ────────────────────────────────────────────────────────────
 
   function hasAnswered(answerId: string): boolean {
-    const raw = localAnswers[answerId] ?? ''
-    if (raw.startsWith('[')) {
-      // Arrays encode either plain strings (ordering / multi-part numeric —
-      // "answered" means at least one non-blank entry) or file-submission
-      // objects ({url,name,type} — any entry at all counts as answered).
-      try {
-        const parsed = JSON.parse(raw) as unknown[]
-        return parsed.some(v => typeof v === 'string' ? v.trim() !== '' : v != null)
-      } catch { return false }
-    }
-    return raw.trim() !== ''
+    return hasStudentAnswer(localAnswers[answerId])
   }
 
   function formatTime(s: number) {
