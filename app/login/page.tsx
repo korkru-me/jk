@@ -8,7 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 export const metadata: Metadata = { title: 'เข้าสู่ระบบ — KorKru' }
 
 export default async function LoginPage({ searchParams }: {
-  searchParams: Promise<{ password_changed?: string; error?: string }>
+  searchParams: Promise<{ password_changed?: string; sessions_revoked?: string; error?: string }>
 }) {
   const params = await searchParams
   return (
@@ -25,7 +25,11 @@ export default async function LoginPage({ searchParams }: {
         {params.password_changed === '1' && (
           <Alert role="status">
             <AlertTitle>เปลี่ยนรหัสผ่านแล้ว</AlertTitle>
-            <AlertDescription>กรุณาเข้าสู่ระบบอีกครั้งด้วยรหัสผ่านใหม่</AlertDescription>
+            <AlertDescription>
+              {params.sessions_revoked === '0'
+                ? 'รหัสผ่านใหม่ใช้ได้แล้ว แต่ระบบยังยืนยันการออกจากระบบทุกอุปกรณ์ไม่ได้ กรุณาเข้าสู่ระบบด้วยรหัสใหม่ หากสงสัยว่าบัญชีถูกเข้าถึง ให้ติดต่อผู้ดูแล KorKru'
+                : 'กรุณาเข้าสู่ระบบอีกครั้งด้วยรหัสผ่านใหม่'}
+            </AlertDescription>
           </Alert>
         )}
         {params.error === 'auth_failed' && (

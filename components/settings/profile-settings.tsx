@@ -4,13 +4,14 @@ import { useState, useTransition, useRef } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { updateProfile } from '@/lib/actions/settings'
+import type { updatePassword } from '@/lib/actions/settings'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card } from '@/components/ui/card'
-import { PasswordSettingsForm } from '@/components/settings/password-settings-form'
+import { PasswordSettingsSection } from '@/components/settings/password-settings-form'
 import {
-  User, Lock, ShieldCheck, Download, Globe,
+  User, ShieldCheck, Download, Globe,
 } from 'lucide-react'
 
 // ─── Section Card ─────────────────────────────────────────────────────────────
@@ -48,9 +49,12 @@ interface ProfileSettingsProps {
     role: string
     created_at: string
   }
+  /** Synthetic lab routes substitute actions so preview forms cannot mutate accounts. */
+  saveProfileAction?: typeof updateProfile
+  changePasswordAction?: typeof updatePassword
 }
 
-export function ProfileSettings({ user }: ProfileSettingsProps) {
+export function ProfileSettings({ user, saveProfileAction = updateProfile, changePasswordAction }: ProfileSettingsProps) {
   const [isPending, startTransition] = useTransition()
 
   const [fullName, setFullName] = useState(user.full_name)
@@ -71,7 +75,7 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
     startTransition(async () => {
-      const res = await updateProfile(fd)
+      const res = await saveProfileAction(fd)
       if (res.error) toast.error(res.error)
       else toast.success('บันทึกโปรไฟล์สำเร็จ ✓')
     })
@@ -147,9 +151,7 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
       </SectionCard>
 
       {/* ── Change Password ──────────────────────────────────────────────── */}
-      <SectionCard title="เปลี่ยนรหัสผ่าน" description="ยืนยันด้วยรหัสผ่านปัจจุบัน แล้วเข้าสู่ระบบใหม่หลังบันทึก" icon={Lock}>
-        <PasswordSettingsForm email={user.email} />
-      </SectionCard>
+      <PasswordSettingsSection email={user.email} changePasswordAction={changePasswordAction} />
 
       <SectionCard title="การยืนยันตัวตนสองชั้น (2FA)" description="ยังไม่รองรับการเปิดใช้งานใน KorKru" icon={ShieldCheck}>
         <p className="text-sm text-muted-foreground">
