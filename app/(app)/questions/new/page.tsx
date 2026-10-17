@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react'
 import Link from 'next/link'
-import { Shuffle, ListChecks, ArrowLeftRight, FileText, CheckSquare, AlignLeft, ArrowUpDown, FileUp, Blocks, Table2, MapPin } from 'lucide-react'
+import { Shuffle, ListChecks, ArrowLeftRight, FileText, CheckSquare, AlignLeft, ArrowUpDown, FileUp, Blocks, Table2, MapPin, ArrowRight } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import styles from './question-types.module.css'
 import { SAMPLE_QUESTIONS } from './_data/sample-questions'
@@ -13,7 +13,7 @@ const QUESTION_TYPES = [
     type: 'written' as QuestionType,
     icon: Shuffle,
     title: 'เติมคำตอบตัวเลข',
-    desc: 'สร้างจากสมการ เขียนสมการเอง หรือกำหนดคำตอบตายตัว — เลือกได้ในหน้าเดียว',
+    desc: 'กำหนดคำตอบเอง หรือสร้างโจทย์จากสมการพร้อมสุ่มตัวเลข',
     accent: 'var(--question-type-numeric)',
   },
   {
@@ -21,7 +21,7 @@ const QUESTION_TYPES = [
     type: 'mcq' as QuestionType,
     icon: ListChecks,
     title: 'ปรนัย (เลือกตอบ)',
-    desc: 'ตัวเลือก 2–6 ข้อ นักเรียนเลือกคำตอบที่ถูกต้องจากรายการ',
+    desc: 'กำหนดตัวเลือก 2–6 ข้อ ให้นักเรียนเลือกคำตอบที่ถูกต้อง',
     accent: 'var(--question-type-mcq)',
   },
   {
@@ -29,7 +29,7 @@ const QUESTION_TYPES = [
     type: 'true_false' as QuestionType,
     icon: CheckSquare,
     title: 'ถูก-ผิด',
-    desc: 'นักเรียนตัดสินว่าข้อความแต่ละข้อถูกหรือผิด',
+    desc: 'ให้นักเรียนตัดสินว่าข้อความแต่ละข้อถูกหรือผิด',
     accent: 'var(--question-type-true-false)',
   },
   {
@@ -37,7 +37,7 @@ const QUESTION_TYPES = [
     type: 'fill_blank' as QuestionType,
     icon: AlignLeft,
     title: 'เติมคำในช่องว่าง',
-    desc: 'ข้อความพร้อมช่องว่าง นักเรียนพิมพ์คำหรือวลีที่ขาดหายไป',
+    desc: 'เว้นช่องในข้อความ ให้นักเรียนเติมคำหรือวลีที่ขาดหายไป',
     accent: 'var(--question-type-fill-blank)',
   },
   {
@@ -45,7 +45,7 @@ const QUESTION_TYPES = [
     type: 'ordering' as QuestionType,
     icon: ArrowUpDown,
     title: 'เรียงลำดับ',
-    desc: 'นักเรียนเรียงรายการ ขั้นตอน หรือเหตุการณ์ให้ถูกลำดับ',
+    desc: 'จัดลำดับขั้นตอน รายการ หรือเหตุการณ์ให้ถูกต้อง',
     accent: 'var(--question-type-ordering)',
   },
   {
@@ -53,7 +53,7 @@ const QUESTION_TYPES = [
     type: 'matching' as QuestionType,
     icon: ArrowLeftRight,
     title: 'จับคู่',
-    desc: 'นักเรียนจับคู่รายการสองชุดที่สัมพันธ์กัน',
+    desc: 'จับคู่ข้อมูลสองชุดด้วยการลากวางหรือโยงเส้น',
     accent: 'var(--question-type-matching)',
   },
   {
@@ -61,7 +61,7 @@ const QUESTION_TYPES = [
     type: 'essay' as QuestionType,
     icon: FileText,
     title: 'อัตนัย (บรรยาย)',
-    desc: 'นักเรียนเขียนคำตอบอิสระ ครูตรวจและให้คะแนนเอง',
+    desc: 'ให้นักเรียนเขียนคำตอบอิสระ ครูตรวจและให้คะแนนเอง',
     accent: 'var(--question-type-essay)',
   },
   {
@@ -69,7 +69,7 @@ const QUESTION_TYPES = [
     type: 'file_upload' as QuestionType,
     icon: FileUp,
     title: 'ส่งไฟล์งาน',
-    desc: 'แนบไฟล์รูปภาพหรือ PDF พร้อมคำสั่ง ให้นักเรียนส่งไฟล์คำตอบกลับมา',
+    desc: 'แนบคำสั่ง รูปภาพ หรือ PDF แล้วให้นักเรียนส่งไฟล์คำตอบ',
     accent: 'var(--question-type-file-upload)',
   },
   {
@@ -77,7 +77,7 @@ const QUESTION_TYPES = [
     type: 'classify' as QuestionType,
     icon: Table2,
     title: 'ตารางจำแนก',
-    desc: 'ตารางเดียว — แถวคือสิ่งที่ให้จำแนก คอลัมน์คือมิติการจำแนก นักเรียนเลือก 1 ตัวเลือกต่อช่อง',
+    desc: 'จำแนกข้อมูลในตาราง โดยเลือกคำตอบให้แต่ละช่อง',
     accent: 'var(--question-type-classify)',
   },
   {
@@ -85,7 +85,7 @@ const QUESTION_TYPES = [
     type: 'image_label' as QuestionType,
     icon: MapPin,
     title: 'เติมคำในรูป',
-    desc: 'รูปเดียว — ครูวางช่องคำตอบไว้บนรูป นักเรียนเติมคำว่าแต่ละจุดคืออะไร พิมพ์เอง เลือกจากรายการ หรือลากคำจากคลัง',
+    desc: 'วางช่องคำตอบบนรูป ให้พิมพ์ เลือก หรือลากคำมาตอบ',
     accent: 'var(--question-type-image-label)',
   },
   {
@@ -93,7 +93,7 @@ const QUESTION_TYPES = [
     type: 'composite' as QuestionType,
     icon: Blocks,
     title: 'โจทย์ผสม (หลายรูปแบบ)',
-    desc: 'รวมคำถามถูก-ผิด เติมคำ เรียงลำดับ ปรนัย ฯลฯ ไว้ในโจทย์เดียวกัน ภายใต้โจทย์หลักเดียว',
+    desc: 'รวมคำถามหลายรูปแบบไว้ภายใต้โจทย์หลักเดียว',
     accent: 'var(--question-type-composite)',
   },
 ]
@@ -104,7 +104,7 @@ export default function NewQuestionTypePage() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">สร้างโจทย์ใหม่</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          เลือกประเภทโจทย์ที่ต้องการสร้าง หรือกด “ดูตัวอย่าง” เพื่อดูมุมมองนักเรียน
+          เลือกประเภทโจทย์เพื่อเริ่มสร้าง หรือกด “ดูตัวอย่างโจทย์” เพื่อทดลองตอบในมุมมองนักเรียน
         </p>
       </div>
 
@@ -120,13 +120,21 @@ export default function NewQuestionTypePage() {
               style={{ '--question-accent': type.accent } as CSSProperties}
               className={styles.card}
             >
-              <Link href={type.href} className={styles.link}>
-                <Icon aria-hidden className="col-start-1 row-start-1 mt-2.5 size-6" />
-                <h2 className="col-start-2 row-start-1 self-center text-sm font-semibold">{type.title}</h2>
-                <p className="col-span-2 col-start-2 row-start-2 text-xs leading-relaxed text-foreground/75">{type.desc}</p>
-              </Link>
-              <div className="relative z-10 col-start-3 row-start-1 self-start">
-                <SamplePreview typeTitle={type.title} samples={SAMPLE_QUESTIONS[type.type]} />
+              <div className={styles.header}>
+                <Icon aria-hidden="true" focusable="false" strokeWidth={1.35} className={styles.watermark} />
+                <h2 className={styles.title}>{type.title}</h2>
+              </div>
+              <div className={styles.body}>
+                <p className={styles.description}>{type.desc}</p>
+                <div className={styles.actions}>
+                  <div className={styles.previewAction}>
+                    <SamplePreview typeTitle={type.title} samples={SAMPLE_QUESTIONS[type.type]} />
+                  </div>
+                  <Link href={type.href} className={styles.link} aria-label={`สร้างโจทย์${type.title}`}>
+                    สร้างโจทย์
+                    <ArrowRight aria-hidden="true" className="size-4" />
+                  </Link>
+                </div>
               </div>
             </Card>
           )

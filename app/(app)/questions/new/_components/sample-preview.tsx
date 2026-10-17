@@ -1,16 +1,17 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { PanelsTopLeft, Sparkles } from 'lucide-react'
+import { Eye, Sparkles } from 'lucide-react'
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { preloadQuestionPreview, QuestionPreviewContent } from '@/components/questions/question-preview'
 import type { SampleQuestion } from '../_data/sample-questions'
+import styles from '../question-types.module.css'
 
 /**
- * "ดูตัวอย่าง" on a question-type card — opens the same student-facing renderer
+ * "ดูตัวอย่างโจทย์" on a question-type card — opens the same student-facing renderer
  * the authoring forms preview with, so what a teacher sees here is what a
  * student would get, not a mock-up of it.
  *
@@ -49,22 +50,23 @@ export function SamplePreview({
         variant="ghost"
         size="sm"
         aria-label={`ดูตัวอย่างโจทย์${typeTitle}`}
+        title={`ดูตัวอย่างโจทย์${typeTitle}`}
         aria-haspopup="dialog"
         aria-expanded={open}
         onPointerEnter={preparePreview}
         onFocus={preparePreview}
         onClick={() => setOpen(true)}
-        className="min-h-11"
+        className={styles.previewButton}
       >
-        <PanelsTopLeft data-icon="inline-start" />
-        ดูตัวอย่าง
+        <Eye aria-hidden="true" data-icon="inline-start" />
+        ดูตัวอย่างโจทย์
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <PanelsTopLeft aria-hidden className="size-4" /> มุมมองนักเรียน · {typeTitle}
+              <Eye aria-hidden className="size-4" /> มุมมองนักเรียน · {typeTitle}
             </DialogTitle>
             <DialogDescription className="sr-only">
               ตัวอย่างโจทย์ประเภท{typeTitle} แสดงด้วยหน้าตาเดียวกับที่นักเรียนเห็นตอนทำข้อสอบ
