@@ -34,6 +34,7 @@ export function SignupForm() {
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [retryAfter, setRetryAfter] = useState(0)
 
@@ -43,15 +44,21 @@ export function SignupForm() {
     watch,
     setValue,
     trigger,
-    formState: { errors },
+    formState: { errors, touchedFields, isSubmitted },
   } = useForm<SignupInput>({
     resolver: zodResolver(signupSchema),
-    defaultValues: { full_name: '', email: '', password: '', accept_terms: false },
+    defaultValues: { full_name: '', email: '', password: '', confirm_password: '', accept_terms: false },
   })
 
   const selectedRole = watch('role')
   const acceptedTerms = watch('accept_terms')
+  const password = watch('password')
+  const confirmPassword = watch('confirm_password')
   const busy = loading || googleLoading
+
+  useEffect(() => {
+    if (touchedFields.confirm_password || isSubmitted) void trigger('confirm_password')
+  }, [password, confirmPassword, touchedFields.confirm_password, isSubmitted, trigger])
 
   useEffect(() => {
     if (retryAfter <= 0) return
@@ -67,6 +74,7 @@ export function SignupForm() {
     formData.set('full_name', values.full_name)
     formData.set('email', values.email)
     formData.set('password', values.password)
+    formData.set('confirm_password', values.confirm_password)
     formData.set('accept_terms', String(values.accept_terms))
 
     try {
@@ -163,6 +171,8 @@ export function SignupForm() {
               id="password"
               type={showPassword ? 'text' : 'password'}
               autoComplete="new-password"
+              autoCapitalize="none"
+              spellCheck={false}
               aria-invalid={!!errors.password}
               aria-describedby={errors.password ? 'signup-password-help signup-password-error' : 'signup-password-help'}
               disabled={busy}
@@ -184,6 +194,37 @@ export function SignupForm() {
           </InputGroup>
           <FieldDescription id="signup-password-help">8 ตัวขึ้นไป มีอักษรอังกฤษและตัวเลข</FieldDescription>
           <FieldError id="signup-password-error" errors={[errors.password]} />
+        </Field>
+
+        <Field data-invalid={!!errors.confirm_password} className="gap-1">
+          <FieldLabel htmlFor="confirm_password">ยืนยันรหัสผ่าน</FieldLabel>
+          <InputGroup className="min-h-[44px]">
+            <InputGroupInput
+              id="confirm_password"
+              type={showConfirmPassword ? 'text' : 'password'}
+              autoComplete="new-password"
+              autoCapitalize="none"
+              spellCheck={false}
+              aria-invalid={!!errors.confirm_password}
+              aria-describedby={errors.confirm_password ? 'signup-confirm-password-error' : undefined}
+              disabled={busy}
+              className="min-h-[44px]"
+              {...registerField('confirm_password')}
+            />
+            <InputGroupAddon align="inline-end" className="py-0">
+              <InputGroupButton
+                size="icon-sm"
+                className="min-h-[44px] min-w-[44px]"
+                onClick={() => setShowConfirmPassword((visible) => !visible)}
+                aria-label={showConfirmPassword ? 'ซ่อนรหัสผ่านยืนยัน' : 'แสดงรหัสผ่านยืนยัน'}
+                aria-pressed={showConfirmPassword}
+                disabled={busy}
+              >
+                {showConfirmPassword ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
+              </InputGroupButton>
+            </InputGroupAddon>
+          </InputGroup>
+          <FieldError id="signup-confirm-password-error" errors={[errors.confirm_password]} />
         </Field>
       </FieldGroup>
 

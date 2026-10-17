@@ -109,6 +109,7 @@ export async function register(formData: FormData) {
     full_name: formData.get('full_name'),
     email: formData.get('email'),
     password: formData.get('password'),
+    confirm_password: formData.get('confirm_password'),
     accept_terms: formData.get('accept_terms') === 'true',
   })
   if (!parsed.success) return { error: validationMessage(parsed.error.issues) }

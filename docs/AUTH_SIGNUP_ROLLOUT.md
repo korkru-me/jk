@@ -8,11 +8,13 @@
 - อีเมลสาธารณะ: `korkru.me@gmail.com`
 - นักเรียนสมัครบัญชีเองได้ ไม่เพิ่มวันเกิด เลขบัตร โทรศัพท์ หรือบังคับคำเชิญ
 - ชื่อที่แสดง อีเมล และประเภทบัญชียังเป็นข้อมูลหลัก ไม่มีโรงเรียน/กลุ่มสาระกลับมาในหน้าสมัคร
+- คำขอเพิ่มเติมวันที่ 17 ตุลาคม: เพิ่มช่อง “ยืนยันรหัสผ่าน” เฉพาะสมัครด้วยอีเมล ไม่เพิ่มช่องอีเมลซ้ำ และยังคงการกดลิงก์ยืนยันอีเมล
 
 ## สิ่งที่โค้ดรองรับ
 
 1. `/terms`, `/privacy`, `/contact` และลิงก์จริงจากหน้าสมัคร/หน้าหลัก; ถอดคำอ้าง ISO 27001/PDPA ที่ไม่มีหลักฐานจาก footer component เดิม (หน้าแรกใช้ LegalLinks แบบกระชับ ไม่เปิด footer การตลาดเดิม)
 2. หน้าสมัครเรียงบทบาท → รับทราบนโยบาย → Google → แบบฟอร์มอีเมล ใช้ shared validation, inline errors, password manager, ปุ่มแสดงรหัส และชื่อที่บอกขอบเขตการมองเห็น
+   ช่องยืนยันรหัสผ่านต้องไม่ว่างและตรงกับรหัสเดิมทุกตัว รวมตัวพิมพ์/ช่องว่าง ตรวจซ้ำฝั่ง server ก่อนนับคำขอส่ง ไม่ส่ง confirmation ต่อไป Supabase มีปุ่มแสดง/ซ่อนแยกและตรวจใหม่เมื่อแก้รหัสหลังกรอกยืนยันแล้ว
 3. ถ้า Supabase ยังไม่มี session หลังสมัคร จะไป `/check-email` พร้อมอีเมลจาก HttpOnly cookie อายุ 30 นาที ไม่มีอีเมลใน query string/localStorage; ปุ่มส่งซ้ำอิงเวลาคำขอเดิม ไม่เริ่ม 60 วินาทีใหม่ทุก reload และเซิร์ฟเวอร์เป็นผู้ตัดสินลิมิต
 4. กรอกอีเมลใหม่ในหน้าเช็กอีเมลเป็นการขอลิงก์ยืนยันของที่อยู่นั้น **ไม่เปลี่ยนอีเมลของบัญชีเดิม** หากกรอกผิดตอนสมัคร ต้องสมัครด้วยที่อยู่ที่ถูกต้องโดยกรอกชื่อ/รหัสผ่านใหม่
 5. signup และ Google complete-profile ตรวจการยอมรับข้อกำหนด/รับทราบ privacy ซ้ำฝั่ง server แล้วบันทึก `terms_version`, `privacy_version`, `terms_acknowledged_at` ใน Auth user metadata ใช้เป็นบันทึกประกอบเท่านั้น **ไม่ใช่ immutable consent audit หรือแหล่ง authorization** บัญชีเดิมไม่ถูกบังคับยอมรับใหม่ในรอบนี้
@@ -56,6 +58,7 @@ Terms/privacy อธิบายฟังก์ชันและช่องท
 - ผลตรวจ: full suite 281 ไฟล์ / 3,499 cases ผ่านก่อนเพิ่ม unsupported-host guard; หลังแก้รอบสุดท้าย auth suite 6 ไฟล์ / 58 cases ผ่าน (รวม guard ใหม่นั้น), TypeScript/token lint/build ผ่าน และ Next MCP `issues`, `configErrors`, `sessionErrors` ว่าง
 - PGlite รัน SQL migration ใหม่ในฐานชั่วคราว ตรวจ cap/reset/grants/RLS/cleanup/การไม่สร้างแถวผู้รับหลัง IP เต็ม ไม่ได้พิสูจน์ race หลาย connection บน hosted Postgres
 - Next.js Turbopack MCP และ browser จริง ตรวจ signup/validation/check-email/cooldown/ลิงก์ผิด/เอกสารที่จอ 1440 และ 390px โดย intercept provider และบล็อก fetch ภายนอก ไม่ใช่หลักฐานว่า SMTP/Google/อีเมลข้ามอุปกรณ์ผ่านแล้ว
-- ฟอร์มใหม่พร้อม policy acknowledgement สูงใกล้เคียงเดิมบนมือถือ (~704px รวม card เทียบเดิม ~703px) และต่ำลงเล็กน้อยบน desktop (~704px เทียบเดิม ~721px) ปุ่มหลัก/ช่องกรอกมีพื้นที่กดอย่างน้อย 44px และไม่ล้นแนวนอน
+- รอบก่อนเพิ่มช่องยืนยันรหัสผ่าน: ฟอร์มพร้อม policy acknowledgement สูงใกล้เคียงเดิมบนมือถือ (~704px รวม card เทียบเดิม ~703px) และต่ำลงเล็กน้อยบน desktop (~704px เทียบเดิม ~721px) หลังเพิ่มช่องยืนยัน card บนมือถือสูง ~782px ช่อง/ปุ่มใหม่ยังอย่างน้อย 44px และไม่ล้นแนวนอน
+- รอบเพิ่ม confirmation: full suite 281 ไฟล์ / 3,502 cases, TypeScript, token lint และ production webpack build ผ่าน ตรวจ browser กรณีไม่ตรง/แก้ให้ตรง/แก้รหัสเดิม/ว่างแล้วกดสมัคร/แสดงซ่อน/สำเร็จไป check-email และ Google ผ่าน mock redirect โดยไม่กรอกรหัส ไม่มีอีเมลจริงหรือ migration เพิ่มในรอบนี้
 
 อ้างอิงที่ตรวจ: [Supabase resend](https://supabase.com/docs/reference/javascript/auth-resend), [Auth rate limits](https://supabase.com/docs/guides/auth/rate-limits), [Password security](https://supabase.com/docs/guides/auth/password-security), [PKCE](https://supabase.com/docs/guides/auth/sessions/pkce-flow), [Vercel request headers](https://vercel.com/docs/headers/request-headers)
