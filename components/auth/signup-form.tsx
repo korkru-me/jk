@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
@@ -10,18 +10,17 @@ import { toast } from 'sonner'
 
 import { loginWithGoogle, register } from '@/lib/actions/auth'
 import { signupSchema, type SignupInput } from '@/lib/auth/validation'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { AccountRoleField, PolicyAcknowledgmentField } from '@/components/auth/account-fields'
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-
-const ACCOUNT_TYPES = [
-  { value: 'teacher', label: 'ครูผู้สอน', icon: '👨‍🏫', desc: 'สร้างโจทย์ ห้องเรียน และข้อสอบ' },
-  { value: 'student', label: 'นักเรียน', icon: '🎒', desc: 'เข้าห้องเรียนและทำงานที่ได้รับ' },
-] as const
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group'
+import { Separator } from '@/components/ui/separator'
 
 function GoogleIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
+    <svg viewBox="0 0 24 24" aria-hidden>
       <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
       <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
       <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
@@ -35,177 +34,168 @@ export function SignupForm() {
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [retryAfter, setRetryAfter] = useState(0)
 
   const {
     register: registerField,
     handleSubmit,
     watch,
     setValue,
+    trigger,
     formState: { errors },
   } = useForm<SignupInput>({
     resolver: zodResolver(signupSchema),
-    defaultValues: { full_name: '', email: '', password: '' },
+    defaultValues: { full_name: '', email: '', password: '', accept_terms: false },
   })
 
   const selectedRole = watch('role')
+  const acceptedTerms = watch('accept_terms')
+  const busy = loading || googleLoading
+
+  useEffect(() => {
+    if (retryAfter <= 0) return
+    const timer = window.setTimeout(() => setRetryAfter((seconds) => Math.max(0, seconds - 1)), 1000)
+    return () => window.clearTimeout(timer)
+  }, [retryAfter])
 
   async function onSubmit(values: SignupInput) {
     setLoading(true)
+    setSubmitError(null)
     const formData = new FormData()
     formData.set('role', values.role)
     formData.set('full_name', values.full_name)
     formData.set('email', values.email)
     formData.set('password', values.password)
+    formData.set('accept_terms', String(values.accept_terms))
 
     try {
       const result = await register(formData)
-      if ('error' in result) {
-        toast.error(
-          result.error === 'User already registered'
-            ? 'อีเมลนี้มีบัญชีอยู่แล้ว'
-            : result.error,
-        )
+      if ('error' in result && result.error) {
+        setSubmitError(result.error)
+        setRetryAfter(result.retryAfterSeconds ?? 0)
         setLoading(false)
         return
       }
 
-      toast.success(
-        result.signedIn
-          ? 'สมัครสมาชิกสำเร็จ! ยินดีต้อนรับสู่ KorKru'
-          : 'สมัครสมาชิกแล้ว กรุณาตรวจสอบอีเมลเพื่อยืนยันบัญชีก่อนเข้าสู่ระบบ'
-      )
-      router.push(result.signedIn ? '/dashboard' : '/login')
+      if (result.signedIn) toast.success('สมัครสมาชิกสำเร็จ ยินดีต้อนรับสู่ KorKru')
+      router.push(result.signedIn ? '/dashboard' : '/check-email')
     } catch {
-      toast.error('เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง')
+      setSubmitError('เชื่อมต่อไม่สำเร็จ กรุณาลองใหม่อีกครั้ง')
       setLoading(false)
     }
   }
 
   async function handleGoogleSignup() {
-    if (!selectedRole) {
-      toast.error('กรุณาเลือกว่าคุณเป็นครูหรือนักเรียนก่อน')
-      return
-    }
+    if (!(await trigger(['role', 'accept_terms']))) return
 
     setGoogleLoading(true)
-    const result = await loginWithGoogle(selectedRole)
-    if (result?.error) {
-      toast.error(result.error)
+    setSubmitError(null)
+    try {
+      const result = await loginWithGoogle(selectedRole, acceptedTerms)
+      if (result?.error) {
+        setSubmitError(result.error)
+        setGoogleLoading(false)
+      }
+    } catch {
+      setSubmitError('เชื่อมต่อ Google ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง')
       setGoogleLoading(false)
     }
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
-      <div className="space-y-2">
-        <Label>คุณใช้งานระบบในฐานะอะไร?</Label>
-        <div className="grid grid-cols-2 gap-2">
-          {ACCOUNT_TYPES.map((accountType) => (
-            <button
-              key={accountType.value}
-              type="button"
-              aria-pressed={selectedRole === accountType.value}
-              onClick={() => setValue('role', accountType.value, { shouldValidate: true })}
-              className={[
-                'flex flex-col items-center gap-1 rounded-xl border-2 p-3 text-sm font-medium transition-all',
-                selectedRole === accountType.value
-                  ? 'border-primary bg-primary/10 text-primary'
-                  : 'border-border text-muted-foreground hover:border-ring',
-              ].join(' ')}
-            >
-              <span className="text-xl" aria-hidden>{accountType.icon}</span>
-              <span className="text-center text-xs font-semibold leading-tight">{accountType.label}</span>
-              <span className="hidden text-center text-[10px] leading-tight opacity-60 sm:block">
-                {accountType.desc}
-              </span>
-            </button>
-          ))}
-        </div>
-        {errors.role && <p className="text-xs text-destructive">{errors.role.message}</p>}
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3" noValidate aria-busy={busy}>
+      <FieldGroup className="gap-3">
+        <AccountRoleField id="signup-role" value={selectedRole} onChange={(role) => setValue('role', role, { shouldValidate: true })} error={errors.role?.message} disabled={busy} />
+        <PolicyAcknowledgmentField id="accept_terms" checked={acceptedTerms === true} onChange={(checked) => setValue('accept_terms', checked, { shouldValidate: true })} error={errors.accept_terms?.message} disabled={busy} />
+
+        <Button type="button" variant="outline" className="min-h-11 w-full" disabled={busy} onClick={handleGoogleSignup}>
+          {googleLoading ? <Loader2 data-icon="inline-start" className="motion-safe:animate-spin" /> : <GoogleIcon />}
+          สมัครด้วย Google
+        </Button>
+      </FieldGroup>
+
+      <div className="flex items-center gap-3" aria-hidden>
+        <Separator className="flex-1" />
+        <span className="shrink-0 text-xs text-muted-foreground">หรือสมัครด้วยอีเมล</span>
+        <Separator className="flex-1" />
       </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="full_name">ชื่อที่ใช้แสดง</Label>
-        <Input
-          id="full_name"
-          placeholder={selectedRole === 'teacher' ? 'เช่น ครูสมชาย ใจดี' : 'เช่น สมชาย ใจดี'}
-          autoComplete="name"
-          {...registerField('full_name')}
-        />
-        {errors.full_name && <p className="text-xs text-destructive">{errors.full_name.message}</p>}
-      </div>
-
-      <div className="space-y-1.5">
-        <Label htmlFor="email">อีเมล</Label>
-        <Input
-          id="email"
-          type="email"
-          placeholder="name@example.com"
-          autoComplete="email"
-          {...registerField('email')}
-        />
-        {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
-      </div>
-
-      <div className="space-y-1.5">
-        <Label htmlFor="password">รหัสผ่าน</Label>
-        <div className="relative">
+      <FieldGroup className="gap-3">
+        <Field data-invalid={!!errors.full_name} className="gap-1">
+          <FieldLabel htmlFor="full_name">ชื่อที่ใช้แสดง</FieldLabel>
           <Input
-            id="password"
-            type={showPassword ? 'text' : 'password'}
-            placeholder="อย่างน้อย 8 ตัว มีตัวอักษร + ตัวเลข"
-            autoComplete="new-password"
-            className="pr-10"
-            {...registerField('password')}
+            id="full_name"
+            placeholder={selectedRole === 'teacher' ? 'เช่น ครูสมชาย ใจดี' : 'เช่น สมชาย ใจดี'}
+            autoComplete="name"
+            aria-invalid={!!errors.full_name}
+            aria-describedby={errors.full_name ? 'signup-name-error' : 'signup-name-help'}
+            disabled={busy}
+            className="min-h-11"
+            {...registerField('full_name')}
           />
-          <button
-            type="button"
-            onClick={() => setShowPassword((visible) => !visible)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
-            aria-label={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
-          >
-            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </button>
-        </div>
-        {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
-      </div>
+          <FieldDescription id="signup-name-help">ชื่อนี้จะแสดงต่อครูและสมาชิกห้องเรียนที่เกี่ยวข้อง</FieldDescription>
+          <FieldError id="signup-name-error" errors={[errors.full_name]} />
+        </Field>
 
-      <Button type="submit" className="w-full" disabled={loading || googleLoading}>
-        {loading ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            กำลังสมัครสมาชิก...
-          </>
-        ) : (
-          'สมัครสมาชิก'
-        )}
-      </Button>
+        <Field data-invalid={!!errors.email} className="gap-1">
+          <FieldLabel htmlFor="email">อีเมล</FieldLabel>
+          <Input
+            id="email"
+            type="email"
+            placeholder="name@example.com"
+            autoComplete="email"
+            autoCapitalize="none"
+            spellCheck={false}
+            aria-invalid={!!errors.email}
+            aria-describedby={errors.email ? 'signup-email-error' : undefined}
+            disabled={busy}
+            className="min-h-11"
+            {...registerField('email')}
+          />
+          <FieldError id="signup-email-error" errors={[errors.email]} />
+        </Field>
 
-      <div className="relative">
-        <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-t border-border" />
-        </div>
-        <div className="relative flex justify-center text-xs">
-          <span className="bg-card px-2 text-muted-foreground">หรือ</span>
-        </div>
-      </div>
+        <Field data-invalid={!!errors.password} className="gap-1">
+          <FieldLabel htmlFor="password">รหัสผ่าน</FieldLabel>
+          <InputGroup className="min-h-11">
+            <InputGroupInput
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="new-password"
+              aria-invalid={!!errors.password}
+              aria-describedby={errors.password ? 'signup-password-help signup-password-error' : 'signup-password-help'}
+              disabled={busy}
+              {...registerField('password')}
+            />
+            <InputGroupAddon align="inline-end" className="py-0">
+              <InputGroupButton
+                size="icon-sm"
+                className="min-h-11 min-w-11"
+                onClick={() => setShowPassword((visible) => !visible)}
+                aria-label={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
+                aria-pressed={showPassword}
+                disabled={busy}
+              >
+                {showPassword ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
+              </InputGroupButton>
+            </InputGroupAddon>
+          </InputGroup>
+          <FieldDescription id="signup-password-help">อย่างน้อย 8 ตัว มีตัวอักษร A–Z และตัวเลข ใช้รหัสผ่านที่ไม่ซ้ำกับเว็บอื่น</FieldDescription>
+          <FieldError id="signup-password-error" errors={[errors.password]} />
+        </Field>
+      </FieldGroup>
 
-      <Button
-        type="button"
-        variant="outline"
-        className="w-full gap-2"
-        disabled={googleLoading || loading}
-        onClick={handleGoogleSignup}
-      >
-        {googleLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <GoogleIcon />}
-        สมัครด้วย Google
+      {submitError && <Alert variant="destructive"><AlertDescription>{submitError}</AlertDescription></Alert>}
+
+      <Button type="submit" className="min-h-11 w-full" disabled={busy || retryAfter > 0}>
+        {loading && <Loader2 data-icon="inline-start" className="motion-safe:animate-spin" />}
+        {loading ? 'กำลังสมัครสมาชิก…' : retryAfter > 0 ? `ลองใหม่ได้ใน ${retryAfter} วินาที` : 'สมัครด้วยอีเมล'}
       </Button>
 
       <p className="text-center text-sm text-muted-foreground">
         มีบัญชีอยู่แล้ว?{' '}
-        <Link href="/login" className="font-medium text-primary hover:underline">
-          เข้าสู่ระบบ
-        </Link>
+        <Link href="/login" className="inline-flex min-h-11 items-center font-medium text-primary hover:underline">เข้าสู่ระบบ</Link>
       </p>
     </form>
   )

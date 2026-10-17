@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
 import { CompleteProfileForm } from '@/components/auth/complete-profile-form'
+import { BrandLogo } from '@/components/brand-logo'
 import { Card } from '@/components/ui/card'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
@@ -40,26 +41,21 @@ export default async function CompleteProfilePage({ searchParams }: Props) {
     ?? ''
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-muted p-4">
-      <Link href="/" className="mb-8 flex items-center gap-2.5">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-base font-bold text-primary-foreground shadow-md">
-          K
-        </div>
-        <div>
-          <p className="text-lg font-bold leading-none text-foreground">KorKru</p>
-          <p className="text-xs text-muted-foreground">คลังข้อสอบอัจฉริยะ</p>
-        </div>
+    <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-muted px-4 py-6">
+      <Link href="/" className="flex min-h-11 items-center" aria-label="KorKru กลับหน้าหลัก">
+        <BrandLogo subtitle="ก่อการเรียนรู้ โดยครู" />
       </Link>
 
-      <Card padding="2xl" elevation="sm" className="w-full max-w-md">
-        <div className="mb-6 text-center">
+      <Card padding="md" elevation="sm" className="w-full max-w-md">
+        <div className="mb-3 text-center">
           <h1 className="text-2xl font-bold text-foreground">ตั้งค่าบัญชีอีกนิดเดียว</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             ยืนยันชื่อและประเภทบัญชี แล้วเริ่มใช้งานได้ทันที
           </p>
         </div>
         <CompleteProfileForm defaultName={defaultName} defaultRole={defaultRole} />
       </Card>
-    </div>
+      <Link href="/contact" className="inline-flex min-h-11 items-center text-sm text-muted-foreground hover:underline">ติดต่อผู้ดูแล</Link>
+    </main>
   )
 }
