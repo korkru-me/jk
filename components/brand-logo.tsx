@@ -5,12 +5,14 @@ interface BrandLogoProps {
   layout?: 'horizontal' | 'stacked'
   subtitle?: string
   compact?: boolean
+  size?: 'default' | 'large'
   className?: string
 }
 
 /** One mark and one spelling across the app, public pages and account screens. */
-export function BrandLogo({ layout = 'horizontal', subtitle, compact = false, className }: BrandLogoProps) {
+export function BrandLogo({ layout = 'horizontal', subtitle, compact = false, size = 'default', className }: BrandLogoProps) {
   const stacked = layout === 'stacked'
+  const large = size === 'large'
 
   return (
     <span className={cn(
@@ -27,7 +29,7 @@ export function BrandLogo({ layout = 'horizontal', subtitle, compact = false, cl
         }}
         className={cn(
           'block shrink-0 bg-brand-accent',
-          stacked
+          large ? 'h-14 sm:h-16' : stacked
             ? (compact ? 'h-8' : 'h-10')
             : (compact ? 'h-8' : 'h-11'),
         )}
@@ -35,7 +37,7 @@ export function BrandLogo({ layout = 'horizontal', subtitle, compact = false, cl
       <span className={cn('flex flex-col', stacked && 'items-center')}>
         <span className={cn(
           'font-bold leading-none tracking-tight text-brand-foreground',
-          stacked
+          large ? 'text-3xl sm:text-4xl' : stacked
             ? (compact ? 'text-xs' : 'text-sm')
             : (compact ? 'text-sm' : 'text-lg'),
         )}>

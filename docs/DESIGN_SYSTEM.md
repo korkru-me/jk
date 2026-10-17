@@ -2,6 +2,8 @@
 
 ## Signup and account trust — 17 October 2026 (prepared)
 
+หน้า login/signup ใช้ `BrandLogo size="large"` โลโก้กวาง `h-14 sm:h-16` และชื่อ KorKru `text-3xl sm:text-4xl` ให้เด่นกว่าหัวข้อ `text-2xl` คงข้อความรองและ gap เดิม ขนาดปกติ/compact ยังใช้กับส่วนอื่นตามเดิม
+
 ตัวเลือกบทบาทสมัครสมาชิกใช้ ToggleGroup แบบปุ่มมีขอบสองช่องเท่ากัน สูงอย่างน้อย 52px พร้อมพื้นอ่อน/เงาบางและวงกลมสถานะ เมื่อเลือกใช้กรอบม่วง พื้นม่วงอ่อนและเครื่องหมายถูก มี hover/pressed/focus ชัดเจน ไม่เพิ่มคำอธิบายหรือเลือกบทบาทไว้ล่วงหน้า ไอคอนตกแต่งซ่อนเมื่อ container แคบกว่า 280px เพื่อรักษาชื่อบทบาทให้อ่านได้ ใช้ aria-pressed และการควบคุมคีย์บอร์ดเดิม ไม่มี radio/checkbox ซ้อนในปุ่ม
 
 Signup uses compact icon ToggleGroup roles, one explicit terms/privacy acknowledgement shared by email/Google, then Google and email fields. Keep visible labels, inline errors, name visibility and password requirements; do not ask for school/subject/phone/DOB in this flow. Primary controls have at least 44px touch targets. Check-email presents a truthful conditional delivery message and server cooldown rather than claiming successful delivery. Terms/privacy/contact are readable linked documents with section anchors; contact uses the owner's approved “ผู้ดูแล KorKru” and public email. No mock certification, 2FA enabled state, device/IP history or working-export claims. Settings shares one teacher/student password form. Preview measurements and actual rollout limits are recorded in `docs/AUTH_SIGNUP_ROLLOUT.md`.
