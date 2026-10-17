@@ -38,7 +38,7 @@ export function AccountRoleField({ id, value, onChange, error, disabled }: {
           disabled={disabled}
         >
           {ACCOUNT_TYPES.map(({ value: role, label, icon: Icon }) => (
-            <ToggleGroupItem key={role} value={role} className="min-h-11 flex-1">
+            <ToggleGroupItem key={role} value={role} className="min-h-[44px] flex-1">
               <Icon data-icon="inline-start" aria-hidden />
               {label}
             </ToggleGroupItem>
@@ -59,7 +59,7 @@ export function PolicyAcknowledgmentField({ id, checked, onChange, error, disabl
 }) {
   return (
     <Field data-invalid={!!error} className="gap-1">
-      <div className="flex min-h-11 items-start gap-2">
+      <div className="flex min-h-[44px] items-start gap-2">
         <Checkbox
           id={id}
           checked={checked}

@@ -3,10 +3,14 @@ import Link from 'next/link'
 import { LoginForm } from '@/components/auth/login-form'
 import { Card } from '@/components/ui/card'
 import { BrandLogo } from '@/components/brand-logo'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 export const metadata: Metadata = { title: 'เข้าสู่ระบบ — KorKru' }
 
-export default function LoginPage() {
+export default async function LoginPage({ searchParams }: {
+  searchParams: Promise<{ password_changed?: string; error?: string }>
+}) {
+  const params = await searchParams
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-muted p-4">
       {/* Logo mark */}
@@ -19,6 +23,18 @@ export default function LoginPage() {
           <h1 className="text-2xl font-bold text-foreground">ยินดีต้อนรับกลับมา</h1>
           <p className="mt-1 text-sm text-muted-foreground">เข้าสู่ระบบเพื่อจัดการโจทย์และห้องเรียน</p>
         </div>
+        {params.password_changed === '1' && (
+          <Alert className="mb-3" role="status">
+            <AlertTitle>เปลี่ยนรหัสผ่านแล้ว</AlertTitle>
+            <AlertDescription>กรุณาเข้าสู่ระบบอีกครั้งด้วยรหัสผ่านใหม่</AlertDescription>
+          </Alert>
+        )}
+        {params.error === 'auth_failed' && (
+          <Alert className="mb-3" variant="destructive">
+            <AlertTitle>ลิงก์เข้าสู่ระบบใช้ไม่ได้</AlertTitle>
+            <AlertDescription>ลิงก์อาจหมดอายุ ถูกใช้แล้ว หรือเปิดจากคนละเบราว์เซอร์ กรุณาเข้าสู่ระบบหรือขอลิงก์ใหม่</AlertDescription>
+          </Alert>
+        )}
         <LoginForm />
       </Card>
 

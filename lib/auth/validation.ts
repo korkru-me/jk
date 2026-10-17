@@ -30,6 +30,9 @@ export const signupSchema = z.object({
   full_name: displayNameSchema,
   email: emailSchema,
   password: passwordSchema,
+  accept_terms: z.boolean().refine((value) => value === true, {
+    message: 'กรุณายอมรับข้อกำหนดและรับทราบนโยบายความเป็นส่วนตัว',
+  }),
 })
 
 export const loginSchema = z.object({
@@ -40,6 +43,9 @@ export const loginSchema = z.object({
 export const completeProfileSchema = z.object({
   role: accountRoleSchema,
   full_name: displayNameSchema,
+  accept_terms: z.boolean().refine((value) => value === true, {
+    message: 'กรุณายอมรับข้อกำหนดและรับทราบนโยบายความเป็นส่วนตัว',
+  }),
 })
 
 export const resetPasswordSchema = z

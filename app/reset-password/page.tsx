@@ -7,12 +7,15 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { BrandLogo } from '@/components/brand-logo'
 import { createClient } from '@/lib/supabase/server'
+import { hasRecoveryGrant } from '@/lib/auth/recovery-grant.server'
 
 export const metadata: Metadata = { title: 'ตั้งรหัสผ่านใหม่ — KorKru' }
 
 export default async function ResetPasswordPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  const { data: { session } } = await supabase.auth.getSession()
+  const canReset = Boolean(user && session && await hasRecoveryGrant(user.id, session.access_token))
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-muted p-4">
@@ -28,7 +31,7 @@ export default async function ResetPasswordPage() {
           </p>
         </div>
 
-        {user ? (
+        {canReset ? (
           <ResetPasswordForm />
         ) : (
           <div className="space-y-4 text-center">

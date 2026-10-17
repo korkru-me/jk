@@ -1,5 +1,16 @@
 # Feature status
 
+## สมัครสมาชิกและความน่าเชื่อถือของบัญชี — 17 ตุลาคม 2026 (เตรียมโค้ด ยังไม่ deploy)
+
+- เพิ่ม terms/privacy/contact ลิงก์จริง ชื่อ “ผู้ดูแล KorKru” และอีเมลสาธารณะ `korkru.me@gmail.com` ตามเจ้าของยืนยัน นักเรียนสมัครเองได้ ไม่มีข้อมูลสมัครเพิ่มเติมหรือคำอ้าง ISO/PDPA ที่ไม่มีหลักฐาน
+- ฟอร์มบทบาท/Google/อีเมลแบบกระชับ ตรวจรับทราบนโยบายทั้ง signup และ Google complete-profile ฝั่ง server; metadata ระบุ version/date เป็น acknowledgement ที่แก้ได้ ไม่ใช่ immutable consent audit/authorization
+- `/check-email` มีอีเมลจาก short-lived HttpOnly cookie, ส่งซ้ำ/cooldown, ลิงก์ผิด/หมดอายุ และทางกลับแก้อีเมลโดยสมัครใหม่ ไม่ใส่อีเมลใน URL
+- เปลี่ยนรหัสผ่าน settings ครู/นักเรียนตรวจรหัสเดิมจริงและ user ID ผ่าน client แยก ไม่ trim รหัสผ่าน; reset ต้องมี grant 10 นาทีจาก fresh code exchange ผูก exact user/session แล้ว global sign-out พร้อมรายงาน revocation failure อย่างตรงไปตรงมา
+- Shared server limiter เก็บ HMAC counter ใน Postgres (60 วินาที, 5/ชั่วโมง, 10/24 ชั่วโมงต่ออีเมล; 120/ชั่วโมงต่อ IP) มี RLS/service-only grants, row locks และ cleanup ไม่ใช้ in-memory production counter
+- ต้องตั้ง `AUTH_FLOW_SECRET`, apply migration `20261017111034` หลังแก้ Staging migration parity เดิม (`20261015132234` ยัง local-only), เปิด hosted email confirmation/Require current password และทดสอบ SMTP จริงก่อนใช้งาน; ไม่มี remote migration/config/email mutation ในรอบนี้ CAPTCHA/direct Auth protection และเอกสารผู้รับผิดชอบข้อมูล/retention ยังไม่ถือว่าเสร็จ
+
+ขอบเขต ผลตรวจ และลำดับ rollout: `docs/AUTH_SIGNUP_ROLLOUT.md` การสมัคร Resend ยังพักไว้ตามคำขอเดิม
+
 ## Resend Free and 80/90/97% quota alerts — 17 October 2026 (prepared, not deployed)
 
 - Owner selected Resend Free and alert recipient `korkru.me@gmail.com`. Added Thai account/domain/SMTP/Vercel/webhook setup guide `docs/RESEND_SETUP.md`; existing password recovery stays unchanged.

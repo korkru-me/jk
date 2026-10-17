@@ -7,14 +7,14 @@ import { Loader2, Mail } from 'lucide-react'
 import { resendSignupConfirmation } from '@/lib/actions/auth'
 import { emailSchema } from '@/lib/auth/validation'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 
-export function CheckEmailForm({ initialEmail, invalidLink = false }: { initialEmail: string | null; invalidLink?: boolean }) {
+export function CheckEmailForm({ initialEmail, initialRetryAfter = 0, invalidLink = false }: { initialEmail: string | null; initialRetryAfter?: number; invalidLink?: boolean }) {
   const [email, setEmail] = useState(initialEmail ?? '')
   const [loading, setLoading] = useState(false)
-  const [retryAfter, setRetryAfter] = useState(initialEmail && !invalidLink ? 60 : 0)
+  const [retryAfter, setRetryAfter] = useState(initialRetryAfter)
   const [fieldError, setFieldError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [requested, setRequested] = useState(false)
@@ -63,7 +63,7 @@ export function CheckEmailForm({ initialEmail, invalidLink = false }: { initialE
       )}
 
       <p className="text-sm text-muted-foreground">
-        เปิดอีเมลจาก KorKru แล้วกดลิงก์ยืนยันบัญชี ตรวจสอบโฟลเดอร์สแปมหรืออีเมลขยะด้วยหากยังไม่พบ
+        เปิดอีเมลจาก KorKru แล้วกดลิงก์ยืนยันบัญชี แนะนำให้เปิดด้วยเบราว์เซอร์ที่ใช้สมัคร และตรวจโฟลเดอร์สแปมหากยังไม่พบ
       </p>
 
       <form onSubmit={handleResend} noValidate aria-busy={loading}>
@@ -83,7 +83,7 @@ export function CheckEmailForm({ initialEmail, invalidLink = false }: { initialE
               aria-invalid={!!fieldError}
               aria-describedby={fieldError ? 'confirmation-email-error' : 'confirmation-email-help'}
               disabled={loading}
-              className="min-h-11"
+              className="min-h-[44px]"
             />
             <FieldDescription id="confirmation-email-help">ใช้ขอลิงก์ยืนยันอีกครั้ง การกรอกช่องนี้ไม่เปลี่ยนอีเมลของบัญชี</FieldDescription>
             {fieldError && <FieldError id="confirmation-email-error">{fieldError}</FieldError>}
@@ -97,7 +97,7 @@ export function CheckEmailForm({ initialEmail, invalidLink = false }: { initialE
             </Alert>
           )}
 
-          <Button type="submit" disabled={loading || retryAfter > 0} className="min-h-11 w-full">
+          <Button type="submit" disabled={loading || retryAfter > 0} className="min-h-[44px] w-full">
             {loading && <Loader2 data-icon="inline-start" className="motion-safe:animate-spin" />}
             {loading ? 'กำลังขอลิงก์…' : retryAfter > 0 ? `ส่งอีกครั้งได้ใน ${retryAfter} วินาที` : 'ส่งลิงก์ยืนยันอีกครั้ง'}
           </Button>
@@ -106,9 +106,9 @@ export function CheckEmailForm({ initialEmail, invalidLink = false }: { initialE
 
       <p className="text-sm text-muted-foreground">
         กรอกอีเมลผิดตอนสมัคร?{' '}
-        <Link href="/signup" className="inline-flex min-h-11 items-center text-primary hover:underline">กลับไปสมัครด้วยอีเมลที่ถูกต้อง</Link>
+        <Link href="/signup" className="inline-flex min-h-[44px] items-center text-primary hover:underline">กลับไปสมัครด้วยอีเมลที่ถูกต้อง</Link>
       </p>
-      <Button variant="outline" className="min-h-11 w-full" render={<Link href="/login" />}>ไปหน้าเข้าสู่ระบบ</Button>
+      <Link href="/login" className={buttonVariants({ variant: 'outline', className: 'min-h-[44px] w-full' })}>ไปหน้าเข้าสู่ระบบ</Link>
     </div>
   )
 }

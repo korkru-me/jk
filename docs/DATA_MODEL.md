@@ -1,5 +1,9 @@
 # Data model และ invariants
 
+## Prepared auth-email counters — 17 October 2026
+
+Migration `20261017111034_auth_email_request_limits.sql` adds operational `auth_email_request_limits`, keyed only by domain-separated HMAC email/IP bucket strings. It contains request counts, window starts and expiry, no raw email/IP/user/tenant records. RLS is enabled; PUBLIC/anon/authenticated grants are revoked. Only service_role can reserve through the fixed invoker RPC or purge expired rows. Network buckets are locked/checked before recipient allocation, all bucket locks follow one order, and hosted pg_cron schedules hourly expiry cleanup. This schema has not been applied; Staging already had local-only `20261015132234`, so remote writes stopped for parity review. Auth policy version/date remains editable user metadata and introduces no legal audit or role-authority table.
+
 สถานะ 15 ตุลาคม 2026: งานคลังฝึก/ชุดฝึกส่วนตัว/ปักทบทวน รูปโปรไฟล์ รับทราบประกาศ และปิดรอบเมื่อหมดเวลาเผยแพร่ Production แล้วตาม `docs/PRODUCTION_SYNC_20261015.md`; ข้อความ local-only/prepared ในบันทึกเฟสก่อนหน้าบอกสถานะขณะพัฒนา ส่วน native SEB ที่ยังพักไว้ไม่ได้เปิดเพิ่ม
 
 การปิดรอบ (`20261014072745`, apply ทั้ง Staging และ Production แล้ว 15 ตุลาคม 2026): `submissions.closed_at` หยุดคำตอบ/วิธีทำ, `close_reason` เป็น `manual|time_limit|close_time`, `answer_revision` ตรวจข้อมูลที่เปลี่ยนระหว่างยืนยันส่ง และ `missing_work_evidence` แจ้งหลักฐานที่ไม่ครบ รอบที่ปิดอาจยังเป็น `in_progress` ขณะรอตรวจโดยไม่เผยแพร่คะแนนชั่วคราว Commit คะแนนตั้ง `submitted_at = closed_at` กับ `status = submitted` ใน transaction เดียว การเรียกซ้ำไม่ทับผลที่เสร็จหรือครูแก้แล้ว ใช้สเกลคะแนนและช่วงสีเดิม

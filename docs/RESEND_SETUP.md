@@ -4,6 +4,8 @@
 
 **สถานะ: เตรียมโค้ดแล้ว ยังไม่เปิดใช้งานจริง** ต้องสมัครบัญชี ยืนยันโดเมน ใส่ secret เปิด SMTP/webhook และ deploy ก่อน ไม่มีการเปลี่ยน Supabase/RLS หรือ migration ในงานนี้
 
+รอบปรับระบบสมัครต่อจากงานนี้มี migration จำกัดคำขอส่งอีเมลและ `AUTH_FLOW_SECRET` เพิ่มแล้ว อ่าน `docs/AUTH_SIGNUP_ROLLOUT.md` ก่อน rollout โค้ดรุ่นใหม่; SMTP เพียงอย่างเดียวไม่ทำให้ email actions พร้อมใช้งาน การสมัคร Resend ยังพักไว้ตามคำขอเจ้าของเมื่อ 17 ตุลาคม
+
 ## สมัครและยืนยันโดเมน
 
 1. เปิด [สมัคร Resend](https://resend.com/signup) ใช้บัญชีที่เจ้าของควบคุม เช่น `korkru.me@gmail.com` และเลือก **Free**

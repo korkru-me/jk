@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label'
 export function ResetPasswordForm() {
   const [loading, setLoading] = useState(false)
   const [completed, setCompleted] = useState(false)
+  const [warning, setWarning] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
   const {
     register,
@@ -35,6 +36,7 @@ export function ResetPasswordForm() {
       toast.error(result.error)
       return
     }
+    setWarning('warning' in result ? result.warning ?? null : null)
     setCompleted(true)
   }
 
@@ -49,7 +51,7 @@ export function ResetPasswordForm() {
         <div>
           <p className="font-semibold text-foreground">ตั้งรหัสผ่านใหม่เรียบร้อยแล้ว</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            เพื่อความปลอดภัย ระบบออกจากบัญชีบนอุปกรณ์อื่นแล้ว
+            {warning ?? 'กรุณาเข้าสู่ระบบอีกครั้งด้วยรหัสผ่านใหม่'}
           </p>
         </div>
         <Button className="w-full" render={<Link href="/login" />}>

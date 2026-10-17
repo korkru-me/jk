@@ -72,7 +72,7 @@ export function CompleteProfileForm({ defaultName, defaultRole }: Props) {
             disabled={loading}
             aria-invalid={!!errors.full_name}
             aria-describedby={errors.full_name ? 'profile-name-error' : 'profile-name-help'}
-            className="min-h-11"
+            className="min-h-[44px]"
             {...register('full_name')}
           />
           <FieldDescription id="profile-name-help">ชื่อนี้จะแสดงต่อครูและสมาชิกห้องเรียนที่เกี่ยวข้อง</FieldDescription>
@@ -80,7 +80,7 @@ export function CompleteProfileForm({ defaultName, defaultRole }: Props) {
         </Field>
         <PolicyAcknowledgmentField id="accept_terms" checked={acceptedTerms === true} onChange={(checked) => setValue('accept_terms', checked, { shouldValidate: true })} error={errors.accept_terms?.message} disabled={loading} />
         {submitError && <Alert variant="destructive"><AlertDescription>{submitError}</AlertDescription></Alert>}
-        <Button type="submit" className="min-h-11 w-full" disabled={loading}>
+        <Button type="submit" className="min-h-[44px] w-full" disabled={loading}>
           {loading && <Loader2 data-icon="inline-start" className="motion-safe:animate-spin" />}
           {loading ? 'กำลังบันทึก…' : 'เริ่มใช้งาน KorKru'}
         </Button>
