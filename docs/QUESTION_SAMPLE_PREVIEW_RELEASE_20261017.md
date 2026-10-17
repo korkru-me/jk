@@ -23,3 +23,9 @@ Local checks ของแพตช์: TypeScript/token lint/production Turbopac
 Production ใช้ Git integration ของ Vercel project `jk` เมื่อ PR #58 merge เข้า `master` ต้องตรวจ deployment Ready, SHA ของ merge และ alias จริงก่อนรายงานเสร็จ ตรวจเว็บจริงแบบอ่านอย่างเดียวโดยไม่สร้างข้อมูล และยืนยัน lab ไม่เปิดใน Production
 
 จุดกู้คืนก่อนปล่อย: Production `3230edfcfd35a17670af6064d4f94f005e0de0fe`, deployment `dpl_5GZHMrNuCekqXk49LPd9gcCf4jwR` (Ready) ไม่มี schema ที่ต้อง rollback
+
+## ผล Production
+
+ยืนยันวันที่ 17/10/2026 22:05 (Asia/Bangkok): PR #58 merge แล้วที่ `83c2e4cfcbbc42409bec67c86e60f1b1eed480b4` และ Production deployment `dpl_7hgfeZUd7eNPL9pbeKtdUoNMepaH` เป็น **READY** โดย project target/aliases `www.korkru.com` และ `korkru.com` ชี้รุ่นเดียวกัน
+
+ตรวจแบบอ่านอย่างเดียว: `/login` HTTP 200 พร้อม tier production และไม่มีป้าย Staging; `/questions/new` สำหรับผู้ไม่มี session HTTP 307 ไป `/login`; lab `/exam-screen-lab/question-samples` HTTP 404 ตาม guard ตรวจแล้วโค้ด runtime บน merge commit ตรงกับรุ่นที่ผ่าน Staging ไม่มีการเขียนข้อมูล Production หรือ apply migration และไม่ได้ทดสอบด้วยบัญชีจริงใน Production
