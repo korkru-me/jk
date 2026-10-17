@@ -1,5 +1,9 @@
 # Architecture
 
+## Resend quota alert — 17 October 2026 (prepared, not deployed)
+
+POST `/api/webhooks/resend` bypasses session refresh only for that exact path and authenticates the bounded raw body with Svix signatures/timestamp validation. Server-only `lib/resend-quota-alert.server.ts` handles `email.sent`/`email.received`, reads Resend `/usage` using a dedicated Full access key, and emails the configured owner when the current UTC-day total reaches 80. A stable payload and per-environment/day Resend idempotency key deduplicate retries/concurrent events; the alert tag prevents loops. No student data is retained or forwarded, no Supabase admin client/schema change or additional cron is needed. Configuration defaults off; account/DNS/SMTP/webhook/Vercel secrets and Staging delivery verification are still required. The owner chose Resend Free and `korkru.me@gmail.com`; setup and delayed-webhook/quota-exhaustion limitations are in `docs/RESEND_SETUP.md`.
+
 สถานะ 15 ตุลาคม 2026: งานคลังฝึก/ชุดฝึกส่วนตัว/ปักทบทวน รูปโปรไฟล์ รับทราบประกาศ และปิดรอบเมื่อหมดเวลาเผยแพร่ Production แล้วตาม `docs/PRODUCTION_SYNC_20261015.md`; ข้อความ local-only/prepared ในบันทึกเฟสก่อนหน้าบอกสถานะขณะพัฒนา ส่วน native SEB ที่ยังพักไว้ไม่ได้เปิดเพิ่ม
 
 รอบที่กำหนดเวลา (14 ตุลาคม 2026) แยกการปิดรับออกจากการตรวจคะแนน: DB cron/write trigger ล็อกรอบที่หมดเวลาทั้งที่ไม่มี browser จากนั้น evaluator TypeScript เดิมตรวจคำตอบที่ล็อกไว้ Claim/commit RPC ใช้ submission row lock กับ revision fence และเผยแพร่คะแนนแบบ atomic งาน POST ที่ตรวจ secret รับการเรียกผ่าน pg_net/Vault ส่วน browser recovery เป็น fallback เฉพาะเจ้าของรอบและเรียกซ้ำได้ GET/prefetch ยังไม่เริ่มหรือให้คะแนนรอบ ต้องมี migration `20261014072745` และตั้ง worker ก่อน rollout; ผ่าน Staging และเผยแพร่ Production พร้อม worker เมื่อ 15 ตุลาคม 2026 ผ่าน PR #56

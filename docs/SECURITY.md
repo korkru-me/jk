@@ -1,5 +1,9 @@
 # Security และ privacy guardrails
 
+## Resend quota webhook — 17 October 2026 (prepared)
+
+The exact public POST `/api/webhooks/resend` uses Svix raw-body signature/timestamp verification, a 32 KiB streaming cap, and server-only configuration (disabled by default). Unauthenticated requests cannot call the provider or choose an alert recipient. Only aggregate current-window usage is read from fixed Resend HTTPS endpoints; redirects are rejected, fetches time out, and upstream error bodies/payloads/keys/recipient lists are never returned or logged. Stable day-scoped idempotency prevents duplicate sends, including retry-after-timeout; the alert tag prevents recursion. SMTP uses a separate domain-restricted Sending access key in Supabase, while the monitor needs Full access solely on the server. Staging/Production signing secrets and keys must be distinct. No Auth/RLS/grading change or database access is added; see `RESEND_SETUP.md` for rollout and limitations.
+
 สถานะ 15 ตุลาคม 2026: งานคลังฝึก/ชุดฝึกส่วนตัว/ปักทบทวน รูปโปรไฟล์ รับทราบประกาศ และปิดรอบเมื่อหมดเวลาเผยแพร่ Production แล้วตาม `docs/PRODUCTION_SYNC_20261015.md`; ข้อความ local-only/prepared ในบันทึกเฟสก่อนหน้าบอกสถานะขณะพัฒนา ส่วน native SEB ที่ยังพักไว้ไม่ได้เปิดเพิ่ม
 
 การปิดรอบ (`20261014072745`, apply ทั้ง Staging และ Production แล้ว 15 ตุลาคม 2026): RPC เป็น SECURITY INVOKER, `search_path = ''` และ revoke PUBLIC/anon/authenticated Student action ใช้ Auth ที่ตรวจแล้วและ exact owned row โดย SQL ตรวจ owner/expiry ก่อน forced closure Trigger คำตอบ/วิธีทำใช้ row lock เดียวกับการปิดและปฏิเสธ late writes ระหว่าง cron ticks เขียนคะแนนแบบ atomic และส่ง receipt ที่ไม่มีคะแนนซ่อน Global worker ต้องผ่าน constant-time secret comparison แยก environment Vault dispatch ใช้โดย postgres cron เท่านั้น ไม่เปิดให้ browser/service-role worker อ่าน Responses มีเฉพาะยอดรวม ไม่พิมพ์ข้อมูลนักเรียนหรือ key และไม่ใช้ credential ของ Staging ใน Production
