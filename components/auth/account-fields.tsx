@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { GraduationCap, Presentation } from 'lucide-react'
+import { Circle, CircleCheck, GraduationCap, Presentation } from 'lucide-react'
 
 import type { AccountRole } from '@/lib/auth/validation'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -33,14 +33,23 @@ export function AccountRoleField({ id, value, onChange, error, disabled }: {
             const role = values[0]
             if (role === 'teacher' || role === 'student') onChange(role)
           }}
-          variant="primary"
-          className="w-full"
+          variant="outline"
+          className="@container/role-options grid w-full grid-cols-2"
           disabled={disabled}
         >
           {ACCOUNT_TYPES.map(({ value: role, label, icon: Icon }) => (
-            <ToggleGroupItem key={role} value={role} className="min-h-[44px] flex-1">
-              <Icon data-icon="inline-start" aria-hidden />
-              {label}
+            <ToggleGroupItem
+              key={role}
+              value={role}
+              className="group/role min-h-[52px] min-w-0 cursor-pointer justify-start gap-1.5 border-2 border-border bg-muted/30 px-2.5 py-1.5 text-foreground shadow-xs hover:border-primary/50 hover:bg-primary/5 aria-pressed:border-primary aria-pressed:bg-primary/10 aria-pressed:text-primary aria-pressed:hover:border-primary aria-pressed:hover:bg-primary/10 motion-safe:active:scale-[0.98]"
+            >
+              <span className="hidden size-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary group-aria-pressed/role:bg-primary group-aria-pressed/role:text-primary-foreground @min-[280px]/role-options:flex">
+                <Icon data-icon="inline-start" aria-hidden />
+              </span>
+              <span className="min-w-0 whitespace-normal text-left leading-snug">{label}</span>
+              {value === role
+                ? <CircleCheck data-icon="inline-end" className="ml-auto text-primary" aria-hidden />
+                : <Circle data-icon="inline-end" className="ml-auto text-muted-foreground/60" aria-hidden />}
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
