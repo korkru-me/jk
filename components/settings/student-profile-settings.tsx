@@ -1,6 +1,8 @@
 'use client'
 
-import { useState, useTransition, useRef } from 'react'
+import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
+import { updateMyAvatar } from '@/lib/actions/avatar'
 import { toast } from 'sonner'
 import { updatePassword } from '@/lib/actions/settings'
 import { updateMyStudentProfile } from '@/lib/actions/student-profile'
@@ -11,8 +13,13 @@ import type { StudentProfile, StudentGuardian, NamePrefix } from '@/lib/types'
 import { buildFullName } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
 import { NativeSelect } from '@/components/ui/native-select'
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
+import { AvatarCropEditor } from '@/components/settings/avatar-crop-editor'
+import { PasswordSettingsSection } from '@/components/settings/password-settings-form'
+import { SignInMethodsSection } from '@/components/settings/sign-in-methods-section'
+import type { AccountSignInMethods, AccountSignInMethodActions } from '@/lib/auth/account-methods-types'
 import {
-  User, Lock, GraduationCap, Phone, Info, Eye, EyeOff, Plus, X,
+  User, GraduationCap, Phone, Eye, Plus, X,
 } from 'lucide-react'
 
 const GRADE_LEVELS = ['ม.1', 'ม.2', 'ม.3', 'ม.4', 'ม.5', 'ม.6', 'อื่นๆ']
@@ -20,24 +27,45 @@ const SECTION_NUMBERS = Array.from({ length: 15 }, (_, i) => i + 1)
 const MAX_GUARDIANS = 3
 const NAME_PREFIXES: NamePrefix[] = ['เด็กหญิง', 'เด็กชาย', 'นาย', 'นางสาว']
 
-function SectionCard({ title, description, icon: Icon, children }: {
+function AudienceNotice({ title, audience, detail }: { title: string; audience: string; detail: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <HoverCard open={open} onOpenChange={setOpen}>
+      <HoverCardTrigger render={<Button type="button" variant="ghost" size="xs" />}
+        className="h-auto min-h-7 max-w-full gap-1.5 whitespace-normal py-1 text-left text-xs font-normal text-muted-foreground"
+        aria-label={`ผู้ที่ดู${title}ได้: ${audience}`} aria-expanded={open}
+        onClick={() => setOpen(value => !value)}>
+        <Eye size={13} className="shrink-0" /><span>{audience}</span>
+      </HoverCardTrigger>
+      <HoverCardContent align="end" role="region" aria-label={`รายละเอียดผู้ที่ดู${title}ได้`}
+        className="max-w-[calc(100vw-2rem)] text-xs leading-relaxed">{detail}</HoverCardContent>
+    </HoverCard>
+  )
+}
+
+function SectionCard({ title, description, audience, audienceDetail, icon: Icon, children }: {
   title: string
-  description: string
+  description?: string
+  audience?: string
+  audienceDetail?: string
   icon: React.ElementType
   children: React.ReactNode
 }) {
   return (
-    <Card className="overflow-hidden">
-      <div className="px-6 py-4 border-b bg-muted/20 flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-          <Icon size={15} className="text-primary" />
+    <Card className="@container/profile-section overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b bg-muted/20 px-4 py-3 sm:px-5">
+        <div className="flex items-center gap-3">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+            <Icon size={15} className="text-primary" />
+          </div>
+          <div>
+            <h2 className="font-semibold text-sm">{title}</h2>
+            {description && <p className="text-xs text-muted-foreground">{description}</p>}
+          </div>
         </div>
-        <div>
-          <h2 className="font-semibold text-sm">{title}</h2>
-          <p className="text-xs text-muted-foreground">{description}</p>
-        </div>
+        {audience && audienceDetail && <AudienceNotice title={title} audience={audience} detail={audienceDetail} />}
       </div>
-      <div className="p-6">{children}</div>
+      <div className="p-4 sm:p-5">{children}</div>
     </Card>
   )
 }
@@ -54,52 +82,36 @@ interface StudentProfileSettingsProps {
     created_at: string
   }
   profile: StudentProfile | null
+  /** Synthetic lab routes substitute actions so preview forms cannot mutate accounts. */
+  saveProfileAction?: typeof updateMyStudentProfile
+  changePasswordAction?: typeof updatePassword
+  saveAvatarAction?: typeof updateMyAvatar
+  signInMethods?: AccountSignInMethods | null
+  signInMethodActions?: AccountSignInMethodActions
 }
 
-export function StudentProfileSettings({ user, profile }: StudentProfileSettingsProps) {
-  const [isPwPending, startPwTransition] = useTransition()
+export function StudentProfileSettings({ user, profile, saveProfileAction = updateMyStudentProfile, changePasswordAction = updatePassword, saveAvatarAction = updateMyAvatar, signInMethods, signInMethodActions }: StudentProfileSettingsProps) {
+  const router = useRouter()
   const [isInfoPending, startInfoTransition] = useTransition()
 
   const [avatarPreview, setAvatarPreview] = useState<string | null>(user.avatar_url)
-  const fileRef = useRef<HTMLInputElement>(null)
 
   const [guardians, setGuardians] = useState<StudentGuardian[]>(
     profile?.guardians?.length ? profile.guardians : [{ name: '', phone: '' }]
   )
 
-  const [showOldPw, setShowOldPw] = useState(false)
-  const [showNewPw, setShowNewPw] = useState(false)
-  const [showConfirmPw, setShowConfirmPw] = useState(false)
-
-  function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    if (file.size > 2 * 1024 * 1024) { toast.error('ขนาดไฟล์ต้องไม่เกิน 2MB'); return }
-    const reader = new FileReader()
-    reader.onloadend = () => setAvatarPreview(reader.result as string)
-    reader.readAsDataURL(file)
-  }
 
   function handleInfoSave(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
     fd.set('guardians', JSON.stringify(guardians))
     startInfoTransition(async () => {
-      const res = await updateMyStudentProfile(fd)
+      const res = await saveProfileAction(fd)
       if (res.error) toast.error(res.error)
       else toast.success('บันทึกข้อมูลสำเร็จ ✓')
     })
   }
 
-  function handlePasswordChange(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    const fd = new FormData(e.currentTarget)
-    startPwTransition(async () => {
-      const res = await updatePassword(fd)
-      if (res.error) toast.error(res.error)
-      else { toast.success('เปลี่ยนรหัสผ่านสำเร็จ ✓'); (e.target as HTMLFormElement).reset() }
-    })
-  }
 
   function updateGuardian(index: number, field: keyof StudentGuardian, value: string) {
     setGuardians(prev => prev.map((g, i) => i === index ? { ...g, [field]: value } : g))
@@ -126,23 +138,27 @@ export function StudentProfileSettings({ user, profile }: StudentProfileSettings
           <div className="relative shrink-0">
             {avatarPreview ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={avatarPreview} alt="avatar" className="w-20 h-20 rounded-2xl object-cover border-2 border-border" />
+              <img src={avatarPreview} alt="รูปโปรไฟล์" className="w-20 h-20 rounded-2xl object-cover border-2 border-border" />
             ) : (
-              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-2xl font-black">
+              <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center text-primary text-2xl font-black">
                 {initials}
               </div>
             )}
           </div>
-          <div className="space-y-1.5">
+          <div className="min-w-0 space-y-1.5">
             <p className="text-sm font-medium">{displayName}</p>
-            <p className="text-xs text-muted-foreground">{user.email}</p>
+            <p className="break-all text-xs text-muted-foreground">{user.email}</p>
             <p className="text-[10px] text-muted-foreground">สมาชิกตั้งแต่ {joinedDate}</p>
-            <Button variant="link" size="xs"
-              type="button"
-              onClick={() => fileRef.current?.click()}>
-              เปลี่ยนรูปโปรไฟล์
-            </Button>
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
+            <AvatarCropEditor src={avatarPreview} onChange={async file => {
+              const form = new FormData()
+              form.set('avatar', file)
+              const result = await saveAvatarAction(form)
+              if (result.error || !result.avatarUrl) return { error: result.error ?? 'บันทึกรูปไม่สำเร็จ' }
+              setAvatarPreview(result.avatarUrl)
+              toast('บันทึกรูปโปรไฟล์แล้ว')
+              router.refresh()
+              return {}
+            }} />
           </div>
         </div>
         <p className="text-[10px] text-muted-foreground mt-4">
@@ -150,19 +166,11 @@ export function StudentProfileSettings({ user, profile }: StudentProfileSettings
         </p>
       </SectionCard>
 
-      {/* ── Notice: shared with homeroom advisor ────────────────────────── */}
-      <div className="flex items-start gap-3 p-4 bg-primary/8 border border-primary/20 rounded-xl">
-        <Info size={16} className="text-primary shrink-0 mt-0.5" />
-        <p className="text-xs text-primary">
-          ข้อมูลตัวตน, ข้อมูลการศึกษา และข้อมูลติดต่อด้านล่างนี้ จะแสดงให้ <b>ครูที่ปรึกษาประจำห้อง Homeroom</b> ของคุณเห็น
-          เพื่อใช้ติดต่อและดูแลนักเรียน — ครูวิชาอื่นหรือนักเรียนคนอื่นจะไม่เห็นข้อมูลนี้
-        </p>
-      </div>
-
       <form key={profile?.updated_at ?? 'new'} onSubmit={handleInfoSave} className="space-y-5">
         {/* ── Identity ────────────────────────────────────────────────────── */}
-        <SectionCard title="ข้อมูลตัวตน" description="คำนำหน้าชื่อ ชื่อ สกุล ชื่อเล่น วันเกิด เพศสภาพ และข้อมูลสุขภาพ" icon={User}>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-[8.5rem_1fr_1fr] mb-4">
+        <SectionCard title="ข้อมูลตัวตน" icon={User} audience="ครูที่ปรึกษา"
+          audienceDetail="ครูที่ปรึกษาในห้อง Homeroom ดูข้อมูลตัวตนและสุขภาพส่วนนี้ได้ ส่วนชื่อที่ใช้แสดงในระบบปรากฏในห้องเรียนด้วย">
+          <div className="mb-4 grid grid-cols-1 gap-4 @lg/profile-section:grid-cols-[8.5rem_1fr_1fr]">
             <div className="space-y-1.5">
               <Label htmlFor="prefix">คำนำหน้าชื่อ</Label>
               <NativeSelect
@@ -184,7 +192,7 @@ export function StudentProfileSettings({ user, profile }: StudentProfileSettings
               <Input id="last_name" name="last_name" defaultValue={user.last_name ?? ''} placeholder="นามสกุล" required />
             </div>
           </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-4">
+          <div className="mb-4 grid grid-cols-1 gap-4 @lg/profile-section:grid-cols-3">
             <div className="space-y-1.5">
               <Label htmlFor="nickname">ชื่อเล่น</Label>
               <Input id="nickname" name="nickname" defaultValue={profile?.nickname ?? ''} placeholder="เช่น น้องแบม" />
@@ -206,7 +214,7 @@ export function StudentProfileSettings({ user, profile }: StudentProfileSettings
               </NativeSelect>
             </div>
           </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 @md/profile-section:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="food_allergy">ข้อมูลการแพ้อาหาร</Label>
               <Input id="food_allergy" name="food_allergy" defaultValue={profile?.food_allergy ?? ''} placeholder="เช่น แพ้กุ้ง, ถั่วลิสง (ถ้าไม่มีเว้นว่างได้)" />
@@ -219,8 +227,9 @@ export function StudentProfileSettings({ user, profile }: StudentProfileSettings
         </SectionCard>
 
         {/* ── Academic ────────────────────────────────────────────────────── */}
-        <SectionCard title="ข้อมูลการศึกษา" description="ระดับชั้น ห้อง โรงเรียน และรหัสประจำตัว" icon={GraduationCap}>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-4">
+        <SectionCard title="ข้อมูลการศึกษา" icon={GraduationCap} audience="ครูที่ปรึกษาและครูประจำวิชา"
+          audienceDetail="ครูประจำวิชาในห้องเรียนของคุณดูระดับชั้น ห้อง รหัสนักเรียน และเลขที่ได้ ส่วนชื่อโรงเรียนแสดงให้ครูที่ปรึกษาในห้อง Homeroom">
+          <div className="mb-4 grid grid-cols-1 gap-4 @lg/profile-section:grid-cols-3">
             <div className="space-y-1.5">
               <Label htmlFor="grade_level">ระดับชั้น</Label>
               <NativeSelect
@@ -248,7 +257,7 @@ export function StudentProfileSettings({ user, profile }: StudentProfileSettings
               <Input id="school_name" name="school_name" defaultValue={profile?.school_name ?? ''} placeholder="ชื่อโรงเรียน" />
             </div>
           </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 @md/profile-section:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="student_code">รหัสนักเรียน</Label>
               <Input id="student_code" name="student_code" defaultValue={profile?.student_code ?? ''} placeholder="รหัสประจำตัวนักเรียน" />
@@ -261,10 +270,11 @@ export function StudentProfileSettings({ user, profile }: StudentProfileSettings
         </SectionCard>
 
         {/* ── Contact ─────────────────────────────────────────────────────── */}
-        <SectionCard title="ข้อมูลติดต่อ" description="ที่อยู่ เบอร์โทร และผู้ปกครอง" icon={Phone}>
+        <SectionCard title="ข้อมูลติดต่อ" icon={Phone} audience="ครูที่ปรึกษา"
+          audienceDetail="ครูที่ปรึกษาในห้อง Homeroom ดูที่อยู่ เบอร์โทร และข้อมูลผู้ปกครองส่วนนี้ได้ เพื่อใช้ติดต่อและดูแลนักเรียน">
           <div className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5 sm:col-span-2">
+            <div className="grid grid-cols-1 gap-4 @md/profile-section:grid-cols-2">
+              <div className="space-y-1.5 @md/profile-section:col-span-2">
                 <Label htmlFor="address">ที่อยู่</Label>
                 <Input id="address" name="address" defaultValue={profile?.address ?? ''} placeholder="บ้านเลขที่ ถนน ตำบล/แขวง อำเภอ/เขต จังหวัด" />
               </div>
@@ -276,32 +286,34 @@ export function StudentProfileSettings({ user, profile }: StudentProfileSettings
 
             <div className="pt-2 border-t space-y-3">
               {guardians.map((g, i) => (
-                <div key={i} className="flex items-end gap-2">
+                <div key={i} className="flex flex-wrap items-end gap-2">
                   <div className="flex-1 space-y-1.5">
-                    <Label>{i === 0 ? 'ชื่อผู้ปกครอง' : `ชื่อผู้ปกครองคนที่ ${i + 1}`}</Label>
+                    <Label htmlFor={`guardian-name-${i}`}>{i === 0 ? 'ชื่อผู้ปกครอง' : `ชื่อผู้ปกครองคนที่ ${i + 1}`}</Label>
                     <Input
+                      id={`guardian-name-${i}`}
                       value={g.name}
                       onChange={e => updateGuardian(i, 'name', e.target.value)}
                       placeholder="ชื่อ-นามสกุลผู้ปกครอง"
                     />
                   </div>
                   <div className="flex-1 space-y-1.5">
-                    <Label>{i === 0 ? 'เบอร์โทรผู้ปกครอง' : `เบอร์โทรผู้ปกครองคนที่ ${i + 1}`}</Label>
+                    <Label htmlFor={`guardian-phone-${i}`}>{i === 0 ? 'เบอร์โทรผู้ปกครอง' : `เบอร์โทรผู้ปกครองคนที่ ${i + 1}`}</Label>
                     <Input
+                      id={`guardian-phone-${i}`}
                       value={g.phone}
                       onChange={e => updateGuardian(i, 'phone', e.target.value)}
                       placeholder="08x-xxx-xxxx"
                     />
                   </div>
                   {guardians.length > 1 && (
-                    <button
+                    <Button variant="ghost" size="icon-sm"
                       type="button"
                       onClick={() => removeGuardian(i)}
-                      className="shrink-0 h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                      title="ลบผู้ปกครองคนนี้"
+                      className="shrink-0 text-muted-foreground hover:text-destructive"
+                      aria-label={`ลบผู้ปกครองคนที่ ${i + 1}`}
                     >
                       <X size={15} />
-                    </button>
+                    </Button>
                   )}
                 </div>
               ))}
@@ -324,67 +336,8 @@ export function StudentProfileSettings({ user, profile }: StudentProfileSettings
       </form>
 
       {/* ── Change Password ──────────────────────────────────────────────── */}
-      <SectionCard title="เปลี่ยนรหัสผ่าน" description="แนะนำให้เปลี่ยนรหัสผ่านทุก 3-6 เดือน" icon={Lock}>
-        <form onSubmit={handlePasswordChange} className="space-y-4 max-w-md">
-          <div className="space-y-1.5">
-            <Label htmlFor="old_password">รหัสผ่านปัจจุบัน</Label>
-            <div className="relative">
-              <Input
-                id="old_password"
-                name="old_password"
-                type={showOldPw ? 'text' : 'password'}
-                placeholder="รหัสผ่านปัจจุบัน"
-                className="pr-10"
-                required
-              />
-              <button type="button" onClick={() => setShowOldPw(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                {showOldPw ? <EyeOff size={15} /> : <Eye size={15} />}
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="new_password">รหัสผ่านใหม่</Label>
-            <div className="relative">
-              <Input
-                id="new_password"
-                name="new_password"
-                type={showNewPw ? 'text' : 'password'}
-                placeholder="รหัสผ่านใหม่ (อย่างน้อย 8 ตัวอักษร)"
-                className="pr-10"
-                required
-              />
-              <button type="button" onClick={() => setShowNewPw(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                {showNewPw ? <EyeOff size={15} /> : <Eye size={15} />}
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="confirm_password">ยืนยันรหัสผ่านใหม่</Label>
-            <div className="relative">
-              <Input
-                id="confirm_password"
-                name="confirm_password"
-                type={showConfirmPw ? 'text' : 'password'}
-                placeholder="พิมพ์รหัสผ่านใหม่อีกครั้ง"
-                className="pr-10"
-                required
-              />
-              <button type="button" onClick={() => setShowConfirmPw(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                {showConfirmPw ? <EyeOff size={15} /> : <Eye size={15} />}
-              </button>
-            </div>
-          </div>
-
-          <Button type="submit" disabled={isPwPending} variant="outline" className="min-w-[140px]">
-            {isPwPending ? 'กำลังเปลี่ยน...' : 'เปลี่ยนรหัสผ่าน'}
-          </Button>
-        </form>
-      </SectionCard>
+      <SignInMethodsSection methods={signInMethods ?? null} {...signInMethodActions} />
+      <PasswordSettingsSection email={user.email} changePasswordAction={changePasswordAction} />
     </div>
   )
 }

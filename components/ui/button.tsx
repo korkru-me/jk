@@ -9,6 +9,9 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
+        workExercise: "bg-work-exercise text-work-foreground hover:bg-work-exercise/90",
+        workExam: "bg-work-exam text-work-foreground hover:bg-work-exam/90",
+        workPractice: "bg-work-practice text-work-foreground hover:bg-work-practice/90",
         default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
         outline:
           "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",

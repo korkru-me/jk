@@ -25,7 +25,6 @@ import { SubQuestionCountBadge } from '@/components/questions/sub-question-count
 import { SolutionButton } from '@/components/questions/solution-button'
 import { Card } from '@/components/ui/card'
 import { DIFF_META, TYPE_LABEL } from '@/lib/question-display'
-import type { QuestionStats } from '@/lib/question-stats'
 import { ImportQuestionsButton } from '@/components/questions/import-questions-button'
 import { getQuestionClientDetail } from '@/lib/actions/questions'
 import type {
@@ -77,7 +76,6 @@ const SEARCH_DEBOUNCE_MS = 500
 interface Props {
   questions: QuestionWithCategory[]
   /** Item analysis per question id; a question absent here has no graded answers yet. */
-  stats: Record<string, QuestionStats>
   teamQuestions: QuestionWithCreator[]
   hasTeamOrg: boolean
   hasMultipleTeams: boolean
@@ -112,7 +110,7 @@ interface Props {
 }
 
 export function QuestionBankClient({
-  questions, stats, teamQuestions, hasTeamOrg, hasMultipleTeams, myTeams, currentUserId,
+  questions, teamQuestions, hasTeamOrg, hasMultipleTeams, myTeams, currentUserId,
   allTags, filters, matchCount, searchGroups, searchGroupCounts, totalCount, perPage, duplicateCounts,
   subQuestionCounts, setMemberships, solutionPresence,
   teamFilters, teamMatchCount, teamSearchGroups, teamSearchGroupCounts, teamPaged,
@@ -597,7 +595,7 @@ export function QuestionBankClient({
                       onPreview={() => void openPreview(q.id)}
                       onToggleFlag={() => toggleFlag(q.id)}
                       myTeams={myTeams}
-                      stats={stats[q.id]}
+
                       allTags={tagPool}
                       duplicateCount={duplicateCounts[q.id] ?? 0}
                       subQuestionCount={subQuestionCounts[q.id]}
@@ -622,7 +620,7 @@ export function QuestionBankClient({
                 onPreview={() => void openPreview(q.id)}
                 onToggleFlag={() => toggleFlag(q.id)}
                 myTeams={myTeams}
-                stats={stats[q.id]}
+
                 allTags={tagPool}
                 duplicateCount={duplicateCounts[q.id] ?? 0}
                 subQuestionCount={subQuestionCounts[q.id]}
@@ -788,7 +786,7 @@ export function QuestionBankClient({
           isFlagged={flaggedIds.has(previewQ.id)}
           onClose={() => setPreviewQ(null)}
           onToggleFlag={() => toggleFlag(previewQ.id)}
-          stats={stats[previewQ.id]}
+
         />
       )}
     </div>

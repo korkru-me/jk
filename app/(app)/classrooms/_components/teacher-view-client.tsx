@@ -22,6 +22,7 @@ import {
 import { ClassroomCard } from './classroom-card'
 import type { Classroom } from '@/lib/types'
 import { Card } from '@/components/ui/card'
+import { ClassroomCoverPattern } from '@/components/classrooms/classroom-cover-pattern'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 
 interface Props {
@@ -30,12 +31,11 @@ interface Props {
   assignmentCountMap: Record<string, number>
   totalStudents: number
   totalAssignments: number
-  trashedCount: number
 }
 
 export function TeacherViewClient({
   classrooms, studentCountMap, assignmentCountMap,
-  totalStudents, totalAssignments, trashedCount,
+  totalStudents, totalAssignments,
 }: Props) {
   const router = useRouter()
   const [isSelecting, setIsSelecting] = useState(false)
@@ -131,88 +131,43 @@ export function TeacherViewClient({
   }
 
   return (
-    <div className="space-y-6 max-w-[1200px]">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-xl font-bold text-foreground">ห้องเรียนของฉัน</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{classrooms.length} ห้องเรียน</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {trashedCount > 0 && (
-            <Link
-              href="/classrooms/trash"
-              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-muted-foreground px-3 py-1.5 rounded-lg hover:bg-muted transition-colors"
-            >
-              <Trash2 className="w-4 h-4" />
-              ถังขยะ
-              <span className="bg-muted text-muted-foreground text-xs font-semibold px-1.5 py-0.5 rounded-full">{trashedCount}</span>
-            </Link>
-          )}
-          {!isSelecting ? (
-            <>
-              {classrooms.length > 0 && (
-                <button
-                  onClick={() => setIsSelecting(true)}
-                  className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-muted-foreground px-3 py-1.5 rounded-lg hover:bg-muted border border-border transition-colors"
-                >
-                  <CheckSquare className="w-4 h-4" />
-                  เลือก
-                </button>
-              )}
-              <Link href="/classrooms/new" className={cn(buttonVariants(), 'gap-2 shadow-sm')}>
-                <Plus className="w-4 h-4" />
-                สร้างห้องเรียน
+    <div className="flex min-w-0 flex-col gap-4">
+      <Card padding="md" className="@container/classrooms-header relative isolate overflow-hidden border-primary/20 bg-primary/5" data-classrooms-header>
+        <ClassroomCoverPattern patternKey="korkru-deer" placement="end" className="pointer-events-none absolute inset-0 size-full text-primary opacity-15" />
+        <div className="relative flex min-w-0 flex-wrap items-center justify-between gap-x-6 gap-y-3">
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <h1 className="text-xl font-bold text-foreground sm:text-2xl">ห้องเรียนของฉัน</h1>
+            <ul aria-label="สรุปห้องเรียน" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-foreground/75 @min-[30rem]/classrooms-header:text-sm">
+              {[
+                { value: classrooms.length, label: 'ห้องเรียน', icon: School },
+                { value: totalStudents, label: 'นักเรียน', unit: 'คน', icon: Users },
+                { value: totalAssignments, label: 'งานทั้งหมด', icon: BookOpen },
+              ].map(({ value, label, unit, icon: Icon }) => <li key={label} className="flex items-center gap-1.5">
+                <Icon aria-hidden="true" className="size-4 shrink-0 text-primary" />
+                <span>{label} <strong className="font-semibold text-foreground">{value.toLocaleString('th-TH')}</strong>{unit && ` ${unit}`}</span>
+              </li>)}
+            </ul>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {!isSelecting ? <>
+              {classrooms.length > 0 && <Button variant="outline" size="sm" className="min-h-[44px]" onClick={() => setIsSelecting(true)}>
+                <CheckSquare data-icon="inline-start" /> เลือก
+              </Button>}
+              <Link href="/classrooms/new" className={cn(buttonVariants({ size: 'sm' }), 'min-h-[44px] gap-1.5')}>
+                <Plus aria-hidden="true" className="size-4" /> สร้างห้องเรียน
               </Link>
-            </>
-          ) : (
-            <button
-              onClick={exitSelection}
-              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-muted-foreground px-3 py-1.5 rounded-lg hover:bg-muted border border-border transition-colors"
-            >
-              <X className="w-4 h-4" />
-              ยกเลิก
-            </button>
-          )}
+            </> : <Button variant="outline" size="sm" className="min-h-[44px]" onClick={exitSelection}>
+              <X data-icon="inline-start" /> ยกเลิก
+            </Button>}
+          </div>
+          {isSelecting && <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 border-t border-primary/15 pt-2">
+            <span className="text-sm font-medium text-foreground">เลือกแล้ว {selected.size} ห้องเรียน</span>
+            <Button variant="link" size="sm" className="min-h-[44px]" onClick={selected.size === classrooms.length ? () => setSelected(new Set()) : selectAll}>
+              {selected.size === classrooms.length ? 'ยกเลิกทั้งหมด' : 'เลือกทั้งหมด'}
+            </Button>
+          </div>}
         </div>
-      </div>
-
-      {/* Selection mode sub-bar */}
-      {isSelecting && (
-        <div className="flex items-center gap-3 bg-primary/10 border border-primary/20 rounded-xl px-4 py-2.5">
-          <span className="text-sm font-medium text-primary">
-            เลือกแล้ว {selected.size} ห้องเรียน
-          </span>
-          <Button variant="link" size="xs"
-            onClick={selected.size === classrooms.length ? () => setSelected(new Set()) : selectAll} className="hover:text-primary">
-            {selected.size === classrooms.length ? 'ยกเลิกทั้งหมด' : 'เลือกทั้งหมด'}
-          </Button>
-        </div>
-      )}
-
-      {/* Summary stats */}
-      {classrooms.length > 0 && !isSelecting && (
-        <div className="grid grid-cols-3 gap-4">
-          {[
-            { label: 'ห้องเรียน', value: classrooms.length, icon: School, color: 'bg-primary/10 text-primary' },
-            { label: 'นักเรียนรวม', value: totalStudents, icon: Users, color: 'bg-tint-1/10 text-tint-1' },
-            { label: 'งานทั้งหมด', value: totalAssignments, icon: BookOpen, color: 'bg-warning/10 text-warning' },
-          ].map(s => {
-            const Icon = s.icon
-            return (
-              <Card edge="ring" padding="md" className="flex items-center gap-3" key={s.label}>
-                <div className={`w-9 h-9 rounded-xl ${s.color} flex items-center justify-center shrink-0`}>
-                  <Icon className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-foreground leading-none">{s.value}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
-                </div>
-              </Card>
-            )
-          })}
-        </div>
-      )}
+      </Card>
 
       {/* Empty state */}
       {classrooms.length === 0 ? (

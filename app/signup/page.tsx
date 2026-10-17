@@ -8,22 +8,22 @@ export const metadata: Metadata = { title: 'สมัครสมาชิก �
 
 export default function SignupPage() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-muted p-4">
-      {/* Logo mark */}
-      <Link href="/" className="mb-8 flex items-center gap-2.5">
-        <BrandLogo subtitle="คลังข้อสอบอัจฉริยะ" />
+    <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-muted px-4 py-6">
+      <Link href="/" className="flex min-h-11 items-center" aria-label="KorKru กลับหน้าหลัก">
+        <BrandLogo size="large" subtitle="ก่อการเรียนรู้ โดยครู" />
       </Link>
 
-      <Card padding="2xl" elevation="sm" className="w-full max-w-lg">
-        <div className="mb-6 text-center">
+      <Card padding="md" elevation="sm" className="w-full max-w-md">
+        <div className="mb-3 text-center">
           <h1 className="text-2xl font-bold text-foreground">สมัครสมาชิก</h1>
+          <p className="text-sm text-muted-foreground">เลือกบทบาท แล้วเลือกวิธีสร้างบัญชี</p>
         </div>
         <SignupForm />
       </Card>
 
-      <p className="mt-6 text-xs text-muted-foreground">
-        © 2026 KorKru — ก่อการเรียนรู้ โดยครู
+      <p className="text-xs text-muted-foreground">
+        © 2026 KorKru · <Link href="/contact" className="inline-flex min-h-11 items-center hover:underline">ติดต่อผู้ดูแล</Link>
       </p>
-    </div>
+    </main>
   )
 }

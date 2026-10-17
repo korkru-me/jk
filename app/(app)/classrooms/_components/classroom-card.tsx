@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 import Link from 'next/link'
-import { Users, BookOpen, Check, Copy, Trash2 } from 'lucide-react'
+import { Users, BookOpen, Check, Copy, Trash2, ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { withBackHref } from '@/lib/back-link'
 import type { Classroom } from '@/lib/types'
@@ -13,10 +13,8 @@ import { Card } from '@/components/ui/card'
 import { ClassroomIcon } from '@/components/classrooms/classroom-icon'
 import { ClassroomCoverPattern } from '@/components/classrooms/classroom-cover-pattern'
 
-interface Props {
+interface CardProps {
   classroom: Pick<Classroom, 'id' | 'name' | 'description' | 'classroom_type'>
-  studentCount: number
-  assignmentCount: number
   backHref?: string
   isSelecting?: boolean
   isSelected?: boolean
@@ -26,8 +24,13 @@ interface Props {
   dragHandle?: ReactNode
 }
 
+type Props = CardProps & (
+  | { studentCount: number; assignmentCount: number; studentSummary?: never }
+  | { studentSummary: { pendingCount: number }; studentCount?: never; assignmentCount?: never }
+)
+
 export function ClassroomCard({
-  classroom, studentCount, assignmentCount,
+  classroom, studentCount, assignmentCount, studentSummary,
   backHref = '/classrooms',
   isSelecting = false, isSelected = false, onToggle,
   onDuplicate, onDelete, dragHandle,
@@ -70,15 +73,15 @@ export function ClassroomCard({
         <div className={cn('pointer-events-none relative z-10 min-w-0 flex-1', (isSelecting || dragHandle) && 'ml-10')}>
           <div className="flex min-w-0 items-center gap-2">
             <ClassroomIcon iconKey={meta.iconKey} className="size-5 shrink-0" />
-            <p className="truncate text-base font-bold leading-tight">
+            <p title={classroom.name} className={cn('min-w-0 font-bold leading-tight', studentSummary ? 'text-sm line-clamp-2' : 'truncate text-base')}>
               {classroom.name}
             </p>
-            {isHomeroom && <Badge variant="warning" className="shrink-0">HOMEROOM</Badge>}
+            {isHomeroom && <Badge variant="statusWarning" className="shrink-0">HOMEROOM</Badge>}
           </div>
           {(gradeLevel || academicTerm || shownDescription) && <p
             className={cn(
               'mt-1 flex min-w-0 items-center gap-1.5 text-xs font-medium',
-              savedCover ? savedCover.textMuted : 'text-muted-foreground',
+              savedCover ? savedCover.textMuted : 'text-foreground/75',
             )}
           >
             {gradeLevel && <span className="shrink-0"><span className="sr-only">ระดับชั้น </span>{gradeLevel}</span>}
@@ -100,7 +103,22 @@ export function ClassroomCard({
 
       {/* Body */}
       <div className="flex min-h-14 items-center justify-between gap-3 px-4 py-3">
-        <div className="flex min-w-0 items-center gap-4">
+        {studentSummary ? (
+          <>
+            <div className="min-w-0">
+              {isHomeroom ? (
+                <p className="text-xs text-muted-foreground">ครูที่ปรึกษาประจำชั้น</p>
+              ) : studentSummary.pendingCount > 0 ? (
+                <Badge variant="secondary">{studentSummary.pendingCount} รอทำ</Badge>
+              ) : (
+                <p className="text-xs text-muted-foreground">ไม่มีงานรอทำ</p>
+              )}
+            </div>
+            <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-primary">
+              เข้าห้อง <ArrowRight className="size-3.5" aria-hidden="true" />
+            </span>
+          </>
+        ) : <div className="flex min-w-0 items-center gap-4">
           <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
             <Users className="size-3.5 text-muted-foreground" aria-hidden="true" />
             <span className="font-semibold text-foreground">{studentCount}</span>
@@ -111,7 +129,7 @@ export function ClassroomCard({
             <span className="font-semibold text-foreground">{assignmentCount}</span>
             <span className="text-xs">งาน</span>
           </div>
-        </div>
+        </div>}
         {!isSelecting && (onDuplicate || onDelete) && (
           <div className="relative z-20 flex shrink-0 items-center gap-1">
             {onDuplicate && (
@@ -170,7 +188,7 @@ export function ClassroomCard({
     <Card
       edge="ring"
       className={cn(
-        'group relative overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg',
+        'group relative overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg motion-reduce:transform-none motion-reduce:transition-none',
         isHomeroom ? 'ring-2 ring-warning/50 shadow-md' : 'ring-1 ring-border',
       )}
     >

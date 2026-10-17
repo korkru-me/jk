@@ -24,6 +24,11 @@ export const PRACTICE_LIBRARY_COLUMNS = [
   'description',
   'status',
   'reveal_answer_key',
+  'access_code',
+  'calculator_enabled',
+  'scratchpad_enabled',
+  'shuffle_questions',
+  'shuffle_options',
   'published_at',
   'closed_at',
   'created_at',
@@ -39,6 +44,11 @@ export type PracticeLibraryRow = Readonly<{
   description: string | null
   status: PracticeLibraryStatus
   reveal_answer_key: boolean
+  access_code: string | null
+  calculator_enabled: boolean
+  scratchpad_enabled: boolean
+  shuffle_questions: boolean
+  shuffle_options: boolean
   published_at: string | null
   closed_at: string | null
   created_at: string
@@ -85,6 +95,7 @@ export const GET_PRACTICE_STUDENT_QUESTION_PROGRESS_RPC = 'get_practice_student_
 export const BULK_UPDATE_PRACTICE_QUESTION_TAGS_RPC = 'bulk_update_practice_question_tags' as const
 export const REPLACE_DRAFT_PRACTICE_LIBRARY_QUESTIONS_RPC = 'replace_draft_practice_library_questions' as const
 export const CREATE_PRACTICE_LIBRARY_RPC = 'create_practice_library' as const
+export const CREATE_PRACTICE_LIBRARIES_FOR_CLASSROOMS_RPC = 'create_practice_libraries_for_classrooms' as const
 export const UPDATE_PRACTICE_LIBRARY_DRAFT_RPC = 'update_practice_library_draft' as const
 export const DUPLICATE_PRACTICE_LIBRARY_RPC = 'duplicate_practice_library' as const
 

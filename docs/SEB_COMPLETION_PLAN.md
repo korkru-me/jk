@@ -1,3 +1,9 @@
+## Browser entry schema compatibility — 14 October 2026
+
+The live schema lacks submissions.seb_config_revision while this source already selects it. Restore ordinary browser exam/exercise reads with an exact 42703-only retry using the legacy projection. Entry, resume, writable-answer and streak reads retain their actor/resource filters. SEB-required reads and writes reject the legacy projection, including when a caller has a mocked valid native session. This release introduces no migration, RLS/Storage change, native activation, or grading contract change; the SEB rollout remains gated.
+
+Local verification: full Vitest 245 files / 3,244 tests, TypeScript and isolated production webpack build PASS. Regression tests cover the missing/current schema, unrelated errors, GET without allocation, explicit start/resume, answer-write access and fail-closed SEB reads. Production schema probes of the exact waiting/resume/write projections with limit=0 return HTTP 200; no student answers or test attempts are read/written in Production. Synthetic Staging browser UAT PASS: exam/exercise waiting and explicit start reach answer controls, exercise autosave persists, practice access-code entry reaches 24 paginated links. Cleanup PASS for the two synthetic assessments plus the manifest-scoped practice fixtures. Source changes are limited to lib/actions/submissions.ts, lib/exam-taking.ts, lib/exam-write-access.ts and their compatibility helper/tests.
+
 # แผนปิดงาน Safe Exam Browser หลัง Drawing Board
 
 ## อนุมัติ release ordinary waiting/preview เท่านั้น — 12 ตุลาคม 2026

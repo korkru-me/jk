@@ -135,14 +135,14 @@ function extraDataFor(
 }
 
 /** Build the trusted, server-side-looking questions used to seed the lab. */
-export function buildExamScreenQaQuestions(): Question[] {
+export function buildExamScreenQaQuestions(randomized = false): Question[] {
   return EXAM_SCREEN_QA_CASES.map((testCase, index) => {
     const sample = SAMPLE_QUESTIONS[testCase.source][0]
     const props = sample.props
     const stableVariables = props.variables.map(variable => ({
       ...variable,
       // Repeatable values make screenshots comparable across device widths.
-      max: variable.min,
+      max: randomized ? variable.max : variable.min,
     }))
 
     const options = testCase.source === 'matching'
@@ -207,8 +207,8 @@ export interface ExamScreenQaFixture {
   sections: QuestionSetSection[]
 }
 
-export function buildExamScreenQaFixture(): ExamScreenQaFixture {
-  const questions = buildExamScreenQaQuestions()
+export function buildExamScreenQaFixture(randomized = false): ExamScreenQaFixture {
+  const questions = buildExamScreenQaQuestions(randomized)
   const questionIds = questions.map(question => question.id)
   const skeletons = buildAssignmentAttempt({
     question_ids: questionIds,
@@ -245,6 +245,7 @@ export function buildExamScreenQaFixture(): ExamScreenQaFixture {
       max_score: skeleton.max_score,
       questions: {
         ...safe.questions,
+        ...(randomized ? { variables: question.variables, logic_rules: question.logic_rules, answer_formula: question.answer_formula, answer_parts: question.answer_parts } : {}),
         answer_tolerance: question.answer_tolerance,
         solution_text: question.solution_text,
         solution_image_urls: question.solution_image_urls,

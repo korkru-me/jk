@@ -42,13 +42,13 @@ export default async function AssignmentDetailPage({
 
   const { data: assignment } = await supabase
     .from('assignments')
-    .select('*, classrooms(name)')
+    .select('*, classrooms(name, description)')
     .eq('id', id)
     .maybeSingle()
 
   if (!assignment) notFound()
 
-  const a = assignment as Assignment & { classrooms: { name: string } | null }
+  const a = assignment as Assignment & { classrooms: { name: string; description: string | null } | null }
   // No explicit ownership check here — RLS (assignments_org_teacher_all /
   // assignments_co_teacher_all) already scoped the row above; a null result
   // means unauthorized and is handled by notFound() before this point.

@@ -9,6 +9,9 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
+        workExercise: "border-work-exercise/25 bg-work-exercise/10 text-work-exercise",
+        workExam: "border-work-exam/25 bg-work-exam/10 text-work-exam",
+        workPractice: "border-work-practice/25 bg-work-practice/10 text-work-practice",
         default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
         secondary:
           "bg-secondary text-secondary-foreground [a]:hover:bg-secondary/80",

@@ -6,7 +6,7 @@ import type { GroupState } from '@/app/(app)/classrooms/[id]/_components/breakou
 import {
   ClassroomPeopleTabs, type PeopleView,
 } from '@/app/(app)/classrooms/[id]/_components/classroom-people-tabs'
-import type { StudentProfileRow } from '@/app/(app)/classrooms/[id]/_components/homeroom-overview'
+import { HomeroomOverview, type StudentProfileRow } from '@/app/(app)/classrooms/[id]/_components/homeroom-overview'
 import {
   ClassroomAssignmentsTab,
   type ClassroomAssignmentRow,
@@ -155,10 +155,18 @@ export function ClassroomGroupsLabClient({
   scenario,
   fail,
   overviewOnly = false,
+  homeroomOnly = false,
+  workOnly = false,
+  previewNow = '2026-10-14T12:00:00.000Z',
+  missingLayout = false,
 }: {
   scenario: GroupsLabScenario
   fail: boolean
   overviewOnly?: boolean
+  homeroomOnly?: boolean
+  workOnly?: boolean
+  previewNow?: string
+  missingLayout?: boolean
 }) {
   const seed = useMemo(() => initial(scenario), [scenario])
   const [state, setState] = useState<GroupState>(seed.state)
@@ -266,6 +274,12 @@ export function ClassroomGroupsLabClient({
         classroomId={CLASSROOM_ID}
         isHomeroom={false}
         students={roster.slice(0, 3)}
+        studentProfiles={profiles}
+        categories={LAB_CATEGORIES}
+        onSetAssignmentCategory={async () => {
+          await wait()
+          return fail ? { ok: false, error: '(ห้องทดลอง) ย้ายกลุ่มไม่สำเร็จ' } : { ok: true }
+        }}
         assignments={LAB_ASSIGNMENTS}
         homeroomAssignments={[]}
         submissions={[]}
@@ -278,8 +292,51 @@ export function ClassroomGroupsLabClient({
     </section>
   )
 
+  const workFixture = (
+    <ClassroomAssignmentsTab
+      classroomId={CLASSROOM_ID}
+      assignments={[...LAB_ASSIGNMENTS, { ...LAB_ASSIGNMENTS[1], id: '00000000-0000-4000-b000-000000000004', title: 'ข้อสอบกลางภาคจำลอง', type: 'exam', category_id: CATEGORY_ONE_ID, display_order: 4, max_attempts: 1, passing_type: 'percent', passing_value: 70, random_question_count: 2 }]}
+      categories={LAB_CATEGORIES}
+      submissions={[]}
+      studentCount={32}
+      pendingReviewByAssignment={{ '00000000-0000-4000-b000-000000000004': 2 }}
+      practiceLibraries={{ error: null, layoutAvailable: !missingLayout, items: [
+        { id: '00000000-0000-4000-a000-000000000001', title: 'คลังฝึกทบทวนแรงและการเคลื่อนที่', status: 'published', questionCount: 24, categoryId: missingLayout ? null : CATEGORY_ONE_ID, displayOrder: missingLayout ? null : 2 },
+        { id: '00000000-0000-4000-a000-000000000002', title: 'คลังฝึกฉบับร่าง ชื่อยาวสำหรับตรวจรายการรวมบนมือถือ', status: 'draft', questionCount: 8, categoryId: null, displayOrder: null },
+      ] }}
+      recentWork={{ asOf: previewNow, error: null, items: [
+        { id: '00000000-0000-4000-a000-000000000001', title: 'คลังฝึกทบทวนแรงและการเคลื่อนที่', type: 'practice', status: 'published', createdAt: previewNow },
+        { id: '00000000-0000-4000-b000-000000000002', title: 'การเคลื่อนที่แบบโปรเจกไทล์', type: 'exercise', status: 'published', createdAt: previewNow },
+      ] }}
+      onReorderAssignments={async () => {
+        await wait()
+        return fail
+          ? { error: '(ห้องทดลอง) บันทึกลำดับไม่สำเร็จ — รายการควรย้อนกลับเป็นแบบเดิม' }
+          : {}
+      }}
+      onSetAssignmentCategory={async () => {
+        await wait()
+        return fail
+          ? { ok: false, error: '(ห้องทดลอง) ย้ายกลุ่มไม่สำเร็จ — งานควรกลับไปอยู่กลุ่มเดิม' }
+          : { ok: true }
+      }}
+    />
+  )
+
+  if (homeroomOnly) return <main className="flex flex-col gap-4 p-4 sm:p-6">
+    <p className="text-xs text-muted-foreground">Homeroom presentation fixture · synthetic data only</p>
+    <ClassroomOverview classroomId={CLASSROOM_ID} isHomeroom students={[]} assignments={[]}
+      homeroomAssignments={[]} submissions={[]} posts={[]} seenByPost={{}} crossPostTargets={[]}
+      canManage onNavigate={() => undefined} />
+    <HomeroomOverview classroomId={CLASSROOM_ID} students={[]} assignments={[]} submissions={[]} notes={[]} profiles={{}} />
+  </main>
+
+  if (workOnly) {
+    return <div className="w-full min-w-0 p-4 sm:p-6">{workFixture}</div>
+  }
+
   if (overviewOnly) {
-    return <div className="mx-auto max-w-5xl p-4 sm:p-6">{overviewFixture}</div>
+    return <div className="w-full min-w-0 p-4 sm:p-6">{overviewFixture}</div>
   }
 
   return (
@@ -355,26 +412,7 @@ export function ClassroomGroupsLabClient({
             มีครบทั้งฉบับร่าง เผยแพร่แล้ว และปิดแล้ว · ลำดับที่ลากอยู่ในหน่วยความจำของแท็บนี้
           </p>
         </div>
-        <ClassroomAssignmentsTab
-          classroomId={CLASSROOM_ID}
-          assignments={LAB_ASSIGNMENTS}
-          categories={LAB_CATEGORIES}
-          submissions={[]}
-          studentCount={32}
-          pendingReviewByAssignment={{}}
-          onReorderAssignments={async () => {
-            await wait()
-            return fail
-              ? { error: '(ห้องทดลอง) บันทึกลำดับไม่สำเร็จ — รายการควรย้อนกลับเป็นแบบเดิม' }
-              : {}
-          }}
-          onSetAssignmentCategory={async () => {
-            await wait()
-            return fail
-              ? { ok: false, error: '(ห้องทดลอง) ย้ายกลุ่มไม่สำเร็จ — งานควรกลับไปอยู่กลุ่มเดิม' }
-              : { ok: true }
-          }}
-        />
+        {workFixture}
       </section>
 
       <div className="max-w-2xl">

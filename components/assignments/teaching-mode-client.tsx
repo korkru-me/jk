@@ -68,6 +68,8 @@ import { useContextualSidebar } from '@/components/layout/sidebar-context'
 import { SidebarButton, SidebarSectionLabel, useSidebarCompact } from '@/components/layout/sidebar-display'
 import { cn } from '@/lib/utils'
 import { TeachingAnswerCheck, tryFields } from './teaching-try-answer'
+import { drawsRandomValues } from '@/lib/math/shared-random'
+import { readVisibleRandomValues, rememberVisibleRandomValues, visibleRandomValueStorage } from '@/lib/math/visible-random-values'
 
 const TeachingBoardEditor = dynamic(() => import('./teaching-board-editor'), {
   ssr: false,
@@ -471,7 +473,7 @@ function TeachingBoardSlots({
  * question is shown again from the sidebar.
  */
 function TeachingQuestionCard({
-  question, index, total, showSolution, showQuestion, showSavedBoards,
+  question: initialQuestion, index, total, showSolution, showQuestion, showSavedBoards,
   actions, slots, outlined, onActivate, onInsertImage,
 }: {
   question: TeachingQuestionView
@@ -488,6 +490,38 @@ function TeachingQuestionCard({
   onActivate?: () => void
   onInsertImage?: (url: string) => void
 }) {
+  const [variant, setVariant] = useState<TeachingQuestionView | null>(null)
+  const question = variant ?? initialQuestion
+  const generation = useRef(0)
+  const resetQuestion = useCallback(async (previous: Record<string, number>) => {
+    const request = ++generation.current
+    if (!drawsRandomValues(initialQuestion)) return true
+    try {
+      const { buildFreshRandomQuestion } = await import('@/lib/assignment-attempt')
+      const next = buildFreshRandomQuestion(initialQuestion, previous)
+      if (request !== generation.current) return false
+      if (!next) { toast.error('ยังสุ่มตัวเลขชุดใหม่ไม่ได้ กรุณาตรวจช่วงค่าตัวแปร'); return false }
+      setVariant({ ...initialQuestion, randomValues: next.random_values, correctAnswer: next.correct_answer, sharedRandomValues: false })
+      rememberVisibleRandomValues(visibleRandomValueStorage(), JSON.stringify(['teach', location.pathname, initialQuestion.id]), next.random_values)
+      return true
+    } catch {
+      if (request === generation.current) toast.error('สุ่มตัวเลขชุดใหม่ไม่สำเร็จ กรุณาลองอีกครั้ง')
+      return false
+    }
+  }, [initialQuestion])
+
+  useEffect(() => {
+    setVariant(null)
+    const identity = JSON.stringify(['teach', location.pathname, initialQuestion.id])
+    const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined
+    if (navigation?.type === 'reload' && new URL(navigation.name).pathname === location.pathname) {
+      void resetQuestion(readVisibleRandomValues(visibleRandomValueStorage(), identity) ?? initialQuestion.randomValues)
+    } else {
+      rememberVisibleRandomValues(visibleRandomValueStorage(), identity, initialQuestion.randomValues)
+    }
+    return () => { generation.current++ }
+  }, [initialQuestion, resetQuestion])
+
   const fields = useMemo(() => tryFields(question), [question])
   const [values, setValues] = useState<string[]>(() => (fields ?? []).map(() => ''))
 
@@ -534,7 +568,7 @@ function TeachingQuestionCard({
           fields={fields}
           values={values}
           onChange={setValue}
-          onClear={() => setValues(fields.map(() => ''))}
+          onClear={() => { void resetQuestion(question.randomValues).then(reset => { if (reset) setValues(fields.map(() => '')) }) }}
           revealAnswerKey={showSolution}
         />
       )}

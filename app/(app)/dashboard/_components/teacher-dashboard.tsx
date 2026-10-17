@@ -1,28 +1,21 @@
 import Link from 'next/link'
 import {
-  ArrowLeftRight,
   BookOpen,
-  Boxes,
   ChevronRight,
-  FileText,
   Layers,
-  ListChecks,
-  ListOrdered,
-  NotebookPen,
-  Paperclip,
-  PenLine,
   Plus,
   School,
-  Table2,
-  TextCursorInput,
-  ToggleLeft,
 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { TYPE_LABEL } from '@/lib/question-display'
-import type { Classroom } from '@/lib/types'
+import { DashboardQuestionList, type QuestionPreviewLoader } from './dashboard-question-list'
+import type { QuestionCardRow } from '@/components/questions/question-card'
+import type { QuestionCardData } from '@/lib/question-card-data'
+import type { Classroom, QuestionSet } from '@/lib/types'
+import { QuestionSetCard } from '@/components/questions/question-set-card'
 import { ClassroomCard } from '@/app/(app)/classrooms/_components/classroom-card'
+import { DashboardWelcome } from './dashboard-welcome'
 
 /**
  * Decorative accents distinguish the three kinds of work without claiming a
@@ -41,28 +34,15 @@ const CLASSROOM_ACCENT: Accent = {
 }
 
 const SET_ACCENT: Accent = {
-  chip: 'bg-tint-2/10 text-tint-2',
-  border: 'border-tint-2/25',
-  hover: 'hover:bg-tint-2/5',
+  chip: 'bg-primary/10 text-primary',
+  border: 'border-primary/25',
+  hover: 'hover:bg-primary/5',
 }
 
 const QUESTION_ACCENT: Accent = {
   chip: 'bg-tint-3/10 text-tint-3',
   border: 'border-tint-3/25',
   hover: 'hover:bg-tint-3/5',
-}
-
-const TYPE_ICON: Record<string, React.ElementType> = {
-  mcq: ListChecks,
-  written: PenLine,
-  essay: NotebookPen,
-  true_false: ToggleLeft,
-  fill_blank: TextCursorInput,
-  matching: ArrowLeftRight,
-  ordering: ListOrdered,
-  file_upload: Paperclip,
-  composite: Boxes,
-  classify: Table2,
 }
 
 export type DashboardClassroom = Pick<
@@ -76,16 +56,16 @@ export type DashboardClassroom = Pick<
 export interface DashboardQuestionSet {
   id: string
   title: string
+  description?: string | null
   questionCount: number
+  sections?: QuestionSet['sections']
 }
 
-export interface DashboardQuestion {
-  id: string
-  title: string
-  question_type: string
-}
+export type DashboardQuestion = QuestionCardRow
 
 interface Props {
+  currentUserId: string
+  fullName: string
   classroomsCount: number
   questionsCount: number
   setsCount: number
@@ -93,9 +73,14 @@ interface Props {
   classrooms: DashboardClassroom[]
   questionSets: DashboardQuestionSet[]
   questions: DashboardQuestion[]
+  questionCardData?: QuestionCardData
+  myTeams?: { id: string; name: string }[]
+  loadQuestionPreview?: QuestionPreviewLoader
 }
 
 export function TeacherDashboard({
+  currentUserId,
+  fullName,
   classroomsCount,
   questionsCount,
   setsCount,
@@ -103,41 +88,32 @@ export function TeacherDashboard({
   classrooms,
   questionSets,
   questions,
+  questionCardData,
+  myTeams,
+  loadQuestionPreview,
 }: Props) {
   const isEmpty = classroomsCount === 0 && questionsCount === 0 && setsCount === 0
 
-  if (isEmpty) return <GettingStarted />
+  const welcome = (
+    <DashboardWelcome
+      fullName={fullName}
+      classroomsCount={classroomsCount}
+      studentsCount={studentsCount}
+      questionsCount={questionsCount}
+      setsCount={setsCount}
+    />
+  )
+
+  if (isEmpty) return (
+    <div className="flex max-w-[1200px] flex-col gap-4">
+      {welcome}
+      <GettingStarted />
+    </div>
+  )
 
   return (
-    <div className="flex max-w-[1200px] flex-col gap-7">
-      {/* A compact strip keeps useful totals without pushing the actual work
-          below the fold. */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-3">
-        <CompactStatCard
-          href="/classrooms"
-          icon={School}
-          accent={CLASSROOM_ACCENT}
-          value={classroomsCount}
-          label="ห้องเรียน"
-          sub={studentsCount > 0 ? `นักเรียนรวม ${studentsCount} คน` : 'ยังไม่มีนักเรียน'}
-        />
-        <CompactStatCard
-          href="/questions"
-          icon={BookOpen}
-          accent={QUESTION_ACCENT}
-          value={questionsCount}
-          label="โจทย์ในคลัง"
-          sub="โจทย์ที่คุณสร้างเอง"
-        />
-        <CompactStatCard
-          href="/questions/sets"
-          icon={Layers}
-          accent={SET_ACCENT}
-          value={setsCount}
-          label="แฟ้มโจทย์"
-          sub="แฟ้มที่คุณสร้างเอง"
-        />
-      </div>
+    <div className="flex max-w-[1200px] flex-col gap-4">
+      {welcome}
 
       <DashboardSection
         title="ห้องเรียนของฉัน"
@@ -149,7 +125,7 @@ export function TeacherDashboard({
         emptyText="ยังไม่มีห้องเรียน"
         emptyAction={{ href: '/classrooms/new', label: 'สร้างห้องเรียนแรก' }}
       >
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {classrooms.map(classroom => (
             <div key={classroom.id} data-dashboard-classroom-card>
               <ClassroomCard
@@ -173,15 +149,21 @@ export function TeacherDashboard({
         emptyText="ยังไม่มีแฟ้มโจทย์"
         emptyAction={{ href: '/questions/sets/new', label: 'สร้างแฟ้มโจทย์แรก' }}
       >
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-3">
           {questionSets.map(set => (
-            <CompactResourceCard
+            <QuestionSetCard
               key={set.id}
-              href={`/questions/sets/${set.id}/edit`}
-              title={set.title}
-              meta={`${set.questionCount} ข้อ`}
-              icon={Layers}
-              accent={SET_ACCENT}
+              set={{
+                id: set.id,
+                title: set.title,
+                description: set.description,
+                created_by: currentUserId,
+                sections: set.sections ?? [],
+                valid_question_count: set.questionCount,
+              }}
+              currentUserId={currentUserId}
+              backHref="/dashboard"
+              refreshAfterDelete
             />
           ))}
         </div>
@@ -197,62 +179,14 @@ export function TeacherDashboard({
         emptyText="ยังไม่มีโจทย์ในคลัง"
         emptyAction={{ href: '/questions/new', label: 'สร้างโจทย์แรก' }}
       >
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          {questions.map(question => (
-            <CompactResourceCard
-              key={question.id}
-              href={`/questions/${question.id}/edit`}
-              title={question.title}
-              meta={TYPE_LABEL[question.question_type] ?? question.question_type}
-              icon={TYPE_ICON[question.question_type] ?? FileText}
-              accent={QUESTION_ACCENT}
-            />
-          ))}
-        </div>
+        <DashboardQuestionList
+          questions={questions}
+          cardData={questionCardData}
+          myTeams={myTeams}
+          loadPreview={loadQuestionPreview}
+        />
       </DashboardSection>
     </div>
-  )
-}
-
-function CompactStatCard({
-  href,
-  icon: Icon,
-  accent,
-  value,
-  label,
-  sub,
-}: {
-  href: string
-  icon: React.ElementType
-  accent: Accent
-  value: number
-  label: string
-  sub: string
-}) {
-  return (
-    <Link href={href} className="group" data-dashboard-stat-card>
-      <Card
-        radius="md"
-        padding="sm"
-        interactive
-        className={cn(
-          'flex min-h-20 flex-col items-center justify-center gap-1.5 p-2 text-center sm:min-h-18 sm:flex-row sm:justify-start sm:gap-3 sm:p-3 sm:text-left',
-          accent.border
-        )}
-      >
-        <span className={cn('flex size-8 shrink-0 items-center justify-center rounded-lg sm:size-9', accent.chip)}>
-          <Icon className="size-4" aria-hidden="true" />
-        </span>
-        <span className="min-w-0 sm:flex-1">
-          <span className="flex flex-col items-center gap-0.5 sm:flex-row sm:items-baseline sm:gap-2">
-            <strong className="text-lg leading-none sm:text-xl">{value.toLocaleString()}</strong>
-            <span className="text-xs leading-tight font-medium sm:truncate sm:text-sm">{label}</span>
-          </span>
-          <span className="mt-1 hidden truncate text-xs text-muted-foreground sm:block">{sub}</span>
-        </span>
-        <ChevronRight className="hidden size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 sm:block" aria-hidden="true" />
-      </Card>
-    </Link>
   )
 }
 
@@ -309,35 +243,6 @@ function DashboardSection({
   )
 }
 
-function CompactResourceCard({
-  href,
-  title,
-  meta,
-  icon: Icon,
-  accent,
-}: {
-  href: string
-  title: string
-  meta: string
-  icon: React.ElementType
-  accent: Accent
-}) {
-  return (
-    <Card radius="md" className={cn('overflow-hidden', accent.border)}>
-      <Link href={href} className={cn('flex min-h-20 items-center gap-3 p-3 transition-colors', accent.hover)}>
-        <span className={cn('flex size-10 shrink-0 items-center justify-center rounded-xl', accent.chip)}>
-          <Icon className="size-5" aria-hidden="true" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <strong className="block truncate text-sm">{title}</strong>
-          <span className="mt-0.5 block text-xs text-muted-foreground">{meta}</span>
-        </span>
-        <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-      </Link>
-    </Card>
-  )
-}
-
 function GettingStarted() {
   const steps = [
     {
@@ -366,7 +271,7 @@ function GettingStarted() {
   return (
     <div className="flex max-w-[1200px] flex-col gap-4">
       <div>
-        <h1 className="text-xl font-bold">เริ่มต้นใช้งาน</h1>
+        <h2 className="text-xl font-bold">เริ่มต้นใช้งาน</h2>
         <p className="mt-1 text-sm text-muted-foreground">เลือกสิ่งที่คุณอยากสร้างก่อน</p>
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

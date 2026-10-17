@@ -49,6 +49,7 @@ const PreviewModal = dynamic(
   { ssr: false },
 )
 import type { QuestionCardData } from '@/lib/question-card-data'
+import { SET_THEME_BORDER, SET_THEME_ICON, SET_THEME_SURFACE, SET_THEME_TEXT } from '@/lib/question-set-theme'
 
 /**
  * A โจทย์ as this panel receives it.
@@ -298,7 +299,7 @@ export function SetStructurePanel({
     <Card padding="xl" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <Layers className="size-4 shrink-0 text-primary" aria-hidden="true" />
+          <Layers className={cn('size-4 shrink-0', SET_THEME_TEXT)} aria-hidden="true" />
           <h2 className="whitespace-nowrap font-semibold text-foreground">โจทย์ในแฟ้มนี้</h2>
           <span className="whitespace-nowrap text-xs text-muted-foreground">{questionIds.length} ข้อ</span>
         </div>
@@ -335,7 +336,7 @@ export function SetStructurePanel({
           onClick={() => setQuestionsExpanded(expanded => !expanded)}
           className="group h-auto min-w-0 flex-1 justify-start gap-2 p-0 text-left hover:bg-transparent"
         >
-          <Layers className="size-4 shrink-0 text-primary" aria-hidden="true" />
+          <Layers className={cn('size-4 shrink-0', SET_THEME_TEXT)} aria-hidden="true" />
           <span className="whitespace-nowrap font-semibold text-foreground">โจทย์ในแฟ้มนี้</span>
           <span className="whitespace-nowrap text-xs text-muted-foreground">{questionIds.length} ข้อ</span>
           <ChevronDown
@@ -369,10 +370,10 @@ export function SetStructurePanel({
   )
 
   const sectionsPanel = (
-    <Card padding="lg" className="flex flex-col gap-2.5">
+    <Card padding="lg" className={cn('flex flex-col gap-2.5', SET_THEME_BORDER)}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <Folder className="size-4 shrink-0 text-primary" aria-hidden="true" />
+          <Folder className={cn('size-4 shrink-0', SET_THEME_TEXT)} aria-hidden="true" />
           <h2 className="whitespace-nowrap font-semibold text-foreground">แฟ้มย่อย</h2>
           {sections.length > 0 && (
             <span className="whitespace-nowrap text-xs text-muted-foreground">
@@ -432,7 +433,7 @@ export function SetStructurePanel({
                 type="button"
                 variant="ghost"
                 onClick={() => setDialogSectionId(NEW_SECTION)}
-                className="h-auto min-h-[62px] gap-2 rounded-2xl border border-dashed border-border text-muted-foreground hover:border-primary/40 hover:bg-primary/[0.03] hover:text-primary"
+                className={cn('h-auto min-h-[62px] gap-2 rounded-[12px] border border-dashed', SET_THEME_SURFACE, SET_THEME_TEXT)}
               >
                 <Plus data-icon="inline-start" aria-hidden="true" />
                 <span className="text-sm font-medium">สร้างแฟ้มย่อย</span>
@@ -673,7 +674,7 @@ function SectionCard({
       edge="ring"
       padding="sm"
       className={cn(
-        'group relative flex items-center gap-2.5 transition-colors hover:ring-primary/30',
+        'group relative flex items-center gap-2.5 rounded-[12px] transition-colors hover:ring-primary/30',
         isDragging && 'z-10 opacity-70 ring-primary/40',
       )}
     >
@@ -686,17 +687,17 @@ function SectionCard({
         onClick={onOpen}
         aria-label={`เปิดแฟ้มย่อย ${section.title || UNNAMED}`}
         title="กดเพื่อเปิด หรือกดค้างแล้วลากเพื่อสลับตำแหน่ง"
-        className="absolute inset-0 h-auto cursor-grab touch-manipulation rounded-2xl hover:bg-transparent active:cursor-grabbing"
+        className="absolute inset-0 h-auto cursor-grab touch-manipulation rounded-[12px] hover:bg-transparent active:cursor-grabbing"
         {...attributes}
         {...listeners}
       />
 
-      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-        <Folder className="w-4 h-4 text-primary" />
+      <div className={cn('flex size-8 shrink-0 items-center justify-center rounded-lg', SET_THEME_ICON, SET_THEME_TEXT)}>
+        <Folder className="size-4" />
       </div>
 
       <div className="flex-1 min-w-0">
-        <p className="font-semibold text-foreground text-sm truncate transition-colors group-hover:text-primary">
+        <p className={cn('truncate text-sm font-semibold', SET_THEME_TEXT)}>
           {section.title || <span className="text-muted-foreground font-medium">{UNNAMED}</span>}
         </p>
         <p className="text-xs text-muted-foreground">{section.question_ids.length} ข้อ</p>

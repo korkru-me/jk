@@ -57,13 +57,24 @@ export function buildPracticeProgressHref(
   studentId: string,
   state: PracticeProgressSearchState,
   page: number,
+  baseHref?: string,
 ): string {
-  const params = new URLSearchParams()
+  const params = new URLSearchParams({ tab: 'progress', student: studentId })
   if (state.q) params.set('q', state.q)
   if (page > 1) params.set('page', String(page))
   const query = params.toString()
-  const path = `/practice/${encodeURIComponent(libraryId)}/progress/${encodeURIComponent(studentId)}`
+  const path = baseHref ?? `/practice/${encodeURIComponent(libraryId)}/edit`
   return `${path}${query ? `?${query}` : ''}`
+}
+
+/** Sort the full safe aggregate before slicing: a practiced question on a later
+ * database page must precede every unpracticed question. Preserve library order
+ * within each group; counts measure activity, not correctness or ranking. */
+export function pagePracticeQuestionProgress(rows: readonly PracticeQuestionProgressSummary[], requestedPage: number) {
+  const ordered = rows.filter(row => row.attempt_count > 0).concat(rows.filter(row => row.attempt_count === 0))
+  const totalPages = Math.max(1, Math.ceil(ordered.length / PRACTICE_PROGRESS_PAGE_SIZE))
+  const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 && requestedPage <= totalPages ? requestedPage : 1
+  return { questions: ordered.slice((page - 1) * PRACTICE_PROGRESS_PAGE_SIZE, page * PRACTICE_PROGRESS_PAGE_SIZE), totalPages, page }
 }
 
 /**

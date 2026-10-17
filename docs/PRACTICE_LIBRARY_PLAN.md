@@ -165,7 +165,7 @@ Acceptance gate:
 
 งานหลัก:
 
-- เพิ่ม `practice_libraries` สำหรับคลังฝึกหนึ่งห้องใน MVP, `practice_library_questions` สำหรับสมาชิกโจทย์ตามลำดับ และ `practice_answer_attempts` สำหรับ accepted-check event โดยไม่ผูกกับตารางคะแนน
+- เพิ่ม `practice_libraries` โดยหนึ่งแถวคงผูกหนึ่งห้อง, `practice_library_questions` สำหรับสมาชิกโจทย์ตามลำดับ และ `practice_answer_attempts` สำหรับ accepted-check event โดยไม่ผูกกับตารางคะแนน; หน้าสร้างเลือกหลายห้องได้เหมือน assignment แต่ atomic RPC จะสร้างคลังที่ตั้งค่าเหมือนกันแยกหนึ่งชุดต่อห้อง เพื่อไม่รวม roster/progress ข้ามห้อง
 - `practice_answer_attempts` เก็บเฉพาะ `library_id`, `student_id`, `question_id`, `checked_at`, `idempotency_key`; บังคับ unique อย่างน้อยที่ `(library_id, student_id, idempotency_key)` แล้ว derive จำนวนครั้งด้วย `count(*)` แทนการมี aggregate counter เป็น source of truth ชุดที่สอง
 - `checked_at` มาจากฐานข้อมูล ไม่รับเวลาจาก browser และ RPC สำหรับ append event เรียกได้จาก server boundary เท่านั้น; browser ห้าม insert/update/delete event โดยตรง
 - Server Action ต้องตรวจ auth, รูปทรงและความไม่ว่างของคำตอบก่อนเรียก RPC; RPC ตรวจ published status, roster, library membership และ actor ซ้ำอีกชั้น โดยไม่รับหรือเก็บ payload คำตอบ
@@ -198,8 +198,8 @@ route หลักของเฟสนี้คือ `/practice`, `/practice/n
 
 งานหลัก:
 
-- เพิ่มตัวเลือก “คลังฝึก · ไม่มีคะแนน” ในทางเข้าสร้างงาน แต่พาไป route/domain เฉพาะ
-- ทำหน้าตั้งค่าแบบ compact: ชื่อ, คำชี้แจง, ห้องเป้าหมาย, สถานะ และรายการโจทย์
+- เพิ่มตัวเลือก “คลังฝึก” ในทางเข้าสร้างงานภายในห้องเรียน แต่พาไป route/domain เฉพาะ และไม่เพิ่มทางเข้าใน sidebar หลัก
+- ทำหน้าตั้งค่าแบบ compact: ชื่อ, คำชี้แจง, ห้องเป้าหมาย, สถานะ และรายการโจทย์; เมื่อมาจากห้องเรียนให้ตรึงห้องหลักและใช้ disclosure เลือกห้องเพิ่มเติมแบบเดียวกับ assignment ส่วนทางเข้ากลางเลือกหลายห้องในข้อมูลพื้นฐาน
 - ใช้ selector ของคลังโจทย์เดิมโดยกรองเฉพาะชนิดที่รองรับและโหลด preview ตามคำขอ
 - รองรับเลือก/เอาออกหลายข้อ จัดลำดับเมื่อจำเป็น และเตือนก่อนทิ้ง draft ที่ยังไม่บันทึก
 - เพิ่ม flow bulk tag ตามภาพอ้างอิง โดยเขียนแท็กกลับที่โจทย์ต้นทาง ไม่สร้างแท็กสำเนาเฉพาะคลัง
@@ -225,7 +225,7 @@ Acceptance gate:
 
 เป้าหมายคือค้นหาจากโจทย์มากกว่าร้อยข้อได้เร็ว เข้าใจง่าย และไม่โหลดข้อมูลเกินจำเป็น
 
-route หลักของเฟสนี้คือ `/practice/[id]` และใช้ URL state `q`, `tag` ซ้ำได้หลายค่า และ `page` ที่ validate แล้ว; ค่าเริ่มต้นโหลด 24 ข้อต่อหน้า
+route หลักของเฟสนี้คือหน้ารอ `/practice/[id]` และรายการโจทย์ `/practice/[id]/library`; รายการใช้ URL state `q`, `tag` ซ้ำได้หลายค่า และ `page` ที่ validate แล้ว ค่าเริ่มต้นโหลด 24 ข้อต่อหน้า ส่วนหน้ารอไม่มี input คำตอบและไม่สร้าง event
 
 งานหลัก:
 
@@ -363,7 +363,7 @@ Acceptance gate:
 - Phase 1: contract “ไม่มีคะแนน”, exact multi-tag AND, accepted-check/idempotency และภาพอ้างอิงถูกตรึงแล้ว
 - Phase 2: schema/RLS/RPC contract กำหนดเป็น 3 ตารางแยกและ service-only accepted-check; สถานะ apply จริงต้องยืนยันจาก migration ledger ของ environment ไม่ใช่จากไฟล์ใน Git
 - Phase 3: ทางเข้าครู, list/create/edit/lifecycle และตัวเลือกโจทย์อยู่หลัง server-only `PRACTICE_LIBRARY_ENABLED`; ไม่เพิ่ม `AssignmentType`
-- Phase 4: student library ใช้ search + tag AND + pagination ใน URL และ list DTO ที่ไม่บรรทุกเฉลย
+- Phase 4: student library มีหน้ารอก่อนเข้า แล้วใช้ search + tag AND + pagination ใน URL ที่ `/practice/[id]/library` และ list DTO ที่ไม่บรรทุกเฉลย
 - Phase 5: หน้าทำโจทย์ใช้ server evaluator/feedback ส่วนตัวและ append event แบบ idempotent โดยไม่เขียน submission
 - Phase 6: overview/detail progress ใช้ DTO allowlist และปฏิเสธ view-only co-teacher; ไม่มีคะแนน ความถูกต้อง ranking หรือ activity timeline
 - Phase 7: automated/browser/database evidence, viewport QA, performance fixture และ owner sign-off บันทึกใน `docs/SELF_PRACTICE_UAT.md`; ถ้ารายการ release gate ใดยังไม่ผ่าน ให้คง flag ปิดใน Production แม้ code path จะ build ผ่าน

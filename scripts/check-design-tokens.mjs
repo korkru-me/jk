@@ -37,7 +37,6 @@ const SKIP_FILES = [
   'app/(app)/assignments/[id]/export/_components/omr-sheet-preview.tsx',
   'app/(app)/assignments/[id]/export/_components/pdf-preview.tsx',
   'app/(app)/assignments/[id]/print/page.tsx',
-  'app/(app)/classrooms/[id]/report/page.tsx',
   'components/exam/print-worksheet.tsx',
 ]
 

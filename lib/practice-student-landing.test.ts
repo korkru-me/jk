@@ -40,6 +40,8 @@ describe('student practice landing privacy seam', () => {
       classroomId: 'classroom-id',
       classroomName: 'ฟิสิกส์ ม.4',
       questionCount: 24,
+      publishedAt: null,
+      createdAt: null,
     })
     expect(Object.keys(item)).not.toEqual(expect.arrayContaining([
       'answer',
@@ -57,5 +59,12 @@ describe('student practice landing privacy seam', () => {
       classroomName: 'ห้องเรียน',
       questionCount: -4.8,
     }).questionCount).toBe(0)
+  })
+  it('keeps valid discovery timestamps and safely treats old or malformed dates as unknown', () => {
+    const input = { id: 'library-id', title: 'คลังฝึก', classroomId: 'classroom-id', classroomName: 'วิชา', questionCount: 1 }
+    expect(studentPracticeLibraryListItem({ ...input, publishedAt: 'invalid', createdAt: '2026-10-01T09:00:00Z' }))
+      .toMatchObject({ publishedAt: null, createdAt: '2026-10-01T09:00:00Z' })
+    expect(studentPracticeLibraryListItem({ ...input, publishedAt: '2026-10-14T09:00:00Z' }).publishedAt)
+      .toBe('2026-10-14T09:00:00Z')
   })
 })

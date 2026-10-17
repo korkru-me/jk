@@ -3,7 +3,7 @@ import 'server-only'
 import type { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import {
-  fetchAllRows,
+  fetchAllRows, fetchRowsInChunks,
 } from '@/lib/supabase/fetch-all-rows'
 import { withQuestionPoints, type BankQuestion } from '@/lib/question-bank'
 import {
@@ -68,6 +68,7 @@ export interface PracticeClassroomAccessRow {
   org_id: string
   teacher_id: string
   name: string
+  description: string | null
   status: string
   classroom_type: string
   access: PracticeClassroomAccess
@@ -254,6 +255,31 @@ export async function loadPracticeEditorQuestions(
   }
 }
 
+/** Source management is checked by the caller; new references still require ordinary question RLS. */
+export async function loadPracticeCopyQuestions(
+  supabase: SupabaseServerClient,
+  userId: string,
+  sourceIds: string[],
+  initialBank?: Awaited<ReturnType<typeof loadSupportedPracticeBankQuestions>>,
+) {
+  const bank = initialBank ?? await loadSupportedPracticeBankQuestions(supabase, userId)
+  if (bank.error) return { ...bank, missingIds: sourceIds, unsupportedIds: [] as string[] }
+  const byId = new Map(bank.questions.map(question => [question.id, question]))
+  const unread = sourceIds.filter(id => !byId.has(id))
+  const extra = await fetchRowsInChunks<PracticeBankRow, string>(unread, ids => supabase
+    .from('questions').select(PRACTICE_BANK_FIELDS).in('id', ids)
+    .eq('is_research_snapshot', false).neq('visibility', 'pending'))
+  if (extra.error) return { questions: bank.questions, missingIds: unread, unsupportedIds: [] as string[], error: 'โหลดโจทย์ต้นฉบับไม่สำเร็จ กรุณาโหลดหน้าใหม่' }
+  const found = new Set([...byId.keys(), ...extra.rows.map(question => question.id)])
+  for (const row of extra.rows) if (isSupportedPracticeQuestion(row)) byId.set(row.id, safePracticeBankQuestion(row))
+  return {
+    questions: [...byId.values()],
+    missingIds: sourceIds.filter(id => !found.has(id)),
+    unsupportedIds: extra.rows.filter(row => !isSupportedPracticeQuestion(row)).map(row => row.id),
+    error: null,
+  }
+}
+
 export async function authenticatePracticeTeacher(supabase: SupabaseServerClient): Promise<
   | { ok: true; userId: string }
   | { ok: false; error: string; unauthenticated?: boolean }
@@ -288,7 +314,7 @@ export async function loadPracticeClassroomAccess(
 ): Promise<PracticeClassroomAccessRow | null> {
   const { data: classroom } = await supabase
     .from('classrooms')
-    .select('id, org_id, teacher_id, name, status, classroom_type')
+    .select('id, org_id, teacher_id, name, description, status, classroom_type')
     .eq('id', classroomId)
     .maybeSingle()
   if (!classroom) return null
@@ -317,14 +343,14 @@ export async function loadManageablePracticeClassrooms(
   const [{ data: owned, error: ownedError }, { data: coTeaching, error: coError }] = await Promise.all([
     supabase
       .from('classrooms')
-      .select('id, org_id, teacher_id, name, status, classroom_type')
+      .select('id, org_id, teacher_id, name, description, status, classroom_type')
       .eq('teacher_id', userId)
       .eq('status', 'active')
       .neq('classroom_type', 'homeroom')
       .order('created_at', { ascending: false }),
     supabase
       .from('classroom_co_teachers')
-      .select('classroom_id, permission, classrooms(id, org_id, teacher_id, name, status, classroom_type)')
+      .select('classroom_id, permission, classrooms(id, org_id, teacher_id, name, description, status, classroom_type)')
       .eq('user_id', userId)
       .in('permission', ['admin', 'manage']),
   ])
@@ -335,13 +361,23 @@ export async function loadManageablePracticeClassrooms(
 
   const rows = new Map<string, PracticeClassroomOption>()
   for (const classroom of (owned ?? []) as ClassroomRow[]) {
-    rows.set(classroom.id, { id: classroom.id, orgId: classroom.org_id, name: classroom.name })
+    rows.set(classroom.id, {
+      id: classroom.id,
+      orgId: classroom.org_id,
+      name: classroom.name,
+      description: classroom.description,
+    })
   }
   for (const relation of (coTeaching ?? []) as unknown as CoTeacherRow[]) {
     const classroom = oneClassroom(relation.classrooms)
     if (!classroom || classroom.status !== 'active' || classroom.classroom_type === 'homeroom') continue
     if (!canManagePracticeLibrary(accessForPermission(relation.permission))) continue
-    rows.set(classroom.id, { id: classroom.id, orgId: classroom.org_id, name: classroom.name })
+    rows.set(classroom.id, {
+      id: classroom.id,
+      orgId: classroom.org_id,
+      name: classroom.name,
+      description: classroom.description,
+    })
   }
 
   return {

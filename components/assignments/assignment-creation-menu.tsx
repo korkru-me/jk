@@ -1,12 +1,10 @@
 'use client'
 
+import { ExerciseIcon, ExamIcon, PracticeIcon } from '@/lib/assignment-display'
 import Link from 'next/link'
 import {
-  ClipboardPenLine,
-  BookOpenCheck,
   Copy,
   Plus,
-  Repeat2,
 } from 'lucide-react'
 import { assignmentCreationHref, assignmentReuseHref } from '@/lib/assignment-creation'
 import { Button } from '@/components/ui/button'
@@ -63,6 +61,9 @@ export function AssignmentCreationMenu({
           <Button
             type="button"
             variant={variant}
+            data-classroom-action={variant === 'default' || undefined}
+            data-classroom-navigation={variant === 'primaryGhost' || undefined}
+            data-classroom-selected={active}
             size={size}
             className={cn('pl-3.5 pr-2.5 transition-colors has-data-[icon=inline-start]:pl-3.5 [&_svg:not([class*="size-"])]:size-4', className)}
             aria-label={label}
@@ -78,7 +79,6 @@ export function AssignmentCreationMenu({
         <DropdownMenuGroup>
           <DropdownMenuLabel>เลือกสิ่งที่ต้องการสร้าง</DropdownMenuLabel>
           <DropdownMenuItem
-            variant="primary"
             className="py-2"
             render={<Link href={assignmentReuseHref(classroomId)} onNavigate={() => navigate(assignmentReuseHref(classroomId))} />}
           >
@@ -86,7 +86,6 @@ export function AssignmentCreationMenu({
             <span>นำงานเดิมมาใช้</span>
           </DropdownMenuItem>
           <DropdownMenuItem
-            variant="primary"
             className="py-2"
             render={(
               <Link
@@ -95,12 +94,11 @@ export function AssignmentCreationMenu({
               />
             )}
           >
-            <Repeat2 aria-hidden="true" />
+            <ExerciseIcon aria-hidden="true" />
             <span>แบบฝึกหัด</span>
           </DropdownMenuItem>
           {practiceLibrary && (
             <DropdownMenuItem
-              variant="primary"
               className="py-2"
               render={(
                 <Link
@@ -109,12 +107,11 @@ export function AssignmentCreationMenu({
                 />
               )}
             >
-              <BookOpenCheck aria-hidden="true" />
-              <span>คลังฝึก · ไม่มีคะแนน</span>
+              <PracticeIcon aria-hidden="true" />
+              <span>คลังฝึก</span>
             </DropdownMenuItem>
           )}
           <DropdownMenuItem
-            variant="primary"
             className="py-2"
             render={(
               <Link
@@ -123,7 +120,7 @@ export function AssignmentCreationMenu({
               />
             )}
           >
-            <ClipboardPenLine aria-hidden="true" />
+            <ExamIcon aria-hidden="true" />
             <span>ข้อสอบ</span>
           </DropdownMenuItem>
         </DropdownMenuGroup>

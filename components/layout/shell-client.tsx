@@ -117,7 +117,7 @@ export function ShellClient({
               previewNavigationOnly={previewNavigationOnly}
             />
             <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-              <main className="flex-1 overflow-y-auto overscroll-contain bg-muted/30 p-6 md:[&>.assignment-create-stage]:max-w-[calc(100%+(var(--spacing)*6)-var(--notification-anchor-right-inset))] md:[&>.assignment-edit-stage]:max-w-[calc(100%+(var(--spacing)*6)-var(--notification-anchor-right-inset))] md:[&>.assignment-waiting-stage]:max-w-[calc(100%+(var(--spacing)*6)-var(--notification-anchor-right-inset))] md:[&>.classroom-create-stage]:max-w-[calc(100%+(var(--spacing)*6)-var(--notification-anchor-right-inset))]">
+              <main className="flex-1 overflow-y-auto overscroll-contain bg-muted/30 p-6 has-[[data-exam-normal-stage]]:pt-0 md:[&>.assignment-create-stage]:max-w-[calc(100%+(var(--spacing)*6)-var(--notification-anchor-right-inset))] md:[&>.assignment-edit-stage]:max-w-[calc(100%+(var(--spacing)*6)-var(--notification-anchor-right-inset))] md:[&>.assignment-waiting-stage]:max-w-[calc(100%+(var(--spacing)*6)-var(--notification-anchor-right-inset))] md:[&>.classroom-create-stage]:max-w-[calc(100%+(var(--spacing)*6)-var(--notification-anchor-right-inset))] lg:[&>.student-profile-stage]:max-w-[calc(100%+(var(--spacing)*6)-var(--notification-anchor-right-inset))]">
                 {children}
               </main>
             </div>

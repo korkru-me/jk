@@ -20,6 +20,8 @@ import type { StudentNoteRow, StudentProfileRow } from './homeroom-overview'
 import type { HomeroomAssignmentRow } from '@/lib/homeroom-data'
 import { targetedStudentIds, type ClassroomGroup } from '@/lib/classroom-groups'
 import type { AssignmentCategory } from '@/lib/assignment-categories'
+import type { ClassroomPracticeLibrariesResult } from '@/lib/classroom-practice-libraries'
+import type { RecentClassroomWorkResult } from '@/lib/classroom-recent-work'
 import {
   classroomNavigationHref,
   classroomNavigationFor,
@@ -34,6 +36,7 @@ import { nextStudentSortRules, type StudentSortRule } from '@/lib/student-sort'
 import type { PeopleView } from './classroom-people-tabs'
 import { ClassroomAccessPanel } from './classroom-access-panel'
 import { cn } from '@/lib/utils'
+import { ClassroomTheme } from '@/components/classrooms/classroom-theme'
 
 function TabLoading() {
   return <div className="h-32 rounded-2xl bg-muted animate-pulse" aria-label="กำลังโหลดเนื้อหา" />
@@ -75,6 +78,8 @@ interface Props {
   coTeachers: CoTeacherRow[]
   invites: InviteRow[]
   classroomAssignments: ClassroomAssignmentRow[]
+  practiceLibraries?: ClassroomPracticeLibrariesResult | null
+  recentWork?: RecentClassroomWorkResult | null
   assignmentCategories: AssignmentCategory[]
   classroomSubmissions: {
     id: string; assignment_id: string; student_id: string; status: string
@@ -104,16 +109,19 @@ interface Props {
   initialNavigationItem: ClassroomNavigationKey
   initialPeopleView: PeopleView
   backHref: string
+  /** Keeps the local presentation fixture inside its synthetic route. */
+  navigationPathname?: string
 }
 
 export function ClassroomDetailClient({
   classroom, switchableClassrooms, students, assignmentCount, isOwner, canManage, coTeachers, invites,
-  classroomAssignments, assignmentCategories, classroomSubmissions, classroomExtensions,
+  classroomAssignments, practiceLibraries, recentWork, assignmentCategories, classroomSubmissions, classroomExtensions,
   homeroomAssignments, homeroomSubmissions, studentNotes, studentProfiles, ownerName, posts,
   pendingReviewByAssignment, seenByPost, crossPostTargets,
-  groups, groupMembers, initialNavigationItem, initialPeopleView, backHref,
+  groups, groupMembers, initialNavigationItem, initialPeopleView, backHref, navigationPathname,
 }: Props) {
   const router = useRouter()
+  const navigationPath = navigationPathname ?? `/classrooms/${classroom.id}`
   const isHomeroom = classroom.classroom_type === 'homeroom'
   const navigationItems = useMemo(
     () => classroomNavigationFor(classroom.classroom_type, canManage),
@@ -170,7 +178,7 @@ export function ClassroomDetailClient({
   }, [classroomAssignments])
 
   const navigateTo = useCallback((nextItem: ClassroomNavigationKey) => {
-    if (window.location.pathname !== `/classrooms/${classroom.id}`) {
+    if (window.location.pathname !== navigationPath) {
       router.push(classroomNavigationPath(classroom.id, nextItem))
       return
     }
@@ -179,7 +187,7 @@ export function ClassroomDetailClient({
     const nextUrl = classroomNavigationHref(window.location.href, nextItem)
     const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`
     if (nextUrl !== currentUrl) window.history.pushState(null, '', nextUrl)
-  }, [classroom.id, router])
+  }, [classroom.id, navigationPath, router])
 
   const changePeopleView = useCallback((nextView: PeopleView) => {
     setPeopleView(nextView)
@@ -226,6 +234,7 @@ export function ClassroomDetailClient({
       classroom={classroom}
       switchableClassrooms={switchableClassrooms}
       backHref={backHref}
+      overviewHref={navigationPath}
       navigationItems={navigationItems}
       activeItem={activeTab}
       studentCount={students.length}
@@ -236,16 +245,16 @@ export function ClassroomDetailClient({
         ? <ClassroomSettingsDialog classroom={classroom} placement="sidebar" />
         : undefined}
     />
-  ), [activeTab, backHref, classroom, isOwner, navigateTo, navigationItems, students.length, switchableClassrooms, switchClassroom])
+  ), [activeTab, backHref, classroom, isOwner, navigateTo, navigationItems, navigationPath, students.length, switchableClassrooms, switchClassroom])
 
-  useContextualSidebar(`/classrooms/${classroom.id}`, renderContextualSidebar, classroom.id)
+  useContextualSidebar(navigationPath, renderContextualSidebar, classroom.id)
 
   function toggleStudentSort(key: StudentSortKey) {
     setStudentSortRules(current => nextStudentSortRules(current, key))
   }
 
   return (
-    <div className="flex min-w-0 max-w-[1200px] flex-col gap-6">
+    <ClassroomTheme cover={classroomMeta.cover} className="flex w-full min-w-0 flex-col gap-6">
       {/* Header card */}
       <div
         className={cn(
@@ -314,6 +323,10 @@ export function ClassroomDetailClient({
             classroomId={classroom.id}
             isHomeroom={isHomeroom}
             students={students}
+            studentProfiles={studentProfiles}
+            categories={assignmentCategories}
+            groupNameById={groupNameById}
+            pendingReviewByAssignment={pendingReviewByAssignment}
             assignments={classroomAssignments}
             homeroomAssignments={homeroomAssignments}
             submissions={isHomeroom ? homeroomSubmissions : classroomSubmissions}
@@ -357,6 +370,8 @@ export function ClassroomDetailClient({
             classroomId={classroom.id}
             assignments={classroomAssignments}
             categories={assignmentCategories}
+            practiceLibraries={practiceLibraries}
+            recentWork={recentWork}
             submissions={classroomSubmissions}
             studentCount={students.length}
             audienceByAssignment={audienceByAssignment}
@@ -409,6 +424,6 @@ export function ClassroomDetailClient({
           </div>
         )}
       </div>
-    </div>
+    </ClassroomTheme>
   )
 }

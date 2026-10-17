@@ -1,13 +1,12 @@
 'use client'
 
+import { WorkTypeBadge } from '@/components/assignments/work-type'
 import Link from 'next/link'
 import {
   Activity,
   ChevronLeft,
   ClipboardCheck,
   Eye,
-  FileClock,
-  FileText,
   LayoutDashboard,
   Pencil,
   Play,
@@ -15,17 +14,16 @@ import {
   Radio,
   Square,
   Trash2,
-  Users,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { SidebarButton, useSidebarCompact } from '@/components/layout/sidebar-display'
 import { cn } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { assignmentSizeLabel } from '@/lib/assignment-size-label'
 import { withBackHref } from '@/lib/back-link'
 import { classroomNavigationPath } from '@/lib/classroom-navigation'
 import type { Assignment } from '@/lib/types'
+import { coverOf, parseDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
 
 const STATUS_META = {
   draft: { label: 'ร่าง', color: 'bg-muted text-muted-foreground', dot: 'bg-muted-foreground' },
@@ -45,12 +43,11 @@ export type AssignmentSidebarSummary = Pick<
   | 'random_question_count'
   | 'completion_rule'
   | 'streak_target'
-> & { classrooms: { name: string } | null }
+> & { classrooms: { name: string; description?: string | null } | null }
 
 interface AssignmentContextNavigationProps {
   assignment: AssignmentSidebarSummary
   currentSection?: 'detail' | 'edit'
-  studentCount?: number
   pendingCount?: number
   pendingReviewCapped?: boolean
   gradeHref: string
@@ -67,7 +64,6 @@ interface AssignmentContextNavigationProps {
 export function AssignmentContextNavigation({
   assignment: a,
   currentSection = 'detail',
-  studentCount,
   pendingCount = 0,
   pendingReviewCapped = false,
   gradeHref,
@@ -82,6 +78,7 @@ export function AssignmentContextNavigation({
 }: AssignmentContextNavigationProps) {
   const compact = useSidebarCompact()
   const statusMeta = STATUS_META[a.status]
+  const cover = coverOf(parseDescription(a.classrooms?.description ?? null))
   const assignmentTypeLabel = a.type === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'
   const isOpeningAgain = a.status === 'closed'
   const canOpenAssignment = a.status === 'draft' || isOpeningAgain
@@ -96,7 +93,7 @@ export function AssignmentContextNavigation({
   }
 
   return (
-    <div className="flex min-w-0 flex-col gap-3">
+    <div className="flex min-w-0 flex-col gap-3 [&_[data-slot=button]]:min-h-[44px]">
       <SidebarButton
         label="กลับไปงานที่มอบหมาย"
         variant="ghost"
@@ -106,35 +103,16 @@ export function AssignmentContextNavigation({
         <ChevronLeft data-icon="inline-start" />
       </SidebarButton>
 
-      <Card radius="md" padding="sm" className={cn('flex flex-col gap-2.5 border-primary/20 bg-primary/5', compact && 'md:hidden')}>
+      <Card radius="md" padding="sm" className={cn('flex flex-col gap-2', cover ? `${cover.surface} ${cover.text}` : 'bg-muted/50', compact && 'md:hidden')}>
         <div className="flex items-center justify-between gap-2">
           <Badge variant="secondary" className={statusMeta.color}>
             <span aria-hidden="true" className={`size-1.5 rounded-full ${statusMeta.dot}`} />
             {statusMeta.label}
           </Badge>
-          <Badge variant="outline">{assignmentTypeLabel}</Badge>
+          <WorkTypeBadge type={a.type} />
         </div>
         <div className="min-w-0">
           <p className="line-clamp-2 font-bold leading-snug text-foreground" title={a.title}>{a.title}</p>
-          {a.classrooms?.name && (
-            <p className="mt-1 truncate text-xs text-muted-foreground" title={a.classrooms.name}>
-              ห้องหลัก · {a.classrooms.name}
-            </p>
-          )}
-        </div>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1.5">
-            <FileText aria-hidden="true" className="size-3.5 text-primary" />
-            <strong className="font-medium text-foreground">{assignmentSizeLabel(a)}</strong>
-            {missingQuestionCount > 0 && <span className="text-warning">· หาย {missingQuestionCount}</span>}
-            {duplicateQuestionCount > 0 && <span className="text-warning">· ซ้ำ {duplicateQuestionCount}</span>}
-          </span>
-          {studentCount !== undefined && (
-            <span className="flex items-center gap-1.5">
-              <Users aria-hidden="true" className="size-3.5 text-primary" />
-              <strong className="font-medium text-foreground">{studentCount}</strong> คน
-            </span>
-          )}
         </div>
       </Card>
 
@@ -158,7 +136,7 @@ export function AssignmentContextNavigation({
               onClick={() => runAction(onPublish)}
               disabled={isPending || !questionsReady}
               size="sm"
-              className="w-full justify-start border-0 bg-success text-success-foreground hover:bg-success/90"
+              className="w-full justify-start border-transparent bg-success text-success-foreground hover:bg-success/90"
             >
               <Play data-icon="inline-start" />
             </SidebarButton>
@@ -245,15 +223,6 @@ export function AssignmentContextNavigation({
               className="w-full justify-start"
             >
               <Radio data-icon="inline-start" />
-            </SidebarButton>
-            <SidebarButton
-              label="รายงานคุมสอบ"
-              size="sm"
-              variant="ghost"
-              render={<Link href={`/assignments/${a.id}/proctor/report`} onClick={onClose} />}
-              className="w-full justify-start"
-            >
-              <FileClock data-icon="inline-start" />
             </SidebarButton>
           </>
         )}

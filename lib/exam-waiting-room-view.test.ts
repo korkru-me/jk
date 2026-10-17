@@ -78,7 +78,7 @@ describe('exercise uses the same waiting presentation with exercise-specific rul
     const html = render({ activeSubmissionId: state === 'active' ? 'receipt' : null, expired: state === 'expired',
       completedSubmissionId: state === 'completed' ? 'receipt' : null })
     expect(html).not.toContain('เวลาเริ่มเมื่อกดเข้า')
-    expect(html).toContain(state === 'active' ? 'กลับเข้าห้องทำแบบฝึกหัดรอบเดิม' : state === 'expired'
+    expect(html).toContain(state === 'active' ? 'ทำต่อ' : state === 'expired'
       ? 'ตรวจสอบผลรอบทำแบบฝึกหัดเดิม' : 'ดูผลรอบทำแบบฝึกหัดเดิม')
   })
   it('renders threshold/streak rules without claiming an attempt quota or fixed question count', () => {

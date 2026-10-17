@@ -13,7 +13,6 @@ import {
   Clock3,
   Eye,
   EyeOff,
-  FileClock,
   Maximize,
   Minimize,
   MonitorCheck,
@@ -24,7 +23,6 @@ import {
   ShieldAlert,
   LockKeyhole,
   Smartphone,
-  Trash2,
   UserCheck,
   UserX,
   Users,
@@ -32,7 +30,7 @@ import {
   Wifi,
   WifiOff,
 } from 'lucide-react'
-import { acknowledgeProctorEvents, purgeAssignmentProctorData } from '@/lib/actions/exam-proctor'
+import { acknowledgeProctorEvents } from '@/lib/actions/exam-proctor'
 import { reviewAndroidExamAccess, type AndroidApprovalView } from '@/lib/actions/android-exam'
 import {
   isReviewableProctorEvent,
@@ -43,10 +41,6 @@ import {
   PROCTOR_REVIEW_QUEUE_LIMIT,
   selectProctorDashboardEvents,
 } from '@/lib/exam-proctor-alerts'
-import {
-  EXAM_PROCTOR_RETENTION_DAYS,
-  totalPurgedProctorRecords,
-} from '@/lib/exam-proctor-retention'
 import {
   applyProctorEventChanges,
   applyProctorSessionChanges,
@@ -71,6 +65,8 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { useProctorAlerts } from './use-proctor-alerts'
+import { loadProctorSessions } from '@/lib/exam-proctor-history'
+import { ProctorHistory } from './proctor-history'
 
 export interface ProctorParticipant {
   studentId: string
@@ -106,7 +102,6 @@ interface Props {
 
 const ACTIVE_WINDOW_MS = 45_000
 const SEB_PREFLIGHT_POLL_MS = 10_000
-const PROCTOR_SESSION_SELECT = 'submission_id, org_id, assignment_id, student_id, started_monitoring_at, last_seen_at, is_online, is_tab_visible, is_fullscreen, completed_at, tab_switch_count, fullscreen_exit_count, window_blur_count, clipboard_attempt_count, screenshot_key_count, active_connection_count, concurrent_connection_count, secure_browser_verified_at, secure_browser_platform, secure_browser_version, exam_access_mode, android_approved_at, android_approved_by, last_event_type, last_event_at, created_at, updated_at'
 const PROCTOR_EVENT_SELECT = 'id, org_id, assignment_id, submission_id, student_id, event_type, occurred_at_client, created_at, acknowledged_at, acknowledged_by'
 const ANDROID_APPROVAL_SELECT = 'id, assignment_id, student_id, status, requested_at, reviewed_at, reviewed_by, expires_at, updated_at'
 const SEB_PREFLIGHT_CHECKIN_SELECT = 'assignment_id, student_id, verified_at, valid_until, platform, version'
@@ -191,7 +186,6 @@ export function ProctorDashboard({
   const [snapshotRefreshRequestVersion, setSnapshotRefreshRequestVersion] = useState(0)
   const [snapshotError, setSnapshotError] = useState(false)
   const [now, setNow] = useState(() => Date.now())
-  const [isPurging, startPurgeTransition] = useTransition()
   const [isReviewing, startReviewTransition] = useTransition()
   const [isAcknowledging, startAcknowledgeTransition] = useTransition()
   const [reviewingStudentId, setReviewingStudentId] = useState<string | null>(null)
@@ -272,11 +266,7 @@ export function ProctorDashboard({
         unacknowledgedEventsResult,
         approvalsResult,
       ] = await Promise.all([
-        supabase
-          .from('exam_proctor_sessions')
-          .select(PROCTOR_SESSION_SELECT)
-          .eq('assignment_id', assignment.id)
-          .order('last_seen_at', { ascending: false }),
+        loadProctorSessions(supabase, assignment.id),
         supabase
           .from('exam_proctor_events')
           .select(PROCTOR_EVENT_SELECT)
@@ -657,43 +647,6 @@ export function ProctorDashboard({
         ? 'เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือนนอกแท็บ แต่ยังใช้เสียงและข้อความในหน้านี้ได้'
         : 'ระบบจะขอสิทธิ์แจ้งเตือนของเบราว์เซอร์เมื่อครูกดเปิด'
 
-  async function handlePurge() {
-    const ok = await confirm({
-      title: 'ล้างข้อมูลคุมสอบของชุดนี้?',
-      description: (
-        <span>
-          เหตุการณ์ ตัวนับสถานะ ข้อมูลการเชื่อมต่อ
-          {assignment.secureBrowserRequired ? ' และผลตรวจความพร้อม SEB ล่าสุด' : ''}
-          จะถูกลบถาวร แต่คำตอบ คะแนน และประวัติการส่งข้อสอบยังอยู่ครบ
-          {assignment.secureBrowserRequired
-            ? ' สถานะพร้อมใน roster จะว่างจนกว่านักเรียนตรวจใหม่ แต่ session SEB ที่ออกไปแล้วจะไม่ถูกยกเลิกด้วยปุ่มนี้'
-            : ''}
-        </span>
-      ),
-      confirmLabel: 'ล้างข้อมูลคุมสอบ',
-      variant: 'destructive',
-    })
-    if (!ok) return
-
-    startPurgeTransition(async () => {
-      const result = await purgeAssignmentProctorData(assignment.id)
-      if ('error' in result) {
-        toast.error(result.error)
-        return
-      }
-
-      setSessions([])
-      setEvents([])
-      setSebCheckins([])
-      setUnacknowledgedCount(0)
-      const totalDeleted = totalPurgedProctorRecords(result.deleted)
-      toast.success(totalDeleted > 0
-        ? `ล้างข้อมูลคุมสอบแล้ว ${totalDeleted} รายการ`
-        : 'ไม่มีข้อมูลคุมสอบที่ต้องล้าง')
-      router.refresh()
-    })
-  }
-
   function handleAndroidReview(studentId: string, decision: 'approve' | 'deny') {
     setReviewingStudentId(studentId)
     startReviewTransition(async () => {
@@ -794,14 +747,6 @@ export function ProctorDashboard({
           <p className="mt-1 text-sm text-muted-foreground">{assignment.title} · {assignment.classroomName}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            nativeButton={false}
-            size="sm"
-            variant="outline"
-            render={<Link href={`/assignments/${assignment.id}/proctor/report`} />}
-          >
-            <FileClock aria-hidden="true" /> ดูรายงานย้อนหลัง
-          </Button>
           <Badge
             variant={isRealtimeLive ? 'secondary' : 'outline'}
             className={isRealtimeLive ? 'text-success' : snapshotError ? 'text-destructive' : 'text-warning'}
@@ -928,32 +873,6 @@ export function ProctorDashboard({
           </div>
         </Card>
       )}
-
-      <Card padding="md">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex gap-3">
-            <Clock3 className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-            <div>
-              <p className="text-sm font-medium text-foreground">เก็บข้อมูลคุมสอบไม่เกิน {EXAM_PROCTOR_RETENTION_DAYS} วัน</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {assignment.secureBrowserRequired
-                  ? `ระบบเก็บสัญญาณสดไม่เกิน ${EXAM_PROCTOR_RETENTION_DAYS} วันนับจาก heartbeat ล่าสุด และเก็บผลตรวจความพร้อม SEB ไม่เกิน ${EXAM_PROCTOR_RETENTION_DAYS} วันนับจากเวลาตรวจ การล้างส่วนนี้ไม่กระทบคำตอบ คะแนน หรือ submission`
-                  : `ระบบเก็บสัญญาณสดไม่เกิน ${EXAM_PROCTOR_RETENTION_DAYS} วันนับจาก heartbeat ล่าสุด การล้างส่วนนี้ไม่กระทบคำตอบ คะแนน หรือ submission`}
-              </p>
-            </div>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handlePurge}
-            disabled={isPurging || activeCount > 0}
-            className="shrink-0 text-destructive"
-          >
-            <Trash2 aria-hidden="true" />
-            {isPurging ? 'กำลังล้าง…' : activeCount > 0 ? 'รอให้นักเรียนออฟไลน์' : 'ล้างข้อมูลคุมสอบ'}
-          </Button>
-        </div>
-      </Card>
 
       {assignment.androidMonitoredAllowed && (
         <Card className="overflow-hidden border-warning/30">
@@ -1154,6 +1073,7 @@ export function ProctorDashboard({
           )}
         </Card>
       </div>
+      <ProctorHistory key={assignment.id} assignmentId={assignment.id} studentNameById={studentNameById} sessions={sessions} />
       {confirmDialog}
     </div>
   )

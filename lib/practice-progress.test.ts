@@ -5,6 +5,7 @@ import {
   buildPracticeQuestionProgress,
   buildPracticeStudentProgress,
   parsePracticeProgressSearchParams,
+  pagePracticeQuestionProgress,
 } from './practice-progress'
 
 const students = [
@@ -23,7 +24,7 @@ describe('practice progress DTOs', () => {
     const state = parsePracticeProgressSearchParams({ q: '  แรง   และ ไฟฟ้า ', page: '3' })
     expect(state).toEqual({ q: 'แรง และ ไฟฟ้า', page: 3 })
     expect(buildPracticeProgressHref('library', 'student', state, 2))
-      .toBe('/practice/library/progress/student?q=%E0%B9%81%E0%B8%A3%E0%B8%87+%E0%B9%81%E0%B8%A5%E0%B8%B0+%E0%B9%84%E0%B8%9F%E0%B8%9F%E0%B9%89%E0%B8%B2&page=2')
+      .toBe('/practice/library/edit?tab=progress&student=student&q=%E0%B9%81%E0%B8%A3%E0%B8%87+%E0%B9%81%E0%B8%A5%E0%B8%B0+%E0%B9%84%E0%B8%9F%E0%B8%9F%E0%B9%89%E0%B8%B2&page=2')
   })
 
   it('keeps roster order and reports activity counts without ranking students', () => {
@@ -72,6 +73,18 @@ describe('practice progress DTOs', () => {
     expect(JSON.stringify({ overview, detail })).not.toMatch(
       /answer|correct|score|points|verdict|solution|checked_at/i,
     )
+  })
+
+  it('places practiced questions from later pages first without ranking by count or changing the source', () => {
+    const rows = Array.from({ length: 143 }, (_, index) => ({ question_id: `q-${index}`, title: `${index}`, tags: [], attempt_count: index === 140 ? 9 : index === 100 ? 1 : 0 }))
+    const first = pagePracticeQuestionProgress(rows, 1)
+    expect(first.questions.slice(0, 3).map(row => row.question_id)).toEqual(['q-100', 'q-140', 'q-0'])
+    expect(first.totalPages).toBe(3)
+    expect(pagePracticeQuestionProgress(rows, 2).questions.every(row => row.attempt_count === 0)).toBe(true)
+    expect(pagePracticeQuestionProgress(rows, 3).questions).toHaveLength(43)
+    expect(rows[0].question_id).toBe('q-0')
+    expect(pagePracticeQuestionProgress(rows, 999).page).toBe(1)
+    expect(pagePracticeQuestionProgress([], 2)).toEqual({ questions: [], totalPages: 1, page: 1 })
   })
 
   it.each([

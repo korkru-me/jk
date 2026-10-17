@@ -1,5 +1,17 @@
 # Domain model และคำศัพท์
 
+ข้อสอบและแบบฝึกหัดที่กำหนดเวลา (อนุมัติ 14 ตุลาคม 2026) ทำต่อในรอบและเวลาเริ่มเดิมหลังหลุด/ออกจากหน้า ใช้เวลาที่ถึงก่อนระหว่าง timer กับ hard close ที่รวม extension รายคน โดยแยกจากกำหนดส่งตรงเวลา เมื่อหมดเวลาหยุดรับคำตอบแม้ออฟไลน์ ปิดรอบอัตโนมัติ และตรวจจากคำตอบที่ server รับก่อนปิด หลักฐานที่ขาดแจ้งครูพิจารณาโดยไม่ค้างรอบ การรอ/ยืนยันผลไม่กินสิทธิ์ใหม่ ส่วนรอบใหม่ต้องกดเองตามกติกาจำนวนครั้งและเงื่อนไขผ่านเดิม
+
+## การแก้ชุดฝึกและปักโจทย์ส่วนตัว
+
+นักเรียนแก้ชื่อและสมาชิกของชุดที่ตนเป็นเจ้าของได้โดยต้องเหลืออย่างน้อยหนึ่งข้อ ความคืบหน้าคำนวณใหม่จากสมาชิกปัจจุบัน แต่การเอาข้อออกไม่ลบประวัติการลองตอบ โจทย์ที่ปักไว้ทบทวนเป็นความสัมพันธ์ส่วนตัวกับคลังเดิม ไม่ผูกกับชุดใดชุดหนึ่งและไม่เปลี่ยนผลการตอบ
+
+
+## Student-created personal practice exercises
+
+A personal exercise groups existing questions in one accessible published practice library. It is private to its student and uses the practice domain, without an Assignment, Submission, grade or deadline. Selecting its card selects its member questions; the separate Start action opens a paged practice run using the original check flow and the teacher's library tool/reveal settings. The student chooses a browser-local color and 1/3/5/10 questions per page. Progress on the library card is the count of distinct questions with accepted checks, including checks before group creation, not correct answers or mastery; run navigation represents only the current in-memory answers/checks. Teachers and classmates cannot read the group names or members.
+
+
 อัปเดตล่าสุด: 26 กันยายน 2026
 
 ## บทบาทผู้ใช้
@@ -128,7 +140,12 @@ MCQ แบบคำนวณสามารถสร้างสูตรคำ�
 
 ## คลังฝึกด้วยตนเอง — โดเมนแยกหลัง feature flag
 
+สรุปงานของนักเรียนแสดงคลังฝึกร่วมกับ assignment เป็น presentation เท่านั้น ใช้สี/ไอคอนห้องและป้าย “คลังฝึก” ชัดเจน เข้าฝึกซ้ำได้โดยไม่มี completed state; ไม่สร้างกำหนดส่งหรือ Submission ไม่เพิ่มงานค้าง/ใกล้กำหนด/ส่งแล้ว/คะแนน/ปฏิทิน งานที่ทำครบเงื่อนไขเดิมอยู่ท้ายเสมอ ส่วนคลังกับงานที่ยังไม่เสร็จใช้ตัวเรียงเดียวกันภายในกลุ่มที่ยังไม่เสร็จ
+
+การรวมรายการคลังฝึกกับข้อสอบ/แบบฝึกหัดในกรอบกลุ่มงานของครูเป็น presentation เท่านั้น คลังฝึกใช้กลุ่มเดิมของห้องและจัดลำดับร่วมกันได้เมื่อ migration ของ layout ถูกติดตั้ง แต่ยังใช้โดเมน practice, ไม่มีคะแนน และไม่เพิ่ม `practice` เข้า `AssignmentType`.
+
 - **คลังฝึก** เป็นชุดโจทย์ไม่มีคะแนนที่ครูเปิดให้นักเรียนในห้องฝึกเอง แยกจาก `Assignment` โดยโครงสร้าง ไม่ใช่แบบฝึกหัดที่ตั้งคะแนนเป็นศูนย์ และไม่สร้าง `Submission` หรือ `SubmissionAnswer`
+- รายการคลังฝึกต้องปรากฏภายในห้องเรียน: ครูผู้จัดการเห็นทุกสถานะในแท็บงานที่มอบหมาย นักเรียนเห็นเฉพาะคลังเผยแพร่ในห้องที่ตนเป็นสมาชิก และกดเข้าหน้ารอของ `/practice/[id]` โดยไม่เปลี่ยนคลังฝึกเป็น assignment
 - ใช้คลังโจทย์ แท็ก ตัวแสดงโจทย์ และ evaluator ที่ปลอดภัยร่วมกับระบบเดิมได้ แต่ route, lifecycle, permission และข้อมูลความคืบหน้าต้องเป็นของคลังฝึกเอง
 - นักเรียนค้นจากชื่อ/ข้อความและเลือกแท็กได้หลายค่า (สูงสุด 20 แท็กต่อการค้นหาโดย UI ต้องแจ้งข้อจำกัด ไม่ตัดเงียบ) โดยโจทย์ต้องตรง **ทุกแท็กที่เลือก (AND)**; การเพิ่มแท็กทำให้ผลแคบลง และแท็กใช้ exact whole-tag หลัง trim/case-folding ไม่ตีความ substring หรือ alias เอง
 - **การลองตอบ** เกิดเมื่อผู้เรียนกด “ตรวจคำตอบ” พร้อมคำตอบที่ไม่ว่างหนึ่งครั้ง การเปิดข้อ พิมพ์ร่าง autosave reload หรือเปิดเฉลยไม่นับ และ retry ของการกดเดียวกันต้องไม่เพิ่มซ้ำ
@@ -194,3 +211,11 @@ MCQ แบบคำนวณสามารถสร้างสูตรคำ�
 - เจ้าของห้องและครูร่วมสิทธิ์ `admin/manage` จัดการโครงการ ผู้เข้าร่วม และคะแนนได้ ครูร่วม `view` เห็น metadata โครงการ/รอบวัดแต่ไม่เห็นคะแนนรายบุคคล นักเรียนไม่มีสิทธิ์อ่านตารางวิจัย
 - คะแนนที่ไม่มีข้อมูลหมายถึงไม่มีแถว observation ห้ามสร้างคะแนนศูนย์แทน ช่องคะแนนก่อนและหลังต้องอ้างผู้เข้าร่วมคนเดิมก่อนทำ paired analysis
 - หน้าคุมสอบสดไม่ใช่ส่วนของโมดูลวิจัย และเลื่อนไปทำหลังงานวิจัยทุกเฟสเสร็จ โดยอยู่ที่ “ห้องเรียน > งานข้อสอบ”
+
+## ยืนยันงานที่เพิ่งสร้างในห้องเรียน
+
+หน้ารายการงานของครูรวม metadata ของ assignments ที่ link มาห้องนี้ และ practice libraries ของห้องเดียวกัน เฉพาะ `created_by` ของ actor ที่มีสิทธิ์จัดการแล้ว แสดงหน้าต่างเวลา 72 ชั่วโมงจาก `created_at` ไม่ใช้ `updated_at` ไม่สร้าง receipt หรือเปลี่ยนสถานะงานเพื่อยืนยัน UI งานร่างยังเป็นร่างและไม่ถูกแสดงแก่นักเรียนเพราะกรอบนี้ กรอบยืนยันหมดอายุโดยไม่ลบ assignments/practice libraries หรือ attempt ใด ๆ
+
+### Item analysis deferred — 14 October 2026
+
+Question-bank, set, dashboard and assignment question cards no longer calculate or expose answer-derived item analysis (usage, empirical difficulty, discrimination or last-used timestamps). The associated answer queries, calculator and sort options are removed at the owner’s request; a future research feature must define its own authorization and data contract. Assignment scoring, completion rules, answer review and submission-level summaries remain in scope. No persisted answers or questions are removed.

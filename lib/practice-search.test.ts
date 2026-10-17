@@ -31,7 +31,7 @@ describe('practice search URL contract', () => {
     })
     const url = new URL(href, 'https://korkru.test')
 
-    expect(url.pathname).toBe('/practice/library-1')
+    expect(url.pathname).toBe('/practice/library-1/library')
     expect(url.searchParams.get('q')).toBe('สนามไฟฟ้า')
     expect(url.searchParams.getAll('tag')).toEqual(['สอวน. ค่าย 1', 'ไฟฟ้า'])
     expect(url.searchParams.get('page')).toBe('3')
@@ -81,4 +81,23 @@ describe('practice search URL contract', () => {
     expect(state.tags).toHaveLength(20)
     expect(state.ignoredTagCount).toBe(3)
   })
+})
+
+
+it('keeps an exercise through question and paging links and validates untrusted IDs', () => {
+  const id = '80000000-0000-4000-8000-000000000001'
+  const state = parsePracticeSearchParams({ exercise: id, page: '2' })
+  expect(new URL(buildPracticeQuestionHref('library', 'question', state), 'https://test.invalid').searchParams.get('exercise')).toBe(id)
+  expect(new URL(buildPracticeSearchHref('library', state, { page: 3 }), 'https://test.invalid').searchParams.get('exercise')).toBe(id)
+  expect(buildPracticeSearchHref('library', state, { exerciseId: '', page: 1 })).toBe('/practice/library/library')
+  expect(parsePracticeSearchParams({ exercise: 'not-a-uuid' }).exerciseId).toBeUndefined()
+})
+
+it('retains review-only search across paging and question return links', () => {
+  const state = parsePracticeSearchParams({ review: '1', q: 'test', page: '2' })
+  expect(state.reviewOnly).toBe(true)
+  expect(new URL(buildPracticeSearchHref('library', state, { page: 3 }), 'https://test.invalid').searchParams.get('review')).toBe('1')
+  expect(new URL(buildPracticeQuestionHref('library', 'question', state), 'https://test.invalid').searchParams.get('review')).toBe('1')
+  expect(parsePracticeSearchParams({ review: 'yes' }).reviewOnly).toBeUndefined()
+  expect(parsePracticeSearchParams({ review: '1', exercise: '80000000-0000-4000-8000-000000000001' }).reviewOnly).toBeUndefined()
 })

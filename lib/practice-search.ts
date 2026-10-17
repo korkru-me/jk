@@ -1,3 +1,4 @@
+import { isUuid } from '@/lib/practice-library-contracts'
 import { searchTerms } from '@/lib/question-search'
 
 export const PRACTICE_PAGE_SIZE = 24
@@ -8,6 +9,8 @@ export interface PracticeSearchState {
   tags: string[]
   page: number
   ignoredTagCount: number
+  exerciseId?: string
+  reviewOnly?: boolean
 }
 
 type SearchParamValue = string | string[] | undefined
@@ -89,6 +92,8 @@ export function parsePracticeSearchParams(
     tags: Object.freeze(tags) as string[],
     page,
     ignoredTagCount: normalizedTags.length - tags.length,
+    ...(first(params.review) === '1' && !isUuid(first(params.exercise)) ? { reviewOnly: true } : {}),
+    ...(isUuid(first(params.exercise)) ? { exerciseId: first(params.exercise) } : {}),
   })
 }
 
@@ -106,11 +111,15 @@ export function buildPracticeSearchHref(
     tags: normalizePracticeTags(patch.tags ?? state.tags),
     page: Math.min(Math.max(1, patch.page ?? state.page), MAX_PAGE),
     ignoredTagCount: 0,
+    reviewOnly: patch.reviewOnly ?? state.reviewOnly,
+    exerciseId: patch.exerciseId === undefined ? state.exerciseId : (patch.exerciseId || undefined),
   }
   const boundedTags = tagsWithinUrlBudget(next.q, next.tags, next.page)
   const params = queryParams(next.q, boundedTags, next.page)
+  if (next.exerciseId) params.set('exercise', next.exerciseId)
+  else if (next.reviewOnly) params.set('review', '1')
   const query = params.toString()
-  return `/practice/${encodeURIComponent(libraryId)}${query ? `?${query}` : ''}`
+  return `/practice/${encodeURIComponent(libraryId)}/library${query ? `?${query}` : ''}`
 }
 
 export function buildPracticeQuestionHref(

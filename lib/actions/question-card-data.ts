@@ -6,7 +6,6 @@ import {
   CARD_DATA_MAX_IDS,
   EMPTY_CARD_DATA,
   fetchDuplicateCounts,
-  fetchQuestionStats,
   fetchSetMemberships,
   fetchSolutionPresence,
   type QuestionCardData,
@@ -36,7 +35,7 @@ type DetailRow = {
  * the page. A แฟ้ม of a thousand โจทย์ therefore costs what a แฟ้ม of twenty
  * does.
  *
- * Failure is silent by design — a missing badge or an absent สถิติ strip is a
+ * Failure is silent by design — a missing metadata badge is a
  * far better outcome than an editor that will not open.
  */
 export async function getQuestionCardData(questionIds: string[]): Promise<QuestionCardData> {
@@ -73,13 +72,12 @@ export async function getQuestionCardData(questionIds: string[]): Promise<Questi
     }
   }
 
-  const [stats, subQuestionCounts, duplicateCounts, setMemberships, solutionPresence] = await Promise.all([
-    fetchQuestionStats(supabase, ids),
+  const [subQuestionCounts, duplicateCounts, setMemberships, solutionPresence] = await Promise.all([
     fetchSubQuestionCounts(supabase, rows),
     fetchDuplicateCounts(supabase, user.id, rows),
     fetchSetMemberships(supabase, user.id, ids),
     fetchSolutionPresence(supabase, rows),
   ])
 
-  return { details, stats, duplicateCounts, subQuestionCounts, setMemberships, solutionPresence }
+  return { details, duplicateCounts, subQuestionCounts, setMemberships, solutionPresence }
 }

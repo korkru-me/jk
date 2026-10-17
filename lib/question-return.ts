@@ -26,6 +26,9 @@ export const QUESTIONS_PATH = '/questions'
  */
 export const RETURN_SET_PARAM = 'set'
 
+/** Fixed origin for edits opened from the teacher's recent questions. */
+export const RETURN_DASHBOARD_PARAM = 'dashboard'
+
 /** The แฟ้ม editor a return id points at. */
 export const setEditPath = (setId: string) => `${QUESTIONS_PATH}/sets/${setId}/edit`
 
@@ -55,6 +58,7 @@ export function questionsReturnTo(params: URLSearchParams | { get(name: string):
     const decoded = new URLSearchParams(encoded)
     const setId = decoded.get(RETURN_SET_PARAM)
     if (setId) return UUID.test(setId) ? setEditPath(setId) : QUESTIONS_PATH
+    if (decoded.get(RETURN_DASHBOARD_PARAM) === '1') return '/dashboard'
     const query = decoded.toString()
     if (query) return `${QUESTIONS_PATH}?${query}`
     return QUESTIONS_PATH
@@ -64,10 +68,11 @@ export function questionsReturnTo(params: URLSearchParams | { get(name: string):
 
 /**
  * Guards the redirect target a form sends to the server: it arrives from the
- * browser, so it is only allowed to be the question bank and its query string.
+ * browser, so only the bank, a set editor, or the exact dashboard are allowed.
  */
 export function safeQuestionsRedirect(target: string | undefined): string {
   if (!target) return QUESTIONS_PATH
+  if (target === '/dashboard') return target
   if (target === QUESTIONS_PATH) return target
   // A แฟ้ม editor, rebuilt from its id rather than trusted as a path.
   const setMatch = /^\/questions\/sets\/([^/?#]+)\/edit$/.exec(target)

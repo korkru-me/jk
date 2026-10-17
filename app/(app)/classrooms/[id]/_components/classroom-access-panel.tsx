@@ -49,6 +49,7 @@ export function ClassroomAccessPanel({
             <Button
               type="button"
               variant="primaryGhost"
+              data-classroom-link
               size="xs"
               aria-expanded={classCodeVisible}
               onClick={() => setClassCodeVisible(visible => !visible)}

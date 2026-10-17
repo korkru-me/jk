@@ -1,5 +1,115 @@
 # Architecture
 
+## Signup trust flow — 17 October 2026 (prepared, not deployed)
+
+Signup/Google profile completion validate policy acknowledgement on the server. Auth metadata records policy version/date as editable acknowledgement only. The check-email page reads a 30-minute HttpOnly hint with the last request time; email never enters its URL. Signup resend and PKCE callback failures share an explicit invalid-link state; optional `/auth/confirm` handles signup token hashes after the SMTP template is configured. Recovery retains PKCE plus a one-hour signed intent carrying recipient/nonce hash and optional expected user ID; the secret email nonce, same-browser intent and exchanged identity must match before issuing the ten-minute user/access-token-bound grant checked on reset POST. Old nonce-less links must be reissued; clearing intent/grant cookies is not an atomic single-use ledger.
+
+All four public email actions reserve the same HMAC email/IP buckets through one fixed server-only RPC. SQL row locks serialize shared counters, network limits are checked before allocating recipient rows, browser roles have neither table nor function grants, and the invoker RPC cannot read user/tenant data. Vercel's trusted header is required on hosted Vercel; unsupported hosted proxies fail closed. Provider-side Auth limits remain necessary for direct API requests. Hosted SMTP/config, migration parity and real Staging delivery remain pending; see `docs/AUTH_SIGNUP_ROLLOUT.md`.
+
+settings ครู/นักเรียนใช้ `PasswordSettingsSection`/`PasswordSettingsForm` และ shared validation เดียวกัน ตรวจรหัสใหม่ต่างจากรหัสปัจจุบันแบบ raw ก่อน Auth ไม่ trim รหัสผ่าน และคง exact session/email verification กับ client ยืนยันรหัสเดิมที่ไม่เก็บ session ผลลัพธ์มีชนิดข้อผิดพลาดและช่องที่เกี่ยวข้อง แยกรหัสเดิมผิด/ติดลิมิต/บริการขัดข้อง/ต้องยืนยันตัวตนใหม่จากกรณีรหัสเปลี่ยนแล้วแต่ global revocation ล้มเหลว กรณีหลังไป `/login?password_changed=1&sessions_revoked=0` เพื่อแสดงคำเตือนต่อเนื่อง การลืมรหัสหรือบัญชี Google ที่ยังไม่มีรหัสกลับเข้าเส้นทาง email recovery เดิม รอบปรับฟอร์มนี้ไม่มี schema/remote/config/deploy change
+
+`SignInMethodsSection` ร่วมครู/นักเรียนรับสถานะจาก trusted `getUser.identities` ไม่มี has-password inference การเชื่อม Google ตรวจรหัสปัจจุบันด้วย client ไม่เก็บ session ก่อนออก challenge HMAC 5 นาทีที่ผูก ID/อีเมล/exact access token; GIS โหลดเมื่อยืนยันแล้วและรับ nonce hash Server ตรวจ Google JWT ผ่าน `jose`/fixed JWKS (RS256, issuer/audience, iat/exp อายุ 5 นาที, nonce, verified same email) ก่อน isolated `signInWithIdToken` แล้วตรวจ user ID/อีเมล/Google subject และยุติเฉพาะ temporary session ไม่แทน cookies หรือแก้ profile/role เดิม ทางตั้งรหัสผ่านผูกอีเมลและ ID ฝั่ง server ก่อน recovery เดียวกัน ปิด rollout flag ไว้และไม่เปิด Manual Linking; direct Auth/automatic linking เดิมและ email-change race ยังต้องตรวจ Staging รายละเอียด `docs/ACCOUNT_SIGN_IN_METHODS.md`
+
+## Resend quota alert — 17 October 2026 (prepared, not deployed)
+
+POST `/api/webhooks/resend` bypasses session refresh only for that exact path and authenticates the bounded raw body with Svix signatures/timestamp validation. Server-only `lib/resend-quota-alert.server.ts` handles `email.sent`/`email.received`, reads Resend `/usage` using a dedicated Full access key, and emails the configured owner at 80%, 90%, 97% of the current UTC-day cap (highest reached level only). Stable payloads and per-environment/day/level v2 idempotency keys deduplicate retries/concurrent events. Alert tags allow self-events to advance to a higher threshold if the alert itself consumed it, but never repeat the same/lower level; the final level is ignored. No student data is retained or forwarded, no Supabase admin client/schema change or additional cron is needed. Configuration defaults off; account/DNS/SMTP/webhook/Vercel secrets and Staging delivery verification are still required. The owner chose Resend Free and `korkru.me@gmail.com`; setup and delayed-webhook/quota-exhaustion limitations are in `docs/RESEND_SETUP.md`.
+
+รอบที่กำหนดเวลา (14 ตุลาคม 2026) แยกการปิดรับออกจากการตรวจคะแนน: DB cron/write trigger ล็อกรอบที่หมดเวลาทั้งที่ไม่มี browser จากนั้น evaluator TypeScript เดิมตรวจคำตอบที่ล็อกไว้ Claim/commit RPC ใช้ submission row lock กับ revision fence และเผยแพร่คะแนนแบบ atomic งาน POST ที่ตรวจ secret รับการเรียกผ่าน pg_net/Vault ส่วน browser recovery เป็น fallback เฉพาะเจ้าของรอบและเรียกซ้ำได้ GET/prefetch ยังไม่เริ่มหรือให้คะแนนรอบ ต้องมี migration `20261014072745` และตั้ง worker ก่อน rollout; ผ่าน Staging แล้วแต่ยังไม่เปลี่ยน Production
+
+## Practice management workspace — 15 October 2026 (local only)
+
+The exact-manager `/practice/[id]/edit` route now renders overview by default, `?tab=settings` for the existing editor, and `?tab=progress` for roster data. `student`, `q`, and `page` select one authorized student's detail. Legacy `/progress` and `/progress/[studentId]` URLs redirect to this workspace, preserving search/page; the destination repeats authentication, feature gate and exact-library manage authorization. Sidebar registration uses the existing shell context, with no centered max-width wrapper or extra sidebar column.
+
+Overview question cards project only safe metadata from the existing exact-membership manager loader and use its authorized preview action lazily. Overview and progress reuse one roster component. Progress still exposes only identity, tags and accepted-check counts. The existing service-only detail RPC is read in batches of at most 100 rows under the same actor/library/student scope, up to the library's existing 1,000-question limit; safe aggregates are stably partitioned into practiced/unpracticed before UI pagination. Partial/error reads fail rather than becoming zero counts. No learner answers, verdicts, event times, grades, RLS or schema change.
+
+The embedded editor keeps existing validation and persistence actions. Saving refreshes the workspace instead of leaving for the classroom, and its dirty state disables lifecycle buttons. Link navigation still asks before discarding changes, including edits made after a prior successful save. Lifecycle rules remain draft → published → closed; this UI does not add reopening a closed library.
+
+## Practice reuse through the assignment creation hub - 15 October 2026
+
+The reuse picker merges paginated practice metadata from manageable same-organization classrooms under ordinary RLS and the existing feature flag. Practice choices route to the create page with a source library id. The page rechecks source management and destination access/organization, reads ordered membership, and seeds an explicit content/settings-only copyPreset. Existing initialLibrary edit/lifecycle behavior stays separate. Creation uses the existing validated create action and invoker RPC; no GET creates rows, and no learner history or display grouping is copied.
+
+loadPracticeCopyQuestions reuses the request's actor-scoped bank and queries only missing source ids through ordinary question RLS in bounded chunks. Missing/inaccessible/unsupported ids remain in the source selection with explicit blocking metadata, so library management does not grant reuse of another owner's private questions. No new admin query or answer-bearing DTO crosses the client boundary. Guarded fixtures inject in-memory creation/navigation callbacks; route permission and DTO regressions run without external services.
+
+## Work type presentation — 15 October 2026
+
+lib/assignment-display.tsx owns the work-type icon, label, semantic colour and primitive variant for exercise/exam/practice. components/assignments/work-type.tsx renders consistent icons/badges; buttons, dropdowns and filters consume that metadata. Browser palettes define work-* tokens independently from classroom cover and submission-state colours. Student summary and legacy assignment-list DTOs forward the existing selected type only for this presentation; access/scoring/query boundaries are unchanged.
+
+## Student subject classroom tabs and deadline alerts — 15 October 2026
+
+StudentClassroomView keeps the verified server projections and passes header/announcement/practice/calendar React nodes into StudentClassroomTabs. The shared grid keeps the classroom header and left-aligned TabsList above one dynamic TabsContent, with the calendar beside the header. One AssignmentList preserves its filters while switching announcements on/off; the tab list stays outside its labelled panel. Native history updates only the tab query and preserves other search/hash values. One initialized timestamp drives both classroomWorkAlertCount and AssignmentList; production ticks locally each minute, and focus/visible/pageshow-persisted refreshes the existing authorized route with a 5-second duplicate-event guard. No polling query, read/dismiss storage or new data boundary is introduced.
+
+classroomOverdueWork returns distinct, teacher-ordered rows whose deadline has passed and whose verified submission is neither submitted nor graded. The tab derives its counter and tooltip names/deadlines from that same list before presentation filters; classroomWorkAlertCount delegates to it. This missing-submission reminder clears after submission regardless of score/mastery, while card/calendar completion still uses isCompleted. No additional query or optimistic local dismissal is introduced. The environment-gated student-classroom fixture includes subject posts, synthetic completed/empty states and overdue-many for bounded long-list tooltips; its completion link changes only fixture props and never starts/submits real work. Subject classroom presentation changes only; the separate homeroom roster/calendar page keeps its existing domain.
+
+## Student dashboard welcome composition — 15 October 2026
+
+StudentDashboard renders the server-side StudentDashboardWelcome above StudentView inside the existing classrooms anchor. The welcome reuses JoinClassroomForm with the same initial code and Server Action; StudentView's optional showJoinForm defaults true and is false only when the parent hosts that form. There is one form/state boundary, no additional data read, authentication check or mutation path. BRAND_MARK_URL is a decorative CSS mask. The environment-gated student-dashboard fixture adds a synthetic long-name case; its join action still returns mock feedback without database access. Teacher dashboard files and behavior are unchanged by this task.
+
+## วงจรตัวเลขสุ่มใหม่ — 15 ตุลาคม 2026
+
+`drawFreshValues` เปรียบเทียบ numeric map แบบไม่ขึ้นกับลำดับ key และลองไม่เกิน 128 ครั้ง ถ้าไม่มีชุดต่างให้คืน error แทนรายงานสำเร็จด้วยค่าเก่า `buildAssignmentAttempt` รับชุดก่อนหน้าสำหรับ full retry; wrong-only retry และ recycled streak ใช้ helper เดียวกัน โดย shared seed ใช้กับ initial draw เท่านั้น
+
+Document reload ของ ExamClient เรียก useRefreshRandomAnswers เป็น client POST หลัง flush autosave; GET/RSC/prefetch ไม่เขียนคำตอบ Hook ไม่ทำซ้ำเมื่อ viewport หรือ state เปลี่ยน และ retry เฉพาะข้อที่ยังไม่สำเร็จ Server action ตรวจ getWritableStudentAnswer แล้ว update random_values/correct_answer/student_answer/math_input_modes พร้อมเงื่อนไข exact id/submission/old numeric map และ count=1 Browser ได้เฉพาะค่าที่แสดง ไม่ได้เฉลย
+
+useAnswerAutosave และ backup v2 เพิ่ม numeric-map token แบบ optional สำหรับ compatibility; ร่างของ random question ที่ไม่มี token หรือไม่ตรงกับ server ถูกตัดออก Save เก่าจากอีกหน้าต่างถูกปฏิเสธ ไม่เอาคำตอบชุดเดิมไปทับชุดใหม่ PracticeSingleQuestionRunner และ PracticeExerciseRunner ขอ variant ใหม่โดยส่งค่าที่เห็นล่าสุดเป็น exclusion เท่านั้น การตรวจสิทธิ์/receipt/evaluation ยังอยู่ server ทั้งหมด
+
+Session storage เก็บเพียงค่าตัวเลขที่แสดงแล้วแยก actor/library/question หรือ pathname ไม่มีคำตอบ/ผลตรวจ/receipt/secret และไม่ใช่ authority; manual retry มี ref สำรองแม้ storage ใช้ไม่ได้ การเปรียบเทียบข้าม document ของ preview/คลังฝึกอาศัย optional session history (หาก browser ปิด storage จะยังสุ่มใหม่แต่ไม่รับรองการกันค่าซ้ำข้าม reload) งานที่มี submission เทียบจากแถว server ได้เสมอ Teacher question preview ใช้ client-only dynamic boundary เพราะมีการสุ่มใน initial state; teacher final grading อ่าน latest answer-key override
+
+## Teacher work card layout - 15 October 2026
+
+ClassroomAssignmentsTab keeps the same rows, category/order state, sensors, collision rules, persistence callbacks and rollback logic. SortableAssignmentRow now renders a Card and category contents use a responsive grid. In-category sorting uses rectSortingStrategy; cross-category drops keep existing append semantics and stationary layout. The handle remains the sole drag activator, independent from menus and action links. ClassroomRecentWork changes only copy/layout, retaining the same expiry logic. The guarded classroom-groups fixture receives a server timestamp so recent samples remain visible; category/order mutations still run in memory.
+
+Legacy layout fallback: missing practice-library layout metadata no longer disables ordinary assignment handles. Unsupported library handles/selects stay disabled with a short explanation; assignment sorting/category changes use existing persistence. Reorder calculations skip locked library slots, so moving an assignment into a category containing locked libraries places it after the movable assignments without moving those libraries. The synthetic work fixture adds layout=missing for this regression path. No schema, permission or server-action changes.
+
+## Classroom interior theme — 15 October 2026
+
+`components/classrooms/classroom-theme.tsx` maps the existing validated cover id to the same nine semantic tokens as COVER_PRESETS; no metadata format, database query, server action, or permission changes. A CSS module applies colour only to explicit data-classroom-* decoration hooks. Teacher detail, its separately rendered contextual sidebar, subject student view, and homeroom student view each mount the scope. Category, urgency and grading palettes are independent. The optional trusted navigationPathname on ClassroomDetailClient keeps the guarded synthetic classroom-themes fixture on its own path; production defaults to /classrooms/:id and retains its existing routing/authorization.
+
+## ส่งคำตอบชุดฝึกและสรุปผลเฉพาะรอบ — 15 ตุลาคม 2026
+
+PracticeExerciseRunner จัด registry ของ PracticeQuestionHandle บน panel ที่โหลดและคง mount ไว้ การส่งตรวจเรียงเฉพาะข้อที่มีคำตอบแต่ยังไม่มี verdict โดยเรียก check เดิมของแต่ละ panel จึงใช้ safe receipt, math modes, การตรวจสิทธิ์ และ retry idempotency envelope เดิม ไม่มี submitSubmission หรือ grading client-side เพิ่ม ข้อที่ตรวจแล้วไม่ส่งซ้ำเมื่อเปิดสรุป ส่วน error หยุดการส่ง แสดงข้อที่ต้องแก้ และไม่เปิดผลสำเร็จ
+
+PracticeExerciseSummary ใช้ snapshot ของสถานะเมื่อส่งครบ และ practiceRunSummary นับผลรายข้อโดย intersect กับสมาชิกชุดเท่านั้น ไม่มีการสร้าง Submission เก็บคำตอบ/ผลถูกผิด/คะแนนใหม่ หรือเปลี่ยน schema accepted-check event ยังคงเป็น metadata ตาม action เดิม การทบทวนซ่อนสรุปแล้วเปิด panel เดิม จึงคงร่างในหน่วยความจำ; ออกจากหน้าหรือ reload ไม่รับรองการกู้ร่าง/ผลสรุป เกณฑ์ hasStudentAnswer แยกเป็น helper ร่วมกับ ExamClient สำหรับสี/จำนวนคำตอบ โดยไม่เปลี่ยน evaluator หรือผลคะแนนงาน
+
+## Question-set colour flow — 15 October 2026
+
+CreateQuestionSetForm shares ClassroomCoverThemePicker with classrooms. Description text and theme are separate form fields, serialized together by question-set server actions using the existing description column. Theme changes participate in the existing debounced, serialized save queue. An automatic selection in edit mode resolves once in the editor, so subsequent rename or structural saves retain the same colour. Dashboard summaries now include description, allowing the same themed QuestionSetCard on home and the set library; per-set theme variables decorate only folder surfaces/text/icons.
+
+The guarded /exam-screen-lab/question-set-themes route injects create/save/delete callbacks and synthetic rows, never writing a database; its sample title/description/theme persist only in browser storage. It exercises create, edit, reopen and responsive palettes. Live Auth/Data API permission and persistence integration remain untested in this local-only delivery.
+
+## คลังฝึกลดการโหลดซ้ำ — 15 ตุลาคม 2026
+
+Search ใช้ Next Form `action=""`/`scroll={false}` เพื่อ client navigation แทน native GET document reload. Local route อ่าน all snapshot โดยตรงเพื่อได้ library metadata และทำ filtered snapshot ขนานเฉพาะเมื่อมีคำ/แท็ก ไม่อ่าน page แรกแยกซ้ำก่อน snapshot. ภายใน snapshot หน้าแรกตรวจ student/library/roster ตามเดิม แล้ว private page reader ใช้ authorized library เดียวกันเฉพาะคำขอ/รอบ batch นั้น; แต่ละ RPC ยังตรวจ actor/library ปัจจุบันและมีขอบเขต 24 rows, concurrency สูงสุด 8. ไม่มี cache สิทธิ์หรือข้อมูลส่วนตัวข้าม request; public search ยังตรวจสิทธิ์ใหม่ทุกครั้ง และ snapshot ไม่ส่งผลบางส่วนเมื่อหน้าใดล้มเหลว/total เปลี่ยน/IDs ซ้ำ
+
+## Teacher home welcome — 15 October 2026
+
+The existing verified dashboard profile supplies full_name to TeacherDashboard. DashboardWelcome renders on the server using the existing counts and Bangkok clock; four time periods each have three wordings selected by Thai calendar day. Greeting changes on a new server render, without timers, additional queries or a client boundary on the production dashboard. Empty teacher accounts retain GettingStarted below the welcome. The guarded /exam-screen-lab/teacher-dashboard route supplies synthetic empty/name/clock cases without database reads or writes.
+
+### หน้าทำชุดฝึกส่วนตัว — 15 ตุลาคม 2026
+
+`/practice/[id]/exercises/[exerciseId]/take` ตรวจ Auth, feature flag, published student library และ access-code session ก่อนเปิดหน้ารัน ใน development อ่านชุดจาก local adapter แล้ว intersect สมาชิกกับ authorized metadata snapshot; production อ่านชุดผ่าน owner/library-scoped RPC เดิม. `getPracticeRunQuestion` ตรวจ exact question access และ access session ซ้ำทุกคำขอ แล้วใช้ `preparePracticeRunQuestion` ร่วมกับหน้ารายข้อเพื่อส่งเฉพาะ safe variant, signed receipt และ tool flags ไม่มี raw key/seed
+
+`PracticeExerciseRunner` โหลดเฉพาะหน้าที่กำลังแสดง (1/3/5/10 ข้อ) และคง panel ที่โหลดแล้วแบบ hidden เพื่อรักษาคำตอบ/math modes/feedback ในหน่วยความจำระหว่างเปลี่ยนหน้า ใช้ `ExamQuestionFrame`, navigation, flags, toolbar, calculator และ Scratchpad เดิม ตรวจคำตอบผ่าน action practice เดิมและไม่สร้าง Submission. สี/จำนวนข้อต่อหน้าเก็บแยก owner/library/exercise ใน browser presentation storage; ไม่แก้ schema หรือย้ายข้อมูลขึ้น cloud. โหมดโฟกัสใช้ fullscreen ของ document เพื่อให้ portal ของเครื่องมือยังเปิดได้ และออกจาก fullscreen เมื่อออกจากหน้ารัน
+
+Scratchpad สร้าง initial-data promise แบบไม่มี I/O ใน render แล้วย้ายการอ่าน IndexedDB/เผยสถานะไป effect หลัง commit พร้อม cancellation guard และ stable scope ตาม owner/submission/answer/part. ป้องกัน async state update ของ render ที่ถูกทิ้งระหว่าง lazy/Suspense และไม่เริ่มการเขียนก่อน draft hydrate ผ่าน policy เดิม
+
+### ตรวจชุดฝึกส่วนตัวใน checkout ที่รัน localhost — 14 ตุลาคม 2026
+
+`/practice/[id]/library` ใช้ `isLocalPracticeReviewEnabled` เฉพาะ `NODE_ENV=development` เพื่อให้ตรวจ UI ใน checkout หลักได้ก่อนลง schema ใหม่ `loadPracticeLibraryLocalSnapshot` เรียก RPC ค้นหาเดิมเป็นหน้า 24 ข้อใน batch ที่จำกัด ตรวจ actor/library/access session เดิม และส่งเฉพาะ display DTO ไม่มี answer key/solution payload ในรายการ ทั้ง snapshot รวมและ search matching IDs ช่วยให้เลือก/กรองหมุดข้ามหน้าได้โดยไม่ต้องเรียก RPC ของ schema ที่ยังไม่ apply
+
+`PracticeLocalLibraryView` ใช้ localStorage แยก user/library เก็บเฉพาะชื่อ/สมาชิก/revision/หมุด ใช้ strict schema และสมาชิกจาก snapshot ที่ตรวจสิทธิ์แล้ว; desired pin state/idempotent retry และ expected revision ป้องกันการทับร่างจากอีกแท็บเมื่อ storage ล่าสุดต่างกัน นับความคืบหน้าจาก metadata ปัจจุบัน, กรองร่วมกับคำค้น/แท็ก, คงลำดับในชุด และไม่เรียก server mutation ของชุด/หมุดใน dev mode ข้อมูล browser ไม่มีการย้ายไป cloud อัตโนมัติและแสดงข้อจำกัดนี้ใน UI. `NODE_ENV=production` ยังคง server/RPC path ที่ต้องผ่าน Staging integration ก่อนเผยแพร่
+
+## Local-first personal exercise editing and pins
+
+PracticeLibraryView persists edit draft identity/revision/title and selected questions in actor/library-scoped sessionStorage. It invokes separate create/update/pin actions; the server remains the authority for owner/membership/revision checks. The list DTO supplies member titles so removal works beyond the current page. The review URL flag persists through search, pagination and question return links and selects its own bounded RPC. The synthetic lab overrides actions and URL builders, persists only labelled sample groups/pins in browser localStorage, and stays isolated from Auth and database writes. Hosted rollout is deferred by the owner.
+
+
+## Student personal practice exercise boundary (prepared 14 October 2026)
+
+The access assertion helper alone is service-only SECURITY DEFINER with an empty search_path, to share-lock protected library/roster rows without expanding direct UPDATE grants. Main creation/list/page RPCs remain SECURITY INVOKER.
+
+PracticeLibraryView owns browser selection and an inline naming form over allowlisted question metadata. PracticeQuestionCard exposes student actions separately from teacher QuestionCard. Temporary selections are scoped to actor/library in sessionStorage; durable groups go through lib/actions/practice-exercises.ts, verified Auth/library/code sessions, and service-only invoker RPCs. loadPracticeExercises validates its allowlisted DTO. The optional exercise URL UUID selects the owned, paginated group-read RPC instead of global library search; question return links retain the group. SolutionLoaderProvider uses a student action that verifies exact question membership and reveal settings before returning only attached solution columns. No grading or persistent answer storage changes.
+
+
 อัปเดตล่าสุด: 12 ตุลาคม 2026
 
 เอกสารนี้อธิบายสถาปัตยกรรมที่พบใน repository ปัจจุบัน ไม่ใช่การรับรองว่าทุกส่วนถูก deploy หรือผ่านการทดสอบ production แล้ว
@@ -50,6 +160,10 @@ App shell มี contextual sidebar registry ฝั่ง client ที่ผู
 
 ## Runtime boundaries
 
+“โจทย์ล่าสุด” ของครูใช้ `DashboardQuestionList` เป็น client wrapper ของ `QuestionCard` เดิม โดย server อ่านข้อมูลสรุปของ 5 โจทย์ล่าสุดและใช้ `getQuestionCardData` เดิมอ่านสถิติ/จำนวนข้อย่อย/แฟ้ม/เฉลยเฉพาะ id ที่แสดง พร้อมทีมจาก membership ภายใต้ session/RLS; รายละเอียดโจทย์และเฉลยโหลดเมื่อเปิดดูเท่านั้น · `question-return` รองรับ marker `dashboard=1` ใน `from` และยอมให้ redirect ไป `/dashboard` ที่ตรงตัวเท่านั้น เมื่อแก้ไขหรือยกเลิกจึงกลับหน้าหลักได้โดยไม่เพิ่ม arbitrary redirect
+
+การ์ดแฟ้มโจทย์ใช้ Client Component กลาง `components/questions/question-set-card.tsx` ร่วมกันในคลังและหน้าหลักครู โดยครูยังโหลดรายการล่าสุด/ยอดรวมฝั่ง server; query เพิ่ม `sections` จากแถวเดิมเพื่อแสดงจำนวนแฟ้มย่อย การดาวน์โหลด/ลบเรียก Server Actions เดิมภายใต้ session/RLS เดิม และหน้าหลักรีเฟรช server data หลังลบสำเร็จ · drag handle เป็น optional slot เฉพาะคลัง ไม่เพิ่ม DnD ลงหน้าหลัก
+
 ตาม UI-014/UI-018 (6 ต.ค. 2026) ตัวแถบ `Sidebar` ของ app shell ใช้ `transition-none` แทน width/transform 200ms ทั้งการย่อเป็น icon rail บน desktop และเปิด/ปิด drawer บนมือถือ ปุ่มที่เปลี่ยนความสูง/padding ระหว่าง full/compact ใน contextual sidebar ใช้ `transition-colors` แทน `transition-all` เฉพาะตำแหน่งนั้น เพื่อให้ตำแหน่งไอคอนตามแกน Y เปลี่ยนพร้อมตัวแถบในเฟรมเดียวโดยยังคง color feedback การเปลี่ยนนี้เป็น CSS display-only ไม่เพิ่ม timer/request และไม่เปลี่ยน state persistence, registry หรือ authorization
 
 ตาม UI-025 เมื่อ sidebar อยู่ในสถานะย่อบน desktop หน้า `/assignments/new` จะขยายกรอบสร้างงานไปทางซ้ายเท่ากับพื้นที่ sidebar ที่คืนมา (`w-64` → `w-20`) โดยตรึงขอบขวาไว้ตำแหน่งเดิม; ใช้ marker `assignment-create-stage` เพื่อจำกัดพฤติกรรมไว้เฉพาะหน้าสร้างงาน ไม่จัดกึ่งกลาง direct child อื่นของ `<main>` แบบเหมารวม และ mobile drawer ไม่รับกฎนี้
@@ -94,7 +208,8 @@ Vercel รันโค้ดฝั่ง server ด้วยเขตเวล�
 - บัญชีครูและนักเรียนใช้ email/password เป็นตัวตนหลักเดียวกันทั่วระบบ; classroom code ใช้สร้าง membership ไม่ใช่ login identifier
 - email/password signup ส่ง `role` และ `survey_role` ที่ผ่าน server validation เข้า auth metadata แล้ว database trigger สร้าง `public.users` กับ personal organization ใน transaction เดียว
 - OAuth account ที่ยังไม่มี `survey_role` ต้องผ่าน `/complete-profile`; Server Action ตรวจ exact authenticated user และยอมกำหนด `teacher|student` ได้เฉพาะครั้งแรก ส่วน protected layout ปฏิเสธ profile ที่ยังไม่สมบูรณ์
-- Magic link ตั้ง `shouldCreateUser: false`; password recovery กลับผ่าน `/auth/callback?next=/reset-password` เพื่อแลก PKCE code เป็น server session ก่อนเปลี่ยน credential
+- หน้า login แสดง Google และ email/password ใช้ shared `loginSchema`, inline errors และสถานะกำลังส่งร่วมกัน รหัสผ่านสำหรับ login ตรวจเพียงไม่ว่างเพื่อรองรับบัญชีเดิม; ปุ่ม Magic Link ถูกถอดจาก UI แต่ backend `sendMagicLink` และ callback เดิมยังอยู่ โดยตั้ง `shouldCreateUser: false` และตอบโดยไม่เปิดเผยว่ามีบัญชีหรือไม่
+- password recovery กลับผ่าน `/auth/callback?next=/reset-password&recovery_nonce=…` ตรวจ same-browser intent/recipient/expected ID ร่วมกับ PKCE ก่อนออก grant และเปลี่ยน credential
 - `users.role` ใช้ `teacher`, `student`, `admin`
 - `organization_members.org_role` ใช้ `owner`, `admin`, `teacher`, `student`
 - ครูประจำชั้นมาจากการเป็นครูของ classroom ชนิด `homeroom`
@@ -116,8 +231,8 @@ Vercel รันโค้ดฝั่ง server ด้วยเขตเวล�
 1. Server อ่าน `PRACTICE_LIBRARY_ENABLED` แล้วส่งเพียง boolean presentation gate เข้า app shell; sidebar และทางเข้าสร้างจึงไม่อ่าน environment ฝั่ง browser ค่า flag ไม่ใช่สิทธิ์ และ route/action/RPC ยังตรวจ authorization ทุกครั้ง
 2. ทางเข้าจากเมนูมอบหมายลิงก์ตรงไป `/practice/new?classroom=<uuid>` โดยไม่เพิ่มค่าใน `AssignmentType`; lifecycle และตารางของคลังฝึกไม่แตะ assignment/submission
 3. หน้าครู `/practice`, `/practice/new`, `/practice/[id]/edit` ใช้ session-bound client และตรวจเจ้าของห้องหรือ co-teacher `admin/manage`; create/update/duplicate/reorder เป็น RPC แบบ atomic ส่วน owner-private membership เดิมอ่านผ่าน service-only manager RPC ที่ผูก exact actor + library โดยไม่ขยายให้ครูร่วมอ่านคลังส่วนตัวทั้งก้อน
-4. หน้านักเรียน `/practice/[id]` รับ `q`, `tag` ซ้ำ และ `page` ที่ validate แล้ว แล้วเรียก `search_practice_library_questions` หนึ่งครั้งต่อหน้าเพื่อกรองคำค้น + exact multi-tag AND, รวม attempt count และ total ก่อนส่ง allowlisted list DTO 24 แถว; answer-bearing field ไม่อยู่ใน initial RSC payload
-5. หน้ารายข้อใช้ `get_practice_question_for_student` ตรวจ published library, roster และ exact membership ใน statement เดียว จากนั้นสุ่ม/ประเมินคำตอบผ่าน server boundary; browser ส่งคำตอบกับ UUID idempotency key และรับเฉพาะ feedback ของ request ตนเอง ใบรับรองพกเพียง nonce กับ keyed binding ไม่พก seed หรือ raw question revision และ server อนุมาน seed ด้วย HMAC หลังตรวจลายเซ็น
+4. หน้านักเรียน `/practice/[id]` ตรวจรหัสผ่านฝั่ง server เมื่อคลังกำหนดไว้ แล้วออก signed HttpOnly session อายุสั้นก่อนอนุญาต `/library` และหน้ารายข้อ; รหัสจริงไม่อยู่ใน DTO จากนั้นรับ `q`, `tag` ซ้ำ และ `page` ที่ validate แล้ว และเรียก `search_practice_library_questions` หนึ่งครั้งต่อหน้าเพื่อกรองคำค้น + exact multi-tag AND, รวม attempt count/total และใช้ลำดับคงที่ต่อนักเรียนเมื่อเปิด `shuffle_questions` ก่อนส่ง allowlisted list DTO 24 แถว
+5. หน้ารายข้อใช้ `get_practice_question_for_student` ตรวจ published library, roster และ exact membership ใน statement เดียว จากนั้นสุ่ม/ประเมินคำตอบผ่าน server boundary; `shuffle_options` ถูกผูกใน signed question revision เครื่องคิดเลขโหลดเมื่อกดใช้ และกระดาษทดเก็บใน IndexedDB ของเครื่องโดยไม่มีทางแนบส่ง browser ส่งคำตอบกับ UUID idempotency key และรับเฉพาะ feedback ของ request ตนเอง ใบรับรองพกเพียง nonce กับ keyed binding ไม่พก seed หรือ raw question revision และ server อนุมาน seedด้วย HMAC หลังตรวจลายเซ็น
 6. หน้าความคืบหน้า `/practice/[id]/progress` และ `/practice/[id]/progress/[studentId]` ใช้ aggregate RPC แบบแบ่งหน้า 50 แถว รวม append-only event เป็น DTO เฉพาะชื่อ/เลขที่ จำนวนข้อที่เคยตอบ จำนวนครั้ง ชื่อโจทย์และแท็ก ไม่ query raw answer table ของ assignment และไม่มี ranking/default sort ตามจำนวน
 7. คำตอบจับคู่ใน practice ใช้ ephemeral token ที่สร้างจาก `right_text + right_image` ที่นักเรียนเห็น ไม่พก authored index จึงรองรับตัวเลือกที่มีเฉพาะรูปโดยไม่เผย mapping; รูปแบบ `right_text[]` ของ assignment/exam เดิมไม่เปลี่ยน และไม่ต้องมี migration เพิ่ม
 8. query ของคลัง/นักเรียน/progress ต้องอยู่ภายใต้ `org_id` + classroom relation เสมอ; admin client ใช้ได้หลัง server authorization และจำกัด exact IDs เท่านั้น ไม่ใช้ขยายการค้น roster
@@ -143,11 +258,8 @@ DTO และ schema contract อยู่ใน `lib/practice-library-contracts
 7. `getExamTakingData()` อ่าน attempt ด้วย trusted server client หลังตรวจ owner แล้วแปลงผ่าน `toSafeExamAnswer()`; browser ไม่ได้รับ answer snapshot, สูตร, correct flags หรือ canonical ordering
 8. นักเรียนบันทึกคำตอบระหว่างทำผ่าน Server Action; direct browser mutation ของ `submissions`/`submission_answers` ถูก revoke
 9. หาก assignment เปิดคุมสอบ `useExamProctor()` ส่ง heartbeat/เหตุการณ์แบบ batch พร้อม opaque id ต่อแท็บไปยัง `recordProctorSignal()`; action ตรวจ session + exact attempt แล้วให้ service role เรียก RPC ที่ตรวจซ้ำและเขียน lease ใน `exam_proctor_connections` พร้อมสรุป/เหตุการณ์ใน `exam_proctor_sessions`/`exam_proctor_events` แบบ atomic หากมี lease สดเกินหนึ่งจะสร้าง `concurrent_connection` ฝั่งฐานข้อมูล สัญญาณที่ส่งไม่สำเร็จ retry แบบ backoff 1/3/10/30 วินาทีและยังมี heartbeat ทุก 15 วินาที ครูรับการเปลี่ยนแปลงผ่าน Supabase Realtime ภายใต้ RLS; เมื่อ channel หลุด dashboard อ่าน snapshot ผ่าน RLS ทุก 15 วินาทีและ reconcile ทุก 60 วินาทีแม้ channel ปกติ โดย replay event ที่มาระหว่าง query เพื่อไม่ย้อนสถานะ หน้าครู resolve เฉพาะชื่อของ student IDs ที่อยู่ใน roster/submission/event หลัง assignment ผ่าน RLS แล้ว จึงแสดงได้ว่าใครเกิดเหตุการณ์ใดโดยไม่เปิด profile อื่น ครูรับทราบ reviewable event ผ่าน service-role-only RPC แบบ first-ack-wins; metadata นี้อยู่บน event เดิมจึงกระจาย `UPDATE` ผ่าน Realtime และใช้ retention เดียวกัน โดย payload หลักมี trigger ห้ามแก้ ส่วน seen-ID registry รวมสัญญาณใหม่ต่อคนก่อน toast/เสียงและไม่เตือนซ้ำจาก snapshot หรือ acknowledgement update เสียงกับ Browser Notification ต้องเปิดจาก user gesture และทำงานเฉพาะขณะ dashboard ยังเปิด ไม่มี background push ส่วน `exam_watermark_enabled` แสดงชื่อกับรหัส attempt เฉพาะบน client เพื่อเป็นแรงเสียดทานต่อการส่งภาพ ไม่ได้บันทึกภาพหน้าจอ
-   - `/assignments/[id]/proctor/report` เป็น read path หลังสอบบนตารางเดิม ไม่มี schema หรือ persisted report เพิ่ม หน้าอ่าน assignment ผ่าน session-bound client ก่อนเพื่อยืนยัน owner, co-teacher `admin/manage` หรือ super admin แล้วอ่าน event ผ่าน RLS อีกชั้น ตัวกรอง student, attempt, event kind และ acknowledgement ถูก parse ด้วย allowlist ฝั่ง server และ query แบบแบ่งหน้า; admin client ใช้หลัง authorization เท่านั้นเพื่อ resolve ชื่อจาก exact student IDs ของ retained proctor sessions ที่ RLS คืนให้ assignment นี้ (มี hard cap 2,000 attempts) จึงไม่ค้นหรือส่ง roster ทั้ง organization และไม่ส่งประวัติ event ทั้งชุดเข้า browser
-   - ลำดับและเวลาหลักของรายงานมาจาก `exam_proctor_events.created_at` ซึ่งฐานข้อมูลกำหนด ส่วน `occurred_at_client` เป็นเวลาประกอบจากนาฬิกาที่ client ควบคุมและไม่ใช้เป็น authority รายงานใช้ถ้อยคำกลางว่าเป็นสัญญาณประกอบ ไม่คำนวณ risk score และไม่เปลี่ยนการรับทราบให้เป็นคำตัดสินนักเรียน
-   - CSV ไม่สร้างจาก payload ของหน้าปัจจุบัน แต่ endpoint ตรวจสิทธิ์ผู้จัดการซ้ำแล้ว re-query ตามตัวกรองเดียวกัน ตรึงขอบเขต event ใหม่ด้วย ID สูงสุดจาก count query แรกและปฏิเสธเมื่อจำนวนที่อ่านไม่ตรงกัน กลไกนี้ไม่ใช่ transactional snapshot ของ acknowledgement ทุกช่อง จำกัด 10,000 แถว, 2,000 attempts และ 4 MiB; หากข้อมูลเปลี่ยนหรือเกินเพดานจะตอบ error โดยไม่ส่งไฟล์บางส่วนหรือเขียนว่าครบ ป้องกัน spreadsheet formula injection ในทุก cell ที่มาจากข้อมูลผู้ใช้ และส่ง `Cache-Control: private, no-store` กับ `X-Content-Type-Options: nosniff` ไม่มี migration ใหม่สำหรับเฟสนี้
-10. `pg_cron` เรียก `purge_expired_exam_proctor_data()` วันละครั้งเพื่อลบ event, connection lease, session summary ของ attempt และ SEB preflight check-in ที่เกิน 90 วัน; ครูที่มีสิทธิ์จัดการกดล้างราย assignment ได้ผ่าน Server Action + service-role-only RPC ซึ่งตรวจ actor ซ้ำและไม่ยอมล้างขณะมี session สด คำตอบ คะแนน และ submission ไม่อยู่ในขอบเขตการล้างนี้
-   - CSV ที่ดาวน์โหลดออกจาก KorKru เป็นสำเนาแยกและไม่ถูก job 90 วันหรือการล้างราย assignment ตามลบ ผู้ดาวน์โหลดต้องเก็บในพื้นที่จำกัดสิทธิ์และลบเองเมื่อหมดวัตถุประสงค์
+   - ห้องคุมสอบสดมีประวัติในหน้าเดิม อ่านเหตุการณ์ครั้งละ 100 รายการด้วย exclusive ID cursor ภายใต้ session RLS และอ่าน session สรุปทุกรอบเป็น batch 500 แถว ไม่ใช้รายงานหรือ CSV แยก หน้า server ตรวจ exact owner/manage co-teacher/super-admin ก่อนอ่านรายชื่อ
+10. นโยบายใหม่คงหลักฐานคุมสอบจนลบ assignment โดยใช้ FK cascade เดิม Migration `20261015132234` ยกเลิกทั้ง proctor/Android retention jobs และ purge RPCs ไม่แก้ RLS หรืออายุสิทธิ์เข้าสอบ ผู้ใช้อนุญาตให้ apply เฉพาะ migration นี้บน linked remote แล้ว ตรวจ cron/RPC แบบอ่านอย่างเดียวและยืนยัน remote history เพิ่มเพียงเวอร์ชันนี้ ส่วน local-only อีก 20 รายการยังคงอยู่
 11. เมื่อส่ง ระบบตรวจชนิดที่รองรับ คงงานที่ต้องตรวจโดยครูไว้ และปิด presence ของห้องคุมสอบแบบ best-effort
 12. RLS คืนคะแนน/เฉลยให้นักเรียนตาม `show_results` เท่านั้น ส่วนการแสดงคะแนนผ่าน per-question override, display rescaling, teacher score adjustment และ attempt strategy ตามลำดับเดียวกันทุกหน้า; adjustment เก็บแยกจาก raw answer total และ clamp 0–คะแนนเต็ม
 13. สถานะส่งช้าใช้ first completed attempt ต่อ student แล้วจัดเทียบ `due_at`/`late_bands` ที่เลื่อนด้วย extension ส่วนบุคคล สีซ้ำรวมเป็นกลุ่มเดียวกันได้ หน้าผลและ Server Action ใช้ pure helper เดียวกัน Action รับเพียง assignment+color+replacement adjustment ตรวจสิทธิ์ใหม่ แล้วให้ service-role-only RPC เขียนทุก attempt กับ append-only batch/item audit ใน transaction เดียว
@@ -292,3 +404,69 @@ npm run build
 ```
 
 สำหรับ auth/RLS/grading ต้องทดสอบด้วยหลายบทบาทและข้อมูลคนละ organization ไม่ใช่ทดสอบเฉพาะ happy path
+
+## Student learning home
+
+- Student work summary now includes a separate `practiceWork` discovery projection. The verified student branch calls the existing session/RLS-bound practice catalog loader only when the practice flag is enabled; it returns active enrolled subject-room/published-library metadata with publish/create timestamps and question counts. Library load failure is shown separately without replacing ordinary work. Cards share classroom themes and link to the existing waiting/access-code route. Completed assignments sort after all active items in every direction; libraries always remain active and never feed task/grade/calendar counts. Missing deadlines stay after dated active work; undated ties use newest publication/assignment first. No schema or grading change is involved.
+
+- Student `/dashboard` composes `StudentView`, `StudentWorkSummary`, recent announcements and `AssignmentCalendar`; the student sidebar calls it **พื้นที่เรียนรู้ของฉัน**. Teacher dashboard rendering stays on the existing role branch. Student `/classrooms` redirects to the classroom anchor (preserving the join code), and `/my-submissions` redirects to the summary anchor after session verification.
+- Server reads are scoped to the verified student's own roster rows and submissions; published work uses enrolled `assignment_classrooms` links and existing group reach rules. The pure `buildStudentLearningData` projection shares the summary page's official-attempt, display-score, passing and visibility helpers across pending badges, work rows and calendar events. It removes hidden score values from presentation props and derives classroom themes from reachable classroom IDs. History remains per attempt; done totals remain per assignment.
+- The synthetic, environment-gated `/exam-screen-lab/student-dashboard` renders the same projection/components without database access. Joining or leaving a classroom revalidates `/dashboard` as well as the classroom list. No schema change is involved.
+
+## Teacher classroom work presentation
+
+`ClassroomAssignmentsTab` merges allowlisted practice summaries with assignment rows using namespaced `practice:<uuid>` UI keys. Both share category surfaces and DnD; practice rows keep their own settings/progress/lifecycle routes. Session-RLS category updates and the service-only `reorder_classroom_work` RPC persist practice presentation metadata without touching grading or activity. The loader retries the old projection on missing layout columns and disables practice grouping/mixed dragging until the additive migration is installed.
+
+## Student classroom presentation
+
+- Subject and homeroom student views share `StudentClassroomHeader`, using the teacher's saved cover preset, icon and pattern metadata. The student return link uses the existing validated `back` helper and falls back to the classroom anchor on the combined learning home.
+- `AssignmentList` keeps status/type/category filtering local. Its whole-card links use the pure `studentAssignmentCardState` projection to choose the existing take or submission route, preserve unfinished retries independently of the official attempt, enforce attempt/completion presentation rules, and gate displayed scores with the shared result-visibility helpers. The server's membership, group, scoring and submission queries stay unchanged.
+- The environment-gated `/exam-screen-lab/student-classroom` uses synthetic props and read-only fixture detail links; announcement seen tracking is disabled and no exam start/submit or database access is involved.
+
+## Student profile presentation
+
+- The authenticated settings layout still reads the verified user's role, then renders `SettingsShell`; only students omit the duplicate settings navigation. The student stage shares the shell's measured notification anchor on large screens and uses full width on small screens.
+- `AvatarCropEditor` decodes a local file or the current image in the browser, bounds its square crop through the pure `avatar-crop` helper, and returns a 512×512 PNG data URL to the existing page-local preview. Object URLs are released when drafts close or the component unmounts. No avatar URL is persisted; profile/password actions and data-access policies remain unchanged.
+- Section audience labels reflect the classroom server projection: homeroom advisors can see the student profile, while subject teachers receive only grade, section, student code and class number. School name stays in the advisor projection, and the interface explains that distinction. These labels do not grant access.
+- The environment-gated `/exam-screen-lab/student-profile` supplies synthetic identities/images and non-mutating form actions to the same shell/editor/form; it never queries student data or changes accounts.
+
+## Student learning layout and announcement receipts
+
+- The learning home shares the shell's measured notification anchor with its left content column; the mini calendar occupies the following column and sticks inside the existing main scrollport. Container queries choose one/two/three classroom and assignment cards without depending solely on viewport width. The work summary is a bounded scroll region with a pure immutable sort using assignment created_at or deadline; grading/group reach projections stay unchanged.
+- Explicit announcement acknowledgements have separate round/receipt tables from legacy post_reads. Service-only SECURITY INVOKER RPCs verify the session-derived actor's role and exact classroom membership/management permission; acknowledgement and resend serialize on the post row, so an old popup cannot acknowledge a new round. Direct PUBLIC/anon/authenticated grants are revoked and both new tables keep RLS enabled.
+- The protected app layout loads only the verified student's pending feed when the server rollout flag is enabled. Student payloads have no peer receipts; only the authorized teacher projection attaches acknowledgement status to stream posts. Old seen metrics keep their original label while the flag is disabled. No schema is assumed before rollout; migration parity currently blocks hosted activation.
+- Local fixtures render the same popup and teacher acknowledgement panel with synthetic sessionStorage state and callbacks; no real Auth/database/notification writes occur. See STUDENT_ANNOUNCEMENT_ACKNOWLEDGEMENTS.md for rollout checks and the tests not yet run.
+
+- 14 ต.ค. 2026: student avatar editor บันทึก crop ผ่าน `lib/actions/avatar.ts` ใช้ verified Auth/บัญชี active, immutable owner path + compare-and-set users.avatar_url และ rollback; client รอ save ก่อนปิด ไม่ส่ง owner/URL จาก browser ส่วน summary/announcements ใช้ bounded region ที่ส่ง wheel ต่อให้ main เมื่อสุดกรอบ รายละเอียด `STUDENT_PROFILE_AVATARS.md`.
+
+- 14 ต.ค. 2026: นักเรียนใน homeroom ใช้โครง `student-learning-stage` ร่วมสำหรับคอลัมน์เนื้อหา/ปฏิทิน sticky และ notification alignment ประกาศอยู่ก่อน roster ที่มี bounded natural scroll; peer names/class number DTO สร้างหลัง exact membership guard ด้วย helper `student-homeroom-classmates` ไม่ใช้ compliance card แล้ว.
+
+## Exam toolbar and navigation presentation
+
+- `components/exam/exam-toolbar-dock.tsx` pins the normal exam/exercise toolbar inside the app's main scrollport. Its ResizeObserver writes CSS variables for the actual toolbar height and scrollport top padding, without a React state update or scroll listener. Question scroll margins include both so existing focus/scrollIntoView navigation does not hide the question beneath the dock.
+- `ExamClient` renders a compact timer/progress Card and a content-sized, height-bounded navigation Card. Only the number grid shrinks/scrolls; legends and submit remain visible. Focus mode keeps its existing independent question scroller and header. Streak mode retains its absence of bulk navigation/submission and a total-based progress meter.
+- This is presentation only: timer/auto-save/proctor hooks, answer state, checking/submit guards, tool configuration gates and overlay ownership remain on their existing paths. Synthetic lab options `timed=1`, `type=exercise`, and `shell=1` exercise this UI without Auth, database writes or real attempts. Native SEB and real submission lifecycle verification belong to their separate work; no schema rollout is needed here.
+
+## Student result summary and mandatory solution identity
+
+- `SubmissionScoreSummary` and `SubmissionAnswerReview` share presentation between the authorized result route and a synthetic lab. Stored grades, visibility/release gates, native exit, retries and private work-artifact authorization remain on their original paths. The unused StudyPathPanel is removed.
+- `loadStudentSolutionWatermark` runs only after exact submission ownership or assignment-management authorization. It projects name/code/class/class number/server-issued time for that student without roster, email or contact/health data. Taking data carries required solution_watermark after owner/native-access checks; released-solution actions return identity with items. Failed identity lookup prevents serializing solution bodies.
+- A fixed portal covers review/dialogs/revealed exercise feedback independently of optional exam watermark. Teacher review labels identity as the student's work and teacher-view context. Server time advances with performance elapsed time, including while a cached dialog is closed. This is visual attribution, not cryptographic evidence.
+- Only analytics PDF export is removed by user request; analytics and CSV remain. PDF attachment reader changes are a pending local draft, so external files have no physical watermark. See STUDENT_SOLUTION_RESULTS.md.
+- When integrating isolated attempt-expiry work (19f7ca5), retain its closed_at/timeout-receipt guards alongside the required watermark field and compact summary. This change does not integrate that work.
+
+
+## Student classroom calendar scope
+
+- Subject classrooms derive CalendarEvent rows from the already authorized StudentAssignmentRow list through classroomCalendarEvents. The existing isCompleted gate drives both cards and their calendar; no cross-subject query is added to this path. Both subject and homeroom use the learning-stage sticky layout.
+- Student homeroom replaces the teacher aggregate/highest-score reduction with loadStudentLearningCalendar after verified Auth and exact room membership. Owner-scoped paginated memberships/submissions plus published enrolled-room links and groupOf feed the same buildStudentLearningData projection as the dashboard. Only calendar DTOs are returned; teacher homeroom aggregation is unchanged.
+- studentWorkSeverity shares the 48-hour deadline scale between calendar dots and card stripes. orderStudentClassroomWork stably partitions completed rows and whole completed groups, deciding group completion from the unfiltered list. Visibility/retry/scoring rules remain unchanged. See STUDENT_CLASSROOM_CALENDAR.md.
+
+## การเลื่อน shell ระหว่างทำข้อสอบ — 14 ตุลาคม 2026
+
+`useAppViewport` รักษาเอกสารไว้ที่จุดเริ่มต้นทั้งจาก visual viewport events และ window scroll ซึ่ง Chrome desktop อาจสร้างเมื่อโฟกัส input หรือใช้ scrollIntoView โดยไม่ส่ง visualViewport.scroll; main/คอลัมน์โจทย์ยังเลื่อนภายใน และ appShellHeight ยังไม่บังคับตำแหน่งระหว่าง pinch zoom MCQ radio อยู่ในแถวจริงเพื่อไม่ให้ตำแหน่งของ input ที่ซ่อนทำเอกสารหลุดจอ
+
+`ExamQuestionFrame` จัดหนึ่งพื้นผิวต่อข้อและใช้ container width เลือกการวางรูปข้างคำตอบ; `ExamQuestionNavigation` แยกสีคำตอบ ขอบข้อปัจจุบัน และไอคอนธง ทั้งสองเป็น presentation เท่านั้น ไม่เปลี่ยนคำตอบที่ serialize, autosave, authorization หรือ grading
+
+
+- Classroom card entry (14 October 2026): native anchors retain the existing state-derived href and perform document GET, avoiding dependence on a pending/stale App Router transition. The take route has a lightweight loading boundary; ownership/access/schedule checks and explicit waiting-room start POST remain unchanged. Synthetic browser verification blocks RSC transitions and asserts a new document plus the expected destination for mouse/keyboard entry. This does not establish the underlying cause of the real account's pending request.

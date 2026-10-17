@@ -1,123 +1,68 @@
-import Link from 'next/link'
-import { ChevronLeft, GraduationCap, Users, Home } from 'lucide-react'
+import { ClassroomTheme } from '@/components/classrooms/classroom-theme'
+import { parseDescription } from '../../_components/classroom-meta'
+import { Users } from 'lucide-react'
 import { ClassroomStream } from './classroom-stream'
 import { AssignmentCalendar, type CalendarEvent } from '@/app/(app)/dashboard/_components/assignment-calendar'
 import type { Classroom, ClassroomPost } from '@/lib/types'
+import type { HomeroomClassmate } from '@/lib/student-homeroom-classmates'
 import { Card } from '@/components/ui/card'
-import { displayDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
-
-interface Classmate { id: string; full_name: string }
+import { StudentClassroomHeader } from './student-classroom-header'
 
 interface Props {
   classroom: Classroom
   teacherName: string
   studentCount: number
-  classmates: Classmate[]
+  classmates: HomeroomClassmate[]
   calendarEvents: CalendarEvent[]
-  complianceRate: number | null
-  complianceSubmitted: number
-  complianceTotal: number
   posts: ClassroomPost[]
+  trackSeen?: boolean
+  initialNow?: string
+  previewLabel?: string
 }
 
 export function HomeroomStudentView({
   classroom, teacherName, studentCount, classmates,
-  calendarEvents, complianceRate, complianceSubmitted, complianceTotal, posts,
+  calendarEvents, posts, trackSeen = true, initialNow, previewLabel,
 }: Props) {
   return (
-    <div className="space-y-6 max-w-5xl">
-      <Link
-        href="/classrooms"
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <ChevronLeft className="w-4 h-4" /> ห้องเรียนทั้งหมด
-      </Link>
-
-      {/* Header card — deliberately themed like the teacher-side homeroom
-          header so students recognize this as their advisory class, not a
-          subject classroom. */}
-      <div className="bg-gradient-to-br from-slate-800 via-slate-800 to-indigo-900 rounded-2xl p-6 text-white">
-        <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-primary mb-1.5">
-          <Home className="w-3 h-3" /> ครูที่ปรึกษาประจำชั้น
-        </p>
-        <h1 className="text-2xl font-bold leading-tight">{classroom.name}</h1>
-        {displayDescription(classroom.description) && (
-          <p className="text-white/50 text-sm mt-1">{displayDescription(classroom.description)}</p>
-        )}
-        <div className="flex items-center gap-5 mt-4 flex-wrap text-sm">
-          <div className="flex items-center gap-2">
-            <GraduationCap className="w-4 h-4 text-white/50" />
-            <span className="text-white/50">ครูที่ปรึกษา:</span>
-            <span className="font-medium">{teacherName}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Users className="w-4 h-4 text-white/50" />
-            <span className="font-semibold">{studentCount}</span>
-            <span className="text-white/50">คนในห้องนี้</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Personal compliance — visible only to this student, never to classmates */}
-      <Card padding="lg">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-sm font-semibold">ภาพรวมของฉัน</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {complianceTotal > 0
-                ? `ส่งงานตรงเวลาแล้ว ${complianceSubmitted}/${complianceTotal} รายการ (นับทุกวิชา) · เห็นเฉพาะคุณ`
-                : 'ยังไม่มีงานที่ครบกำหนดส่ง'}
-            </p>
-          </div>
-          {complianceRate !== null && (
-            <p className={`text-2xl font-bold shrink-0 ${
-              complianceRate >= 80 ? 'text-success'
-                : complianceRate >= 50 ? 'text-warning'
-                : 'text-destructive'
-            }`}>
-              {complianceRate}%
-            </p>
-          )}
-        </div>
-      </Card>
-
-      {/* Calendar — due dates aggregated from every subject classroom this
-          student belongs to, since the homeroom itself has no assignments. */}
-      <AssignmentCalendar events={calendarEvents} />
-
-      {/* Classmates — names only, no scores or submission status */}
-      <div>
-        <h2 className="font-semibold mb-3 flex items-center gap-2">
-          <Users className="w-4 h-4 text-muted-foreground" /> เพื่อนร่วมห้อง
-        </h2>
-        {classmates.length === 0 ? (
-          <Card edge="dashed" padding="xl" className="text-center text-sm text-muted-foreground">
-            ยังไม่มีเพื่อนคนอื่นในห้องนี้
-          </Card>
-        ) : (
-          <Card padding="md" className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {classmates.map(s => (
-              <div key={s.id} className="flex items-center gap-2 min-w-0">
-                <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
-                  {s.full_name.charAt(0)}
-                </div>
-                <span className="text-sm truncate">{s.full_name}</span>
+    <ClassroomTheme cover={parseDescription(classroom.description).cover} className="student-learning-stage @container/homeroom flex w-full min-w-0 flex-col gap-3" data-student-homeroom>
+      {previewLabel && <p className="text-xs text-muted-foreground">{previewLabel}</p>}
+      <div className="grid items-start gap-4 @min-[46rem]/homeroom:grid-cols-[minmax(0,1fr)_14rem] @min-[64rem]/homeroom:grid-cols-[minmax(0,1fr)_16rem]" data-student-homeroom-grid>
+        <div className="flex min-w-0 flex-col gap-4" data-student-homeroom-content>
+          <StudentClassroomHeader classroom={classroom} teacherName={teacherName} studentCount={studentCount} />
+          <ClassroomStream classroomId={classroom.id} canPost={false} initialPosts={posts} variant="panel"
+            maxHeightClass="max-h-[min(28rem,60dvh)]" title="ประกาศจากครูที่ปรึกษา" trackSeen={trackSeen} />
+          <section aria-labelledby="homeroom-classmates-heading" className="min-w-0">
+            <Card data-classroom-panel className="@container/classmates overflow-hidden">
+              <div data-classroom-panel-header className="flex items-center justify-between gap-3 border-b px-4 py-3">
+                <h2 data-classroom-heading id="homeroom-classmates-heading" className="flex items-center gap-2 text-sm font-semibold">
+                  <Users className="size-4" aria-hidden="true" /> เพื่อนร่วมห้อง
+                </h2>
+                <span className="text-xs text-muted-foreground">{classmates.length} คน</span>
               </div>
-            ))}
-          </Card>
-        )}
+              {classmates.length ? (
+                <div className="max-h-[min(22rem,50dvh)] overflow-y-auto px-4 py-2 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                  tabIndex={0} role="region" aria-label="รายชื่อเพื่อนร่วมห้อง เรียงตามเลขที่" data-classmates-scroll>
+                  <ul className="grid gap-x-4 @min-[24rem]/classmates:grid-cols-2 @min-[42rem]/classmates:grid-cols-3">
+                    {classmates.map(student => (
+                      <li key={student.id} className="flex min-w-0 items-start gap-2.5 border-b border-border/60 py-2.5" data-classmate-number={student.class_number ?? ''}>
+                        <span data-classroom-icon className="flex w-11 shrink-0 flex-col items-center rounded-lg bg-primary/10 py-1 text-primary">
+                          <span className="text-[9px] leading-none">เลขที่</span>
+                          <span className="text-sm font-bold tabular-nums">{student.class_number ?? '—'}</span>
+                        </span>
+                        <span className="min-w-0 break-words pt-1 text-sm font-medium">{student.full_name}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : <p className="px-4 py-6 text-center text-sm text-muted-foreground">ยังไม่มีเพื่อนคนอื่นในห้องนี้</p>}
+            </Card>
+          </section>
+        </div>
+        <aside aria-label="ปฏิทินกำหนดส่งงาน" className="min-w-0 self-start @min-[46rem]/homeroom:sticky @min-[46rem]/homeroom:top-0" data-sticky-homeroom-calendar>
+          <AssignmentCalendar events={calendarEvents} initialNow={initialNow} scopeLabel="งานรวมทุกวิชา" />
+        </aside>
       </div>
-
-      {/* Stream — the advisor's channel: attendance, forms, school-wide notices */}
-      <ClassroomStream
-        classroomId={classroom.id}
-        canPost={false}
-        initialPosts={posts}
-        variant="panel"
-        maxHeightClass="max-h-[680px]"
-        title="ประกาศจากครูที่ปรึกษา"
-        trackSeen
-      />
-    </div>
+    </ClassroomTheme>
   )
 }

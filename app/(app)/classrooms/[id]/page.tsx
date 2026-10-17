@@ -7,13 +7,16 @@ import { ClassroomDetailClient } from './_components/classroom-detail-client'
 import { StudentClassroomView, type StudentAssignmentRow } from './_components/student-classroom-view'
 import { HomeroomStudentView } from './_components/homeroom-student-view'
 import { getClassroomPosts, getPostSeenByPost } from '@/lib/actions/classroom-posts'
+import { getClassroomAnnouncementAcknowledgementStatus } from '@/lib/actions/classroom-announcement-acknowledgements'
+import { isAnnouncementAcknowledgementEnabled } from '@/lib/classroom-announcement-acknowledgements'
 import { getHomeroomAggregate } from '@/lib/homeroom-data'
 import { selectOfficialAttempt, rescaleToDisplayMax } from '@/lib/scoring'
 import { isAttemptExpired } from '@/lib/grading'
 import { completionAttemptLimit, findPassingCompletion } from '@/lib/assignment-completion'
-import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
+import { fetchAllRows, fetchRowsInChunks } from '@/lib/supabase/fetch-all-rows'
+import { buildHomeroomClassmates, type HomeroomClassmateUser } from '@/lib/student-homeroom-classmates'
 import type { StudentNoteRow, StudentProfileRow } from './_components/homeroom-overview'
-import type { CalendarEvent } from '@/app/(app)/dashboard/_components/assignment-calendar'
+import { loadStudentLearningCalendar } from '@/lib/student-learning-calendar.server'
 import { linkReachesGroup, type ClassroomGroup } from '@/lib/classroom-groups'
 import type { AssignmentCategory } from '@/lib/assignment-categories'
 import {
@@ -27,6 +30,9 @@ import {
 } from '@/lib/classroom-navigation'
 import { backHrefFromSearchParams } from '@/lib/back-link'
 import { ClassroomRecentViewTracker } from './_components/classroom-recent-view-tracker'
+import { isPracticeLibraryEnabled } from '@/lib/practice-question'
+import { loadClassroomPracticeLibraries } from '@/lib/classroom-practice-libraries.server'
+import { loadClassroomRecentWork } from '@/lib/classroom-recent-work.server'
 
 export default async function ClassroomDetailPage({
   params,
@@ -52,6 +58,7 @@ export default async function ClassroomDetailPage({
 
   const isTeacher = profile?.role === 'teacher' || profile?.role === 'admin'
   const c = classroom as Classroom
+  const showPracticeLibraries = isPracticeLibraryEnabled(process.env) && c.classroom_type === 'subject'
 
   // ─── Student path ─────────────────────────────────────────────────────────
   if (!isTeacher) {
@@ -64,49 +71,34 @@ export default async function ClassroomDetailPage({
     if (!membership) notFound()
 
     // Homeroom rooms have no assignments of their own — a student sees a
-    // personal calendar/compliance view aggregated from their other
+    // personal calendar aggregated from their other
     // (subject) classrooms instead of an assignment list.
     if (c.classroom_type === 'homeroom') {
       const [
         { data: teacherProfile },
         { count: studentCount },
-        { data: classmateRows },
+        classmateResult,
         posts,
-        { assignments, submissions },
+        calendarEvents,
       ] = await Promise.all([
         admin.from('users').select('full_name').eq('id', c.teacher_id).single(),
         admin.from('classroom_students').select('id', { count: 'exact', head: true }).eq('classroom_id', id),
-        admin
-          .from('classroom_students')
-          .select('student_id, users!inner(id, full_name)')
-          .eq('classroom_id', id)
-          .neq('student_id', authUser!.id),
+        fetchAllRows((from, to) => admin.from('classroom_students')
+          .select('student_id, users!classroom_students_student_id_fkey!inner(id, full_name, prefix, first_name, last_name)')
+          .eq('classroom_id', id).neq('student_id', authUser.id).order('student_id').range(from, to)
+          .returns<{ student_id: string; users: HomeroomClassmateUser }[]>()),
         getClassroomPosts(id),
-        getHomeroomAggregate(admin, id, [authUser!.id]),
+        loadStudentLearningCalendar(admin, authUser.id),
       ])
-      const classmates = (classmateRows ?? []).map((m: any) => ({ id: m.users.id as string, full_name: m.users.full_name as string }))
-
-      const now = Date.now()
-      const isDone = (status?: string) => status === 'submitted' || status === 'graded'
-      const bestByAssignment = new Map<string, typeof submissions[number]>()
-      for (const s of submissions) {
-        const prev = bestByAssignment.get(s.assignment_id)
-        if (!prev || (s.total_score ?? -1) > (prev.total_score ?? -1)) bestByAssignment.set(s.assignment_id, s)
-      }
-      const dueAssignments = assignments.filter(a => !a.end_at || new Date(a.end_at).getTime() <= now)
-      const complianceSubmitted = dueAssignments.filter(a => isDone(bestByAssignment.get(a.id)?.status)).length
-      const complianceRate = dueAssignments.length > 0 ? Math.round((complianceSubmitted / dueAssignments.length) * 100) : null
-
-      const calendarEvents: CalendarEvent[] = assignments
-        .filter((a): a is typeof a & { end_at: string } => !!a.end_at)
-        .map(a => ({
-          id: a.id,
-          title: a.title,
-          classroomName: a.classroomName,
-          endAt: a.end_at,
-          done: isDone(bestByAssignment.get(a.id)?.status),
-          submissionId: bestByAssignment.get(a.id)?.id ?? null,
-        }))
+      if (classmateResult.error) throw new Error('โหลดรายชื่อเพื่อนร่วมห้องไม่สำเร็จ')
+      // Membership was verified above. Read only numbers for this room's peers;
+      // no other student profile fields enter the student-facing projection.
+      const numbers = await fetchRowsInChunks(classmateResult.rows.map(row => row.student_id), ids =>
+        admin.from('student_profiles').select('student_id, class_number').in('student_id', ids)
+          .returns<{ student_id: string; class_number: number | null }[]>(),
+      )
+      if (numbers.error) throw new Error('โหลดเลขที่เพื่อนร่วมห้องไม่สำเร็จ')
+      const classmates = buildHomeroomClassmates(classmateResult.rows.map(row => row.users), numbers.rows, authUser.id)
 
       return (
         <HomeroomStudentView
@@ -115,9 +107,6 @@ export default async function ClassroomDetailPage({
           studentCount={studentCount ?? 0}
           classmates={classmates}
           calendarEvents={calendarEvents}
-          complianceRate={complianceRate}
-          complianceSubmitted={complianceSubmitted}
-          complianceTotal={dueAssignments.length}
           posts={posts}
         />
       )
@@ -130,6 +119,7 @@ export default async function ClassroomDetailPage({
       assignmentCategoryRows,
       posts,
       { data: myGroup },
+      practiceLibraries,
     ] = await Promise.all([
       admin.from('users').select('full_name').eq('id', c.teacher_id).single(),
       admin.from('classroom_students').select('id', { count: 'exact', head: true }).eq('classroom_id', id),
@@ -142,6 +132,9 @@ export default async function ClassroomDetailPage({
         .eq('classroom_id', id)
         .eq('student_id', authUser!.id)
         .maybeSingle(),
+      showPracticeLibraries
+        ? loadClassroomPracticeLibraries(supabase, id, 'student_member')
+        : Promise.resolve(null),
     ])
     const assignmentIds = Array.from(new Set((links ?? []).map((l: any) => l.assignment_id)))
     const categoryByAssignment = new Map(
@@ -242,6 +235,7 @@ export default async function ClassroomDetailPage({
         assignments={assignments}
         categories={(assignmentCategoryRows ?? []) as AssignmentCategory[]}
         posts={posts}
+        practiceLibraries={practiceLibraries}
       />
     )
   }
@@ -289,6 +283,7 @@ export default async function ClassroomDetailPage({
     posts,
     { data: groupRows },
     { data: groupMemberRows },
+    practiceLibraries,
   ] = await Promise.all([
     admin
       .from('classroom_co_teachers')
@@ -341,6 +336,11 @@ export default async function ClassroomDetailPage({
           .select('student_id, group_id')
           .eq('classroom_id', id)
       : Promise.resolve({ data: [] as { student_id: string; group_id: string }[] }),
+    showPracticeLibraries
+      ? loadClassroomPracticeLibraries(supabase, id, isOwner ? 'classroom_owner'
+        : myCoTeacherPermission === 'admin' ? 'co_teacher_admin'
+        : myCoTeacherPermission === 'manage' ? 'co_teacher_manage' : 'co_teacher_view')
+      : Promise.resolve(null),
   ])
 
   // Co-teacher roster + active invites
@@ -374,6 +374,9 @@ export default async function ClassroomDetailPage({
   // Assignments linked to this classroom (via assignment_classrooms, not the
   // legacy single classroom_id column, so multi-classroom assignments count too)
   const linkedAssignmentIds = Array.from(new Set((assignmentLinkRows ?? []).map((l: any) => l.assignment_id)))
+  const recentWorkPromise = c.classroom_type === 'subject' && canManage
+    ? loadClassroomRecentWork(supabase, id, authUser.id, linkedAssignmentIds, showPracticeLibraries)
+    : Promise.resolve(null)
   const displayOrderByAssignment = new Map(
     (assignmentLinkRows ?? []).map((l: any) => [l.assignment_id as string, l.display_order as number | null])
   )
@@ -562,7 +565,11 @@ export default async function ClassroomDetailPage({
 
   // Who has seen each announcement. Only the teaching side can read these rows
   // (post_reads_select), and only this side has any use for them.
-  const seenByPost = canManage ? await getPostSeenByPost(posts.map(p => p.id)) : {}
+  const acknowledgementsEnabled = isAnnouncementAcknowledgementEnabled(process.env)
+  const acknowledgementStatus = canManage && acknowledgementsEnabled ? await getClassroomAnnouncementAcknowledgementStatus(id) : {}
+  const displayPosts = canManage && acknowledgementsEnabled
+    ? posts.map(post => ({ ...post, acknowledgementStatus: acknowledgementStatus[post.id] ?? { round: 1, remindedAt: null, studentIds: [] } })) : posts
+  const seenByPost = canManage && !acknowledgementsEnabled ? await getPostSeenByPost(posts.map(p => p.id)) : {}
   const initialNavigationItem = resolveClassroomNavigationKey(
     sp.view,
     classroomNavigationFor(c.classroom_type, canManage),
@@ -585,6 +592,8 @@ export default async function ClassroomDetailPage({
         coTeachers={coTeachers}
         invites={invites}
         classroomAssignments={classroomAssignments}
+        practiceLibraries={practiceLibraries}
+        recentWork={await recentWorkPromise}
         assignmentCategories={assignmentCategories}
         classroomSubmissions={classroomSubmissions}
         classroomExtensions={classroomExtensions}
@@ -593,7 +602,7 @@ export default async function ClassroomDetailPage({
         studentNotes={studentNotes}
         studentProfiles={studentProfiles}
         ownerName={ownerProfile?.full_name ?? 'ครูหลัก'}
-        posts={posts}
+        posts={displayPosts}
         pendingReviewByAssignment={pendingReviewByAssignment}
         seenByPost={seenByPost}
         crossPostTargets={crossPostTargets}

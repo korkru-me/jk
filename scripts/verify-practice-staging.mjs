@@ -77,6 +77,7 @@ const runLabel = runId.replaceAll('-', '').slice(0, 12)
 const createdAccounts = []
 const questionIds = []
 let classroomId = null
+let secondClassroomId = null
 let libraryId = null
 let verified = false
 let deferredManifestPath = null
@@ -180,8 +181,8 @@ async function insertQuestions(ownerId, orgId) {
 
 async function cleanup() {
   let clean = true
-  if (classroomId) {
-    const removedClassroom = await admin.from('classrooms').delete().eq('id', classroomId)
+  for (const id of [classroomId, secondClassroomId].filter(Boolean)) {
+    const removedClassroom = await admin.from('classrooms').delete().eq('id', id)
     if (removedClassroom.error) clean = false
   }
   for (let start = 0; start < questionIds.length; start += 100) {
@@ -244,6 +245,17 @@ try {
     status: 'active',
     classroom_type: 'subject',
   }), 'Could not create synthetic classroom')
+  secondClassroomId = randomUUID()
+  successful(await admin.from('classrooms').insert({
+    id: secondClassroomId,
+    org_id: ownerOrgId,
+    teacher_id: owner.id,
+    name: `Practice QA second room ${runLabel}`,
+    description: 'Synthetic Staging UAT only',
+    class_code: `Q${runLabel.slice(0, 5).toUpperCase()}`,
+    status: 'active',
+    classroom_type: 'subject',
+  }), 'Could not create second synthetic classroom')
   successful(await admin.from('classroom_co_teachers').insert([
     { classroom_id: classroomId, user_id: coAdmin.id, permission: 'admin', invited_by: owner.id },
     { classroom_id: classroomId, user_id: coManage.id, permission: 'manage', invited_by: owner.id },
@@ -259,17 +271,61 @@ try {
   ]), 'Could not configure synthetic student profiles')
 
   await insertQuestions(owner.id, ownerOrgId)
-  const createdLibrary = await owner.client.rpc('create_practice_library', {
+  const createdLibrary = await owner.client.rpc('create_practice_libraries_for_classrooms', {
     p_org_id: ownerOrgId,
-    p_classroom_id: classroomId,
+    p_classroom_ids: [classroomId, secondClassroomId],
     p_title: `Practice QA ${runLabel} 1,000 questions`,
     p_description: 'Synthetic Staging UAT only',
     p_reveal_answer_key: false,
+    p_access_code: 'SYNTHETIC-QA',
+    p_calculator_enabled: true,
+    p_scratchpad_enabled: true,
+    p_shuffle_questions: false,
+    p_shuffle_options: true,
     p_question_ids: questionIds,
     p_publish: true,
   })
   libraryId = successful(createdLibrary, 'Could not create published practice library')
   assert(typeof libraryId === 'string', 'Practice library id was not returned')
+  const createdRooms = successful(await owner.client.from('practice_libraries')
+    .select('id, classroom_id, access_code, calculator_enabled, scratchpad_enabled, shuffle_questions, shuffle_options')
+    .in('classroom_id', [classroomId, secondClassroomId]), 'Could not read created room settings')
+  assert(createdRooms.length === 2 && createdRooms.some(row => row.id === libraryId
+    && row.classroom_id === classroomId), 'Multi-room creation did not return the primary library')
+  assert(createdRooms.every(row => row.access_code === 'SYNTHETIC-QA'
+    && row.calculator_enabled === true && row.scratchpad_enabled === true
+    && row.shuffle_questions === false && row.shuffle_options === true),
+  'Created practice settings were not persisted in both rooms')
+  for (const row of createdRooms) {
+    const memberships = await owner.client.from('practice_library_questions')
+      .select('question_id', { count: 'exact', head: true }).eq('library_id', row.id)
+    assert(!memberships.error && memberships.count === questionIds.length,
+      'Multi-room creation did not preserve every question in both rooms')
+  }
+  const compatibilityDraft = successful(await owner.client.rpc('create_practice_libraries_for_classrooms', {
+    p_org_id: ownerOrgId, p_classroom_ids: [classroomId],
+    p_title: `Practice QA compatibility ${runLabel}`, p_description: null,
+    p_reveal_answer_key: false, p_access_code: 'KEEP-QA',
+    p_calculator_enabled: true, p_scratchpad_enabled: false,
+    p_shuffle_questions: true, p_shuffle_options: false,
+    p_question_ids: [questionIds[0]], p_publish: false,
+  }), 'Could not create compatibility draft')
+  const oldEditorCount = successful(await coManage.client.rpc('update_practice_library_draft', {
+    p_library_id: compatibilityDraft, p_title: `Practice QA previous editor ${runLabel}`,
+    p_description: null, p_reveal_answer_key: true, p_question_ids: [questionIds[0]],
+  }), 'Previous editor could not save the compatibility draft')
+  assert(Number(oldEditorCount) === 1, 'Previous editor membership count was incorrect')
+  const oldEditorSettings = successful(await owner.client.from('practice_libraries')
+    .select('access_code, calculator_enabled, scratchpad_enabled, shuffle_questions, shuffle_options')
+    .eq('id', compatibilityDraft).single(), 'Could not read compatibility draft settings')
+  assert(oldEditorSettings.access_code === 'KEEP-QA' && oldEditorSettings.calculator_enabled === true
+    && oldEditorSettings.scratchpad_enabled === false && oldEditorSettings.shuffle_questions === true
+    && oldEditorSettings.shuffle_options === false, 'Previous editor overwrote new settings')
+  const deniedOldEditor = await coView.client.rpc('update_practice_library_draft', {
+    p_library_id: compatibilityDraft, p_title: 'Forbidden QA', p_description: null,
+    p_reveal_answer_key: false, p_question_ids: [questionIds[0]],
+  })
+  assert(deniedOldEditor.error?.code === '42501', 'View-only previous editor access was not denied')
 
   const anonymousRead = await anonymous.from('practice_libraries').select('id').eq('id', libraryId)
   assert(anonymousRead.error?.code === '42501', 'Anonymous practice read was not denied')
@@ -282,6 +338,30 @@ try {
   'Roster student library read failed')
   assert(studentRead.length === 1 && studentRead[0].status === 'published',
     'Roster student could not see the published practice library')
+
+  // The classroom page reads safe metadata through the actor's session and
+  // counts memberships in PostgREST, without loading question/answer payloads.
+  for (const account of [owner, coAdmin, coManage, coView, studentA, studentB, outsider, foreignTeacher]) {
+    const studentView = [studentA, studentB, outsider].includes(account)
+    let listQuery = account.client.from('practice_libraries')
+      .select('id, title, status, practice_library_questions(count)')
+      .eq('classroom_id', classroomId)
+    if (studentView) listQuery = listQuery.eq('status', 'published')
+    const list = successful(await listQuery.order('updated_at', { ascending: false })
+      .order('id', { ascending: false }).range(0, 999), 'Classroom practice metadata read failed')
+    const expected = [outsider, foreignTeacher].includes(account) ? 0 : studentView ? 1 : 2
+    assert(list.length === expected, 'Classroom list crossed an actor/status boundary')
+    assert(list.every(row => Object.keys(row).every(key =>
+      ['id', 'title', 'status', 'practice_library_questions'].includes(key))),
+    'Classroom list included fields outside the metadata allowlist')
+    if (list.length) {
+      assert(list.find(row => row.id === libraryId)?.practice_library_questions[0]?.count === 1000,
+        'Classroom list lost memberships in its aggregate count')
+    }
+  }
+  const anonymousList = await anonymous.from('practice_libraries')
+    .select('id, title, status, practice_library_questions(count)').eq('classroom_id', classroomId)
+  assert(anonymousList.error || anonymousList.data.length === 0, 'Anonymous classroom list was readable')
 
   const startedAt = process.hrtime.bigint()
   const search = await admin.rpc('search_practice_library_questions', {
@@ -395,6 +475,77 @@ try {
     && !('is_correct' in attempted) && !('score' in attempted),
   'Teacher detail exposed unsafe data or returned the wrong count')
 
+  if (args.has('--personal-exercises')) {
+    const exerciseId = randomUUID()
+    const members = questionIds.slice(0, 3)
+    const actor = { p_actor_id: studentA.id, p_library_id: libraryId }
+    const create = { ...actor, p_id: exerciseId, p_title: 'Synthetic private exercise', p_question_ids: members }
+    successful(await admin.rpc('create_student_practice_exercise', create), 'Personal exercise creation failed')
+    successful(await admin.rpc('create_student_practice_exercise', create), 'Personal exercise retry failed')
+    const groups = successful(await admin.rpc('list_student_practice_exercises', actor), 'Personal exercise list failed')
+    assert(groups.length === 1 && groups[0].revision === 1 && groups[0].question_ids.length === 3,
+      'Personal exercise creation was duplicated or lost members')
+    const peerGroups = successful(await admin.rpc('list_student_practice_exercises', {
+      ...actor, p_actor_id: studentB.id,
+    }), 'Peer personal exercise list failed')
+    assert(peerGroups.length === 0, 'Personal group leaked to a classmate')
+    const page = successful(await admin.rpc('get_student_practice_exercise_questions', {
+      ...actor, p_exercise_id: exerciseId, p_limit: 2, p_offset: 0,
+    }), 'Personal exercise pagination failed')
+    assert(page.length === 2 && Number(page[0].total_count) === 3, 'Personal exercise pagination/count differs')
+    const peerPage = await admin.rpc('get_student_practice_exercise_questions', {
+      ...actor, p_actor_id: studentB.id, p_exercise_id: exerciseId, p_limit: 2, p_offset: 0,
+    })
+    assert(peerPage.error?.code === '42501', 'A peer could open another student group')
+    const outsiderGroup = await admin.rpc('create_student_practice_exercise', {
+      ...create, p_actor_id: outsider.id, p_id: randomUUID(),
+    })
+    assert(outsiderGroup.error?.code === '42501', 'An outsider could create a personal exercise')
+    const edit = { ...actor, p_id: exerciseId, p_title: 'Synthetic revised exercise',
+      p_question_ids: members.slice(0, 2), p_expected_revision: 1 }
+    assert(successful(await admin.rpc('update_student_practice_exercise', edit), 'Exercise update failed') === 2,
+      'Exercise revision did not advance')
+    assert(successful(await admin.rpc('update_student_practice_exercise', edit), 'Exercise update retry failed') === 2,
+      'Idempotent update advanced revision')
+    const stale = await admin.rpc('update_student_practice_exercise', { ...edit, p_title: 'Stale update' })
+    assert(stale.error?.code === 'PT409', 'A stale edit overwrote the current exercise')
+    const pin = { ...actor, p_question_id: firstQuestionId, p_pinned: true }
+    successful(await admin.rpc('set_student_practice_review_pin', pin), 'Review pin failed')
+    successful(await admin.rpc('set_student_practice_review_pin', pin), 'Review pin retry failed')
+    const pins = successful(await admin.rpc('list_student_practice_review_pins', actor), 'Review pin list failed')
+    assert(pins.length === 1 && pins[0].question_id === firstQuestionId, 'Review pin was duplicated')
+    const pinnedQuestions = successful(await admin.rpc('search_student_practice_review_questions', {
+      ...actor, p_terms: [], p_tags: [], p_limit: 24, p_offset: 0,
+    }), 'Pinned question search failed')
+    assert(pinnedQuestions.length === 1 && pinnedQuestions[0].question_id === firstQuestionId,
+      'Pinned question search returned another scope')
+    const peerPins = successful(await admin.rpc('list_student_practice_review_pins', {
+      ...actor, p_actor_id: studentB.id,
+    }), 'Peer pin list failed')
+    assert(peerPins.length === 0, 'Review pins leaked to a classmate')
+    const direct = await studentA.client.from('student_practice_exercises').select('id')
+    assert(direct.error?.code === '42501' || direct.data?.length === 0, 'Browser bypassed the server-only table boundary')
+    const spoof = await studentB.client.rpc('list_student_practice_exercises', actor)
+    assert(spoof.error?.code === '42501', 'Browser could spoof the student on a privileged RPC')
+    successful(await admin.rpc('set_student_practice_review_pin', { ...pin, p_pinned: false }), 'Unpin failed')
+    assert(successful(await admin.rpc('list_student_practice_review_pins', actor), 'Unpin verification failed').length === 0,
+      'Unpin did not persist')
+    const roomLibraries = successful(await admin.from('practice_libraries').select('id').eq('classroom_id', classroomId),
+      'Could not load synthetic room work')
+    const workIds = roomLibraries.map(row => `practice:${row.id}`).toReversed()
+    successful(await admin.rpc('reorder_classroom_work', {
+      p_actor_id: owner.id, p_classroom_id: classroomId, p_work_ids: workIds,
+    }), 'Practice ordering failed')
+    const ordered = successful(await admin.from('practice_libraries').select('id,display_order').eq('classroom_id', classroomId),
+      'Practice order verification failed')
+    assert(ordered.every(row => row.display_order === workIds.indexOf(`practice:${row.id}`) + 1),
+      'Practice order was not persisted')
+    const forbiddenOrder = await admin.rpc('reorder_classroom_work', {
+      p_actor_id: outsider.id, p_classroom_id: classroomId, p_work_ids: workIds,
+    })
+    assert(forbiddenOrder.error?.code === '42501', 'An outsider could reorder classroom work')
+  }
+
   const frozenMembership = await owner.client
     .from('practice_library_questions')
     .delete()
@@ -434,6 +585,7 @@ try {
       runId,
       runLabel,
       classroomId,
+      secondClassroomId,
       libraryId,
       questionIds,
       accounts: createdAccounts.map(account => ({
@@ -458,11 +610,16 @@ try {
     elapsedMs: Number(elapsedMs.toFixed(2)),
     checks: [
       'authenticated role matrix',
+      'classroom metadata list, exact counts, role/status isolation and safe projection',
+      'multi-classroom creation with 1,000 questions and persisted settings',
+      'previous editor compatibility preserves settings and permissions',
       'tag AND plus pagination',
       'idempotent append-only progress',
       'student progress isolation',
       'teacher-safe progress DTO',
       'published membership freeze',
+      ...(args.has('--personal-exercises') ? ['private exercise create/edit/pagination and stale-write protection',
+        'private review pin/search/unpin', 'peer/outsider/browser-spoof denial', 'persisted practice order and authorization'] : []),
       ...(!keepForBrowser ? ['closed-library denial'] : []),
     ],
   }))

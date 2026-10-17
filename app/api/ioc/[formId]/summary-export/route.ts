@@ -1,7 +1,7 @@
 import { getAuthUser } from '@/lib/auth/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { encodeRfc5987Filename } from '@/lib/exam-proctor-report'
+import { encodeRfc5987Filename } from '@/lib/download-filename'
 import { formatIocIndex, summarizeIocForm, type IocScore } from '@/lib/ioc'
 import { formatStandardLabel } from '@/lib/ioc-form'
 import {

@@ -1,9 +1,13 @@
+import { WorkTypeBadge } from '@/components/assignments/work-type'
 import { createClient } from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/auth/server'
 import { fetchBankQuestions, withQuestionPoints } from '@/lib/question-bank'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronLeft, FileText, Timer } from 'lucide-react'
+import { ClassroomWorkHeader } from '@/components/assignments/classroom-work-header'
+import { Badge } from '@/components/ui/badge'
+import { assignmentSizeLabel } from '@/lib/assignment-size-label'
 import { EditAssignmentForm } from '@/components/assignments/edit-assignment-form'
 import type { EditableAssignment, EditableAssignmentQuestion } from '@/components/assignments/edit-assignment-form'
 import type { CountableQuestion } from '@/lib/question-parts'
@@ -36,7 +40,7 @@ export default async function EditAssignmentPage({
   // unauthorized and is handled by notFound() below.
   const assignmentQuery = supabase
     .from('assignments')
-    .select('id, org_id, classroom_id, created_by, status, title, description, question_ids, question_points, display_max_score, start_at, due_at, late_bands, end_at, duration_minutes, max_attempts, mode, type, score_strategy, retry_scope, questions_per_page, instant_check, instant_check_answer_key, completion_rule, streak_target, streak_question_cap, streak_recycle_pool, passing_type, passing_value, show_results, show_solutions, sections, show_sections, shuffle_questions, shuffle_options, access_code, proctoring_enabled, fullscreen_required, block_clipboard, random_question_count, shared_random_seed, exam_watermark_enabled, require_work_image, calculator_enabled, scratchpad_enabled, secure_browser_mode, android_exam_mode, classrooms(name)')
+    .select('id, org_id, classroom_id, created_by, status, title, description, question_ids, question_points, display_max_score, start_at, due_at, late_bands, end_at, duration_minutes, max_attempts, mode, type, score_strategy, retry_scope, questions_per_page, instant_check, instant_check_answer_key, completion_rule, streak_target, streak_question_cap, streak_recycle_pool, passing_type, passing_value, show_results, show_solutions, sections, show_sections, shuffle_questions, shuffle_options, access_code, proctoring_enabled, fullscreen_required, block_clipboard, random_question_count, shared_random_seed, exam_watermark_enabled, require_work_image, calculator_enabled, scratchpad_enabled, secure_browser_mode, android_exam_mode, classrooms(name, description)')
     .eq('id', id)
     .maybeSingle()
 
@@ -88,7 +92,7 @@ export default async function EditAssignmentPage({
   const duplicateQuestionCount = Math.max(0, a.question_ids.length - uniqueQuestionCount)
 
   return (
-    <div className="assignment-edit-stage flex max-w-5xl flex-col gap-6">
+    <div className="assignment-edit-stage flex max-w-5xl flex-col gap-4">
       <AssignmentEditSidebar
         assignment={assignment as unknown as AssignmentSidebarSummary}
         availableQuestionCount={questions.length}
@@ -100,12 +104,14 @@ export default async function EditAssignmentPage({
         <ChevronLeft className="w-4 h-4" /> กลับไปหน้า{a.type === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'}
       </Link>
 
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">
-          {a.type === 'exam' ? 'ตั้งค่าข้อสอบ' : 'ตั้งค่าแบบฝึกหัด'}
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">{a.title}</p>
-      </div>
+      <ClassroomWorkHeader kind="assignment" title={a.title}
+        classroom={(assignment as unknown as { classrooms: { name: string; description: string | null } | null }).classrooms}
+        badges={<><WorkTypeBadge type={a.type} /><Badge variant={a.status === 'published' ? 'statusSuccess' : 'secondary'}>{a.status === 'published' ? 'เผยแพร่แล้ว' : a.status === 'closed' ? 'ปิดแล้ว' : 'ร่าง'}</Badge></>}
+        details={[
+          { label: 'โจทย์', value: assignmentSizeLabel(a), icon: FileText },
+          { label: 'เวลาทำ', value: a.duration_minutes === null ? 'ไม่จำกัด' : `${a.duration_minutes} นาที`, icon: Timer },
+        ]}
+      />
 
       {groupTargeting.classrooms.length > 0 && (
         <AssignmentGroupTargetsCard

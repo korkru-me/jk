@@ -12,13 +12,13 @@ vi.mock('@/lib/exam-access-session', () => ({ getExamAccessSession: m.access }))
 vi.mock('@/lib/seb-assignment-release.server', () => ({ readCurrentAssignmentSebRelease: m.release, createAssignmentSebSignedDownloadUrl: async () => 'https://synthetic.invalid/seed.seb' }))
 vi.mock('@/lib/seb-session', () => ({ createSebChallenge: () => 'challenge', validateSebChallenge: () => null, getSebSession: vi.fn() }))
 
-import { readSubmissionEntry, startAssignmentFromWaiting as startExamFromWaiting } from './submissions'
+import { readSubmissionEntry, startAssignmentFromWaiting as startExamFromWaiting, finalizeExpiredSubmission, submitSubmission } from './submissions'
 import { waitingResumeId, type ExamWaitingSummary } from '@/lib/exam-waiting-room'
 
 /** Real entry/action/grading/snapshot code; external Auth/DB/native boundaries
  * are mocked. This is not hosted, RLS, transactional or native-SEB proof. */
 type Row = Record<string, unknown>
-type Result = { data: Row[] | null; error: { message: string } | null }
+type Result = { data: Row[] | null; error: { message: string; code?: string } | null }
 const A = '30000000-0000-4000-8000-000000000001'
 const S = '70000000-0000-4000-8000-000000000001'
 const Q = '60000000-0000-4000-8000-000000000001'
@@ -29,6 +29,7 @@ let writes: { table: string; operation: string; row: Row }[]
 let reads: string[]
 let readFailure: string | null
 let writeFailure: string | null
+let revisionColumnMissing = false
 
 class Query implements PromiseLike<Result> {
   private fields = ''
@@ -48,6 +49,7 @@ class Query implements PromiseLike<Result> {
   insert(rows: Row | Row[]) { this.rowsToInsert = Array.isArray(rows) ? rows : [rows]; return this }
   update(row: Row) { this.changes = row; return this }
   private result(): Result {
+    if (revisionColumnMissing && this.fields.includes('seb_config_revision')) return { data: null, error: { code: '42703', message: 'column submissions.seb_config_revision does not exist' } }
     if (readFailure === this.table && !this.rowsToInsert && !this.changes) return { data: null, error: { message: 'synthetic read failure' } }
     if (this.rowsToInsert) {
       if (writeFailure === this.table) return { data: null, error: { message: 'synthetic write failure' } }
@@ -95,6 +97,7 @@ async function summary() {
 }
 
 beforeEach(() => {
+  revisionColumnMissing = false
   vi.clearAllMocks()
   vi.useFakeTimers(); vi.setSystemTime(NOW)
   vi.stubGlobal('fetch', vi.fn(() => { throw new Error('Unexpected external network') }))
@@ -111,7 +114,23 @@ beforeEach(() => {
     exam_proctor_connections: [], exam_proctor_sessions: [],
   }
   m.client.mockResolvedValue({ auth: { getUser: async () => ({ data: { user: { id: USER } } }) } })
-  m.admin.mockReturnValue({ from: (table: string) => new Query(table) })
+  m.admin.mockReturnValue({ from: (table: string) => new Query(table), rpc: async (name: string, args: Row) => {
+    const row = db.submissions.find(s => s.id === args.p_submission_id && s.student_id === args.p_student_id)
+    if (!row) return { data: null, error: { code: '42501' } }
+    if (writeFailure === 'submissions') return { data: null, error: { message: 'synthetic write failure' } }
+    if (row.status !== 'in_progress') return { data: { completed: true, total_score: row.total_score }, error: null }
+    if (name === 'claim_submission_close') {
+      row.closed_at = new Date(NOW).toISOString()
+      writes.push({ table: 'submissions', operation: 'update', row: { closed_at: row.closed_at } })
+      return { data: { completed: false }, error: null }
+    }
+    if (name === 'commit_submission_grade') {
+      Object.assign(row, { status: 'submitted', total_score: 0, submitted_at: row.closed_at })
+      writes.push({ table: 'submissions', operation: 'update', row: { status: 'submitted' } })
+      return { data: { total_score: 0 }, error: null }
+    }
+    throw new Error('unexpected RPC')
+  } })
   m.membership.mockResolvedValue(true)
   m.access.mockResolvedValue(null)
   m.release.mockResolvedValue({ releaseId: 'synthetic-release', revision: 1 })
@@ -123,13 +142,33 @@ afterEach(() => { expect(fetch).not.toHaveBeenCalled(); vi.unstubAllGlobals(); v
 
 describe.each(['exam', 'exercise'])('question-free %s entry', type => {
   beforeEach(() => { db.assignments[0].type = type })
+  it('returns only an idempotent receipt, never a hidden score, for completed rounds', async () => {
+    db.assignments[0].show_results = 'hidden'
+    db.submissions = [attempt({ status: 'submitted', total_score: 9 })]
+    expect(await finalizeExpiredSubmission(S)).toEqual({ success: true })
+    expect(await submitSubmission(S)).toEqual({ success: true })
+    expect(writes).toEqual([])
+  })
+  it('opens the waiting room against the legacy production schema without writes', async () => {
+    revisionColumnMissing = true
+    expect((await summary()).assignmentType).toBe(type)
+    noExamMutation()
+  })
+  it('retains the SEB gate when revision metadata is unavailable', async () => {
+    revisionColumnMissing = true
+    db.assignments[0].secure_browser_mode = 'seb_required'
+    m.access.mockResolvedValue({ mode: 'seb', assignmentConfigRevision: 1 })
+    expect(await readSubmissionEntry(A)).toHaveProperty('error', 'ข้อสอบนี้ยังไม่พร้อมให้เข้า กรุณาแจ้งครูผู้สอน')
+    noExamMutation()
+    expect(m.access).not.toHaveBeenCalled()
+  })
   it('GET/prefetch reads safe metadata without allocating, revealing questions or starting time', async () => {
     const first = await summary()
     vi.setSystemTime(NOW + 20 * 60_000)
-    expect(await summary()).toEqual(first)
+    expect(await summary()).toEqual({ ...first, serverNow: new Date(NOW + 20 * 60_000).toISOString() })
     expect(Object.keys(first).sort()).toEqual(['title', 'description', 'durationMinutes', 'questionCount', 'endAt',
       'accessMode', 'requiresAccessCode', 'previousSubmissionId', 'activeSubmissionId', 'completedSubmissionId',
-      'expired', 'startedAt', 'blockedReason', 'assignmentType', ...(type === 'exercise' ? ['exerciseDetails'] : [])].sort())
+      'expired', 'startedAt', 'blockedReason', 'assignmentType', 'expiresAt', 'serverNow', 'closeReason', 'finishedSubmissionId', ...(type === 'exercise' ? ['exerciseDetails'] : [])].sort())
     expect(first.assignmentType).toBe(type)
     expect(JSON.stringify(first)).not.toMatch(/must-not-serialize|question_ids|correct_answer|private_secret|access_code|total_score/)
     expect(first.startedAt).toBeNull(); expect(db.submissions).toEqual([])
@@ -161,6 +200,7 @@ describe.each(['exam', 'exercise'])('question-free %s entry', type => {
     expect((await summary()).completedSubmissionId).toBe(S)
     db.submissions[0].attempt_number = 1
     expect((await summary()).completedSubmissionId).toBeNull()
+    expect((await summary()).finishedSubmissionId).toBe(S)
     noExamMutation()
   })
   it('recognizes an older passing threshold run without exposing scores', async () => {
@@ -187,7 +227,7 @@ describe.each(['exam', 'exercise'])('question-free %s entry', type => {
     db.assignments[0].end_at = new Date(NOW - 60_000).toISOString()
     db.submissions = [attempt()]
     const view = await summary()
-    expect(view.blockedReason).toContain('หมดเวลา'); expect(waitingResumeId(view, S)).toBeNull()
+    expect(view.expired).toBe(true); expect(view.blockedReason).toBeNull(); expect(waitingResumeId(view, S)).toBeNull()
     noExamMutation()
   })
   it('respects an individual deadline extension', async () => {
@@ -224,6 +264,14 @@ describe.each(['exam', 'exercise'])('question-free %s entry', type => {
 
 describe.each(['exam', 'exercise'])('deliberate %s waiting-room POST', type => {
   beforeEach(() => { db.assignments[0].type = type })
+  it('starts and resumes browser work after the explicit click on the legacy schema', async () => {
+    revisionColumnMissing = true
+    await summary(); noExamMutation()
+    expect(await startExamFromWaiting(A, null, 'start')).toHaveProperty('submissionId', S)
+    expect(await startExamFromWaiting(A, S, 'resume')).toHaveProperty('submissionId', S)
+    expect(db.submissions).toHaveLength(1)
+    expect(db.submission_answers).toHaveLength(1)
+  })
   it('keeps the adjusted passing receipt on explicit start without allocating a retry', async () => {
     Object.assign(db.assignments[0], { passing_type: 'percent', passing_value: 70 })
     db.submissions = [attempt({ status: 'graded', total_score: 6, score_adjustment: 2, max_score: 10 })]
@@ -267,8 +315,9 @@ describe.each(['exam', 'exercise'])('deliberate %s waiting-room POST', type => {
     expect(db.submissions[0].status).toBe('in_progress')
     writeFailure = null; writes = []; reads = []
     db.assignments[0].end_at = new Date(NOW - 60_000).toISOString()
-    expect(await startExamFromWaiting(A, S, 'recover')).toEqual({ error: 'หมดเวลาส่งแล้ว' })
-    noExamMutation()
+    expect(await startExamFromWaiting(A, S, 'recover')).toEqual({ submissionId: S, alreadySubmitted: true })
+    expect(db.submissions).toHaveLength(1)
+    expect(db.submissions[0].status).toBe('submitted')
   })
   it('rejects unknown assignment types without mutation', async () => {
     db.assignments[0].type = 'unknown'

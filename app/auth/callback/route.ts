@@ -2,18 +2,47 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { cookies } from 'next/headers'
+import { issueRecoveryGrant } from '@/lib/auth/recovery-grant.server'
+import { consumeRecoveryIntent, hasRecoveryIntentNonce } from '@/lib/auth/recovery-intent.server'
+
+function recoveryRedirect(origin: string) {
+  const response = NextResponse.redirect(`${origin}/reset-password`)
+  response.headers.set('Cache-Control', 'no-store')
+  response.headers.set('Referrer-Policy', 'no-referrer')
+  return response
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
   const requestedNext = searchParams.get('next')
   const requestedRole = searchParams.get('role')
+  const signupFlow = searchParams.get('flow') === 'signup'
+  const recoveryNonce = searchParams.get('recovery_nonce')
+  const recoveryFlow = requestedNext === '/reset-password'
+  const failedPath = signupFlow || searchParams.get('error_code') === 'otp_expired'
+    ? '/check-email?error=link_invalid'
+    : '/login?error=auth_failed'
   const next = requestedNext?.startsWith('/') && !requestedNext.startsWith('//')
+    && !/[\\\u0000-\u001f]/.test(requestedNext)
     ? requestedNext
     : '/dashboard'
 
   if (!code) {
-    return NextResponse.redirect(`${origin}/login?error=missing_code`)
+    if (recoveryFlow || recoveryNonce !== null) return recoveryRedirect(origin)
+    return NextResponse.redirect(`${origin}${failedPath}`)
+  }
+
+  if (recoveryFlow || recoveryNonce !== null) {
+    // The URL's `next` value and the SDK's mutable redirectType do not prove
+    // email ownership. Reject before exchanging a code without its email nonce.
+    try {
+      if (!recoveryFlow || signupFlow || !recoveryNonce || !(await hasRecoveryIntentNonce(recoveryNonce))) {
+        return recoveryRedirect(origin)
+      }
+    } catch {
+      return recoveryRedirect(origin)
+    }
   }
 
   const cookieStore = await cookies()
@@ -34,7 +63,22 @@ export async function GET(request: NextRequest) {
   const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
   if (error || !data.user) {
-    return NextResponse.redirect(`${origin}/login?error=auth_failed`)
+    if (recoveryFlow) return recoveryRedirect(origin)
+    return NextResponse.redirect(`${origin}${failedPath}`)
+  }
+
+  // A successful exchange must also match the recipient and secret email nonce
+  // in this browser's signed intent before granting password recovery.
+  if (next === '/reset-password') {
+    try {
+      if (!data.session || !recoveryNonce || !(await consumeRecoveryIntent(recoveryNonce, data.user.email ?? '', data.user.id))) {
+        return recoveryRedirect(origin)
+      }
+      await issueRecoveryGrant(data.user.id, data.session.access_token)
+    } catch {
+      return recoveryRedirect(origin)
+    }
+    return recoveryRedirect(origin)
   }
 
   // Ensure profile row exists (first Google login creates it)
@@ -64,10 +108,6 @@ export async function GET(request: NextRequest) {
         p_display_name: fullName,
       })
     }
-  }
-
-  if (next === '/reset-password') {
-    return NextResponse.redirect(`${origin}/reset-password`)
   }
 
   if (profile && profile.role !== 'admin' && !profile.survey_role) {

@@ -4,6 +4,11 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { isAuthRetryableFetchError } from '@supabase/supabase-js'
+import { reserveAuthEmail } from '@/lib/auth/email-request-limit.server'
+import { rememberSignupEmail } from '@/lib/auth/signup-email.server'
+import { POLICY_VERSION } from '@/lib/legal'
+import { clearRecoveryGrant, hasRecoveryGrant } from '@/lib/auth/recovery-grant.server'
+import { clearRecoveryIntent, issueRecoveryIntent } from '@/lib/auth/recovery-intent.server'
 import {
   completeProfileSchema,
   emailSchema,
@@ -21,6 +26,19 @@ function authConnectionError(error: unknown) {
   return isAuthRetryableFetchError(error)
     ? 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่'
     : null
+}
+
+function emailCallbackUrl(flow: 'signup' | 'recovery' | 'login') {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
+  if (!siteUrl) return null
+  try {
+    const url = new URL('/auth/callback', siteUrl)
+    if (flow === 'recovery') url.searchParams.set('next', '/reset-password')
+    if (flow === 'signup') url.searchParams.set('flow', 'signup')
+    return url.toString()
+  } catch {
+    return null
+  }
 }
 
 export async function login(_prevState: unknown, formData: FormData) {
@@ -92,21 +110,31 @@ export async function register(formData: FormData) {
     full_name: formData.get('full_name'),
     email: formData.get('email'),
     password: formData.get('password'),
+    confirm_password: formData.get('confirm_password'),
+    accept_terms: formData.get('accept_terms') === 'true',
   })
   if (!parsed.success) return { error: validationMessage(parsed.error.issues) }
 
   const { email, password, full_name, role } = parsed.data
   const instructor_type = role === 'teacher' ? 'teacher' : null
+  const callbackUrl = emailCallbackUrl('signup')
+  if (!callbackUrl) return { error: 'ระบบสมัครสมาชิกยังไม่พร้อมใช้งาน กรุณาติดต่อผู้ดูแล KorKru' }
+  const limit = await reserveAuthEmail(email)
+  if (!limit.allowed) return { error: limit.error, retryAfterSeconds: limit.retryAfterSeconds }
 
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
+      emailRedirectTo: callbackUrl,
       data: {
         full_name,
         role,
         instructor_type,
         survey_role: role,
+        terms_version: POLICY_VERSION,
+        privacy_version: POLICY_VERSION,
+        terms_acknowledged_at: new Date().toISOString(),
       },
     },
   })
@@ -114,16 +142,28 @@ export async function register(formData: FormData) {
   if (error) {
     const connectionError = authConnectionError(error)
     if (connectionError) return { error: connectionError }
-    return { error: error.message }
+    if (error.code !== 'user_already_exists') {
+      return { error: error.code === 'over_email_send_rate_limit'
+        ? 'มีคำขอส่งอีเมลถี่เกินไป กรุณารอสักครู่แล้วลองใหม่'
+        : 'ยังสมัครสมาชิกไม่ได้ กรุณาตรวจสอบข้อมูลแล้วลองใหม่ หรือติดต่อผู้ดูแล KorKru' }
+    }
   }
 
-  return { success: true, signedIn: Boolean(data.session) }
+  await rememberSignupEmail(email)
+  return { success: true, signedIn: Boolean(data.session), email, retryAfterSeconds: 60 }
 }
 
-export async function loginWithGoogle(role?: AccountRole) {
+export async function loginWithGoogle(role?: AccountRole, acceptTerms?: boolean) {
+  if (role !== undefined && (role !== 'teacher' && role !== 'student')) {
+    return { error: 'กรุณาเลือกว่าคุณเป็นครูหรือนักเรียน' }
+  }
+  if (role && acceptTerms !== true) {
+    return { error: 'กรุณายอมรับข้อกำหนดและรับทราบนโยบายความเป็นส่วนตัว' }
+  }
   const supabase = await createClient()
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
-  const callbackUrl = new URL('/auth/callback', siteUrl)
+  const configuredCallback = emailCallbackUrl('login')
+  if (!configuredCallback) return { error: 'ระบบเข้าสู่ระบบยังไม่พร้อมใช้งาน กรุณาติดต่อผู้ดูแล KorKru' }
+  const callbackUrl = new URL(configuredCallback)
   if (role === 'teacher' || role === 'student') callbackUrl.searchParams.set('role', role)
 
   const { data, error } = await supabase.auth.signInWithOAuth({
@@ -143,14 +183,17 @@ export async function loginWithGoogle(role?: AccountRole) {
 
 export async function sendMagicLink(email: string) {
   const supabase = await createClient()
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
   const parsed = emailSchema.safeParse(email)
   if (!parsed.success) return { error: validationMessage(parsed.error.issues) }
+  const callbackUrl = emailCallbackUrl('login')
+  if (!callbackUrl) return { error: 'ระบบส่งอีเมลยังไม่พร้อมใช้งาน กรุณาติดต่อผู้ดูแล KorKru' }
+  const limit = await reserveAuthEmail(parsed.data)
+  if (!limit.allowed) return { error: limit.error, retryAfterSeconds: limit.retryAfterSeconds }
 
   const { error } = await supabase.auth.signInWithOtp({
     email: parsed.data,
     options: {
-      emailRedirectTo: `${siteUrl}/auth/callback`,
+      emailRedirectTo: callbackUrl,
       shouldCreateUser: false,
     },
   })
@@ -163,30 +206,69 @@ export async function sendMagicLink(email: string) {
   return { success: true }
 }
 
-export async function forgotPassword(email: string) {
+export async function forgotPassword(email: string, expectedUserId?: string) {
   const supabase = await createClient()
   const parsed = emailSchema.safeParse(email)
   if (!parsed.success) return { error: validationMessage(parsed.error.issues) }
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
-  const callbackUrl = new URL('/auth/callback', siteUrl)
-  callbackUrl.searchParams.set('next', '/reset-password')
+  const callbackUrl = emailCallbackUrl('recovery')
+  if (!callbackUrl) return { error: 'ระบบส่งอีเมลยังไม่พร้อมใช้งาน กรุณาติดต่อผู้ดูแล KorKru' }
+  const limit = await reserveAuthEmail(parsed.data)
+  if (!limit.allowed) return { error: limit.error, retryAfterSeconds: limit.retryAfterSeconds }
 
-  const { error } = await supabase.auth.resetPasswordForEmail(parsed.data, {
-    redirectTo: callbackUrl.toString(),
+  try {
+    const nonce = await issueRecoveryIntent(parsed.data, expectedUserId)
+    if (!nonce) return { error: 'ระบบส่งลิงก์ตั้งรหัสผ่านยังไม่พร้อมใช้งาน กรุณาลองใหม่ภายหลังหรือติดต่อผู้ดูแล KorKru' }
+    const redirectUrl = new URL(callbackUrl)
+    redirectUrl.searchParams.set('recovery_nonce', nonce)
+    const { error } = await supabase.auth.resetPasswordForEmail(parsed.data, {
+      redirectTo: redirectUrl.toString(),
+    })
+    if (error) {
+      await clearRecoveryIntent()
+      const connectionError = authConnectionError(error)
+      if (connectionError) return { error: connectionError }
+      return { error: 'ยังส่งอีเมลไม่ได้ในขณะนี้ กรุณารอสักครู่แล้วลองใหม่' }
+    }
+  } catch {
+    await clearRecoveryIntent()
+    return { error: 'ยังส่งอีเมลไม่ได้ในขณะนี้ กรุณารอสักครู่แล้วลองใหม่' }
+  }
+  return { success: true }
+}
+
+export async function resendSignupConfirmation(email: string) {
+  const parsed = emailSchema.safeParse(email)
+  if (!parsed.success) return { error: validationMessage(parsed.error.issues) }
+  const callbackUrl = emailCallbackUrl('signup')
+  if (!callbackUrl) return { error: 'ระบบส่งอีเมลยังไม่พร้อมใช้งาน กรุณาติดต่อผู้ดูแล KorKru' }
+  const limit = await reserveAuthEmail(parsed.data)
+  if (!limit.allowed) return { error: limit.error, retryAfterSeconds: limit.retryAfterSeconds }
+
+  const supabase = await createClient()
+  const { error } = await supabase.auth.resend({
+    type: 'signup',
+    email: parsed.data,
+    options: { emailRedirectTo: callbackUrl },
   })
   if (error) {
     const connectionError = authConnectionError(error)
     if (connectionError) return { error: connectionError }
-    return { error: 'ยังส่งอีเมลไม่ได้ในขณะนี้ กรุณารอสักครู่แล้วลองใหม่' }
+    // Missing/already-confirmed addresses have the same response as pending
+    // accounts. Infrastructure/rate errors still need an honest retry state.
+    if (error.code !== 'user_not_found' && error.code !== 'email_already_confirmed') {
+      return { error: 'ยังส่งอีเมลไม่ได้ในขณะนี้ กรุณารอสักครู่แล้วลองใหม่', retryAfterSeconds: 60 }
+    }
   }
-  return { success: true }
+  await rememberSignupEmail(parsed.data)
+  return { success: true, retryAfterSeconds: 60 }
 }
 
 export async function completeProfile(formData: FormData) {
   const parsed = completeProfileSchema.safeParse({
     role: formData.get('role'),
     full_name: formData.get('full_name'),
+    accept_terms: formData.get('accept_terms') === 'true',
   })
   if (!parsed.success) return { error: validationMessage(parsed.error.issues) }
 
@@ -206,6 +288,18 @@ export async function completeProfile(formData: FormData) {
   if (profile.role === 'admin' || profile.survey_role) return { success: true }
 
   const { role, full_name } = parsed.data
+  // Do not mark onboarding complete when the acknowledgement write failed:
+  // the protected layout uses survey_role to decide whether to show this step.
+  const { error: acknowledgementError } = await supabase.auth.updateUser({
+    data: {
+      full_name, role, survey_role: role,
+      terms_version: POLICY_VERSION,
+      privacy_version: POLICY_VERSION,
+      terms_acknowledged_at: new Date().toISOString(),
+    },
+  })
+  if (acknowledgementError) return { error: 'ยังบันทึกการรับทราบข้อกำหนดไม่ได้ กรุณาลองใหม่' }
+
   const { data: updated, error } = await admin
     .from('users')
     .update({
@@ -222,9 +316,6 @@ export async function completeProfile(formData: FormData) {
   if (error) return { error: 'ไม่สามารถบันทึกข้อมูลบัญชีได้ กรุณาลองใหม่' }
   if (!updated) return { success: true }
 
-  await supabase.auth.updateUser({
-    data: { full_name, role, survey_role: role },
-  })
   return { success: true }
 }
 
@@ -238,6 +329,10 @@ export async function resetPassword(formData: FormData) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ลิงก์ตั้งรหัสผ่านหมดอายุ กรุณาขอลิงก์ใหม่' }
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session || !(await hasRecoveryGrant(user.id, session.access_token))) {
+    return { error: 'กรุณาเปิดลิงก์ตั้งรหัสผ่านใหม่จากอีเมลภายใน 10 นาที' }
+  }
 
   const { error } = await supabase.auth.updateUser({ password: parsed.data.password })
   if (error) {
@@ -247,8 +342,12 @@ export async function resetPassword(formData: FormData) {
   }
 
   // Invalidate refresh tokens on other devices after a credential reset.
-  await supabase.auth.signOut({ scope: 'global' })
-  return { success: true }
+  await clearRecoveryGrant()
+  try {
+    const { error: signOutError } = await supabase.auth.signOut({ scope: 'global' })
+    if (!signOutError) return { success: true }
+  } catch { /* Credential update succeeded; report revocation separately. */ }
+  return { success: true, warning: 'ตั้งรหัสผ่านแล้ว แต่ยังยุติการเข้าสู่ระบบทุกอุปกรณ์ไม่สำเร็จ กรุณาเข้าสู่ระบบใหม่และติดต่อผู้ดูแล' }
 }
 
 export async function logout() {
