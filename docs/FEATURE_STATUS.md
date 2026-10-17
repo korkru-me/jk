@@ -1,11 +1,13 @@
 # Feature status
 
-## กรอบเลือกวิธีนำเข้าโจทย์ตามธีมเว็บ — 17 ตุลาคม 2026 (เตรียมโค้ด ยังไม่ deploy)
+## กรอบเลือกวิธีนำเข้าโจทย์ตามธีมเว็บ — 18 ตุลาคม 2026 (Staging ผ่าน รอปล่อย Production · PR #60)
 
 - `/questions/import` เปลี่ยนสองกรอบเต็มสีเป็น Card หัวสีอ่อน/ส่วนล่างพื้นขาวตามหน้าหลักและหน้าสร้างโจทย์ ใช้ FileText/PackageOpen 32px เป็นภาพจางขวาบน แสดงนามสกุลไฟล์แยกจากชื่อ ย่อคำอธิบายและวาง “เลือกประเภทโจทย์” / “เลือกไฟล์ KorKru” ด้านล่างขวา กดได้ทั้งกรอบ มี focus ring และพื้นที่คำสั่งอย่างน้อย 44px
 - หน้าขยายเต็มความกว้าง shell และใช้ container grid 1/2 คอลัมน์ที่ 42rem วัดกรอบสูง 113.5px ทุกขนาด 320/390/768/1440px จากเดิมประมาณ 123–143px ไม่มี overflow/ข้อความหรือไอคอนถูกตัด ทดสอบ container 500px บน viewport 1440px แล้วเรียงหนึ่งคอลัมน์ตามพื้นที่จริง
 - เพิ่ม fixture `/exam-screen-lab/question-import-options` ที่ import หน้าจริงและปิดบน Production ด้วย guard เดิม ตรวจ local Chrome ทั้งสว่าง/มืด คีย์บอร์ดและ focus ring ผ่าน กดค้าง/ปล่อยบนหัว คำอธิบาย และ footer ของ KorKru แล้วยังเรียก native file input ได้ ตรวจ Enter/Space ด้วยโดยดัก click ไม่ให้เลือกไฟล์จริง รวม 5 ครั้ง ลิงก์ Word คง `back=/questions/import` React แสดง ImportQuestionsButton เดิม ไม่มี runtime error ของ fixture และ Next MCP ไม่มี compilation/config error; session ของ `/` เดิมยังรายงานว่า local ไม่มี Supabase URL/key
-- TypeScript, token lint และ production build ผ่าน ไม่รัน unit suite ซ้ำเพราะไม่มี lib/parser/import logic เปลี่ยน ไม่ได้ทดสอบนำเข้าไฟล์จริง, authenticated shell หรือ hosted Staging ไม่มี migration, schema, scoring หรือรูปแบบ Word/ไฟล์ KorKru เปลี่ยน ใช้ `ImportQuestionsButton` และการ refresh หลังนำเข้าเดิม
+- TypeScript, token lint และ production build ผ่าน ไม่รัน unit suite ซ้ำเพราะไม่มี lib/parser/import logic เปลี่ยน ไม่ได้ทดสอบนำเข้าไฟล์จริงหรือ authenticated shell ไม่มี migration, schema, scoring หรือรูปแบบ Word/ไฟล์ KorKru เปลี่ยน ใช้ `ImportQuestionsButton` และการ refresh หลังนำเข้าเดิม
+
+- Hosted Staging `b142331` / deployment `dpl_AtuWCXvr6K7YfBBZkidLczfAXCzg` Ready พร้อม source revision, alias และป้าย Staging ตรงกัน ตรวจ 320/390/768/1440px และ container 500px ผ่าน: การ์ดสูง 113.5px, ไม่มี overflow, ปุ่มอย่างน้อย 44px, ไอคอน 32px เห็นครบ Word back URL เดิมถูกต้อง กดค้าง/ปล่อยหัว คำอธิบาย และ footer ของ KorKru รวม Enter/Space เรียก file input รวม 5 ครั้งโดยดักไม่ให้เลือกไฟล์จริง โหมดมืด/focus/React controller state ผ่าน ไม่มี runtime error เจ้าของอนุญาต merge/deploy เมื่อผ่าน ดู `docs/QUESTION_IMPORT_CARDS_RELEASE_20261018.md`
 
 ## กรอบเลือกประเภทโจทย์ตามหน้าหลัก — 17 ตุลาคม 2026 (Production · PR #59)
 
