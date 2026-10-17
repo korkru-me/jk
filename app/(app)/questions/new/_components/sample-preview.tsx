@@ -1,12 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { PanelsTopLeft, Sparkles } from 'lucide-react'
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { QuestionPreviewContent } from '@/components/questions/question-preview'
+import { preloadQuestionPreview, QuestionPreviewContent } from '@/components/questions/question-preview'
 import type { SampleQuestion } from '../_data/sample-questions'
 
 /**
@@ -31,6 +31,17 @@ export function SamplePreview({
   const [open, setOpen] = useState(false)
   const many = samples.length > 1
 
+  useEffect(() => {
+    // All cards share the same request. Warm only the renderer; numeric maths
+    // remains on demand. A speculative failure is reported when opened.
+    void preloadQuestionPreview().catch(() => {})
+  }, [])
+
+  function preparePreview() {
+    const needsMath = samples.some(sample => sample.props.questionType === 'written' || sample.props.variables.length > 0)
+    void preloadQuestionPreview(needsMath).catch(() => {})
+  }
+
   return (
     <>
       <Button
@@ -40,6 +51,8 @@ export function SamplePreview({
         aria-label={`ดูตัวอย่างโจทย์${typeTitle}`}
         aria-haspopup="dialog"
         aria-expanded={open}
+        onPointerEnter={preparePreview}
+        onFocus={preparePreview}
         onClick={() => setOpen(true)}
         className="min-h-11"
       >

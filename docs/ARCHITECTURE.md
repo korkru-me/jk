@@ -1,5 +1,9 @@
 # Architecture
 
+## การโหลดตัวอย่างโจทย์ — 17 ตุลาคม 2026
+
+`question-preview.tsx` เป็น client-only loading boundary ที่ใช้ import request ร่วมกันและล้าง cache ของ request ที่ล้มเหลว พร้อม error/retry และ timeout 15 วินาที หน้าเลือกประเภทเตรียม renderer ล่วงหน้า; evaluator แยกเป็น import อีกก้อนสำหรับ `written` หรือโจทย์ที่มีตัวแปรเท่านั้น `question-preview-content` รับ evaluator ผ่าน prop และอ่านกติกาคะแนนจาก `lib/question-scoring.ts` ซึ่งไม่ import mathjs; `assignment-attempt` ใช้และ re-export กติกาชุดเดียวกันโดยไม่เปลี่ยนผลคะแนน ตัวอย่างเริ่มสุ่ม/สลับตัวเลือกหลัง mount ใน browser และไม่มีการอ่าน/เขียนฐานข้อมูลเมื่อเปิดหน้าเลือกประเภท
+
 ## Signup trust flow — 17 October 2026 (prepared, not deployed)
 
 Signup/Google profile completion validate policy acknowledgement on the server. Auth metadata records policy version/date as editable acknowledgement only. The check-email page reads a 30-minute HttpOnly hint with the last request time; email never enters its URL. Signup resend and PKCE callback failures share an explicit invalid-link state; optional `/auth/confirm` handles signup token hashes after the SMTP template is configured. Recovery retains PKCE plus a one-hour signed intent carrying recipient/nonce hash and optional expected user ID; the secret email nonce, same-browser intent and exchanged identity must match before issuing the ten-minute user/access-token-bound grant checked on reset POST. Old nonce-less links must be reissued; clearing intent/grant cookies is not an atomic single-use ledger.

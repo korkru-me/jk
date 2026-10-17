@@ -1,41 +1,93 @@
 'use client'
 
-import { useState } from 'react'
-import dynamic from 'next/dynamic'
+import { useEffect, useState } from 'react'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import type { QuestionPreviewProps } from './question-preview-content'
+import { Button } from '@/components/ui/button'
+import type { PreviewMath, QuestionPreviewProps } from './question-preview-content'
 
 export type { QuestionPreviewProps }
 
-/**
- * Exported under the name the body used to have, so the assignment preview
- * dialog and the question bank's preview modal pick up the same lazy boundary
- * without changing their imports.
- *
- * The preview body carries the whole student-facing renderer — the maths
- * evaluator (mathjs) and the formula renderer (katex), ~895 KB between them.
- * Every question authoring route mounts this trigger, so a static import put
- * both in the first load of pages where a teacher may never open the preview
- * at all. The body already rendered only while the dialog was open; loading it
- * on the same condition simply stops paying for it up front.
- */
-export const QuestionPreviewContent = dynamic(
-  () => import('./question-preview-content').then(m => m.QuestionPreviewContent),
-  {
-    // Random values and option shuffles belong to the visible browser preview.
-    ssr: false,
-    loading: () => (
-      <p className="py-10 text-center text-sm text-muted-foreground">
-        กำลังเตรียมตัวอย่าง...
-      </p>
-    ),
+type PreviewModule = typeof import('./question-preview-content')
+type LoadedPreview = { module: PreviewModule; math: PreviewMath | undefined }
+let previewRequest: Promise<PreviewModule> | undefined
+let mathRequest: Promise<PreviewMath> | undefined
+let readyPreview: PreviewModule | undefined
+let readyMath: PreviewMath | undefined
+
+/** Share one request across samples, but allow a failed chunk request to retry. */
+export async function preloadQuestionPreview(needsMath = false): Promise<LoadedPreview> {
+  const moduleRequest = previewRequest ??= import('./question-preview-content')
+  const evaluatorRequest = needsMath
+    ? (mathRequest ??= import('@/lib/math/evaluator'))
+    : undefined
+  try {
+    const [module, math] = await Promise.all([moduleRequest, evaluatorRequest])
+    readyPreview = module
+    if (math) readyMath = math
+    return { module, math }
+  } catch (error) {
+    if (previewRequest === moduleRequest) previewRequest = undefined
+    if (evaluatorRequest && mathRequest === evaluatorRequest) mathRequest = undefined
+    throw error
   }
-)
+}
+
+function cachedPreview(needsMath: boolean): LoadedPreview | undefined {
+  return readyPreview && (!needsMath || readyMath)
+    ? { module: readyPreview, math: needsMath ? readyMath : undefined }
+    : undefined
+}
+
+/** Client-only so random values and option shuffles start in the browser. */
+export function QuestionPreviewContent(props: QuestionPreviewProps) {
+  const needsMath = props.questionType === 'written' || props.variables.length > 0
+  const [loaded, setLoaded] = useState<LoadedPreview>()
+  const [failed, setFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
+
+  useEffect(() => {
+    let active = true
+    setFailed(false)
+    const cached = cachedPreview(needsMath)
+    if (cached) { setLoaded(cached); return }
+    const timeout = window.setTimeout(() => { if (active) setFailed(true) }, 15_000)
+    void preloadQuestionPreview(needsMath).then(
+      result => {
+        if (active) { setLoaded(result); setFailed(false) }
+        window.clearTimeout(timeout)
+      },
+      error => {
+        console.error('Question preview could not load', error)
+        if (active) setFailed(true)
+        window.clearTimeout(timeout)
+      },
+    )
+    return () => { active = false; window.clearTimeout(timeout) }
+  }, [needsMath, attempt])
+
+  if (loaded && (!needsMath || loaded.math)) {
+    const Content = loaded.module.QuestionPreviewContent
+    return <Content {...props} math={loaded.math} />
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-2 py-3" aria-busy={!failed}>
+      <p role={failed ? 'alert' : 'status'} className="text-sm text-muted-foreground">
+        {failed ? 'โหลดตัวอย่างไม่สำเร็จ กรุณาลองอีกครั้ง' : 'กำลังเตรียมตัวอย่าง...'}
+      </p>
+      {failed && (
+        <Button type="button" variant="outline" size="sm" onClick={() => setAttempt(value => value + 1)}>
+          ลองใหม่
+        </Button>
+      )}
+    </div>
+  )
+}
 
 
 // ── QuestionPreview ──────────────────────────────────────────────────────────────

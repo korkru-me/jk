@@ -1,5 +1,12 @@
 # Feature status
 
+## แก้ตัวอย่างหน้าสร้างโจทย์รอนาน — 17 ตุลาคม 2026 · PR #58
+
+- พบว่า lazy preview เดิมโหลด `mathjs` ผ่านทั้ง evaluator และ `assignment-attempt` แม้เปิดตัวอย่างจับคู่ และแสดงข้อความรอเพียงอย่างเดียว แยก `naturalMaxScore`/`gradeValue` ไป `question-scoring` โดยคงกติกาและ re-export เดิม; ตัวแสดงผลรับ evaluator เฉพาะโจทย์ `written` หรือมีตัวแปร
+- หน้าเลือกประเภทเตรียม renderer ล่วงหน้าผ่าน request เดียวร่วมกันทุกการ์ด; hover/focus ของโจทย์ตัวเลขจึงค่อยเตรียม evaluator การโหลดล้มเหลวหรือเกิน 15 วินาทีแสดงข้อความผิดพลาดและ “ลองใหม่” พร้อมยกเลิกผลตอบกลับของ preview ที่ปิดไปแล้ว
+- `/exam-screen-lab/question-samples` ใช้หน้าเลือกประเภทและตัวอย่างจริงชุดเดียวกันโดยไม่เรียก Auth/ฐานข้อมูล เก็บไว้สำหรับ regression บน local/Staging และปิดด้วย guard เดิมใน Production ไม่มี migration หรือการเปลี่ยนรูปแบบโจทย์/Word
+- ตรวจ Chrome บน fixture: เปิดครบ 11 ประเภท; 10 ประเภทที่ไม่มีตัวแปรไม่มี request `mathjs`, จับคู่ทั้งสองแบบเลือกคำตอบได้, จอ 390px ไม่ล้นแนวนอน; จำลอง chunk คณิตศาสตร์โหลดล้มเหลวแล้วกด “ลองใหม่” สำเร็จ โจทย์ตัวเลขคำนวณ/ตรวจถูกทั้งสองช่องและแสดงคะแนนครู 2/2 ผ่าน TypeScript, token lint, production build และ unit tests รวม regression ที่ห้าม scoring metadata import `mathjs` · Staging hosted build `77ea012` ตรวจครบ 11 ประเภท, คะแนน 2/2, cold-browser chunk failure/retry และมือถือผ่าน ไม่มี runtime error หลังเปิดหน้าใหม่ ไม่ได้ทดสอบ authenticated app shell/บันทึกโจทย์ ซึ่งไม่ได้เปลี่ยนในแพตช์ ดูหลักฐานและขั้นตอนปล่อยใน `docs/QUESTION_SAMPLE_PREVIEW_RELEASE_20261017.md`
+
 ## สมัครสมาชิกและความน่าเชื่อถือของบัญชี — 17 ตุลาคม 2026 (เตรียมโค้ด ยังไม่ deploy)
 
 - หน้า login/signup ใช้ `BrandLogo size="large"` แบบ responsive ตามคำปรับล่าสุด ลดชื่อ KorKru เป็น `text-2xl` เท่าหัวข้อหน้า แล้วขยายกวางเป็น `h-18 sm:h-20` ให้ภาพกวางเด่นกว่า คงขนาดแบรนด์ใน app shell/หน้าอื่นตามเดิม เป็นการปรับภาพลักษณ์เท่านั้น ไม่มี auth/schema/config change
