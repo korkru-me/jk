@@ -2,6 +2,10 @@
 
 สถานะล่าสุด: **release ระบบบัญชีเดิม deploy แล้ว; Staging ต่อ SMTP และเจ้าของรายงานว่ากดยืนยันอีเมลสมัครเข้าใช้ได้แล้ว** เจ้าของกลับมาทำ Resend ต่อและพัก SEB แพตช์ feedback หน้า signup/check-email รอบล่าสุดผ่าน local checks/runtime แล้ว และปล่อยผ่าน Staging ก่อนให้เจ้าของทดสอบต่อ โดยไม่เปิด Production SMTP/Google/quota alerts
 
+แพตช์แอป `30886db` push ที่ `codex/auth-signup-feedback-20261017` แล้ว รวมเข้า `staging` เป็น `218d7a4` โดยรักษางานล่าสุด `3e9e4c2` ไว้ Vercel deployment `dpl_9cunauQwa9EKJn5PEKempAvWGgLi` ขึ้น Ready และอ่าน `/login`, `/signup`, `/check-email`, `/terms`, `/privacy`, `/contact` ได้ HTTP 200 พร้อม badge Staging/source revision ตรง `218d7a4` ทุกหน้า ไม่มี migration/config/secret หรือ Production deploy ในแพตช์นี้
+
+ขั้นถัดไป: เจ้าของ refresh แท็บเก่าเพื่อโหลดแพตช์และทดสอบ UI/confirmation บน Staging ต่อ จากนั้นทดสอบ recovery email/link ในเบราว์เซอร์เดิมก่อนเปิด Production SMTP และ quota alerts; การตรวจ hosted รอบแพตช์เป็น read-only page checks ยังไม่ใช่ independent SMTP/recovery E2E
+
 ## Milestones และสิ่งที่ยังไม่เปิด
 
 - Resend account สร้างแล้ว; `mail.korkru.com` Verified ใน Tokyo และ public DNS ตรงกับค่าที่กำหนด เจ้าของสร้าง Sending access key และกรอกเอง ไม่ส่ง key มาในแชท
