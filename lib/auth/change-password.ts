@@ -72,13 +72,14 @@ function providerError(error: AuthFailure, stage: 'identity' | 'verification' | 
   // the cookie-bound session expired or replace that session in the browser.
   if (stage !== 'verification' && isSessionError(error)) return signInRequired()
   if (stage === 'update') {
+    if (error.code === 'current_password_required') return { error: 'กรุณายืนยันรหัสผ่านปัจจุบันอีกครั้ง', field: 'old_password' }
     if (error.code === 'same_password') return { error: 'กรุณาใช้รหัสผ่านใหม่ที่ต่างจากรหัสผ่านปัจจุบัน', field: 'new_password' }
     if (error.code === 'weak_password') return { error: 'รหัสผ่านนี้ไม่ผ่านเงื่อนไขความปลอดภัย กรุณาใช้รหัสผ่านที่ยาวและคาดเดายากขึ้น', field: 'new_password' }
     if (['reauthentication_needed', 'reauthentication_not_valid', 'reauth_nonce_missing'].includes(error.code ?? '')) {
       return signInRequired()
     }
   }
-  if (stage !== 'identity' && error.code === 'invalid_credentials') {
+  if (stage !== 'identity' && (error.code === 'invalid_credentials' || error.code === 'current_password_mismatch')) {
     return {
       error: 'รหัสผ่านปัจจุบันไม่ถูกต้อง หากสมัครด้วย Google หรือยังไม่ได้ตั้งรหัสผ่าน KorKru ให้ใช้ลิงก์ตั้งรหัสผ่านทางอีเมล',
       field: 'old_password',

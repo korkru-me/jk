@@ -211,8 +211,8 @@ describe('settings password change authorization', () => {
     expect(await changePasswordForUser(form(), f.auth, f.createVerifier)).toEqual({ error: expect.any(String), field: 'new_password' })
   })
 
-  it('attaches an update-time incorrect current password to the current-password field', async () => {
-    f.auth.updateUser.mockResolvedValue({ error: { code: 'invalid_credentials' } })
+  it.each(['invalid_credentials', 'current_password_mismatch', 'current_password_required'])('attaches an update-time current-password rejection to the current-password field (%s)', async (code) => {
+    f.auth.updateUser.mockResolvedValue({ error: { code } })
     expect(await changePasswordForUser(form(), f.auth, f.createVerifier)).toEqual({ error: expect.any(String), field: 'old_password' })
     expect(f.auth.signOut).not.toHaveBeenCalled()
   })
