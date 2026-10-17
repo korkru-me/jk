@@ -10,7 +10,7 @@ export default function SignupPage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-muted px-4 py-6">
       <Link href="/" className="flex min-h-11 items-center" aria-label="KorKru กลับหน้าหลัก">
-        <BrandLogo subtitle="ก่อการเรียนรู้ โดยครู" />
+        <BrandLogo size="large" subtitle="ก่อการเรียนรู้ โดยครู" />
       </Link>
 
       <Card padding="md" elevation="sm" className="w-full max-w-md">

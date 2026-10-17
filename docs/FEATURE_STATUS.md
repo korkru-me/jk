@@ -2,6 +2,8 @@
 
 ## สมัครสมาชิกและความน่าเชื่อถือของบัญชี — 17 ตุลาคม 2026 (เตรียมโค้ด ยังไม่ deploy)
 
+- หน้า login/signup ขยายโลโก้และชื่อ KorKru ด้วย `BrandLogo size="large"` แบบ responsive ให้ชื่อแบรนด์ใหญ่กว่าหัวข้อหน้า คงขนาดแบรนด์ใน app shell/หน้าอื่นตามเดิม เป็นการปรับภาพลักษณ์เท่านั้น ไม่มี auth/schema/config change
+- รอบแบรนด์: ตรวจ local browser ที่ 320/390/1200px ทั้งสองหน้าไม่ล้น ชื่อแบรนด์ 30px บนมือถือ/36px บน desktop เทียบหัวข้อ 24px; โลโก้สูงจาก ~52.8px เป็น ~67.2/76.8px โดยความสูง card เดิมที่ 390/1200px ไม่เปลี่ยน หน้า forgot-password ที่ไม่ opt-in ยังคง 18px/~52.8px; React ยืนยัน prop large, TypeScript/token lint/webpack build ผ่าน และ Next MCP ไม่มี compilation/config/session errors ไม่รัน unit suite ซ้ำเพราะแก้เฉพาะ UI ไม่มี lib/auth/migration/config/deploy change
 - เพิ่ม terms/privacy/contact ลิงก์จริง ชื่อ “ผู้ดูแล KorKru” และอีเมลสาธารณะ `korkru.me@gmail.com` ตามเจ้าของยืนยัน นักเรียนสมัครเองได้ ไม่มีข้อมูลสมัครเพิ่มเติมหรือคำอ้าง ISO/PDPA ที่ไม่มีหลักฐาน
 - ฟอร์มบทบาท/Google/อีเมลแบบกระชับ ตรวจรับทราบนโยบายทั้ง signup และ Google complete-profile ฝั่ง server; metadata ระบุ version/date เป็น acknowledgement ที่แก้ได้ ไม่ใช่ immutable consent audit/authorization
 - ปรับ shared AccountRoleField ให้ครู/นักเรียนดูเป็นปุ่มเลือกชัดเจนตั้งแต่ยังไม่เลือก: ขอบ/พื้นอ่อน/วงกลมสถานะ, selected สีม่วงพร้อมเครื่องหมายถูก และ hover/pressed/focus สูง 52px ไม่มีคำอธิบายเพิ่ม ไม่มีบทบาทเริ่มต้น และไม่เปลี่ยน validation/Auth หรือ UI primitives ส่วนกลาง
