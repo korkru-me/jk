@@ -2,12 +2,12 @@ import { notFound } from 'next/navigation'
 import { ShellClient } from '@/components/layout/shell-client'
 import { SettingsShell } from '@/components/settings/settings-shell'
 import { StudentProfileSettings } from '@/components/settings/student-profile-settings'
-import { Card } from '@/components/ui/card'
+import { ProfileSettings } from '@/components/settings/profile-settings'
 import { isExamScreenLabEnabled } from '@/lib/exam-screen-lab-access'
 import type { StudentProfile } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'ข้อมูลส่วนตัวนักเรียน · ตัวอย่าง — KorKru' }
+export const metadata = { title: 'ข้อมูลส่วนตัว · ตัวอย่าง — KorKru' }
 const USER = {
   id: 'lab-student', email: 'student@example.invalid', full_name: 'เด็กหญิงนักเรียน ตัวอย่าง', role: 'student' as const,
   prefix: 'เด็กหญิง' as const, first_name: 'นักเรียน', last_name: 'ตัวอย่าง',
@@ -32,7 +32,9 @@ export default async function StudentProfileLabPage({ searchParams }: { searchPa
     <ShellClient user={{ ...USER, role: isTeacherShell ? 'teacher' : 'student' }} initialUnreadCount={0} notificationsEnabled={false}>
       <SettingsShell role={isTeacherShell ? 'teacher' : 'student'}>
         <p className="mb-3 text-xs text-muted-foreground">ตัวอย่างสำหรับตรวจหน้าตา · ข้อมูลและรูปจำลอง ไม่มีการบันทึกจริง</p>
-        {isTeacherShell ? <Card padding="md">ตัวอย่างเมนูตั้งค่าของครู</Card> : <StudentProfileSettings
+        {isTeacherShell ? <ProfileSettings
+          user={{ ...USER, role: 'teacher', full_name: 'ครู ตัวอย่าง' }}
+          saveProfileAction={previewOnlyAction} changePasswordAction={previewOnlyAction} /> : <StudentProfileSettings
           user={scenario === 'empty' ? { ...USER, avatar_url: null } : USER}
           profile={scenario === 'empty' ? null : PROFILE}
           saveProfileAction={previewOnlyAction} changePasswordAction={previewOnlyAction} saveAvatarAction={previewOnlyAction} />}

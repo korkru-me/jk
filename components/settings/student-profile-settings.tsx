@@ -15,9 +15,9 @@ import { Card } from '@/components/ui/card'
 import { NativeSelect } from '@/components/ui/native-select'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 import { AvatarCropEditor } from '@/components/settings/avatar-crop-editor'
-import { PasswordSettingsForm } from '@/components/settings/password-settings-form'
+import { PasswordSettingsSection } from '@/components/settings/password-settings-form'
 import {
-  User, Lock, GraduationCap, Phone, Eye, Plus, X,
+  User, GraduationCap, Phone, Eye, Plus, X,
 } from 'lucide-react'
 
 const GRADE_LEVELS = ['ม.1', 'ม.2', 'ม.3', 'ม.4', 'ม.5', 'ม.6', 'อื่นๆ']
@@ -332,9 +332,7 @@ export function StudentProfileSettings({ user, profile, saveProfileAction = upda
       </form>
 
       {/* ── Change Password ──────────────────────────────────────────────── */}
-      <SectionCard title="เปลี่ยนรหัสผ่าน" description="ยืนยันด้วยรหัสผ่านปัจจุบัน แล้วเข้าสู่ระบบใหม่หลังบันทึก" icon={Lock}>
-        <PasswordSettingsForm email={user.email} changePasswordAction={changePasswordAction} />
-      </SectionCard>
+      <PasswordSettingsSection email={user.email} changePasswordAction={changePasswordAction} />
     </div>
   )
 }

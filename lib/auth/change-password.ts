@@ -2,17 +2,21 @@ import { z } from 'zod'
 import { passwordSchema } from './validation'
 
 export const changePasswordSchema = z.object({
-  old_password: z.string().min(1, 'กรุณากรอกรหัสผ่านปัจจุบัน'),
-  new_password: passwordSchema,
-  confirm_password: z.string(),
+  old_password: z.string({ error: 'กรุณากรอกรหัสผ่านปัจจุบัน' }).min(1, 'กรุณากรอกรหัสผ่านปัจจุบัน'),
+  new_password: z.string({ error: 'กรุณากรอกรหัสผ่านใหม่' }).min(1, 'กรุณากรอกรหัสผ่านใหม่').pipe(passwordSchema),
+  confirm_password: z.string({ error: 'กรุณายืนยันรหัสผ่านใหม่' }).min(1, 'กรุณายืนยันรหัสผ่านใหม่'),
 }).refine((values) => values.new_password === values.confirm_password, {
   path: ['confirm_password'],
   message: 'รหัสผ่านใหม่ไม่ตรงกัน',
+}).refine((values) => values.old_password !== values.new_password, {
+  path: ['new_password'],
+  message: 'กรุณาใช้รหัสผ่านใหม่ที่ต่างจากรหัสผ่านปัจจุบัน',
 })
 
 interface AuthFailure {
   code?: string
   status?: number
+  name?: string
 }
 
 interface PasswordChangeAuth {
@@ -32,21 +36,64 @@ interface CredentialVerifier {
   signOut(options: { scope: 'local' }): Promise<{ error: AuthFailure | null }>
 }
 
+export type PasswordChangeField = 'old_password' | 'new_password' | 'confirm_password'
+type PasswordChangeError = { error: string; field?: PasswordChangeField; action?: 'sign_in' }
+
 export type PasswordChangeResult =
-  | { error: string }
+  | PasswordChangeError
   | { success: true; sessionsRevoked: boolean; warning?: string }
 
 const retryMessage = 'ยังเปลี่ยนรหัสผ่านไม่ได้ กรุณาลองใหม่อีกครั้ง'
 const revokedWarning = 'เปลี่ยนรหัสผ่านแล้ว แต่ยังยุติการเข้าสู่ระบบทุกอุปกรณ์ไม่สำเร็จ กรุณาเข้าสู่ระบบใหม่และติดต่อผู้ดูแลหากสงสัยว่าบัญชีถูกเข้าถึง'
 
-function verificationError(error: AuthFailure) {
+function isPasswordChangeField(value: unknown): value is PasswordChangeField {
+  return value === 'old_password' || value === 'new_password' || value === 'confirm_password'
+}
+
+function isSessionError(error: AuthFailure) {
+  return error.name === 'AuthSessionMissingError'
+    || ['session_expired', 'session_not_found', 'refresh_token_not_found', 'refresh_token_already_used', 'bad_jwt', 'no_authorization'].includes(error.code ?? '')
+}
+
+function signInRequired(): PasswordChangeError {
+  return { error: 'กรุณาเข้าสู่ระบบอีกครั้งก่อนเปลี่ยนรหัสผ่าน', action: 'sign_in' }
+}
+
+function providerError(error: AuthFailure, stage: 'identity' | 'verification' | 'update'): PasswordChangeError {
   if (error.status === 429 || error.code === 'over_request_rate_limit') {
-    return 'ลองยืนยันรหัสผ่านหลายครั้งเกินไป กรุณารอสักครู่แล้วลองใหม่'
+    return { error: 'มีคำขอเปลี่ยนรหัสผ่านถี่เกินไป กรุณารอสักครู่แล้วลองใหม่' }
   }
-  if (error.code === 'invalid_credentials') {
-    return 'รหัสผ่านปัจจุบันไม่ถูกต้อง หากสมัครด้วย Google หรือยังไม่ได้ตั้งรหัสผ่าน ให้ใช้ลิงก์ตั้งรหัสผ่านทางอีเมลด้านล่าง'
+  if (error.name === 'AuthRetryableFetchError' || error.status === 0 || error.status === 408
+    || (error.status !== undefined && error.status >= 500)
+    || error.code === 'request_timeout' || error.code === 'unexpected_failure') {
+    return { error: 'ระบบยืนยันตัวตนขัดข้องชั่วคราว กรุณารอสักครู่แล้วลองใหม่' }
   }
-  return 'ยังยืนยันรหัสผ่านปัจจุบันไม่ได้ กรุณาลองใหม่ หรือใช้ลิงก์ตั้งรหัสผ่านทางอีเมลด้านล่าง'
+  // A verifier has its own temporary session. Its errors must never imply that
+  // the cookie-bound session expired or replace that session in the browser.
+  if (stage !== 'verification' && isSessionError(error)) return signInRequired()
+  if (stage === 'update') {
+    if (error.code === 'same_password') return { error: 'กรุณาใช้รหัสผ่านใหม่ที่ต่างจากรหัสผ่านปัจจุบัน', field: 'new_password' }
+    if (error.code === 'weak_password') return { error: 'รหัสผ่านนี้ไม่ผ่านเงื่อนไขความปลอดภัย กรุณาใช้รหัสผ่านที่ยาวและคาดเดายากขึ้น', field: 'new_password' }
+    if (['reauthentication_needed', 'reauthentication_not_valid', 'reauth_nonce_missing'].includes(error.code ?? '')) {
+      return signInRequired()
+    }
+  }
+  if (stage !== 'identity' && error.code === 'invalid_credentials') {
+    return {
+      error: 'รหัสผ่านปัจจุบันไม่ถูกต้อง หากสมัครด้วย Google หรือยังไม่ได้ตั้งรหัสผ่าน KorKru ให้ใช้ลิงก์ตั้งรหัสผ่านทางอีเมล',
+      field: 'old_password',
+    }
+  }
+  if (error.code === 'captcha_failed') {
+    return { error: 'ยังยืนยันตัวตนผ่านระบบตรวจสอบความปลอดภัยไม่ได้ กรุณาใช้ลิงก์ตั้งรหัสผ่านทางอีเมลหรือติดต่อผู้ดูแล' }
+  }
+  if (error.code === 'insufficient_aal') {
+    return { error: 'บัญชีนี้ต้องยืนยันตัวตนเพิ่มเติมก่อนเปลี่ยนรหัสผ่าน กรุณาติดต่อผู้ดูแล' }
+  }
+  if (error.code === 'email_provider_disabled') {
+    return { error: 'ระบบยืนยันด้วยรหัสผ่านยังไม่พร้อมใช้งาน กรุณาติดต่อผู้ดูแล' }
+  }
+  return { error: retryMessage }
 }
 
 /** Verify credentials without replacing the cookie-bound session or trusting a submitted email. */
@@ -60,11 +107,16 @@ export async function changePasswordForUser(
     new_password: formData.get('new_password'),
     confirm_password: formData.get('confirm_password'),
   })
-  if (!parsed.success) return { error: parsed.error.issues[0].message }
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0]
+    const field = issue.path[0]
+    return { error: issue.message, ...(isPasswordChangeField(field) ? { field } : {}) }
+  }
 
   try {
     const { data: { user }, error: userError } = await auth.getUser()
-    if (userError || !user) return { error: 'กรุณาเข้าสู่ระบบอีกครั้งก่อนเปลี่ยนรหัสผ่าน' }
+    if (userError) return providerError(userError, 'identity')
+    if (!user) return signInRequired()
     if (!user.email) return { error: 'บัญชีนี้ไม่มีอีเมลสำหรับยืนยันรหัสผ่าน กรุณาติดต่อผู้ดูแล' }
 
     const verifier = createVerifier()
@@ -79,7 +131,7 @@ export async function changePasswordForUser(
       const cleanup = await verifier.signOut({ scope: 'local' })
       if (cleanup.error) return { error: retryMessage }
     }
-    if (verified.error) return { error: verificationError(verified.error) }
+    if (verified.error) return providerError(verified.error, 'verification')
     if (!verified.data.session || verified.data.user?.id !== user.id) {
       return { error: 'ยืนยันบัญชีไม่สำเร็จ กรุณาเข้าสู่ระบบอีกครั้ง' }
     }
@@ -88,14 +140,7 @@ export async function changePasswordForUser(
       password: parsed.data.new_password,
       current_password: parsed.data.old_password,
     })
-    if (error) {
-      if (error.code === 'same_password') return { error: 'กรุณาใช้รหัสผ่านใหม่ที่ต่างจากรหัสผ่านปัจจุบัน' }
-      if (error.code === 'weak_password') return { error: 'รหัสผ่านนี้ไม่ผ่านเงื่อนไขความปลอดภัย กรุณาใช้รหัสผ่านที่ยาวและคาดเดายากขึ้น' }
-      if (error.code === 'reauthentication_needed' || error.code === 'reauthentication_not_valid') {
-        return { error: 'กรุณาเข้าสู่ระบบใหม่ หรือใช้ลิงก์ตั้งรหัสผ่านทางอีเมลเพื่อยืนยันตัวตนอีกครั้ง' }
-      }
-      return { error: retryMessage }
-    }
+    if (error) return providerError(error, 'update')
   } catch {
     return { error: retryMessage }
   }
