@@ -22,6 +22,10 @@
 
 ## Production และการกู้คืน
 
-Staging ผ่านแล้ว พร้อม merge PR #59 เข้า `master` โดยไม่รวมประวัติ Staging-only กลับเข้า Production Vercel project `jk` deploy จาก `master` อัตโนมัติ ต้องตรวจ Ready, SHA ของ merge และ canonical aliases หลัง merge พร้อม read-only smoke ของหน้า login, route guard และ lab 404
+PR #59 merge เข้า `master` แล้วที่ `397183493460a22c7ee430ce63b081810a403e38` โดยไม่รวมประวัติ Staging-only กลับเข้า Production ไฟล์ runtime ตรงกับ PR ที่ผ่าน Staging Vercel project `jk` deploy จาก `master` อัตโนมัติ
+
+Production deployment `dpl_FEQrrznNtrhvYXXNPhrEZmEFvhXK` เป็น Ready และ source SHA ตรงกับ merge มี canonical aliases `www.korkru.com` และ `korkru.com` ตรวจเว็บจริงแบบอ่านอย่างเดียวหลังเจ้าของอนุมัติ deploy: `/login` 200 พร้อม tier production และไม่มีป้าย Staging, `/questions/new` 307 ไป `/login` เมื่อไม่มี session, `/exam-screen-lab/question-samples` 404 ไม่มีการสร้างหรือแก้ข้อมูล Production
 
 จุดกู้คืนก่อนปล่อย: commit `83c2e4cfcbbc42409bec67c86e60f1b1eed480b4`, deployment `dpl_7hgfeZUd7eNPL9pbeKtdUoNMepaH` (Ready) ไม่มี schema ให้ rollback
+
+บันทึกผลหลัง deploy นี้เป็นเอกสารบน branch `codex/question-type-card-design` ที่ push แล้ว แยกจาก merge commit ของ UI เพื่อไม่สร้าง deployment ใหม่จากการบันทึกสถานะ

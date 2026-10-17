@@ -1,5 +1,13 @@
 # Brand, language และ UI rules
 
+## กรอบเลือกวิธีนำเข้าโจทย์ — 18 ตุลาคม 2026 (Staging ผ่าน รอปล่อย Production · PR #60)
+
+`/questions/import` ใช้ Card radius md แบบเดียวกับหน้าสร้างโจทย์: หัวสีอ่อนสูงขั้นต่ำ 40px ส่วนล่างพื้น card สีขาวใน light mode ขอบกลางและเงาฐานสีบาง คง accent Word จาก tint-1 และ KorKru จาก success เดิมโดยผสม foreground เพื่ออ่านข้อความ ชื่อ 15px และนามสกุลไฟล์ 12px อยู่หัวกรอบ ไอคอน FileText/PackageOpen ขนาด 32px เป็นลายจางขวาบนที่แสดงครบและไม่รับ pointer
+
+ส่วนล่างมีคำอธิบายสั้น 13px และคำสั่งสูงอย่างน้อย 44px ชิดขวา: Word “เลือกประเภทโจทย์” และ KorKru “เลือกไฟล์ KorKru” กดได้ทั้งกรอบด้วย native Link/Button อย่างละหนึ่ง control ไม่มีปุ่มซ้อน ปิด translate ของปุ่มขณะกดเพื่อให้ stretched target ไม่หดเหลือแถวคำสั่ง คง focus ring รอบ Card และ pending/disabled พร้อม spinner ที่เคารพ reduced motion หน้ากว้างเต็ม shell กริดอิง container เป็น 1/2 คอลัมน์ที่ 42rem; container แคบต้องเรียงหนึ่งคอลัมน์แม้ viewport กว้าง
+
+fixture วัดกรอบใหม่ 113.5px ที่ 320/390/768/1440px เทียบเดิมประมาณ 123–143px ไม่มี fixed card height หรือตัดคำ ชื่อและนามสกุลไฟล์ขึ้นบรรทัดได้ตามพื้นที่ ขั้นตอนนำเข้า Word, native chooser, ตรวจซ้ำและ batch import ของ KorKru ใช้ตัวเดิม
+
 ## Signup and account trust — 17 October 2026 (prepared)
 
 หน้า login/signup ใช้ `BrandLogo size="large"` ตามคำปรับล่าสุด ให้กวางเป็นจุดเด่นหลักด้วย `h-18 sm:h-20` และลดชื่อ KorKru เป็น `text-2xl` เท่าหัวข้อหน้า คงข้อความรองและ gap เดิม ขนาดปกติ/compact ยังใช้กับส่วนอื่นตามเดิม
@@ -66,7 +74,7 @@ The source picker includes exercise, exam and feature-enabled practice libraries
 
 เมนูมอบหมายงานในแถบข้างและจุดอื่นที่ใช้ AssignmentCreationMenu ต้องใช้ default item สีเป็นกลาง ไม่มีพื้นหรือข้อความแยกสีประเภท คง hover/focus ปกติและไอคอน/ปลายทางเดิม หน้าทดสอบสีเป็นเครื่องมือ QA เท่านั้น ไม่เพิ่มขั้นตอนใน flow จริง
 
-## หน้าสร้างโจทย์ใหม่ — 17 ตุลาคม 2026 (Staging ผ่าน รอปล่อย Production · PR #59)
+## หน้าสร้างโจทย์ใหม่ — 17 ตุลาคม 2026 (Production · PR #59)
 
 ใช้พื้นที่เนื้อหาเต็มความกว้างข้างเมนู กริดอิง container เป็น 1/2/3 คอลัมน์ที่ 42rem/64rem แต่ละประเภทใช้ semantic token `--question-type-*` ต่างกันครบ 11 สีและคงสีข้าม preset การ์ดใช้ Card เดิมโดยแยกหัวสีอ่อนกับส่วนล่างพื้น card สีขาวใน light mode ตามการ์ดหน้าหลัก หัวสูงขั้นต่ำ 40px มีลายทแยงจางและไอคอนประเภทขนาด 32px ที่ขวาบน แสดงรายละเอียดไอคอนครบภายในหัว ไม่ตัดส่วนเกินและซ่อนจาก accessibility tree; ผสม foreground/card เพื่อให้ชื่อและพื้นอ่านได้ทั้งสว่าง/มืด
 

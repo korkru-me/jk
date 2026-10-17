@@ -1,0 +1,122 @@
+.card {
+  --import-ink: color-mix(in oklab, var(--import-accent) 60%, var(--foreground));
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  isolation: isolate;
+  box-shadow: 0 2px 0 color-mix(in oklab, var(--import-accent) 20%, var(--border));
+}
+
+.word {
+  --import-accent: var(--tint-1);
+}
+
+.korkru {
+  --import-accent: var(--success);
+}
+
+.header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-block-size: 2.5rem;
+  overflow: hidden;
+  border-radius: inherit;
+  border-end-start-radius: 0;
+  border-end-end-radius: 0;
+  border-block-end: 1px solid color-mix(in oklab, var(--import-accent) 20%, var(--border));
+  padding: 0.375rem 0.75rem;
+  background: color-mix(in oklab, var(--import-accent) 8%, var(--card));
+  color: var(--import-ink);
+}
+
+.header::before {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in oklab, var(--import-accent) 4%, transparent);
+  clip-path: polygon(48% 0, 100% 0, 100% 100%);
+  content: '';
+  pointer-events: none;
+}
+
+.watermark {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-end: 0.75rem;
+  inline-size: 2rem;
+  block-size: 2rem;
+  transform: translateY(-50%);
+  opacity: 0.18;
+  pointer-events: none;
+}
+
+.title {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 0.375rem;
+  padding-inline-end: 2.75rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.format {
+  font-size: 0.75rem;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: 0.25rem 0.75rem 0.125rem;
+}
+
+.description {
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+/* A single native link or button covers each card without nesting controls. */
+.action {
+  display: inline-flex;
+  align-self: flex-end;
+  align-items: center;
+  min-block-size: 2.75rem;
+  height: auto;
+  /* A transform would shrink the stretched target to the footer while pressed. */
+  translate: none;
+  margin-block-start: auto;
+  padding: 0;
+  gap: 0.375rem;
+  color: var(--import-ink);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.action::after {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  border-radius: inherit;
+  content: '';
+}
+
+.action:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.card:has(.action:focus-visible) {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+
+.card[data-pending] {
+  opacity: 0.6;
+}
