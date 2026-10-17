@@ -69,7 +69,9 @@ describe('Resend quota alert webhook', () => {
     expect(body.to).toEqual(['owner@example.test'])
     expect(body.from).toBe('KorKru <alerts@mail.example.test>')
     expect(body.text).toContain('80')
-    expect(body.tags).toEqual([{ name: 'kind', value: 'korkru_quota_alert' }])
+    expect(body.tags).toEqual([
+      { name: 'kind', value: 'korkru_quota_alert' }, { name: 'quota_level', value: '80' },
+    ])
     expect(options!.body).not.toContain('student@example.test')
     expect(options!.body).not.toContain('Private reset link')
     expect(options!.redirect).toBe('error')
@@ -104,7 +106,7 @@ describe('Resend quota alert webhook', () => {
     expect(responses.map(response => response.status)).toEqual([200, 200, 200])
     expect(sent).toHaveLength(3)
     expect(accepted.size).toBe(1)
-    expect([...accepted.keys()]).toEqual(['korkru-quota-80/staging/2026-10-17'])
+    expect([...accepted.keys()]).toEqual(['korkru-quota-v2/staging/2026-10-17/80'])
   })
 
   it('checks inbound events because received emails also consume quota', async () => {
@@ -241,7 +243,66 @@ describe('Resend quota alert webhook', () => {
     }, new Date()), environment, fetcher)
     expect(response.status).toBe(200)
     expect(new Headers(fetcher.mock.calls[1][1]!.headers).get('Idempotency-Key'))
-      .toBe('korkru-quota-80/staging/2026-10-18')
+      .toBe('korkru-quota-v2/staging/2026-10-18/80')
     expect(JSON.parse(fetcher.mock.calls[1][1]!.body as string).text).toContain('07:00')
+  })
+
+  it.each([[80, 80], [89, 80], [90, 90], [96, 90], [97, 97], [99, 97]])(
+    'selects only the highest reached level at %i emails (%i%%)', async (used, level) => {
+      const fetcher = provider(used)
+      expect((await handleResendQuotaWebhook(request(), environment, fetcher)).status).toBe(200)
+      const body = JSON.parse(fetcher.mock.calls[1][1]!.body as string)
+      expect(body.subject).toContain(`${level}%`)
+      expect(body.tags).toContainEqual({ name: 'quota_level', value: String(level) })
+      expect(fetcher).toHaveBeenCalledTimes(2)
+    },
+  )
+
+  it('deduplicates independently at 80, 90 and 97 across retries and concurrent events', async () => {
+    const accepted = new Map<string, string>()
+    let used = 80
+    const fetcher = vi.fn<typeof fetch>(async (url, options) => {
+      if (String(url).endsWith('/usage')) return Response.json(usage(used))
+      const key = new Headers(options!.headers).get('Idempotency-Key')!
+      const body = options!.body as string
+      if (accepted.has(key)) expect(accepted.get(key)).toBe(body)
+      accepted.set(key, body)
+      return Response.json({ id: 'deduped-provider-id' })
+    })
+    for (const count of [80, 81, 90, 91, 97, 98]) {
+      used = count
+      await Promise.all([0, 1].map(() => handleResendQuotaWebhook(request(), environment, fetcher)))
+    }
+    expect([...accepted.keys()]).toEqual([80, 90, 97].map(level => `korkru-quota-v2/staging/2026-10-17/${level}`))
+  })
+
+  it.each([[80, 90], [90, 97]])(
+    'allows a %i%% alert consuming quota to trigger the next reached level %i%%', async (previous, current) => {
+      const fetcher = provider(current)
+      const response = await handleResendQuotaWebhook(request({ data: { tags: {
+        kind: 'korkru_quota_alert', quota_level: String(previous),
+      } } }), environment, fetcher)
+      expect(response.status).toBe(200)
+      expect(JSON.parse(fetcher.mock.calls[1][1]!.body as string).subject).toContain(`${current}%`)
+    },
+  )
+
+  it.each([[80, 81], [90, 91], [97, 98], [97, 100]])(
+    'never loops when the %i%% alert is received at usage %i', async (previous, used) => {
+      const fetcher = provider(used)
+      const response = await handleResendQuotaWebhook(request({ data: { tags: {
+        kind: 'korkru_quota_alert', quota_level: String(previous),
+      } } }), environment, fetcher)
+      expect(await response.json()).toEqual({ status: 'ignored' })
+      expect(fetcher.mock.calls.filter(([url]) => String(url).endsWith('/emails'))).toHaveLength(0)
+    },
+  )
+
+  it('uses percentages of the reported cap rather than hardcoded email counts', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(Response.json(usage(180, { limit: 200 })))
+      .mockResolvedValueOnce(Response.json({ id: 'synthetic-alert' }))
+    expect((await handleResendQuotaWebhook(request(), environment, fetcher)).status).toBe(200)
+    expect(JSON.parse(fetcher.mock.calls[1][1]!.body as string).subject).toContain('90%')
   })
 })
