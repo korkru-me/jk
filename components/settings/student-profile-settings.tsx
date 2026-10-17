@@ -15,8 +15,11 @@ import { Card } from '@/components/ui/card'
 import { NativeSelect } from '@/components/ui/native-select'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 import { AvatarCropEditor } from '@/components/settings/avatar-crop-editor'
+import { PasswordSettingsSection } from '@/components/settings/password-settings-form'
+import { SignInMethodsSection } from '@/components/settings/sign-in-methods-section'
+import type { AccountSignInMethods, AccountSignInMethodActions } from '@/lib/auth/account-methods-types'
 import {
-  User, Lock, GraduationCap, Phone, Eye, EyeOff, Plus, X,
+  User, GraduationCap, Phone, Eye, Plus, X,
 } from 'lucide-react'
 
 const GRADE_LEVELS = ['ม.1', 'ม.2', 'ม.3', 'ม.4', 'ม.5', 'ม.6', 'อื่นๆ']
@@ -83,11 +86,12 @@ interface StudentProfileSettingsProps {
   saveProfileAction?: typeof updateMyStudentProfile
   changePasswordAction?: typeof updatePassword
   saveAvatarAction?: typeof updateMyAvatar
+  signInMethods?: AccountSignInMethods | null
+  signInMethodActions?: AccountSignInMethodActions
 }
 
-export function StudentProfileSettings({ user, profile, saveProfileAction = updateMyStudentProfile, changePasswordAction = updatePassword, saveAvatarAction = updateMyAvatar }: StudentProfileSettingsProps) {
+export function StudentProfileSettings({ user, profile, saveProfileAction = updateMyStudentProfile, changePasswordAction = updatePassword, saveAvatarAction = updateMyAvatar, signInMethods, signInMethodActions }: StudentProfileSettingsProps) {
   const router = useRouter()
-  const [isPwPending, startPwTransition] = useTransition()
   const [isInfoPending, startInfoTransition] = useTransition()
 
   const [avatarPreview, setAvatarPreview] = useState<string | null>(user.avatar_url)
@@ -96,9 +100,6 @@ export function StudentProfileSettings({ user, profile, saveProfileAction = upda
     profile?.guardians?.length ? profile.guardians : [{ name: '', phone: '' }]
   )
 
-  const [showOldPw, setShowOldPw] = useState(false)
-  const [showNewPw, setShowNewPw] = useState(false)
-  const [showConfirmPw, setShowConfirmPw] = useState(false)
 
   function handleInfoSave(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -111,15 +112,6 @@ export function StudentProfileSettings({ user, profile, saveProfileAction = upda
     })
   }
 
-  function handlePasswordChange(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    const fd = new FormData(e.currentTarget)
-    startPwTransition(async () => {
-      const res = await changePasswordAction(fd)
-      if (res.error) toast.error(res.error)
-      else { toast.success('เปลี่ยนรหัสผ่านสำเร็จ ✓'); (e.target as HTMLFormElement).reset() }
-    })
-  }
 
   function updateGuardian(index: number, field: keyof StudentGuardian, value: string) {
     setGuardians(prev => prev.map((g, i) => i === index ? { ...g, [field]: value } : g))
@@ -344,67 +336,8 @@ export function StudentProfileSettings({ user, profile, saveProfileAction = upda
       </form>
 
       {/* ── Change Password ──────────────────────────────────────────────── */}
-      <SectionCard title="เปลี่ยนรหัสผ่าน" description="แนะนำให้เปลี่ยนรหัสผ่านทุก 3-6 เดือน" icon={Lock}>
-        <form onSubmit={handlePasswordChange} className="space-y-4 max-w-md">
-          <div className="space-y-1.5">
-            <Label htmlFor="old_password">รหัสผ่านปัจจุบัน</Label>
-            <div className="relative">
-              <Input
-                id="old_password"
-                name="old_password"
-                type={showOldPw ? 'text' : 'password'}
-                placeholder="รหัสผ่านปัจจุบัน"
-                className="pr-10"
-                required
-              />
-              <button type="button" aria-label={showOldPw ? 'ซ่อนรหัสผ่านปัจจุบัน' : 'แสดงรหัสผ่านปัจจุบัน'} onClick={() => setShowOldPw(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                {showOldPw ? <EyeOff size={15} /> : <Eye size={15} />}
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="new_password">รหัสผ่านใหม่</Label>
-            <div className="relative">
-              <Input
-                id="new_password"
-                name="new_password"
-                type={showNewPw ? 'text' : 'password'}
-                placeholder="รหัสผ่านใหม่ (อย่างน้อย 8 ตัวอักษร)"
-                className="pr-10"
-                required
-              />
-              <button type="button" aria-label={showNewPw ? 'ซ่อนรหัสผ่านใหม่' : 'แสดงรหัสผ่านใหม่'} onClick={() => setShowNewPw(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                {showNewPw ? <EyeOff size={15} /> : <Eye size={15} />}
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="confirm_password">ยืนยันรหัสผ่านใหม่</Label>
-            <div className="relative">
-              <Input
-                id="confirm_password"
-                name="confirm_password"
-                type={showConfirmPw ? 'text' : 'password'}
-                placeholder="พิมพ์รหัสผ่านใหม่อีกครั้ง"
-                className="pr-10"
-                required
-              />
-              <button type="button" aria-label={showConfirmPw ? 'ซ่อนการยืนยันรหัสผ่าน' : 'แสดงการยืนยันรหัสผ่าน'} onClick={() => setShowConfirmPw(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                {showConfirmPw ? <EyeOff size={15} /> : <Eye size={15} />}
-              </button>
-            </div>
-          </div>
-
-          <Button type="submit" disabled={isPwPending} variant="outline" className="min-w-[140px]">
-            {isPwPending ? 'กำลังเปลี่ยน...' : 'เปลี่ยนรหัสผ่าน'}
-          </Button>
-        </form>
-      </SectionCard>
+      <SignInMethodsSection methods={signInMethods ?? null} {...signInMethodActions} />
+      <PasswordSettingsSection email={user.email} changePasswordAction={changePasswordAction} />
     </div>
   )
 }

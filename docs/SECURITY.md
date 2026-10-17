@@ -1,5 +1,17 @@
 # Security และ privacy guardrails
 
+## Signup/email safeguards — 17 October 2026 (prepared)
+
+Public auth-email actions validate inputs and reserve bounded shared email/IP counters before sending. The server-only fixed RPC is an explicitly permitted anonymous reservation operation: it accepts only keyed HMACs, performs no user/profile/tenant reads, takes no client-selected SQL/table/function, and exposes no browser grants. RLS remains enabled with no anon/authenticated policies; service_role has only this intended application path, while normal account mutations still require verified identity and exact-resource authorization. Failures/configuration gaps reject sending. The limiter cannot protect direct public Supabase Auth calls; hosted rate limits and current-password enforcement must be configured/tested. CAPTCHA is not wired in this phase.
+
+Current-password settings verifies credentials against the exact getUser identity using a no-storage client, cleans its temporary session, and passes current_password with the update. Recovery requires a one-hour HMAC intent with recipient/nonce hash and optional expected user ID; its secret nonce arrives only in the emailed redirect. Callback requires that intent, nonce, PKCE exchange and matching recipient/ID before issuing the ten-minute exact user/access-token grant. A login cookie or arbitrary fresh OAuth code alone is insufficient. Old nonce-less recovery links must be reissued in the same browser. Global sign-out revokes refresh tokens; existing JWTs can remain valid to expiry. Clearing intent/grant cookies is not an atomic single-use ledger. Policy metadata is user-editable acknowledgement, never authorization or a complete consent audit. Actual controller/retention/minor/sensitive-data policies require owner review before a public legal-compliance claim. Deployment gaps and checks are in `docs/AUTH_SIGNUP_ROLLOUT.md`.
+
+Google connection ใน settings ใช้ verified identities ไม่เชื่อ provider metadata หรืออนุมานว่ามีรหัสผ่าน ต้องตรวจรหัสปัจจุบันของ exact user และ challenge 5 นาทีที่ผูกอีเมล/access token ก่อนตรวจ JWT RS256 กับ Google JWKS คงที่ผ่าน `jose`; ตรวจ issuer/audience/freshness/nonce/verified same email ก่อน Supabase automatic sign-in client แยก แล้วตรวจ ID/อีเมล/Google subject และยุติ temporary session โดยไม่แทน session เดิม ไม่แก้ profile/role หรือ merge ข้อมูลเมื่อ ID ต่าง Flag ค่าเริ่มต้นปิดและไม่เปิด Manual Linking ข้อป้องกันนี้ไม่บังคับทุก direct Auth request; email-change race อาจสร้าง Auth identity ที่ไม่คาด แม้แอปปฏิเสธผล ID ต่าง ต้องตรวจ collision/race บน Staging ก่อนเปิดตาม `docs/ACCOUNT_SIGN_IN_METHODS.md` ไม่อ้างว่าล้าง challenge cookie แล้วเป็น atomic single-use
+
+## Resend quota webhook — 17 October 2026 (prepared)
+
+The exact public POST `/api/webhooks/resend` uses Svix raw-body signature/timestamp verification, a 32 KiB streaming cap, and server-only configuration (disabled by default). Unauthenticated requests cannot call the provider or choose an alert recipient. Only aggregate current-window usage is read from fixed Resend HTTPS endpoints; redirects are rejected, fetches time out, and upstream error bodies/payloads/keys/recipient lists are never returned or logged. Stable day/environment/level-scoped v2 idempotency prevents duplicate sends at 80/90/97%, including retry-after-timeout; signed alert tags permit only upward level transitions, never same/lower-level recursion. SMTP uses a separate domain-restricted Sending access key in Supabase, while the monitor needs Full access solely on the server. Staging/Production signing secrets and keys must be distinct. No Auth/RLS/grading change or database access is added; see `RESEND_SETUP.md` for rollout and limitations.
+
 การปิดรอบ (`20261014072745`, apply เฉพาะ Staging): RPC เป็น SECURITY INVOKER, `search_path = ''` และ revoke PUBLIC/anon/authenticated Student action ใช้ Auth ที่ตรวจแล้วและ exact owned row โดย SQL ตรวจ owner/expiry ก่อน forced closure Trigger คำตอบ/วิธีทำใช้ row lock เดียวกับการปิดและปฏิเสธ late writes ระหว่าง cron ticks เขียนคะแนนแบบ atomic และส่ง receipt ที่ไม่มีคะแนนซ่อน Global worker ต้องผ่าน constant-time secret comparison แยก environment Vault dispatch ใช้โดย postgres cron เท่านั้น ไม่เปิดให้ browser/service-role worker อ่าน Responses มีเฉพาะยอดรวม ไม่พิมพ์ข้อมูลนักเรียนหรือ key และไม่ใช้ credential ของ Staging ใน Production
 
 ## Reset numeric variants safely — 15 October 2026
@@ -53,8 +65,8 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 
 - ตรวจ email, password, display name และ `teacher|student` ซ้ำฝั่ง server ทุกครั้ง ห้ามเชื่อ role จากปุ่มหรือ TypeScript type ใน browser
 - Google OAuth ที่ยังไม่มี `survey_role` ต้องจบ profile completion ก่อนเข้า protected app; การกำหนด role ครั้งแรกต้องตรวจ exact session และ update เฉพาะ profile เดียวที่ `survey_role IS NULL`
-- Magic link จากหน้า login ต้องตั้ง `shouldCreateUser: false` และตอบแบบไม่เปิดเผยว่าอีเมลใดมีบัญชี
-- password recovery ต้องแลก code เป็น session ที่ callback ก่อนเรียก `updateUser`; หลังเปลี่ยน credential ให้ global sign-out เพื่อตัด refresh token เดิม
+- หน้า login ใช้ Google และ email/password โดยถอดปุ่ม Magic Link แล้ว; backend `sendMagicLink` และ callback เดิมยังต้องตั้ง `shouldCreateUser: false`, ผ่าน limiter และตอบแบบไม่เปิดเผยว่าอีเมลใดมีบัญชี
+- password recovery ต้องมี same-browser intent/nonce จากอีเมลและแลก PKCE code ที่ตรง recipient/expected ID ก่อนออก grant และเรียก `updateUser`; หลังเปลี่ยน credential พยายาม global sign-out เพื่อตัด refresh token เดิม และรายงานเมื่อ revocation ไม่สำเร็จ
 - การสร้าง auth user ต้องสร้าง profile และ personal organization ใน transaction เดียว ฟังก์ชันซ่อม provisioning ต้องล็อกต่อ user และ idempotent เพื่อไม่สร้าง workspace ซ้ำเมื่อ callback ชนกัน
 
 ## Supabase admin client

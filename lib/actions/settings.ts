@@ -2,6 +2,8 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient as createIsolatedClient } from '@supabase/supabase-js'
+import { changePasswordForUser, type PasswordChangeResult } from '@/lib/auth/change-password'
 import { revalidatePath } from 'next/cache'
 
 export async function updateProfile(formData: FormData) {
@@ -20,17 +22,17 @@ export async function updateProfile(formData: FormData) {
   return { success: true }
 }
 
-export async function updatePassword(formData: FormData) {
-  const supabase = await createClient()
-  const newPassword = (formData.get('new_password') as string)?.trim()
-  const confirmPassword = (formData.get('confirm_password') as string)?.trim()
-
-  if (!newPassword || newPassword.length < 8) return { error: 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร' }
-  if (newPassword !== confirmPassword) return { error: 'รหัสผ่านใหม่ไม่ตรงกัน' }
-
-  const { error } = await supabase.auth.updateUser({ password: newPassword })
-  if (error) return { error: error.message }
-  return { success: true }
+export async function updatePassword(formData: FormData): Promise<PasswordChangeResult> {
+  try {
+    const supabase = await createClient()
+    return await changePasswordForUser(formData, supabase.auth, () => createIsolatedClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } },
+    ).auth)
+  } catch {
+    return { error: 'ยังเปลี่ยนรหัสผ่านไม่ได้ กรุณาลองใหม่อีกครั้ง' }
+  }
 }
 
 export async function getCurrentUser() {

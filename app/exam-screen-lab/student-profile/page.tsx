@@ -2,12 +2,13 @@ import { notFound } from 'next/navigation'
 import { ShellClient } from '@/components/layout/shell-client'
 import { SettingsShell } from '@/components/settings/settings-shell'
 import { StudentProfileSettings } from '@/components/settings/student-profile-settings'
-import { Card } from '@/components/ui/card'
+import { ProfileSettings } from '@/components/settings/profile-settings'
 import { isExamScreenLabEnabled } from '@/lib/exam-screen-lab-access'
 import type { StudentProfile } from '@/lib/types'
+import type { AccountSignInMethods } from '@/lib/auth/account-methods-types'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'ข้อมูลส่วนตัวนักเรียน · ตัวอย่าง — KorKru' }
+export const metadata = { title: 'ข้อมูลส่วนตัว · ตัวอย่าง — KorKru' }
 const USER = {
   id: 'lab-student', email: 'student@example.invalid', full_name: 'เด็กหญิงนักเรียน ตัวอย่าง', role: 'student' as const,
   prefix: 'เด็กหญิง' as const, first_name: 'นักเรียน', last_name: 'ตัวอย่าง',
@@ -28,13 +29,27 @@ export default async function StudentProfileLabPage({ searchParams }: { searchPa
   if (!isExamScreenLabEnabled(process.env)) notFound()
   const { scenario } = await searchParams
   const isTeacherShell = scenario === 'teacher-shell'
+  const signInMethods: AccountSignInMethods = {
+    email: USER.email, emailVerified: true,
+    google: { state: 'unlinked', email: null }, canConnectGoogle: false,
+  }
+  const signInMethodActions = {
+    startGoogleAction: previewOnlyAction,
+    completeGoogleAction: previewOnlyAction,
+    cancelGoogleAction: previewOnlyAction,
+    sendPasswordEmailAction: previewOnlyAction,
+  }
   return (
     <ShellClient user={{ ...USER, role: isTeacherShell ? 'teacher' : 'student' }} initialUnreadCount={0} notificationsEnabled={false}>
       <SettingsShell role={isTeacherShell ? 'teacher' : 'student'}>
         <p className="mb-3 text-xs text-muted-foreground">ตัวอย่างสำหรับตรวจหน้าตา · ข้อมูลและรูปจำลอง ไม่มีการบันทึกจริง</p>
-        {isTeacherShell ? <Card padding="md">ตัวอย่างเมนูตั้งค่าของครู</Card> : <StudentProfileSettings
+        {isTeacherShell ? <ProfileSettings
+          user={{ ...USER, role: 'teacher', full_name: 'ครู ตัวอย่าง' }}
+          signInMethods={signInMethods} signInMethodActions={signInMethodActions}
+          saveProfileAction={previewOnlyAction} changePasswordAction={previewOnlyAction} /> : <StudentProfileSettings
           user={scenario === 'empty' ? { ...USER, avatar_url: null } : USER}
           profile={scenario === 'empty' ? null : PROFILE}
+          signInMethods={signInMethods} signInMethodActions={signInMethodActions}
           saveProfileAction={previewOnlyAction} changePasswordAction={previewOnlyAction} saveAvatarAction={previewOnlyAction} />}
       </SettingsShell>
     </ShellClient>
