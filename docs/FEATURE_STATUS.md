@@ -4,6 +4,7 @@
 
 - เพิ่ม terms/privacy/contact ลิงก์จริง ชื่อ “ผู้ดูแล KorKru” และอีเมลสาธารณะ `korkru.me@gmail.com` ตามเจ้าของยืนยัน นักเรียนสมัครเองได้ ไม่มีข้อมูลสมัครเพิ่มเติมหรือคำอ้าง ISO/PDPA ที่ไม่มีหลักฐาน
 - ฟอร์มบทบาท/Google/อีเมลแบบกระชับ ตรวจรับทราบนโยบายทั้ง signup และ Google complete-profile ฝั่ง server; metadata ระบุ version/date เป็น acknowledgement ที่แก้ได้ ไม่ใช่ immutable consent audit/authorization
+- หน้าเข้าสู่ระบบเหลือ Google และอีเมล/รหัสผ่าน ลดตัวเลือกโดยถอดปุ่ม Magic Link แสดงข้อผิดพลาดในฟอร์มและปิดช่อง/ปุ่มระหว่างส่งคำขอ ใช้ shared `loginSchema` ที่ตรวจรหัสผ่านเพียงไม่ว่างเพื่อให้บัญชีเดิมยังเข้าได้; backend `sendMagicLink` และ callback เดิมยังอยู่ พร้อม `shouldCreateUser: false` และการตอบที่ไม่เปิดเผยว่ามีบัญชีหรือไม่ ไม่มีการเปลี่ยน schema/config/deploy ในรอบปรับหน้า login
 - ตามคำขอเพิ่มเติม เพิ่ม “ยืนยันรหัสผ่าน” ใน email signup ตรวจข้อความตรงกันทั้ง client/server ก่อนจองโควตาหรือเรียก Auth มีปุ่มแสดง/ซ่อนแยกและตรวจซ้ำเมื่อแก้รหัสเดิม ไม่เก็บ/ส่ง confirmation เข้า Auth metadata ไม่เพิ่มช่องอีเมลซ้ำ และยังยืนยันอีเมลผ่านลิงก์ตามเดิม Google ไม่ต้องกรอกรหัสผ่าน
 - `/check-email` มีอีเมลจาก short-lived HttpOnly cookie, ส่งซ้ำ/cooldown, ลิงก์ผิด/หมดอายุ และทางกลับแก้อีเมลโดยสมัครใหม่ ไม่ใส่อีเมลใน URL
 - เปลี่ยนรหัสผ่าน settings ครู/นักเรียนตรวจรหัสเดิมจริงและ user ID ผ่าน client แยก ไม่ trim รหัสผ่าน; reset ต้องมี grant 10 นาทีจาก fresh code exchange ผูก exact user/session แล้ว global sign-out พร้อมรายงาน revocation failure อย่างตรงไปตรงมา

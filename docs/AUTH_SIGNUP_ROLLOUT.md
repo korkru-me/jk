@@ -21,6 +21,7 @@
 6. settings ครู/นักเรียนใช้ฟอร์มเดียวกัน ยืนยันรหัสเดิมด้วย client แยกที่ไม่เก็บ session เทียบ user ID กับ `getUser` แล้วส่ง `current_password` พร้อมรหัสใหม่ ไม่ trim รหัสผ่าน ใช้ policy เดียวกับสมัคร/รีเซ็ต (8 ตัวขึ้นไป มีอักษรอังกฤษและตัวเลข)
 7. reset-password ต้องมี HMAC grant อายุ 10 นาที ผูก user และ access token จาก code exchange ที่เพิ่งสำเร็จ การล็อกอินอยู่แล้วหรือเปลี่ยน `next` อย่างเดียวไม่พอ หลังตั้งรหัสสำเร็จล้าง grant และ global sign-out; หาก revocation ล้มเหลว แสดงว่ารหัสเปลี่ยนแล้วพร้อมคำแนะนำ ไม่บอกว่ารหัสยังไม่เปลี่ยน JWT ที่ออกไปแล้วอาจยังใช้ได้จนหมดอายุ
 8. ถอดสวิตช์ 2FA/ประวัติ IP จำลอง/Export ที่กดไม่ได้ใน settings เปลี่ยนเป็นสถานะความสามารถจริงและช่องทางติดต่อ
+9. `/login` แสดง Google ก่อนอีเมล/รหัสผ่าน ถอดปุ่ม Magic Link เพื่อลดตัวเลือก ใช้ inline errors และสถานะกำลังส่งที่ปิดช่อง/ปุ่มร่วมกัน ใช้ shared `loginSchema` โดยรหัสผ่านต้องไม่ว่าง แต่ไม่บังคับ policy ของรหัสใหม่กับการเข้าสู่ระบบเพื่อรองรับบัญชีเดิม `sendMagicLink` และ callback เดิมยังคงอยู่ พร้อม `shouldCreateUser: false`, limiter และคำตอบที่ไม่เปิดเผยว่ามีบัญชีหรือไม่ รอบปรับหน้า login ไม่เปลี่ยน schema, config หรือ deployment
 
 ## ข้อจำกัดการส่งฝั่งเซิร์ฟเวอร์
 
@@ -60,5 +61,6 @@ Terms/privacy อธิบายฟังก์ชันและช่องท
 - Next.js Turbopack MCP และ browser จริง ตรวจ signup/validation/check-email/cooldown/ลิงก์ผิด/เอกสารที่จอ 1440 และ 390px โดย intercept provider และบล็อก fetch ภายนอก ไม่ใช่หลักฐานว่า SMTP/Google/อีเมลข้ามอุปกรณ์ผ่านแล้ว
 - รอบก่อนเพิ่มช่องยืนยันรหัสผ่าน: ฟอร์มพร้อม policy acknowledgement สูงใกล้เคียงเดิมบนมือถือ (~704px รวม card เทียบเดิม ~703px) และต่ำลงเล็กน้อยบน desktop (~704px เทียบเดิม ~721px) หลังเพิ่มช่องยืนยัน card บนมือถือสูง ~782px ช่อง/ปุ่มใหม่ยังอย่างน้อย 44px และไม่ล้นแนวนอน
 - รอบเพิ่ม confirmation: full suite 281 ไฟล์ / 3,502 cases, TypeScript, token lint และ production webpack build ผ่าน ตรวจ browser กรณีไม่ตรง/แก้ให้ตรง/แก้รหัสเดิม/ว่างแล้วกดสมัคร/แสดงซ่อน/สำเร็จไป check-email และ Google ผ่าน mock redirect โดยไม่กรอกรหัส ไม่มีอีเมลจริงหรือ migration เพิ่มในรอบนี้
+- รอบปรับหน้า login: TypeScript, token lint และ production webpack build ผ่าน; Next MCP ไม่พบ compilation/config/runtime errors ตรวจ browser ที่ 390×844 และ 1200×900px ไม่ล้นแนวนอน card ลดจาก ~580.8 เป็น ~487.6px (~16%) ช่อง/ปุ่ม/ลิงก์อย่างน้อย 44px ตรวจฟอร์มว่าง/focus/aria errors, รหัสเดิม 6 ตัวถึง mock Auth, ข้อผิดพลาดและการคืนสถานะปุ่ม, แสดง/ซ่อนรหัส, Google ไป mock redirect แม้ฟอร์มว่าง และแถบแจ้ง callback/password_changed ผ่าน React DevTools ยืนยัน LoginForm ใหม่ ไม่รัน full unit suite ซ้ำเพราะไม่มี lib เปลี่ยน และไม่ทดสอบ provider/SMTP/Staging/Production จริง
 
 อ้างอิงที่ตรวจ: [Supabase resend](https://supabase.com/docs/reference/javascript/auth-resend), [Auth rate limits](https://supabase.com/docs/guides/auth/rate-limits), [Password security](https://supabase.com/docs/guides/auth/password-security), [PKCE](https://supabase.com/docs/guides/auth/sessions/pkce-flow), [Vercel request headers](https://vercel.com/docs/headers/request-headers)

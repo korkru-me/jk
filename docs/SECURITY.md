@@ -65,7 +65,7 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 
 - ตรวจ email, password, display name และ `teacher|student` ซ้ำฝั่ง server ทุกครั้ง ห้ามเชื่อ role จากปุ่มหรือ TypeScript type ใน browser
 - Google OAuth ที่ยังไม่มี `survey_role` ต้องจบ profile completion ก่อนเข้า protected app; การกำหนด role ครั้งแรกต้องตรวจ exact session และ update เฉพาะ profile เดียวที่ `survey_role IS NULL`
-- Magic link จากหน้า login ต้องตั้ง `shouldCreateUser: false` และตอบแบบไม่เปิดเผยว่าอีเมลใดมีบัญชี
+- หน้า login ใช้ Google และ email/password โดยถอดปุ่ม Magic Link แล้ว; backend `sendMagicLink` และ callback เดิมยังต้องตั้ง `shouldCreateUser: false`, ผ่าน limiter และตอบแบบไม่เปิดเผยว่าอีเมลใดมีบัญชี
 - password recovery ต้องแลก code เป็น session ที่ callback ก่อนเรียก `updateUser`; หลังเปลี่ยน credential ให้ global sign-out เพื่อตัด refresh token เดิม
 - การสร้าง auth user ต้องสร้าง profile และ personal organization ใน transaction เดียว ฟังก์ชันซ่อม provisioning ต้องล็อกต่อ user และ idempotent เพื่อไม่สร้าง workspace ซ้ำเมื่อ callback ชนกัน
 
