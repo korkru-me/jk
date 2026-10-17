@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card } from '@/components/ui/card'
 import { PasswordSettingsSection } from '@/components/settings/password-settings-form'
+import { SignInMethodsSection } from '@/components/settings/sign-in-methods-section'
+import type { AccountSignInMethods, AccountSignInMethodActions } from '@/lib/auth/account-methods-types'
 import {
   User, ShieldCheck, Download, Globe,
 } from 'lucide-react'
@@ -52,9 +54,11 @@ interface ProfileSettingsProps {
   /** Synthetic lab routes substitute actions so preview forms cannot mutate accounts. */
   saveProfileAction?: typeof updateProfile
   changePasswordAction?: typeof updatePassword
+  signInMethods?: AccountSignInMethods | null
+  signInMethodActions?: AccountSignInMethodActions
 }
 
-export function ProfileSettings({ user, saveProfileAction = updateProfile, changePasswordAction }: ProfileSettingsProps) {
+export function ProfileSettings({ user, saveProfileAction = updateProfile, changePasswordAction, signInMethods, signInMethodActions }: ProfileSettingsProps) {
   const [isPending, startTransition] = useTransition()
 
   const [fullName, setFullName] = useState(user.full_name)
@@ -151,6 +155,7 @@ export function ProfileSettings({ user, saveProfileAction = updateProfile, chang
       </SectionCard>
 
       {/* ── Change Password ──────────────────────────────────────────────── */}
+      <SignInMethodsSection methods={signInMethods ?? null} {...signInMethodActions} />
       <PasswordSettingsSection email={user.email} changePasswordAction={changePasswordAction} />
 
       <SectionCard title="การยืนยันตัวตนสองชั้น (2FA)" description="ยังไม่รองรับการเปิดใช้งานใน KorKru" icon={ShieldCheck}>

@@ -8,6 +8,7 @@ import { reserveAuthEmail } from '@/lib/auth/email-request-limit.server'
 import { rememberSignupEmail } from '@/lib/auth/signup-email.server'
 import { POLICY_VERSION } from '@/lib/legal'
 import { clearRecoveryGrant, hasRecoveryGrant } from '@/lib/auth/recovery-grant.server'
+import { clearRecoveryIntent, issueRecoveryIntent } from '@/lib/auth/recovery-intent.server'
 import {
   completeProfileSchema,
   emailSchema,
@@ -205,7 +206,7 @@ export async function sendMagicLink(email: string) {
   return { success: true }
 }
 
-export async function forgotPassword(email: string) {
+export async function forgotPassword(email: string, expectedUserId?: string) {
   const supabase = await createClient()
   const parsed = emailSchema.safeParse(email)
   if (!parsed.success) return { error: validationMessage(parsed.error.issues) }
@@ -215,12 +216,22 @@ export async function forgotPassword(email: string) {
   const limit = await reserveAuthEmail(parsed.data)
   if (!limit.allowed) return { error: limit.error, retryAfterSeconds: limit.retryAfterSeconds }
 
-  const { error } = await supabase.auth.resetPasswordForEmail(parsed.data, {
-    redirectTo: callbackUrl,
-  })
-  if (error) {
-    const connectionError = authConnectionError(error)
-    if (connectionError) return { error: connectionError }
+  try {
+    const nonce = await issueRecoveryIntent(parsed.data, expectedUserId)
+    if (!nonce) return { error: 'ระบบส่งลิงก์ตั้งรหัสผ่านยังไม่พร้อมใช้งาน กรุณาลองใหม่ภายหลังหรือติดต่อผู้ดูแล KorKru' }
+    const redirectUrl = new URL(callbackUrl)
+    redirectUrl.searchParams.set('recovery_nonce', nonce)
+    const { error } = await supabase.auth.resetPasswordForEmail(parsed.data, {
+      redirectTo: redirectUrl.toString(),
+    })
+    if (error) {
+      await clearRecoveryIntent()
+      const connectionError = authConnectionError(error)
+      if (connectionError) return { error: connectionError }
+      return { error: 'ยังส่งอีเมลไม่ได้ในขณะนี้ กรุณารอสักครู่แล้วลองใหม่' }
+    }
+  } catch {
+    await clearRecoveryIntent()
     return { error: 'ยังส่งอีเมลไม่ได้ในขณะนี้ กรุณารอสักครู่แล้วลองใหม่' }
   }
   return { success: true }
