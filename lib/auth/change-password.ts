@@ -79,7 +79,7 @@ function providerError(error: AuthFailure, stage: 'identity' | 'verification' | 
       return signInRequired()
     }
   }
-  if (stage !== 'identity' && (error.code === 'invalid_credentials' || error.code === 'current_password_mismatch')) {
+  if (stage !== 'identity' && ['invalid_credentials', 'current_password_invalid', 'current_password_mismatch'].includes(error.code ?? '')) {
     return {
       error: 'รหัสผ่านปัจจุบันไม่ถูกต้อง หากสมัครด้วย Google หรือยังไม่ได้ตั้งรหัสผ่าน KorKru ให้ใช้ลิงก์ตั้งรหัสผ่านทางอีเมล',
       field: 'old_password',
