@@ -1,6 +1,14 @@
 # ระบบสมัครและความน่าเชื่อถือของบัญชี — 17 ตุลาคม 2026
 
-สถานะ: เตรียมโค้ดและทดสอบในเครื่องแล้ว **ยังไม่ deploy, ยังไม่ apply migration และยังไม่เชื่อม SMTP/ส่งอีเมลจริง** งานนี้ต่อจาก `codex/resend-quota-alert` จึงมีระบบเตือน 80/90/97% เดิมรวมอยู่ด้วย การสมัคร Resend พักไว้ตามคำขอเจ้าของ
+สถานะล่าสุด: **release ระบบบัญชีเดิม deploy แล้ว; Staging ต่อ SMTP และเจ้าของรายงานว่ากดยืนยันอีเมลสมัครเข้าใช้ได้แล้ว** เจ้าของกลับมาทำ Resend ต่อและพัก SEB แพตช์ feedback หน้า signup/check-email รอบล่าสุดผ่าน local checks/runtime แล้ว และปล่อยผ่าน Staging ก่อนให้เจ้าของทดสอบต่อ โดยไม่เปิด Production SMTP/Google/quota alerts
+
+## Milestones และสิ่งที่ยังไม่เปิด
+
+- Resend account สร้างแล้ว; `mail.korkru.com` Verified ใน Tokyo และ public DNS ตรงกับค่าที่กำหนด เจ้าของสร้าง Sending access key และกรอกเอง ไม่ส่ง key มาในแชท
+- อ่าน Staging configuration ยืนยัน custom SMTP `smtp.resend.com:465`, username `resend`, sender `auth@mail.korkru.com` / `KorKru Staging`, มี password; canonical Site URL เป็น `https://staging.korkru.com`, autoconfirm ปิดและ Require current password เปิด Signup/recovery templates ยังใช้ `{{ .ConfirmationURL }}` รายละเอียดและ tracking ที่ปิดเป็นค่าเริ่มต้นอยู่ใน `RESEND_SETUP.md`
+- เจ้าของรายงานว่าได้รับอีเมลสมัคร ยืนยันแล้วเข้า Staging สำเร็จ **ไม่ใช่ independent hosted Next ServerAction E2E** และยังไม่ยืนยัน recovery/Google/quota-alert delivery จริง
+- release ก่อนเตรียม `AUTH_FLOW_SECRET` แยก environment และ apply/record เฉพาะ limiter migration `20261017111034` แล้วทั้ง Staging/Production โดยไม่ replay migration backlog เดิม
+- Production SMTP ยังไม่เปิดใน workflow นี้และคง autoconfirm เปิด; Google และ `RESEND_QUOTA_ALERTS_ENABLED` ยังปิด ยังไม่ตั้ง Full access monitor key/webhook signing secret
 
 ## ข้อตกลงที่เจ้าของยืนยัน
 
@@ -15,10 +23,12 @@
 1. `/terms`, `/privacy`, `/contact` และลิงก์จริงจากหน้าสมัคร/หน้าหลัก; ถอดคำอ้าง ISO 27001/PDPA ที่ไม่มีหลักฐานจาก footer component เดิม (หน้าแรกใช้ LegalLinks แบบกระชับ ไม่เปิด footer การตลาดเดิม)
 2. หน้าสมัครเรียงบทบาท → รับทราบนโยบาย → Google → แบบฟอร์มอีเมล ใช้ shared validation, inline errors, password manager, ปุ่มแสดงรหัส และชื่อที่บอกขอบเขตการมองเห็น
    ช่องยืนยันรหัสผ่านต้องไม่ว่างและตรงกับรหัสเดิมทุกตัว รวมตัวพิมพ์/ช่องว่าง ตรวจซ้ำฝั่ง server ก่อนนับคำขอส่ง ไม่ส่ง confirmation ต่อไป Supabase มีปุ่มแสดง/ซ่อนแยกและตรวจใหม่เมื่อแก้รหัสหลังกรอกยืนยันแล้ว
-3. ถ้า Supabase ยังไม่มี session หลังสมัคร จะไป `/check-email` พร้อมอีเมลจาก HttpOnly cookie อายุ 30 นาที ไม่มีอีเมลใน query string/localStorage; ปุ่มส่งซ้ำอิงเวลาคำขอเดิม ไม่เริ่ม 60 วินาทีใหม่ทุก reload และเซิร์ฟเวอร์เป็นผู้ตัดสินลิมิต
+   รอบ feedback ล่าสุดแสดงสรุปและข้อผิดพลาดใต้บทบาท/นโยบาย/ชื่อ/อีเมล/รหัสผ่าน/ยืนยันรหัสผ่าน พร้อมเลื่อน focus ไปจุดผิดแรกเอง Google ตรวจเฉพาะบทบาทและนโยบาย ไม่บังคับช่องของ email signup
+3. ถ้า Supabase ยังไม่มี session หลังสมัคร จะไป `/check-email` พร้อมอีเมลจาก HttpOnly cookie อายุ 30 นาที ไม่มีอีเมลใน query string/localStorage; ปุ่มส่งซ้ำอิงเวลาคำขอเดิม ไม่เริ่ม 60 วินาทีใหม่ทุก reload และเซิร์ฟเวอร์เป็นผู้ตัดสินลิมิต รอบ feedback ใช้ absolute deadline คำนวณเวลาที่เหลือใหม่เมื่อ focus/pageshow/visibility เปลี่ยน แก้ countdown ค้างจาก timer ในแท็บเบื้องหลัง
+   หน้า visible ตรวจสถานะทุก 10 วินาทีและเมื่อ focus/pageshow ผ่าน `getSignupConfirmationStatus` ซึ่งใช้ `getUser` ตรวจเฉพาะอีเมลของ session ตัวเองที่มี `email_confirmed_at` และตรงกับอีเมลที่หน้าแสดง ไม่ใช้ public lookup หรือเชื่ออีเมลจากฟอร์มเพียงอย่างเดียว เมื่อยืนยันแล้วซ่อน resend/countdown และแสดง CTA เข้าใช้งาน การตรวจล้มเหลวไม่ถือว่ายืนยันแล้ว
 4. กรอกอีเมลใหม่ในหน้าเช็กอีเมลเป็นการขอลิงก์ยืนยันของที่อยู่นั้น **ไม่เปลี่ยนอีเมลของบัญชีเดิม** หากกรอกผิดตอนสมัคร ต้องสมัครด้วยที่อยู่ที่ถูกต้องโดยกรอกชื่อ/รหัสผ่านใหม่
 5. signup และ Google complete-profile ตรวจการยอมรับข้อกำหนด/รับทราบ privacy ซ้ำฝั่ง server แล้วบันทึก `terms_version`, `privacy_version`, `terms_acknowledged_at` ใน Auth user metadata ใช้เป็นบันทึกประกอบเท่านั้น **ไม่ใช่ immutable consent audit หรือแหล่ง authorization** บัญชีเดิมไม่ถูกบังคับยอมรับใหม่ในรอบนี้
-6. settings ครู/นักเรียนใช้ `PasswordSettingsSection`/`PasswordSettingsForm` ร่วมกัน มีรหัสปัจจุบัน/ใหม่/ยืนยัน พร้อม validation แยกช่องทั้ง client/server ปฏิเสธรหัสใหม่ที่เท่ารหัสเดิมแบบ raw ก่อน Auth และไม่ trim รหัสผ่าน ยังคงตรวจ exact session/email และยืนยันรหัสเดิมด้วย client แยกที่ไม่เก็บ session ก่อนส่ง `current_password` พร้อมรหัสใหม่ ใช้ policy เดียวกับสมัคร/รีเซ็ต (8 ตัวขึ้นไป มีอักษรอังกฤษและตัวเลข) แสดงผลผ่านเงื่อนไขจริงขณะพิมพ์ มีปุ่มแสดง/ซ่อนอิสระ เตือน Caps Lock และทางกู้คืนผ่านอีเมลเมื่อลืมรหัสหรือบัญชี Google ยังไม่มีรหัส ข้อผิดพลาดมีชนิดและช่องที่เกี่ยวข้องสำหรับรหัสเดิมผิด/ติดลิมิต/บริการขัดข้อง/ต้องยืนยันตัวตนใหม่ หากรหัสเปลี่ยนแล้วแต่ global revocation ไม่สำเร็จ ไป `/login?password_changed=1&sessions_revoked=0` เพื่อคงคำเตือน ไม่บอกว่าออกทุกอุปกรณ์สำเร็จ รอบปรับ settings ไม่เปลี่ยน schema/config/remote/deploy; ขั้นเตรียม SMTP/migration parity/hosted current-password ด้านล่างยังต้องทำ
+6. settings ครู/นักเรียนใช้ `PasswordSettingsSection`/`PasswordSettingsForm` ร่วมกัน มีรหัสปัจจุบัน/ใหม่/ยืนยัน พร้อม validation แยกช่องทั้ง client/server ปฏิเสธรหัสใหม่ที่เท่ารหัสเดิมแบบ raw ก่อน Auth และไม่ trim รหัสผ่าน ยังคงตรวจ exact session/email และยืนยันรหัสเดิมด้วย client แยกที่ไม่เก็บ session ก่อนส่ง `current_password` พร้อมรหัสใหม่ ใช้ policy เดียวกับสมัคร/รีเซ็ต (8 ตัวขึ้นไป มีอักษรอังกฤษและตัวเลข) แสดงผลผ่านเงื่อนไขจริงขณะพิมพ์ มีปุ่มแสดง/ซ่อนอิสระ เตือน Caps Lock และทางกู้คืนผ่านอีเมลเมื่อลืมรหัสหรือบัญชี Google ยังไม่มีรหัส ข้อผิดพลาดมีชนิดและช่องที่เกี่ยวข้องสำหรับรหัสเดิมผิด/ติดลิมิต/บริการขัดข้อง/ต้องยืนยันตัวตนใหม่ หากรหัสเปลี่ยนแล้วแต่ global revocation ไม่สำเร็จ ไป `/login?password_changed=1&sessions_revoked=0` เพื่อคงคำเตือน ไม่บอกว่าออกทุกอุปกรณ์สำเร็จ รอบพัฒนา settings เดิมไม่เปลี่ยน remote; สถานะ rollout/SMTP ล่าสุดอยู่ต้นเอกสาร
 7. reset-password ต้องมี HMAC intent อายุ 1 ชั่วโมงที่เก็บ recipient/nonce hash/expected ID เมื่อผูกบัญชี Raw nonce ส่งเฉพาะ `recovery_nonce` ใน redirect ของอีเมล Callback ตรวจ nonce/intent ในเบราว์เซอร์เดิม, PKCE และ recipient/expected ID ก่อนออก grant 10 นาทีผูก user/access token การล็อกอินอยู่แล้วหรือเปลี่ยน `next` อย่างเดียวไม่พอ ลิงก์เก่าที่ไม่มี nonce ต้องขอใหม่ หลังตั้งรหัสสำเร็จล้าง grant และพยายาม global sign-out; หาก revocation ล้มเหลวรายงานว่ารหัสเปลี่ยนแล้วพร้อมคำแนะนำ JWT เดิมอาจยังใช้ได้จนหมดอายุและการล้าง cookie ไม่ใช่ atomic single-use ledger
 8. ถอดสวิตช์ 2FA/ประวัติ IP จำลอง/Export ที่กดไม่ได้ใน settings เปลี่ยนเป็นสถานะความสามารถจริงและช่องทางติดต่อ
 9. `/login` แสดง Google ก่อนอีเมล/รหัสผ่าน ถอดปุ่ม Magic Link เพื่อลดตัวเลือก ใช้ inline errors และสถานะกำลังส่งที่ปิดช่อง/ปุ่มร่วมกัน ใช้ shared `loginSchema` โดยรหัสผ่านต้องไม่ว่าง แต่ไม่บังคับ policy ของรหัสใหม่กับการเข้าสู่ระบบเพื่อรองรับบัญชีเดิม `sendMagicLink` และ callback เดิมยังคงอยู่ พร้อม `shouldCreateUser: false`, limiter และคำตอบที่ไม่เปิดเผยว่ามีบัญชีหรือไม่ รอบปรับหน้า login ไม่เปลี่ยน schema, config หรือ deployment
@@ -40,13 +50,13 @@
 
 ลิมิตนี้คุม **เส้นทางในแอป** ไม่สามารถบังคับ request ที่เรียก Supabase Auth API โดยตรงด้วย public key ต้องตั้ง hosted Auth rate limits และ Require current password ด้วย หากจะเปิด CAPTCHA ต้องเพิ่ม widget และส่ง `captchaToken` ให้ครบทุก flow รวมการยืนยันรหัสเดิมก่อน แล้วทดสอบ Staging; รอบนี้ยังไม่ได้ต่อ CAPTCHA และไม่ควรเปิด enforcement แล้วอ้างว่า flow พร้อมใช้งาน
 
-## ก่อนนำขึ้น Staging
+## Checklist การตั้งค่าและ rollout
 
-1. เทียบ migration ใหม่อีกครั้ง: การตรวจวันที่ 17 ตุลาคมพบ `20261015132234_retain_proctor_evidence_until_assignment_deletion.sql` เป็น local-only ใน Staging; **ไม่ push/replay/repair migration เดิมอัตโนมัติ** ต้องให้ผู้รับผิดชอบจัดลำดับ rollout เดิมให้เรียบร้อยก่อน migration ใหม่ รอบนี้ไม่มีการเขียนฐานข้อมูล remote
-2. Commit migration กับ code ที่พึ่งพากัน แล้ว apply เฉพาะ Staging ตาม workflow ตรวจ RLS/grants/RPC/cron และทดสอบ concurrent connections จริงก่อน Production
+1. ตรวจ migration ledger ทุกครั้งก่อนเปลี่ยน schema: release นี้พบ retention `20261015132234` ต่างใน Staging และ SEB backlog เดิมใน Production จึงปล่อยเฉพาะ migration ใหม่ **ไม่ push/replay/repair migration เดิมอัตโนมัติ** งาน backlog เหล่านั้นยังแยกขอบเขต
+2. Migration กับ code ที่พึ่งพากันอยู่ใน release แล้ว และ apply/record เฉพาะ `20261017111034` ทั้งสอง environment พร้อมตรวจ catalog; hosted Staging Auth/Data smoke เดิมผ่าน 43/43 รวม concurrent limiter และ cleanup ไม่ใช่หลักฐาน SMTP หรือหน้า UI ของแพตช์ใหม่
 3. ตั้ง `AUTH_FLOW_SECRET`, server service key และ canonical `NEXT_PUBLIC_SITE_URL` ของแต่ละ environment ตรวจ redirect allowlist ให้มี `/auth/callback` และ `/auth/confirm`
-4. เปิด hosted **Confirm email** และ **Require current password when changing password**; `supabase/config.toml` ที่แก้เป็น confirmation=true มีผลเฉพาะ local ไม่ได้เปลี่ยน Dashboard ให้แล้ว
-5. ต่อ custom SMTP ตาม `docs/RESEND_SETUP.md` เมื่อเจ้าของพร้อม สมัคร/ยืนยัน/ส่งซ้ำ/กู้คืนด้วยบัญชีสังเคราะห์บน Staging โดยไม่ใช้ข้อมูล Production
+4. Hosted **Require current password when changing password** เปิดแล้วทั้งคู่; Staging เปิด **Confirm email** แต่ Production คง autoconfirm เปิดจน SMTP พร้อม `supabase/config.toml` มีผลเฉพาะ local ไม่ใช่หลักฐานค่า Dashboard
+5. Staging custom SMTP ต่อแล้วตาม `docs/RESEND_SETUP.md` และเจ้าของรายงาน signup/ยืนยันสำเร็จ; ยังต้องตรวจ resend/recovery ด้วยบัญชีสังเคราะห์โดยไม่ใช้ข้อมูล Production
 6. ค่าเริ่มต้น email link แบบ PKCE ต้องเปิดในเบราว์เซอร์เดิม (verifier cookie) ถ้าต้องการข้ามอุปกรณ์ ให้ตั้ง **signup template** หลัง custom SMTP พร้อมเป็น `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email` และทดสอบ click/expired/reused link จริง `/auth/confirm` รองรับเฉพาะ email/signup ไม่ใช้แทน recovery template ในรอบนี้
 7. Recovery template ต้องคง redirect URL ของคำขอที่มี `next=/reset-password` และ `recovery_nonce` กลับ callback แบบ PKCE; เปิดในเบราว์เซอร์ที่ขอภายใน intent 1 ชั่วโมง แล้วตั้งรหัสภายใน grant 10 นาที ลิงก์เก่าที่ไม่มี nonce ต้องขอใหม่ ไม่เปลี่ยนเป็น token-hash recovery โดยไม่มี code รองรับ
 8. ก่อนเปิด Google connection อ่าน `ACCOUNT_SIGN_IN_METHODS.md` ตั้ง public web client ID/audience/Authorized JavaScript origins ให้ตรง environment คง Manual Linking ปิด และเปิด flag หลัง Staging collision/race/สองวิธีเข้าได้ ID เดิมผ่านเท่านั้น ไม่เปลี่ยนการ login Google automatic linking เดิม
@@ -57,6 +67,8 @@ Terms/privacy อธิบายฟังก์ชันและช่องท
 
 ## การตรวจในเครื่อง
 
+- แพตช์ feedback signup/check-email ล่าสุด: TypeScript/token lint ผ่าน; full Vitest **288 ไฟล์ / 3,670 เคส** ผ่าน รวม status action ที่ตรวจ session ของตัวเอง 11 เคส Browser runtime ผ่าน 12 กรณี signup และ 9 กรณี confirmation ด้วย provider จำลอง: ทุกช่อง/การแก้ข้อความทันที/Google เฉพาะ role+terms, success หลังอีกแท็บยืนยันโดยไม่ reload, ไม่ยืนยันอีเมลอื่น, ไม่รับผลตรวจเก่าหลังแก้อีเมล และ cooldown อิงเวลาจริงที่ผ่านไป จอ 320/390px ไม่ล้นแนวนอน; React ตรวจ component/state ได้และ Next MCP compilation/config/session errors ว่าง ไม่ส่งอีเมลจริงเพิ่มเพื่อพิสูจน์ UI
+- Production webpack build ผ่านเมื่อเรียก Next binary ใน checkout นี้โดยตรงด้วย Node 24.19.0 เช่น Vercel; รอบแรกผ่าน symlink `.bin/next` ที่คัดลอกจากอีก checkout ทำให้ Next runtime ปะปนและ prerender ล้มเหลว จึงไม่แก้ application code เพื่อหลบ tooling error ไม่มี migration/config/secret ใหม่
 - TypeScript, token lint, unit tests และ production webpack build ใช้ env จำลอง ไม่มี credential จริง
 - ผลตรวจ: full suite 281 ไฟล์ / 3,499 cases ผ่านก่อนเพิ่ม unsupported-host guard; หลังแก้รอบสุดท้าย auth suite 6 ไฟล์ / 58 cases ผ่าน (รวม guard ใหม่นั้น), TypeScript/token lint/build ผ่าน และ Next MCP `issues`, `configErrors`, `sessionErrors` ว่าง
 - PGlite รัน SQL migration ใหม่ในฐานชั่วคราว ตรวจ cap/reset/grants/RLS/cleanup/การไม่สร้างแถวผู้รับหลัง IP เต็ม ไม่ได้พิสูจน์ race หลาย connection บน hosted Postgres

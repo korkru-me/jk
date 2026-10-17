@@ -1,22 +1,34 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useForm } from 'react-hook-form'
+import { useForm, type FieldErrors } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { loginWithGoogle, register } from '@/lib/actions/auth'
 import { signupSchema, type SignupInput } from '@/lib/auth/validation'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { AccountRoleField, PolicyAcknowledgmentField } from '@/components/auth/account-fields'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group'
 import { Separator } from '@/components/ui/separator'
+
+const SIGNUP_FIELDS = [
+  { name: 'role', label: 'เลือกครูหรือนักเรียน' },
+  { name: 'accept_terms', label: 'ข้อกำหนดและนโยบายความเป็นส่วนตัว' },
+  { name: 'full_name', label: 'ชื่อที่ใช้แสดง' },
+  { name: 'email', label: 'อีเมล' },
+  { name: 'password', label: 'รหัสผ่าน' },
+  { name: 'confirm_password', label: 'ยืนยันรหัสผ่าน' },
+] as const satisfies ReadonlyArray<{ name: keyof SignupInput; label: string }>
+
+type SignupField = (typeof SIGNUP_FIELDS)[number]['name']
+type SignupMethod = 'email' | 'google'
 
 function GoogleIcon() {
   return (
@@ -31,12 +43,15 @@ function GoogleIcon() {
 
 export function SignupForm() {
   const router = useRouter()
+  const form = useRef<HTMLFormElement>(null)
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [retryAfter, setRetryAfter] = useState(0)
+  const [validationMethod, setValidationMethod] = useState<SignupMethod | null>(null)
+  const [fieldToFocus, setFieldToFocus] = useState<SignupField | null>(null)
 
   const {
     register: registerField,
@@ -44,21 +59,50 @@ export function SignupForm() {
     watch,
     setValue,
     trigger,
-    formState: { errors, touchedFields, isSubmitted },
+    clearErrors,
+    getFieldState,
+    formState: { errors, touchedFields },
   } = useForm<SignupInput>({
     resolver: zodResolver(signupSchema),
     defaultValues: { full_name: '', email: '', password: '', confirm_password: '', accept_terms: false },
+    shouldFocusError: false,
   })
 
   const selectedRole = watch('role')
   const acceptedTerms = watch('accept_terms')
   const password = watch('password')
   const confirmPassword = watch('confirm_password')
+  const fullName = watch('full_name')
+  const email = watch('email')
   const busy = loading || googleLoading
+  const invalidFields = validationMethod === null ? [] : SIGNUP_FIELDS.filter(({ name }) =>
+    !!errors[name] && (validationMethod === 'email' || name === 'role' || name === 'accept_terms'))
 
   useEffect(() => {
-    if (touchedFields.confirm_password || isSubmitted) void trigger('confirm_password')
-  }, [password, confirmPassword, touchedFields.confirm_password, isSubmitted, trigger])
+    // After an invalid attempt, keep the summary and cross-field errors in sync
+    // as the user fixes the form. Google only requires role and acknowledgement.
+    if (validationMethod === 'email') void trigger()
+    else if (validationMethod === 'google') void trigger(['role', 'accept_terms'])
+    else if (touchedFields.confirm_password) void trigger('confirm_password')
+  }, [selectedRole, acceptedTerms, fullName, email, password, confirmPassword, touchedFields.confirm_password, validationMethod, trigger])
+
+  useEffect(() => {
+    if (!fieldToFocus || !form.current) return
+    const control = fieldToFocus === 'role'
+      ? form.current.querySelector<HTMLElement>('#signup-role [data-slot="toggle-group-item"]')
+      : fieldToFocus === 'accept_terms'
+        ? form.current.querySelector<HTMLElement>('#accept_terms')
+        : form.current.querySelector<HTMLElement>(`[name="${fieldToFocus}"]`)
+    if (control) {
+      const field = fieldToFocus === 'role'
+        ? control.closest('fieldset')
+        : control.closest('[data-slot="field"]')
+      const target = field ?? control
+      target.scrollIntoView({ block: 'center', behavior: 'auto' })
+      control.focus({ preventScroll: true })
+    }
+    setFieldToFocus(null)
+  }, [fieldToFocus])
 
   useEffect(() => {
     if (retryAfter <= 0) return
@@ -67,6 +111,7 @@ export function SignupForm() {
   }, [retryAfter])
 
   async function onSubmit(values: SignupInput) {
+    setValidationMethod('email')
     setLoading(true)
     setSubmitError(null)
     const formData = new FormData()
@@ -94,8 +139,20 @@ export function SignupForm() {
     }
   }
 
+  function handleInvalid(values: FieldErrors<SignupInput>) {
+    setValidationMethod('email')
+    setSubmitError(null)
+    setFieldToFocus(SIGNUP_FIELDS.find(({ name }) => values[name])?.name ?? null)
+  }
+
   async function handleGoogleSignup() {
-    if (!(await trigger(['role', 'accept_terms']))) return
+    setValidationMethod('google')
+    setSubmitError(null)
+    clearErrors(['full_name', 'email', 'password', 'confirm_password'])
+    if (!(await trigger(['role', 'accept_terms']))) {
+      setFieldToFocus(getFieldState('role').error ? 'role' : 'accept_terms')
+      return
+    }
 
     setGoogleLoading(true)
     setSubmitError(null)
@@ -111,13 +168,21 @@ export function SignupForm() {
     }
   }
 
+  const validationSummary = invalidFields.length > 0 && (
+    <Alert id="signup-validation-summary" variant="destructive">
+      <AlertTitle>ยังสมัครสมาชิกไม่ได้</AlertTitle>
+      <AlertDescription>กรุณาตรวจสอบ: {invalidFields.map(({ label }) => label).join(' · ')}</AlertDescription>
+    </Alert>
+  )
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-2" noValidate aria-busy={busy}>
+    <form ref={form} onSubmit={handleSubmit(onSubmit, handleInvalid)} className="flex flex-col gap-2" noValidate aria-busy={busy}>
       <FieldGroup className="gap-2">
         <AccountRoleField id="signup-role" value={selectedRole} onChange={(role) => setValue('role', role, { shouldValidate: true })} error={errors.role?.message} disabled={busy} />
         <PolicyAcknowledgmentField id="accept_terms" checked={acceptedTerms === true} onChange={(checked) => setValue('accept_terms', checked, { shouldValidate: true })} error={errors.accept_terms?.message} disabled={busy} />
 
-        <Button type="button" variant="outline" className="min-h-[44px] w-full" disabled={busy} onClick={handleGoogleSignup}>
+        {validationMethod === 'google' && validationSummary}
+        <Button type="button" variant="outline" className="min-h-[44px] w-full" disabled={busy} onClick={handleGoogleSignup} aria-describedby={validationMethod === 'google' && invalidFields.length > 0 ? 'signup-validation-summary' : undefined}>
           {googleLoading ? <Loader2 data-icon="inline-start" className="motion-safe:animate-spin" /> : <GoogleIcon />}
           สมัครด้วย Google
         </Button>
@@ -230,7 +295,8 @@ export function SignupForm() {
 
       {submitError && <Alert variant="destructive"><AlertDescription>{submitError}</AlertDescription></Alert>}
 
-      <Button type="submit" className="min-h-[44px] w-full" disabled={busy || retryAfter > 0}>
+      {validationMethod === 'email' && validationSummary}
+      <Button type="submit" className="min-h-[44px] w-full" disabled={busy || retryAfter > 0} aria-describedby={validationMethod === 'email' && invalidFields.length > 0 ? 'signup-validation-summary' : undefined}>
         {loading && <Loader2 data-icon="inline-start" className="motion-safe:animate-spin" />}
         {loading ? 'กำลังสมัครสมาชิก…' : retryAfter > 0 ? `ลองใหม่ได้ใน ${retryAfter} วินาที` : 'สมัครด้วยอีเมล'}
       </Button>
