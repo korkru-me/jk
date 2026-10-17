@@ -6,10 +6,8 @@ import type { QuestionPreviewProps } from '@/components/questions/question-previ
  * a teacher can see what a type turns into for a student before committing to
  * building one.
  *
- * These are written examples, not production data: the chooser prefers the
- * teacher's own newest question of the type and only falls back here when they
- * have not built one yet, and either way the dialog labels which of the two it
- * is showing. Nothing here is ever saved to the question bank.
+ * These are written examples, not production data. The chooser always shows
+ * these labelled examples without querying or saving the teacher's bank.
  *
  * They are shaped exactly like a saved question's preview props, so the same
  * student-facing renderer draws them — an example that drifted from what the

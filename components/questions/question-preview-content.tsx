@@ -2,10 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { randomizeVariables, evaluateFormula, evaluateStudentAnswer } from '@/lib/math/evaluator'
 import { drawFreshValues } from '@/lib/math/fresh-random-values'
 import { readVisibleRandomValues, rememberVisibleRandomValues, visibleRandomValueStorage } from '@/lib/math/visible-random-values'
-import { gradeValue, naturalMaxScore } from '@/lib/assignment-attempt'
+import { gradeValue, naturalMaxScore } from '@/lib/question-scoring'
 import { containsMath } from '@/lib/math/latex'
 import { renderRichTextHtml } from '@/lib/rich-text-html'
 import { RichText } from '@/components/ui/rich-text'
@@ -45,6 +44,9 @@ const PART_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ', 'ช', 'ซ', '�
 function isPdfUrl(url: string) {
   return /\.pdf(\?|$)/i.test(url)
 }
+
+export type PreviewMath = Pick<typeof import('@/lib/math/evaluator'),
+  'randomizeVariables' | 'evaluateFormula' | 'evaluateStudentAnswer'>
 
 export interface QuestionPreviewProps {
   questionText: string
@@ -144,7 +146,13 @@ export function QuestionPreviewContent({
   partLabelStyle,
   attachmentUrls = [],
   answerTolerance,
-}: QuestionPreviewProps) {
+  math,
+}: QuestionPreviewProps & { math: PreviewMath | undefined }) {
+  // The loading boundary supplies the evaluator only for numeric questions or
+  // questions with variables. Other types must not download mathjs to open.
+  const randomizeVariables = (input: Variable[]) => input.length ? math!.randomizeVariables(input) : {}
+  const evaluateFormula: PreviewMath['evaluateFormula'] = (...args) => math!.evaluateFormula(...args)
+  const evaluateStudentAnswer: PreviewMath['evaluateStudentAnswer'] = (...args) => math!.evaluateStudentAnswer(...args)
   const labels = partLabels(partLabelStyle)
   const [values, setValues] = useState<Record<string, number>>(() => randomizeVariables(variables))
   const visibleValuesIdentity = JSON.stringify([questionText, variables])
