@@ -2,194 +2,171 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { unstable_rethrow } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
-import { Loader2, Eye, EyeOff, Mail } from 'lucide-react'
-import { toast } from 'sonner'
+import type { z } from 'zod'
+import { Loader2, Eye, EyeOff } from 'lucide-react'
 
-import { login, loginWithGoogle, sendMagicLink } from '@/lib/actions/auth'
+import { login, loginWithGoogle } from '@/lib/actions/auth'
+import { loginSchema } from '@/lib/auth/validation'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group'
+import { Separator } from '@/components/ui/separator'
 
-const schema = z.object({
-  email:    z.string().email('รูปแบบอีเมลไม่ถูกต้อง'),
-  password: z.string().min(1, 'กรุณากรอกรหัสผ่าน'),
-})
+type FormValues = z.infer<typeof loginSchema>
 
-type FormValues = z.infer<typeof schema>
+function GoogleIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+    </svg>
+  )
+}
 
 export function LoginForm() {
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
-  const [magicLoading, setMagicLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const busy = loading || googleLoading
 
   const {
     register,
     handleSubmit,
-    getValues,
     formState: { errors },
-  } = useForm<FormValues>({ resolver: zodResolver(schema) })
+  } = useForm<FormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: '', password: '' },
+  })
 
   async function onSubmit(values: FormValues) {
     setLoading(true)
-    const fd = new FormData()
-    fd.set('email', values.email)
-    fd.set('password', values.password)
-    const result = await login(null, fd)
-    if (result?.error) {
-      toast.error(result.error)
+    setSubmitError(null)
+    const formData = new FormData()
+    formData.set('email', values.email)
+    formData.set('password', values.password)
+    try {
+      const result = await login(null, formData)
+      if (result?.error) setSubmitError(result.error)
+    } catch (error) {
+      unstable_rethrow(error)
+      setSubmitError('เชื่อมต่อไม่สำเร็จ กรุณาลองเข้าสู่ระบบอีกครั้ง')
+    } finally {
       setLoading(false)
     }
   }
 
-  async function handleMagicLink() {
-    const email = getValues('email')
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      toast.error('กรุณากรอกอีเมลที่ถูกต้องก่อนส่ง Magic Link')
-      return
-    }
-    setMagicLoading(true)
+  async function handleGoogleLogin() {
+    setGoogleLoading(true)
+    setSubmitError(null)
     try {
-      const result = await sendMagicLink(email)
-      if (result?.error) {
-        toast.error(result.error)
-      } else {
-        toast.success('หากอีเมลนี้มีบัญชี ระบบจะส่งลิงก์เข้าสู่ระบบให้')
-      }
-    } catch {
-      toast.error('เกิดข้อผิดพลาด กรุณาลองใหม่')
+      const result = await loginWithGoogle()
+      if (result?.error) setSubmitError(result.error)
+    } catch (error) {
+      unstable_rethrow(error)
+      setSubmitError('เชื่อมต่อ Google ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง')
+    } finally {
+      setGoogleLoading(false)
     }
-    setMagicLoading(false)
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
-      {/* Email */}
-      <div className="space-y-1.5">
-        <Label htmlFor="email">อีเมล</Label>
-        <Input
-          id="email"
-          type="email"
-          placeholder="teacher@school.ac.th"
-          autoComplete="email"
-          {...register('email')}
-        />
-        {errors.email && (
-          <p className="text-xs text-destructive">{errors.email.message}</p>
-        )}
-      </div>
-
-      {/* Password */}
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between">
-          <Label htmlFor="password">รหัสผ่าน</Label>
-          <Link
-            href="/forgot-password"
-            className="text-xs text-primary hover:underline"
-          >
-            ลืมรหัสผ่าน?
-          </Link>
-        </div>
-        <div className="relative">
-          <Input
-            id="password"
-            type={showPassword ? 'text' : 'password'}
-            placeholder="••••••••"
-            autoComplete="current-password"
-            className="pr-10"
-            {...register('password')}
-          />
-          <button
-            type="button"
-            onClick={() => setShowPassword((v) => !v)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-muted-foreground transition-colors"
-            aria-label={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
-          >
-            {showPassword ? (
-              <EyeOff className="h-4 w-4" />
-            ) : (
-              <Eye className="h-4 w-4" />
-            )}
-          </button>
-        </div>
-        {errors.password && (
-          <p className="text-xs text-destructive">{errors.password.message}</p>
-        )}
-      </div>
-
-      <Button type="submit" className="w-full" disabled={loading}>
-        {loading ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            กำลังเข้าสู่ระบบ...
-          </>
-        ) : (
-          'เข้าสู่ระบบ'
-        )}
-      </Button>
-
-      {/* Divider */}
-      <div className="relative">
-        <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-t border-border" />
-        </div>
-        <div className="relative flex justify-center text-xs">
-          <span className="bg-card px-2 text-muted-foreground">
-            หรือเข้าสู่ระบบด้วย
-          </span>
-        </div>
-      </div>
-
-      {/* Google OAuth */}
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3" noValidate aria-busy={busy}>
       <Button
         type="button"
         variant="outline"
-        className="w-full gap-2"
-        disabled={googleLoading || loading}
-        onClick={async () => {
-          setGoogleLoading(true)
-          const result = await loginWithGoogle()
-          if (result?.error) {
-            toast.error(result.error)
-            setGoogleLoading(false)
-          }
-        }}
+        className="min-h-[44px] w-full"
+        disabled={busy}
+        onClick={handleGoogleLogin}
       >
-        {googleLoading ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
-            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
-            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-          </svg>
-        )}
+        {googleLoading ? <Loader2 data-icon="inline-start" className="motion-safe:animate-spin" /> : <GoogleIcon />}
         เข้าสู่ระบบด้วย Google
       </Button>
 
-      {/* Magic Link */}
-      <Button
-        type="button"
-        variant="outline"
-        className="w-full gap-2"
-        disabled={magicLoading || loading}
-        onClick={handleMagicLink}
-      >
-        {magicLoading ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <Mail className="h-4 w-4" />
-        )}
-        ส่งลิงก์เข้าสู่ระบบทางอีเมล
+      <div className="flex items-center gap-3" aria-hidden>
+        <Separator className="flex-1" />
+        <span className="shrink-0 text-xs text-muted-foreground">หรือใช้อีเมล</span>
+        <Separator className="flex-1" />
+      </div>
+
+      <FieldGroup className="gap-2">
+        <Field data-invalid={!!errors.email} className="gap-1">
+          <FieldLabel htmlFor="email">อีเมล</FieldLabel>
+          <Input
+            id="email"
+            type="email"
+            inputMode="email"
+            placeholder="name@example.com"
+            autoComplete="username"
+            autoCapitalize="none"
+            spellCheck={false}
+            aria-invalid={!!errors.email}
+            aria-describedby={errors.email ? 'login-email-error' : undefined}
+            disabled={busy}
+            className="min-h-[44px]"
+            {...register('email')}
+          />
+          <FieldError id="login-email-error" errors={[errors.email]} />
+        </Field>
+
+        <Field data-invalid={!!errors.password} className="gap-1">
+          <div className="flex items-center justify-between gap-2">
+            <FieldLabel htmlFor="password">รหัสผ่าน</FieldLabel>
+            <Link href="/forgot-password" className="inline-flex min-h-[44px] items-center text-xs text-primary underline-offset-4 hover:underline">
+              ลืมรหัสผ่าน?
+            </Link>
+          </div>
+          <InputGroup className="min-h-[44px]">
+            <InputGroupInput
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              autoCapitalize="none"
+              spellCheck={false}
+              aria-invalid={!!errors.password}
+              aria-describedby={errors.password ? 'login-password-error' : undefined}
+              disabled={busy}
+              className="min-h-[44px]"
+              {...register('password')}
+            />
+            <InputGroupAddon align="inline-end" className="py-0">
+              <InputGroupButton
+                size="icon-sm"
+                className="min-h-[44px] min-w-[44px]"
+                onClick={() => setShowPassword((value) => !value)}
+                aria-label={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
+                aria-pressed={showPassword}
+                disabled={busy}
+              >
+                {showPassword ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
+              </InputGroupButton>
+            </InputGroupAddon>
+          </InputGroup>
+          <FieldError id="login-password-error" errors={[errors.password]} />
+        </Field>
+      </FieldGroup>
+
+      {submitError && (
+        <Alert variant="destructive">
+          <AlertDescription>{submitError}</AlertDescription>
+        </Alert>
+      )}
+
+      <Button type="submit" className="min-h-[44px] w-full" disabled={busy}>
+        {loading && <Loader2 data-icon="inline-start" className="motion-safe:animate-spin" />}
+        {loading ? 'กำลังเข้าสู่ระบบ…' : 'เข้าสู่ระบบ'}
       </Button>
 
-      <p className="text-center text-sm text-muted-foreground">
-        ยังไม่มีบัญชี?{' '}
-        <Link href="/signup" className="font-medium text-primary hover:underline">
+      <p className="flex flex-wrap items-center justify-center gap-1 text-sm text-muted-foreground">
+        ยังไม่มีบัญชี?
+        <Link href="/signup" className="inline-flex min-h-[44px] items-center font-medium text-primary underline-offset-4 hover:underline">
           สมัครสมาชิก
         </Link>
       </p>
