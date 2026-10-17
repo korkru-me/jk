@@ -1,20 +1,24 @@
 # แผนปล่อยระบบบัญชี — 17 ตุลาคม 2026
 
-สถานะ checkpoint นี้: **เตรียม release source, environment และ counter schema บน Staging แล้ว ยังไม่ deploy รุ่นนี้ขึ้น Production** เจ้าของอนุมัติเฉพาะการเพิ่ม secret/migration/URL/current-password policy แล้ว การสมัคร Resend ยังพักไว้ การเปิดความสามารถที่ต้องใช้ SMTP/Google จริงต้องรายงานแยกจากการนำโค้ดขึ้นเว็บ
+สถานะ checkpoint นี้: **Staging deploy และตรวจ Auth/Data smoke แล้ว; Production prerequisites ครบ แต่ยังไม่ deploy รุ่นนี้** เจ้าของอนุมัติการปล่อย Staging → Production พร้อม secret/migration/URL/current-password policy แล้ว การสมัคร Resend ยังพักไว้ การเปิดความสามารถที่ต้องใช้ SMTP/Google จริงต้องรายงานแยกจากการนำโค้ดขึ้นเว็บ
 
 ## Source และขอบเขต
 
 - Release branch: `codex/auth-production-release-20261017` เริ่มจาก Production `origin/master` ที่ `e1ccfc0`
-- Cherry-pick งานแชท 13 commits โดยไม่รวมสาม commits ประวัติ/synchronization ก่อนหน้า Source แอปที่ตรวจใน release `e20540a` ตรงกับ chat head `a2512d1`
+- Cherry-pick งานแชท 13 commits โดยไม่รวมสาม commits ประวัติ/synchronization ก่อนหน้า พร้อม release fixes ที่ตรวจต่อเนื่องจนถึง candidate `a83ecfc`
 - รวมหน้า signup/login/ยืนยันอีเมล/เอกสารติดต่อและนโยบาย, การเปลี่ยนรหัสครูและนักเรียน, โค้ดเชื่อมวิธีเข้าใช้บัญชีเดียวกัน, recovery safeguards, quota alerts และขนาดแบรนด์บนหน้าบัญชี
 - ไม่รวม `20261009142610_atomic_seb_exam_start.sql` และไม่เปิด native SEB เพิ่ม ไม่แก้ไฟล์งาน local ที่พักไว้นอก release นี้
 
 ## สิ่งที่ตรวจแล้ว
 
-- Full unit suite ผ่าน 286 ไฟล์ / 3,657 cases หลังรองรับ error codes `current_password_invalid`/`current_password_mismatch`/`current_password_required` เพิ่มจาก provider; TypeScript, token lint และ production webpack build ผ่าน
+- Full unit suite ผ่าน 3,657 cases; TypeScript, token lint และ production webpack build ผ่าน รวม error mapping ของ provider สำหรับ `current_password_invalid`/`current_password_mismatch`/`current_password_required`
 - Node.js ของ Vercel project `jk` เป็น 24 ซึ่งผ่านข้อกำหนด Node ≥22 ของ `svix@2.8.0`
 - Production ปัจจุบันยังเป็น deployment **Ready ของ `master` `e1ccfc0`** ไม่ใช่ release ใหม่นี้
-- ผล local/mock เดิมไม่ยืนยันการส่ง SMTP, Google linking หรือ recovery ผ่านอีเมลจริงบน hosted environment รายละเอียดอยู่ใน `AUTH_SIGNUP_ROLLOUT.md` และ `ACCOUNT_SIGN_IN_METHODS.md`
+- Staging deployment `dpl_JAPz9zrcyqafBcDDKpLaBH5jKKvz` เป็น **READY** ที่ SHA `aa21bd53547709808ea1daefcb2b992a3fb69460`; ไฟล์ auth/app ตรงกับ release `a83ecfc` ความต่างที่เหลือเป็นประวัติ QA/docs ของ Staging
+- Hosted Staging Auth/Data smoke **ผ่าน 43 รายการ ไม่ผ่าน 0 รายการ**: บัญชีครู/นักเรียนสังเคราะห์คง ID/role/profile หลังเปลี่ยนรหัส, รหัสปัจจุบันผิดถูกปฏิเสธ, isolated verifier ไม่แทน session เดิม, รหัสใหม่เข้าได้และรหัสเก่าเข้าไม่ได้; limiter สี่คำขอพร้อมกันอนุญาตหนึ่ง/ให้รอสาม และ anon/authenticated เรียกไม่ได้
+- Cleanup ยืนยัน `sessions`, `authUsers`, `publicProfiles`, `organizations`, `limiterBuckets` เป็น `true` ครบ
+- Hosted `/login`, `/signup`, `/terms`, `/privacy`, `/contact` ตอบ HTTP 200 ครบ มีป้าย STAGING และ SHA ตรงกับ deployment ทุกหน้า; login/signup แสดงโลโก้กวางขนาดใหญ่
+- **ยังไม่ได้ยืนยัน hosted Next ServerAction E2E, SMTP/อีเมลจริง หรือ Google จริง** ผล Auth/Data API, public-page smoke และ local/mock ไม่ครอบคลุมการทดสอบเหล่านี้ รายละเอียดอยู่ใน `AUTH_SIGNUP_ROLLOUT.md` และ `ACCOUNT_SIGN_IN_METHODS.md`
 
 ## Hosted configuration ที่อ่านพบ
 
@@ -25,28 +29,25 @@
 
 การไม่มี custom SMTP ไม่ใช่หลักฐานว่าอีเมลบัญชีส่งถึงผู้ใช้ทั่วไปได้ การเข้าสู่ระบบ Google ยังต้องตั้ง provider ให้พร้อม ไม่ถือว่าปุ่มหรือโค้ดที่ deploy แล้วแปลว่าบริการภายนอกเปิดใช้งานแล้ว
 
+หลังเตรียม release ยืนยัน Production Site URL/redirects เป็น canonical `https://www.korkru.com` และ Require current password เปิดแล้ว โดยคง email autoconfirm เปิดและ Google provider ปิด; Staging เปิด Require current password เช่นกัน
+
 ## แผนฐานข้อมูลเฉพาะงานนี้
 
 มี migration ใหม่ที่วางแผนปล่อยเพียงไฟล์เดียว: `20261017111034_auth_email_request_limits.sql` สำหรับ HMAC email/IP counters, service-only RPC/grants, RLS และ cleanup ของ counters ไม่มีการเปลี่ยน profile/role/ownership หรือข้อมูลการเรียน
 
 Production ยังมี backlog SEB เดิม 13 รายการ และ Staging ยังมีความต่างของ retention migration `20261015132234` ต้องบันทึก/ตรวจ ledger ของเป้าหมายจริงก่อนดำเนินการ ไม่ใช้ broad `db push`, ไม่ replay backlog, ไม่แก้ไฟล์ migration ที่ apply แล้ว และไม่ rewrite ประวัติเพื่อทำให้ตัวเลขตรงกัน การปล่อยรอบนี้ไม่รวมการสะสาง backlog เหล่านั้น
 
-สถานะ migration ใหม่ ณ checkpoint นี้: **Staging apply SQL ของไฟล์นี้และ record version 20261017111034 แล้ว; Production ยังรอ** Catalog ตรวจ RLS เปิด, anon/authenticated อ่านตารางหรือเรียก RPC ไม่ได้, service role เขียนได้, RPC เป็น invoker และมี local counter-cleanup schedule ไม่เปลี่ยน version เก่า การทดสอบ runtime บน Staging ยังอยู่ระหว่างตรวจ
+สถานะ migration ใหม่ ณ checkpoint นี้: **Staging และ Production apply SQL ของไฟล์นี้และ record เฉพาะ version 20261017111034 แล้ว** Production catalog ยืนยัน RLS เปิด, anon/authenticated อ่านตารางไม่ได้, service role insert ได้, ทั้งสอง RPC เป็น invoker และให้ execute เฉพาะ service role; cleanup schedule `17 * * * *` เปิดใช้งาน ไม่เปลี่ยน version เก่า ผล Auth/Data runtime บน Staging อยู่ในรายการที่ตรวจแล้วข้างต้น
 
-เพิ่ม `AUTH_FLOW_SECRET` แบบ sensitive คนละค่าสำหรับ Vercel Production และ Preview เฉพาะ `staging`, ตั้ง Google linking/Resend flags เป็น false และระบุ tier Production แล้ว ยังไม่หมุนหรือคัดลอก secret เดิม เปิด Require current password บน Staging โดยคง confirmation/Google/provider settings เดิม การทดสอบพบรหัสปฏิเสธจริง `current_password_invalid` (HTTP 400) จึงรองรับใน error mapping ด้วย
+ยืนยัน `AUTH_FLOW_SECRET` แบบ sensitive คนละค่าสำหรับ Vercel Production และ Preview เฉพาะ `staging` พร้อม Google linking/Resend flags เป็น false และ tier Production แล้ว ไม่บันทึก secret ใน Git หรือรายงานผล การทดสอบ Staging พบรหัสปฏิเสธจริง `current_password_invalid` (HTTP 400) จึงรองรับใน error mapping ด้วย
 
-Staging Auth/Data API ตรวจผ่าน 43 รายการ: บัญชีครู/นักเรียนสังเคราะห์คง ID/role/profile เดิมหลังเปลี่ยนรหัส, รหัสเดิมผิดถูกปฏิเสธ, isolated verifier ไม่แทน session เดิม, รหัสใหม่เข้าได้และรหัสเก่าเข้าไม่ได้; limiter สี่คำขอพร้อมกันอนุญาตหนึ่ง/ให้รอสาม และ anon/authenticated เรียกไม่ได้ ข้อมูลจำลอง users/profiles/personal organizations/counters ถูกล้างครบ ส่วน reporter ของการ sign-out ซ้ำระหว่าง cleanup ยังอยู่ระหว่างตรวจ ไม่ใช้ผลนี้อ้างว่า SMTP หรือ Next Server Action บน hosted UI ผ่านแล้ว
+## ขั้นตอน Production ที่ยังรอ
 
-## ลำดับ rollout
+1. เปิดและ merge PR ผ่าน workflow ของ `master` โดยคงขอบเขต release ที่ตรวจแล้ว
+2. รอ Production deployment เป็น Ready ตรวจ SHA และ alias จริง
+3. ทำ public smoke test แบบอ่านอย่างเดียว แล้วบันทึกผล Production แยกจาก Staging
 
-1. เก็บ release source/แผนนี้เป็น commit ที่ตรวจสอบได้ และตรวจ upstream ของ branch โดยไม่ดึง SEB history กลับเข้ามา
-2. เตรียม `AUTH_FLOW_SECRET` แบบสุ่มอย่างน้อย 32 ตัว **คนละค่าระหว่าง Staging และ Production** กับ service key/URL ของ environment ที่ถูกต้อง ไม่เขียน secret ใน Git หรือรายงานผล
-3. ปล่อย counter migration ตามขอบเขตข้างต้นและตรวจบน Staging ก่อน deploy source ไป Staging ทดสอบบัญชีสังเคราะห์/ลิมิต/สิทธิ์/การเปลี่ยนรหัสและ callback ที่ทำได้จริง โดยไม่ใช้ข้อมูล Production
-4. หลัง Staging verification ผ่าน จึงแก้ Production Site URL/redirects ให้เป็น canonical origin `https://www.korkru.com` ที่แอปใช้ และเปิด **Require current password** ตามผลที่ตรวจ เก็บรายการค่าที่เปลี่ยนเพื่อ rollback ได้ ไม่เปลี่ยน config ส่วนอื่นโดยพ่วงมา
-5. Apply/ตรวจเฉพาะ counter migration บน Production และตั้ง `AUTH_FLOW_SECRET` ให้พร้อม **ก่อน** deploy แอปรุ่นใหม่ มิฉะนั้น email actions จะ fail closed ทั้ง signup/ส่งซ้ำ/ลืมรหัส/ขอตั้งรหัสจาก settings
-6. Deploy ผ่าน release workflow ของ `master` หลังตรวจ source/checks แล้ว ตรวจ deployment Ready, commit ที่ deploy และ alias จริง ก่อนทำ public smoke test แบบอ่านอย่างเดียว บันทึก hash/deployment และผลตรวจที่ทำจริง
-
-ขั้นที่ยังรอ ณ checkpoint นี้: hosted Staging verification, migration ใหม่ทั้งสอง environment, secret/config ที่จำเป็น, การ merge/deploy Production และการตรวจเว็บหลัง deploy
+Counter schema และ `AUTH_FLOW_SECRET` ต้องพร้อมก่อนแอปรุ่นใหม่ เพราะ email actions จะ fail closed หากขาด dependency นี้ ทั้ง signup/ส่งซ้ำ/ลืมรหัส/ขอตั้งรหัสจาก settings; prerequisites เหล่านี้ยืนยันแล้วตามข้างต้น
 
 ## ค่าที่จะรักษาระหว่างการปล่อยโค้ด
 
