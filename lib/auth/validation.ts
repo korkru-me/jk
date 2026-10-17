@@ -30,9 +30,13 @@ export const signupSchema = z.object({
   full_name: displayNameSchema,
   email: emailSchema,
   password: passwordSchema,
+  confirm_password: z.string({ error: 'กรุณายืนยันรหัสผ่าน' }).min(1, 'กรุณายืนยันรหัสผ่าน'),
   accept_terms: z.boolean().refine((value) => value === true, {
     message: 'กรุณายอมรับข้อกำหนดและรับทราบนโยบายความเป็นส่วนตัว',
   }),
+}).refine((values) => values.password === values.confirm_password, {
+  path: ['confirm_password'],
+  message: 'รหัสผ่านไม่ตรงกัน',
 })
 
 export const loginSchema = z.object({

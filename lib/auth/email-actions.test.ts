@@ -18,7 +18,7 @@ import { completeProfile, forgotPassword, loginWithGoogle, register, resendSignu
 
 function signup(accept = true) {
   const form = new FormData()
-  Object.entries({ role: 'student', full_name: 'นักเรียนทดสอบ', email: 'Student@Example.COM', password: 'password1', accept_terms: String(accept) }).forEach(([key, value]) => form.set(key, value))
+  Object.entries({ role: 'student', full_name: 'นักเรียนทดสอบ', email: 'Student@Example.COM', password: 'password1', confirm_password: 'password1', accept_terms: String(accept) }).forEach(([key, value]) => form.set(key, value))
   return form
 }
 beforeEach(() => {
@@ -44,6 +44,19 @@ describe('public email actions', () => {
       } },
     })
     expect(mocks.remember).toHaveBeenCalledWith('student@example.com')
+    expect(mocks.signUp.mock.calls[0][0]).not.toHaveProperty('confirm_password')
+    expect(mocks.signUp.mock.calls[0][0].options.data).not.toHaveProperty('confirm_password')
+  })
+
+  it('rejects missing or mismatched confirmation before reserving or sending email', async () => {
+    for (const confirmation of [null, '', 'Password1', 'password1 ']) {
+      const form = signup()
+      if (confirmation === null) form.delete('confirm_password')
+      else form.set('confirm_password', confirmation)
+      expect(await register(form)).toHaveProperty('error')
+    }
+    expect(mocks.reserve).not.toHaveBeenCalled()
+    expect(mocks.signUp).not.toHaveBeenCalled()
   })
   it('does not reveal an already registered address in the signup result', async () => {
     mocks.signUp.mockResolvedValue({ data: { session: null, user: null }, error: { code: 'user_already_exists' } })
