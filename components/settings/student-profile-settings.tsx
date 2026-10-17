@@ -16,6 +16,8 @@ import { NativeSelect } from '@/components/ui/native-select'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 import { AvatarCropEditor } from '@/components/settings/avatar-crop-editor'
 import { PasswordSettingsSection } from '@/components/settings/password-settings-form'
+import { SignInMethodsSection } from '@/components/settings/sign-in-methods-section'
+import type { AccountSignInMethods, AccountSignInMethodActions } from '@/lib/auth/account-methods-types'
 import {
   User, GraduationCap, Phone, Eye, Plus, X,
 } from 'lucide-react'
@@ -84,9 +86,11 @@ interface StudentProfileSettingsProps {
   saveProfileAction?: typeof updateMyStudentProfile
   changePasswordAction?: typeof updatePassword
   saveAvatarAction?: typeof updateMyAvatar
+  signInMethods?: AccountSignInMethods | null
+  signInMethodActions?: AccountSignInMethodActions
 }
 
-export function StudentProfileSettings({ user, profile, saveProfileAction = updateMyStudentProfile, changePasswordAction = updatePassword, saveAvatarAction = updateMyAvatar }: StudentProfileSettingsProps) {
+export function StudentProfileSettings({ user, profile, saveProfileAction = updateMyStudentProfile, changePasswordAction = updatePassword, saveAvatarAction = updateMyAvatar, signInMethods, signInMethodActions }: StudentProfileSettingsProps) {
   const router = useRouter()
   const [isInfoPending, startInfoTransition] = useTransition()
 
@@ -332,6 +336,7 @@ export function StudentProfileSettings({ user, profile, saveProfileAction = upda
       </form>
 
       {/* ── Change Password ──────────────────────────────────────────────── */}
+      <SignInMethodsSection methods={signInMethods ?? null} {...signInMethodActions} />
       <PasswordSettingsSection email={user.email} changePasswordAction={changePasswordAction} />
     </div>
   )

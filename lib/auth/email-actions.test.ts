@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   reserve: vi.fn(), remember: vi.fn(),
   getUser: vi.fn(), getSession: vi.fn(), updateUser: vi.fn(), signOut: vi.fn(), profileRead: vi.fn(), profileUpdate: vi.fn(),
   hasGrant: vi.fn(), clearGrant: vi.fn(),
+  issueIntent: vi.fn(), clearIntent: vi.fn(),
 }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn(async () => ({ auth: mocks })) }))
 vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: vi.fn(() => ({ from: () => ({
@@ -14,6 +15,7 @@ vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: vi.fn(() => ({ from:
 vi.mock('@/lib/auth/email-request-limit.server', () => ({ reserveAuthEmail: mocks.reserve }))
 vi.mock('@/lib/auth/signup-email.server', () => ({ rememberSignupEmail: mocks.remember }))
 vi.mock('@/lib/auth/recovery-grant.server', () => ({ hasRecoveryGrant: mocks.hasGrant, clearRecoveryGrant: mocks.clearGrant }))
+vi.mock('@/lib/auth/recovery-intent.server', () => ({ issueRecoveryIntent: mocks.issueIntent, clearRecoveryIntent: mocks.clearIntent }))
 import { completeProfile, forgotPassword, loginWithGoogle, register, resendSignupConfirmation, resetPassword, sendMagicLink } from '../actions/auth'
 
 function signup(accept = true) {
@@ -24,6 +26,7 @@ function signup(accept = true) {
 beforeEach(() => {
   vi.stubEnv('NEXT_PUBLIC_SITE_URL', 'https://fixture.invalid')
   mocks.reserve.mockResolvedValue({ allowed: true })
+  mocks.issueIntent.mockResolvedValue('n'.repeat(43))
   mocks.signUp.mockResolvedValue({ data: { session: null, user: { id: 'synthetic' } }, error: null })
   for (const name of ['resend', 'resetPasswordForEmail', 'signInWithOtp'] as const) mocks[name].mockResolvedValue({ error: null })
 })
@@ -68,6 +71,7 @@ describe('public email actions', () => {
       expect(await action()).toMatchObject({ error: 'กรุณารอ', retryAfterSeconds: 60 })
     }
     for (const fn of [mocks.signUp, mocks.resend, mocks.resetPasswordForEmail, mocks.signInWithOtp]) expect(fn).not.toHaveBeenCalled()
+    expect(mocks.issueIntent).not.toHaveBeenCalled()
   })
   it('resends only signup confirmations with the fixed destination', async () => {
     await resendSignupConfirmation('STUDENT@example.com')
@@ -88,8 +92,32 @@ describe('public email actions', () => {
   it('does not create a new user through magic link and scopes recovery to reset-password', async () => {
     await sendMagicLink('student@example.com')
     expect(mocks.signInWithOtp.mock.calls[0][0].options.shouldCreateUser).toBe(false)
-    await forgotPassword('student@example.com')
-    expect(mocks.resetPasswordForEmail).toHaveBeenCalledWith('student@example.com', { redirectTo: 'https://fixture.invalid/auth/callback?next=%2Freset-password' })
+    const result = await forgotPassword(' Student@Example.COM ')
+    expect(mocks.issueIntent).toHaveBeenCalledWith('student@example.com', undefined)
+    expect(mocks.resetPasswordForEmail).toHaveBeenCalledWith('student@example.com', { redirectTo: `https://fixture.invalid/auth/callback?next=%2Freset-password&recovery_nonce=${'n'.repeat(43)}` })
+    expect(result).toEqual({ success: true })
+    expect(JSON.stringify(result)).not.toContain('n'.repeat(43))
+  })
+  it('adds an exact user restriction for authenticated password setup without returning that proof', async () => {
+    const result = await forgotPassword('student@example.com', 'original-user')
+    expect(mocks.issueIntent).toHaveBeenCalledWith('student@example.com', 'original-user')
+    expect(result).toEqual({ success: true })
+    expect(JSON.stringify(result)).not.toMatch(/original-user|nnnnnnnnnn/)
+  })
+  it('fails closed before sending when the signed recovery intent cannot be created', async () => {
+    mocks.issueIntent.mockResolvedValue(null)
+    expect(await forgotPassword('student@example.com')).toHaveProperty('error')
+    expect(mocks.resetPasswordForEmail).not.toHaveBeenCalled()
+  })
+  it('clears the pending intent after a failed or thrown provider send without exposing its nonce', async () => {
+    mocks.resetPasswordForEmail.mockResolvedValueOnce({ error: { code: 'unexpected_failure', message: 'private provider details' } })
+    const first = await forgotPassword('student@example.com')
+    expect(first).toHaveProperty('error')
+    expect(JSON.stringify(first)).not.toMatch(/private provider|nnnnnnnnnn/)
+    expect(mocks.clearIntent).toHaveBeenCalledOnce()
+    mocks.resetPasswordForEmail.mockRejectedValueOnce(new Error('private transport details'))
+    expect(await forgotPassword('student@example.com')).toHaveProperty('error')
+    expect(mocks.clearIntent).toHaveBeenCalledTimes(2)
   })
   it('requires acknowledgement for Google signup before connecting to Google', async () => {
     expect(await loginWithGoogle('student', false)).toHaveProperty('error')

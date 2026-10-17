@@ -3,12 +3,14 @@ import { getCurrentUser } from '@/lib/actions/settings'
 import { getMyStudentProfile } from '@/lib/actions/student-profile'
 import { ProfileSettings } from '@/components/settings/profile-settings'
 import { StudentProfileSettings } from '@/components/settings/student-profile-settings'
+import { getAccountSignInMethods } from '@/lib/actions/account-methods'
 
 export const metadata = { title: 'ข้อมูลส่วนตัว — KorKru' }
 
 export default async function ProfileSettingsPage() {
   const user = await getCurrentUser()
   if (!user) redirect('/login')
+  const signInMethods = await getAccountSignInMethods()
 
   if (user.role === 'student') {
     const profile = await getMyStudentProfile()
@@ -25,12 +27,14 @@ export default async function ProfileSettingsPage() {
           created_at: user.created_at,
         }}
         profile={profile}
+        signInMethods={signInMethods}
       />
     )
   }
 
   return (
     <ProfileSettings
+      signInMethods={signInMethods}
       user={{
         id: user.id,
         full_name: user.full_name,
