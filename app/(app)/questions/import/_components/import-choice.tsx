@@ -2,9 +2,12 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ChevronRight, FileText, Loader2, PackageOpen } from 'lucide-react'
+import { ArrowRight, FileText, Loader2, PackageOpen } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 import { ImportQuestionsButton } from '@/components/questions/import-questions-button'
 import { withBackHref } from '@/lib/back-link'
+import styles from './import-choice.module.css'
 
 /**
  * The two ways โจทย์ get into the คลัง without being typed.
@@ -14,47 +17,58 @@ import { withBackHref } from '@/lib/back-link'
  * does not: it is what the sidebar's "นำเข้าโจทย์" points at, and it says what
  * each file is before asking anyone to pick one.
  */
-const CARD =
-  'flex items-start gap-4 rounded-xl border-2 p-4 text-left transition-all hover:shadow-md'
-
 export function ImportChoice() {
   const router = useRouter()
 
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-      <Link
-        href={withBackHref('/questions/import/word', '/questions/import')}
-        className={`${CARD} border-tint-1/20 bg-tint-1/10 text-tint-1`}
-      >
-        <FileText className="mt-0.5 size-6 shrink-0" aria-hidden />
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold">จากไฟล์ Word (.docx)</p>
-          <p className="mt-0.5 text-xs leading-relaxed opacity-75">
-            แบบฝึกหัดหรือข้อสอบที่พิมพ์ไว้แล้ว — เลือกประเภทโจทย์ก่อน แล้วระบบจะบอกวิธีจัดไฟล์ให้อ่านได้แม่นที่สุด
-          </p>
+    <div className="grid grid-cols-1 gap-3 @min-[42rem]:grid-cols-2">
+      <Card radius="md" padding="none" interactive className={`${styles.card} ${styles.word}`}>
+        <div className={styles.header}>
+          <FileText aria-hidden="true" focusable="false" strokeWidth={1.35} className={styles.watermark} />
+          <h2 className={styles.title}>จากไฟล์ Word <span className={styles.format}>.docx</span></h2>
         </div>
-        <ChevronRight className="mt-0.5 size-4 shrink-0 opacity-40" aria-hidden />
-      </Link>
+        <div className={styles.body}>
+          <p className={styles.description}>
+            นำเข้าแบบฝึกหัดหรือข้อสอบที่พิมพ์ไว้แล้ว
+          </p>
+          <Link
+            href={withBackHref('/questions/import/word', '/questions/import')}
+            aria-label="เลือกประเภทโจทย์เพื่อนำเข้าจากไฟล์ Word .docx"
+            className={styles.action}
+          >
+            เลือกประเภทโจทย์ <ArrowRight aria-hidden="true" className="size-4" />
+          </Link>
+        </div>
+      </Card>
 
       <ImportQuestionsButton onImported={() => router.refresh()}>
         {({ open, isPending }) => (
-          <button
-            type="button"
-            onClick={open}
-            disabled={isPending}
-            className={`${CARD} border-success/20 bg-success/10 text-success disabled:opacity-60`}
-          >
-            {isPending
-              ? <Loader2 className="mt-0.5 size-6 shrink-0 animate-spin" aria-hidden />
-              : <PackageOpen className="mt-0.5 size-6 shrink-0" aria-hidden />}
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold">จากไฟล์ KorKru (.korkru.json)</p>
-              <p className="mt-0.5 text-xs leading-relaxed opacity-75">
-                ไฟล์ที่ส่งออกจากคลังโจทย์ของ KorKru — ใช้ย้ายโจทย์ข้ามบัญชี หรือรับไฟล์ที่ครูคนอื่นส่งมา
-              </p>
+          <Card radius="md" padding="none" interactive data-pending={isPending || undefined} className={`${styles.card} ${styles.korkru}`}>
+            <div className={styles.header}>
+              <PackageOpen aria-hidden="true" focusable="false" strokeWidth={1.35} className={styles.watermark} />
+              <h2 className={styles.title}>จากไฟล์ KorKru <span className={styles.format}>.korkru.json</span></h2>
             </div>
-            <ChevronRight className="mt-0.5 size-4 shrink-0 opacity-40" aria-hidden />
-          </button>
+            <div className={styles.body}>
+              <p className={styles.description}>
+                ย้ายโจทย์ข้ามบัญชี หรือรับไฟล์จากครูคนอื่น
+              </p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={open}
+                disabled={isPending}
+                aria-busy={isPending}
+                aria-label={isPending ? 'กำลังนำเข้าโจทย์จากไฟล์ KorKru' : 'เลือกไฟล์ KorKru .korkru.json เพื่อนำเข้าโจทย์'}
+                className={styles.action}
+              >
+                {isPending ? 'กำลังนำเข้า...' : 'เลือกไฟล์ KorKru'}
+                {isPending
+                  ? <Loader2 aria-hidden="true" data-icon="inline-end" className="motion-safe:animate-spin" />
+                  : <ArrowRight aria-hidden="true" data-icon="inline-end" />}
+              </Button>
+            </div>
+          </Card>
         )}
       </ImportQuestionsButton>
     </div>

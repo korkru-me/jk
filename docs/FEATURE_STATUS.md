@@ -1,10 +1,21 @@
 # Feature status
 
-## กรอบเลือกประเภทโจทย์ตามหน้าหลัก — 17 ตุลาคม 2026 (เตรียมโค้ด ยังไม่ deploy)
+## กรอบเลือกวิธีนำเข้าโจทย์ตามธีมเว็บ — 17 ตุลาคม 2026 (เตรียมโค้ด ยังไม่ deploy)
+
+- `/questions/import` เปลี่ยนสองกรอบเต็มสีเป็น Card หัวสีอ่อน/ส่วนล่างพื้นขาวตามหน้าหลักและหน้าสร้างโจทย์ ใช้ FileText/PackageOpen 32px เป็นภาพจางขวาบน แสดงนามสกุลไฟล์แยกจากชื่อ ย่อคำอธิบายและวาง “เลือกประเภทโจทย์” / “เลือกไฟล์ KorKru” ด้านล่างขวา กดได้ทั้งกรอบ มี focus ring และพื้นที่คำสั่งอย่างน้อย 44px
+- หน้าขยายเต็มความกว้าง shell และใช้ container grid 1/2 คอลัมน์ที่ 42rem วัดกรอบสูง 113.5px ทุกขนาด 320/390/768/1440px จากเดิมประมาณ 123–143px ไม่มี overflow/ข้อความหรือไอคอนถูกตัด ทดสอบ container 500px บน viewport 1440px แล้วเรียงหนึ่งคอลัมน์ตามพื้นที่จริง
+- เพิ่ม fixture `/exam-screen-lab/question-import-options` ที่ import หน้าจริงและปิดบน Production ด้วย guard เดิม ตรวจ local Chrome ทั้งสว่าง/มืด คีย์บอร์ดและ focus ring ผ่าน กดค้าง/ปล่อยบนหัว คำอธิบาย และ footer ของ KorKru แล้วยังเรียก native file input ได้ ตรวจ Enter/Space ด้วยโดยดัก click ไม่ให้เลือกไฟล์จริง รวม 5 ครั้ง ลิงก์ Word คง `back=/questions/import` React แสดง ImportQuestionsButton เดิม ไม่มี runtime error ของ fixture และ Next MCP ไม่มี compilation/config error; session ของ `/` เดิมยังรายงานว่า local ไม่มี Supabase URL/key
+- TypeScript, token lint และ production build ผ่าน ไม่รัน unit suite ซ้ำเพราะไม่มี lib/parser/import logic เปลี่ยน ไม่ได้ทดสอบนำเข้าไฟล์จริง, authenticated shell หรือ hosted Staging ไม่มี migration, schema, scoring หรือรูปแบบ Word/ไฟล์ KorKru เปลี่ยน ใช้ `ImportQuestionsButton` และการ refresh หลังนำเข้าเดิม
+
+## กรอบเลือกประเภทโจทย์ตามหน้าหลัก — 17 ตุลาคม 2026 (Production · PR #59)
 
 - `/questions/new` ใช้หัวสีอ่อนและส่วนล่างสีขาวตามการ์ดหน้าหลัก คงสีประเภททั้ง 11 แบบ ย้ายไอคอนเป็นลายพื้นหลังขวาบนขนาด 32px ให้เห็นครบในหัวสูงขั้นต่ำ 40px ย่อคำอธิบายและระยะห่าง แถวคำสั่งวาง Eye พร้อม “ดูตัวอย่างโจทย์” แบบ ghost เล็กทางซ้าย และ “สร้างโจทย์” พร้อมลูกศรทางขวา ทั้งกรอบยังเป็นลิงก์สร้างเดิมโดยปุ่มตัวอย่างแยก target มีพื้นที่กดอย่างน้อย 44px
 - ตามคำปรับล่าสุดของเจ้าของ ลดความสูงจากต้นแบบใหม่ประมาณ 187px เหลือ 114px (ประมาณ 39%) ที่ 390/768/1440px; ที่ 320px สูง 114–133px ตามข้อความ ปุ่มตัวอย่างที่มองเห็นสูงประมาณ 33.6px พร้อมพื้นที่กดโปร่งใส ไอคอนพื้นหลังไม่ถูกตัด ไม่ล้นแนวนอนและปุ่มไม่เบียดกันทั้งสี่ขนาด
 - ตรวจ local fixture `/exam-screen-lab/question-samples` ด้วย Chrome: เปิดตัวอย่างครบ 11 ประเภท โหมดสว่าง/มืด ลิงก์ทั้งกรอบ/ปุ่มตัวอย่าง และคีย์บอร์ดเปิด/ปิด Dialog กับ focus ring ผ่าน; หลังคืนข้อความ “ดูตัวอย่างโจทย์” ตรวจขนาดทั้งสี่และเปิด/ปิดจับคู่ซ้ำผ่าน TypeScript, token lint และ production build ผ่าน Next MCP ไม่มี compilation/config errors; fixture ไม่มี runtime error แต่มี session ของ `/` รายงานว่า local ยังไม่มี Supabase URL/key จึงไม่ได้ทดสอบ authenticated app shell/บันทึกโจทย์หรือ hosted Staging ในรอบออกแบบนี้ ไม่รัน unit suite ซ้ำเพราะไม่มีการแก้ `lib/` หรือ logic ตัวอย่าง/คะแนน ไม่มี migration หรือรูปแบบโจทย์/Word เปลี่ยน
+
+- Hosted Staging commit `3e9e4c2` / deployment `dpl_C7z7XVAwa3SQuqYFC7mXMxryUqpz` เป็น Ready พร้อม alias และป้าย Staging ตรงกัน ไฟล์ UI สามไฟล์ตรงกับ PR เปิดตัวอย่างครบ 11 ประเภท คะแนนตัวเลข 2/2, 320/390/768/1440px, ปุ่มไม่เบียดกัน/ไอคอนไม่ถูกตัด, โหมดมืดและคีย์บอร์ดผ่าน ไม่พบ runtime error ใช้ fixture ร่วมกับ route จริงโดยไม่สร้างข้อมูลหรือเรียกฐานข้อมูล เจ้าของอนุญาต merge/deploy เมื่อผ่าน ดูบันทึก `docs/QUESTION_TYPE_CARDS_RELEASE_20261017.md`
+
+- PR #59 merge เข้า `master` ที่ `3971834` แล้ว Production deployment `dpl_FEQrrznNtrhvYXXNPhrEZmEFvhXK` เป็น Ready และ SHA ตรงกับ merge พร้อม alias `www.korkru.com`/`korkru.com` ตรวจแบบ read-only: `/login` 200 และ tier production ไม่มีป้าย Staging, `/questions/new` 307 ไป login เมื่อไม่มี session, lab ตัวอย่าง 404 ไม่มีข้อมูลหรือ schema เปลี่ยน
 
 ## แก้ตัวอย่างหน้าสร้างโจทย์รอนาน — 17 ตุลาคม 2026 · PR #58
 
