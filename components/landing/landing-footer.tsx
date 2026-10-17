@@ -1,99 +1,39 @@
 import Link from 'next/link'
 import { BrandLogo } from '@/components/brand-logo'
+import { LegalLinks } from '@/components/legal/legal-links'
+import { Separator } from '@/components/ui/separator'
+import { LEGAL_LINKS } from '@/lib/legal'
 
 export function LandingFooter() {
   return (
-    <footer className="border-t border-border bg-card">
-      <div className="mx-auto max-w-6xl px-4 py-12">
-        <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
-          <div className="col-span-2 sm:col-span-1">
-            <div className="flex items-center gap-2.5 mb-4">
-              <BrandLogo />
-            </div>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              แพลตฟอร์มคลังข้อสอบอัจฉริยะ สำหรับครูและสถาบันการศึกษา สร้างโดยครู เพื่อครู
+    <footer className="bg-card">
+      <Separator />
+      <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-5">
+        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+          <div className="flex max-w-md flex-col gap-2">
+            <Link href="/" aria-label="KorKru หน้าหลัก" className="inline-flex min-h-11 w-fit items-center rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+              <BrandLogo compact />
+            </Link>
+            <p className="text-sm leading-6 text-muted-foreground">
+              พื้นที่สร้างโจทย์ จัดห้องเรียน และติดตามงานสำหรับครูและนักเรียน
             </p>
           </div>
-
-          <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-              ผลิตภัณฑ์
-            </h3>
-            <ul className="space-y-2">
-              {[
-                { href: '/pricing', label: 'ราคาและแพ็กเกจ' },
-                { href: '/signup', label: 'สมัครใช้งานฟรี' },
-                { href: '/login', label: 'เข้าสู่ระบบ' },
-              ].map((link) => (
-                <li key={link.href}>
-                  <Link
-                    href={link.href}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-              บริษัท
-            </h3>
-            <ul className="space-y-2">
-              {[
-                { href: '#', label: 'เกี่ยวกับเรา' },
-                { href: 'mailto:hello@korkru.app', label: 'ติดต่อเรา' },
-                { href: '#', label: 'บล็อก' },
-              ].map((link) => (
-                <li key={link.label}>
-                  <a
-                    href={link.href}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {link.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-              กฎหมาย
-            </h3>
-            <ul className="space-y-2">
-              {[
-                { href: '#', label: 'เงื่อนไขการให้บริการ' },
-                { href: '#', label: 'นโยบายความเป็นส่วนตัว' },
-                { href: '#', label: 'นโยบายคุกกี้' },
-                { href: '#', label: 'การคุ้มครองข้อมูล (PDPA)' },
-              ].map((link) => (
-                <li key={link.label}>
-                  <a
-                    href={link.href}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {link.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
+          <nav aria-label="บัญชีและความช่วยเหลือ" className="flex flex-wrap gap-x-4 gap-y-1">
+            {[
+              { href: '/signup', label: 'สมัครสมาชิก' },
+              { href: '/login', label: 'เข้าสู่ระบบ' },
+              { href: LEGAL_LINKS.contact, label: 'ติดต่อผู้ดูแล' },
+            ].map(({ href, label }) => (
+              <Link key={href} href={href} className="inline-flex min-h-11 items-center text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+                {label}
+              </Link>
+            ))}
+          </nav>
         </div>
-
-        <div className="mt-10 flex flex-col items-center justify-between gap-3 border-t border-border pt-6 sm:flex-row">
-          <p className="text-xs text-muted-foreground">
-            © 2026 KorKru — ก่อการเรียนรู้ โดยครู
-          </p>
-          <div className="flex items-center gap-4 text-xs text-muted-foreground">
-            <span>รองรับกรอบ PISA</span>
-            <span>•</span>
-            <span>ISO 27001 Ready</span>
-            <span>•</span>
-            <span>PDPA Compliant</span>
-          </div>
+        <Separator />
+        <div className="flex flex-col justify-between gap-1 sm:flex-row sm:items-center">
+          <p className="text-xs text-muted-foreground">© 2026 KorKru — ก่อการเรียนรู้ โดยครู</p>
+          <LegalLinks />
         </div>
       </div>
     </footer>
