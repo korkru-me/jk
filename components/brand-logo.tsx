@@ -29,7 +29,7 @@ export function BrandLogo({ layout = 'horizontal', subtitle, compact = false, si
         }}
         className={cn(
           'block shrink-0 bg-brand-accent',
-          large ? 'h-14 sm:h-16' : stacked
+          large ? 'h-18 sm:h-20' : stacked
             ? (compact ? 'h-8' : 'h-10')
             : (compact ? 'h-8' : 'h-11'),
         )}
@@ -37,7 +37,7 @@ export function BrandLogo({ layout = 'horizontal', subtitle, compact = false, si
       <span className={cn('flex flex-col', stacked && 'items-center')}>
         <span className={cn(
           'font-bold leading-none tracking-tight text-brand-foreground',
-          large ? 'text-3xl sm:text-4xl' : stacked
+          large ? 'text-2xl' : stacked
             ? (compact ? 'text-xs' : 'text-sm')
             : (compact ? 'text-sm' : 'text-lg'),
         )}>
