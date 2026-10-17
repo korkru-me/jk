@@ -1,33 +1,121 @@
 .card {
+  --question-ink: color-mix(in oklab, var(--question-accent) 60%, var(--foreground));
   position: relative;
-  display: grid;
-  grid-template-columns: 1.5rem minmax(0, 1fr) auto;
-  column-gap: 0.75rem;
-  row-gap: 0.25rem;
-  align-content: start;
-  padding: 0.75rem;
-  color: color-mix(in oklab, var(--question-accent) 60%, var(--foreground));
-  background: color-mix(in oklab, var(--question-accent) 9%, var(--card));
-  border-color: color-mix(in oklab, var(--question-accent) 32%, var(--border));
+  display: flex;
+  flex-direction: column;
+  isolation: isolate;
+  box-shadow: 0 2px 0 color-mix(in oklab, var(--question-accent) 20%, var(--border));
 }
 
-/* The link covers the card while the sibling preview remains a separate control. */
+.header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-block-size: 2.5rem;
+  overflow: hidden;
+  border-radius: inherit;
+  border-end-start-radius: 0;
+  border-end-end-radius: 0;
+  border-block-end: 1px solid color-mix(in oklab, var(--question-accent) 20%, var(--border));
+  padding: 0.375rem 0.75rem;
+  background: color-mix(in oklab, var(--question-accent) 8%, var(--card));
+  color: var(--question-ink);
+}
+
+.header::before {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in oklab, var(--question-accent) 4%, transparent);
+  clip-path: polygon(48% 0, 100% 0, 100% 100%);
+  content: '';
+  pointer-events: none;
+}
+
+.watermark {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-end: 0.75rem;
+  inline-size: 2rem;
+  block-size: 2rem;
+  transform: translateY(-50%);
+  opacity: 0.18;
+  pointer-events: none;
+}
+
+.title {
+  position: relative;
+  padding-inline-end: 2.75rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: 0.25rem 0.75rem 0.125rem;
+}
+
+.description {
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-block-start: auto;
+}
+
+/* The create link covers the card; preview stays a separate sibling control. */
 .link {
-  display: grid;
-  grid-column: 1 / -1;
-  grid-row: 1 / span 2;
-  grid-template-columns: subgrid;
-  grid-template-rows: subgrid;
+  display: inline-flex;
+  min-block-size: 2.75rem;
+  align-items: center;
+  gap: 0.375rem;
+  color: var(--question-ink);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .link::after {
   position: absolute;
+  z-index: 1;
   inset: 0;
   border-radius: inherit;
   content: '';
 }
 
-.link:focus-visible::after {
+.link:focus-visible {
+  outline: none;
+}
+
+.card:has(.link:focus-visible) {
   outline: 2px solid var(--ring);
-  outline-offset: 2px;
+  outline-offset: 3px;
+}
+
+.previewAction {
+  position: relative;
+  z-index: 2;
+}
+
+.previewButton {
+  position: relative;
+}
+
+/* Keep a generous hit area around the compact preview button at every density. */
+.previewButton::after {
+  position: absolute;
+  inset-inline: -6px;
+  inset-block-start: 50%;
+  block-size: max(2.75rem, calc(100% + 12px));
+  transform: translateY(-50%);
+  content: '';
 }
