@@ -104,12 +104,12 @@ export function SignupForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3" noValidate aria-busy={busy}>
-      <FieldGroup className="gap-3">
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-2" noValidate aria-busy={busy}>
+      <FieldGroup className="gap-2">
         <AccountRoleField id="signup-role" value={selectedRole} onChange={(role) => setValue('role', role, { shouldValidate: true })} error={errors.role?.message} disabled={busy} />
         <PolicyAcknowledgmentField id="accept_terms" checked={acceptedTerms === true} onChange={(checked) => setValue('accept_terms', checked, { shouldValidate: true })} error={errors.accept_terms?.message} disabled={busy} />
 
-        <Button type="button" variant="outline" className="min-h-11 w-full" disabled={busy} onClick={handleGoogleSignup}>
+        <Button type="button" variant="outline" className="min-h-[44px] w-full" disabled={busy} onClick={handleGoogleSignup}>
           {googleLoading ? <Loader2 data-icon="inline-start" className="motion-safe:animate-spin" /> : <GoogleIcon />}
           สมัครด้วย Google
         </Button>
@@ -121,7 +121,7 @@ export function SignupForm() {
         <Separator className="flex-1" />
       </div>
 
-      <FieldGroup className="gap-3">
+      <FieldGroup className="gap-2">
         <Field data-invalid={!!errors.full_name} className="gap-1">
           <FieldLabel htmlFor="full_name">ชื่อที่ใช้แสดง</FieldLabel>
           <Input
@@ -131,10 +131,10 @@ export function SignupForm() {
             aria-invalid={!!errors.full_name}
             aria-describedby={errors.full_name ? 'signup-name-error' : 'signup-name-help'}
             disabled={busy}
-            className="min-h-11"
+            className="min-h-[44px]"
             {...registerField('full_name')}
           />
-          <FieldDescription id="signup-name-help">ชื่อนี้จะแสดงต่อครูและสมาชิกห้องเรียนที่เกี่ยวข้อง</FieldDescription>
+          <FieldDescription id="signup-name-help">ครูและสมาชิกห้องเรียนที่เกี่ยวข้องจะเห็นชื่อนี้</FieldDescription>
           <FieldError id="signup-name-error" errors={[errors.full_name]} />
         </Field>
 
@@ -150,7 +150,7 @@ export function SignupForm() {
             aria-invalid={!!errors.email}
             aria-describedby={errors.email ? 'signup-email-error' : undefined}
             disabled={busy}
-            className="min-h-11"
+            className="min-h-[44px]"
             {...registerField('email')}
           />
           <FieldError id="signup-email-error" errors={[errors.email]} />
@@ -158,7 +158,7 @@ export function SignupForm() {
 
         <Field data-invalid={!!errors.password} className="gap-1">
           <FieldLabel htmlFor="password">รหัสผ่าน</FieldLabel>
-          <InputGroup className="min-h-11">
+          <InputGroup className="min-h-[44px]">
             <InputGroupInput
               id="password"
               type={showPassword ? 'text' : 'password'}
@@ -166,12 +166,13 @@ export function SignupForm() {
               aria-invalid={!!errors.password}
               aria-describedby={errors.password ? 'signup-password-help signup-password-error' : 'signup-password-help'}
               disabled={busy}
+              className="min-h-[44px]"
               {...registerField('password')}
             />
             <InputGroupAddon align="inline-end" className="py-0">
               <InputGroupButton
                 size="icon-sm"
-                className="min-h-11 min-w-11"
+                className="min-h-[44px] min-w-[44px]"
                 onClick={() => setShowPassword((visible) => !visible)}
                 aria-label={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
                 aria-pressed={showPassword}
@@ -181,21 +182,21 @@ export function SignupForm() {
               </InputGroupButton>
             </InputGroupAddon>
           </InputGroup>
-          <FieldDescription id="signup-password-help">อย่างน้อย 8 ตัว มีตัวอักษร A–Z และตัวเลข ใช้รหัสผ่านที่ไม่ซ้ำกับเว็บอื่น</FieldDescription>
+          <FieldDescription id="signup-password-help">8 ตัวขึ้นไป มีอักษรอังกฤษและตัวเลข</FieldDescription>
           <FieldError id="signup-password-error" errors={[errors.password]} />
         </Field>
       </FieldGroup>
 
       {submitError && <Alert variant="destructive"><AlertDescription>{submitError}</AlertDescription></Alert>}
 
-      <Button type="submit" className="min-h-11 w-full" disabled={busy || retryAfter > 0}>
+      <Button type="submit" className="min-h-[44px] w-full" disabled={busy || retryAfter > 0}>
         {loading && <Loader2 data-icon="inline-start" className="motion-safe:animate-spin" />}
         {loading ? 'กำลังสมัครสมาชิก…' : retryAfter > 0 ? `ลองใหม่ได้ใน ${retryAfter} วินาที` : 'สมัครด้วยอีเมล'}
       </Button>
 
       <p className="text-center text-sm text-muted-foreground">
         มีบัญชีอยู่แล้ว?{' '}
-        <Link href="/login" className="inline-flex min-h-11 items-center font-medium text-primary hover:underline">เข้าสู่ระบบ</Link>
+        <Link href="/login" className="inline-flex min-h-[44px] items-center font-medium text-primary hover:underline">เข้าสู่ระบบ</Link>
       </p>
     </form>
   )

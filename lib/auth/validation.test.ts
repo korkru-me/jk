@@ -13,6 +13,7 @@ describe('authentication input validation', () => {
       full_name: '  ครูสมชาย ใจดี  ',
       email: ' Teacher@Example.COM ',
       password: 'teacher123',
+      accept_terms: true,
     })
 
     expect(result).toEqual({
@@ -20,6 +21,7 @@ describe('authentication input validation', () => {
       full_name: 'ครูสมชาย ใจดี',
       email: 'teacher@example.com',
       password: 'teacher123',
+      accept_terms: true,
     })
   })
 
@@ -29,6 +31,7 @@ describe('authentication input validation', () => {
       full_name: 'ผู้ดูแลระบบ',
       email: 'admin@example.com',
       password: 'password1',
+      accept_terms: true,
     }).success).toBe(false)
 
     expect(signupSchema.safeParse({
@@ -36,6 +39,7 @@ describe('authentication input validation', () => {
       full_name: 'สมชาย ใจดี',
       email: 'student@example.com',
       password: 'abcdefgh',
+      accept_terms: true,
     }).success).toBe(false)
   })
 
@@ -43,11 +47,13 @@ describe('authentication input validation', () => {
     expect(completeProfileSchema.safeParse({
       role: 'student',
       full_name: 'นักเรียนทดลอง',
+      accept_terms: true,
     }).success).toBe(true)
 
     expect(completeProfileSchema.safeParse({
       role: '',
       full_name: 'นักเรียนทดลอง',
+      accept_terms: true,
     }).success).toBe(false)
   })
 
@@ -61,6 +67,15 @@ describe('authentication input validation', () => {
       password: 'newpassword1',
       confirm_password: 'different1',
     }).success).toBe(false)
+  })
+
+  it('requires explicit acknowledgement on email and Google profile signup', () => {
+    const emailSignup = { role: 'student', full_name: 'นักเรียนทดสอบ', email: 'student@example.com', password: 'password1' }
+    for (const accept_terms of [undefined, false, 'true', 1]) {
+      expect(signupSchema.safeParse({ ...emailSignup, accept_terms }).success).toBe(false)
+      expect(completeProfileSchema.safeParse({ role: 'student', full_name: 'นักเรียนทดสอบ', accept_terms }).success).toBe(false)
+    }
+    expect(signupSchema.safeParse({ ...emailSignup, accept_terms: true }).success).toBe(true)
   })
 
   it('rejects malformed email addresses', () => {
