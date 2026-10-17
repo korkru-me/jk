@@ -1,6 +1,6 @@
 # Brand, language และ UI rules
 
-## กรอบเลือกวิธีนำเข้าโจทย์ — 18 ตุลาคม 2026 (Staging ผ่าน รอปล่อย Production · PR #60)
+## กรอบเลือกวิธีนำเข้าโจทย์ — 18 ตุลาคม 2026 (Production · PR #60)
 
 `/questions/import` ใช้ Card radius md แบบเดียวกับหน้าสร้างโจทย์: หัวสีอ่อนสูงขั้นต่ำ 40px ส่วนล่างพื้น card สีขาวใน light mode ขอบกลางและเงาฐานสีบาง คง accent Word จาก tint-1 และ KorKru จาก success เดิมโดยผสม foreground เพื่ออ่านข้อความ ชื่อ 15px และนามสกุลไฟล์ 12px อยู่หัวกรอบ ไอคอน FileText/PackageOpen ขนาด 32px เป็นลายจางขวาบนที่แสดงครบและไม่รับ pointer
 

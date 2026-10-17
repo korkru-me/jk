@@ -26,6 +26,10 @@ Local TypeScript, token lint และ production build ผ่าน Independent
 
 ## Production และการกู้คืน
 
-เมื่อ Staging ผ่านให้ merge เฉพาะ PR #60 เข้า `master` แล้วตรวจ Vercel project `jk` เป็น Ready ด้วย merge SHA และ canonical aliases ที่ตรงกัน ตรวจเว็บจริงแบบ read-only: login, route guard ของ `/questions/import` และ lab 404 โดยไม่สร้างหรือแก้ข้อมูล Production
+PR #60 merge เข้า `master` แล้วที่ `1b85c28aae21b0bd2fb8263e74c8a25d298fa5fe` โดยไม่รวมประวัติ Staging-only ไฟล์ runtime ทั้งสี่ตรงกับ PR ที่ผ่าน Staging Vercel project `jk` deploy จาก `master` อัตโนมัติ
+
+Production deployment `dpl_GgmT6sEaXm4MDvvX8HEJJYwhoxpb` เป็น Ready พร้อม source SHA ตรงกับ merge และ canonical aliases `www.korkru.com`/`korkru.com` ตรวจเว็บจริงแบบ read-only หลังเจ้าของอนุมัติ: `/login` 200 พร้อม tier production ไม่มีป้าย Staging, `/questions/import` และ `/questions/import/word?back=%2Fquestions%2Fimport` 307 ไป `/login` เมื่อไม่มี session, `/exam-screen-lab/question-import-options` 404 ไม่สร้างหรือแก้ข้อมูล Production
 
 จุดกู้คืนก่อนปล่อย: commit `397183493460a22c7ee430ce63b081810a403e38`, deployment `dpl_FEQrrznNtrhvYXXNPhrEZmEFvhXK` (Ready) ไม่มี schema ให้ rollback
+
+บันทึกหลัง deploy นี้ push บน branch `codex/question-import-card-design` แยกจาก merge commit ของ UI เพื่อไม่สร้าง deployment ใหม่จากการบันทึกสถานะ
