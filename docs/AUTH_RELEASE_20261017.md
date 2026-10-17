@@ -11,7 +11,7 @@
 
 ## สิ่งที่ตรวจแล้ว
 
-- Full unit suite ผ่าน 286 ไฟล์ / 3,656 cases หลังรองรับ error codes `current_password_mismatch`/`current_password_required` เพิ่มจาก provider; token lint และ production webpack build ของชุดรวมก่อนปรับ error mapping ผ่าน
+- Full unit suite ผ่าน 286 ไฟล์ / 3,657 cases หลังรองรับ error codes `current_password_invalid`/`current_password_mismatch`/`current_password_required` เพิ่มจาก provider; TypeScript, token lint และ production webpack build ผ่าน
 - Node.js ของ Vercel project `jk` เป็น 24 ซึ่งผ่านข้อกำหนด Node ≥22 ของ `svix@2.8.0`
 - Production ปัจจุบันยังเป็น deployment **Ready ของ `master` `e1ccfc0`** ไม่ใช่ release ใหม่นี้
 - ผล local/mock เดิมไม่ยืนยันการส่ง SMTP, Google linking หรือ recovery ผ่านอีเมลจริงบน hosted environment รายละเอียดอยู่ใน `AUTH_SIGNUP_ROLLOUT.md` และ `ACCOUNT_SIGN_IN_METHODS.md`
@@ -33,7 +33,9 @@ Production ยังมี backlog SEB เดิม 13 รายการ แล
 
 สถานะ migration ใหม่ ณ checkpoint นี้: **Staging apply SQL ของไฟล์นี้และ record version 20261017111034 แล้ว; Production ยังรอ** Catalog ตรวจ RLS เปิด, anon/authenticated อ่านตารางหรือเรียก RPC ไม่ได้, service role เขียนได้, RPC เป็น invoker และมี local counter-cleanup schedule ไม่เปลี่ยน version เก่า การทดสอบ runtime บน Staging ยังอยู่ระหว่างตรวจ
 
-เพิ่ม `AUTH_FLOW_SECRET` แบบ sensitive คนละค่าสำหรับ Vercel Production และ Preview เฉพาะ `staging`, ตั้ง Google linking/Resend flags เป็น false และระบุ tier Production แล้ว ยังไม่หมุนหรือคัดลอก secret เดิม เปิด Require current password บน Staging โดยคง confirmation/Google/provider settings เดิม การทดสอบจริงรอบแรกสร้าง/อ่านบทบาทบัญชีจำลองสำเร็จ แต่หยุดที่การตรวจ wrong-current-password; cleanup users/profiles/personal organizations และ sessions ครบ จึงยังไม่อ้างว่า hosted password verification ผ่าน
+เพิ่ม `AUTH_FLOW_SECRET` แบบ sensitive คนละค่าสำหรับ Vercel Production และ Preview เฉพาะ `staging`, ตั้ง Google linking/Resend flags เป็น false และระบุ tier Production แล้ว ยังไม่หมุนหรือคัดลอก secret เดิม เปิด Require current password บน Staging โดยคง confirmation/Google/provider settings เดิม การทดสอบพบรหัสปฏิเสธจริง `current_password_invalid` (HTTP 400) จึงรองรับใน error mapping ด้วย
+
+Staging Auth/Data API ตรวจผ่าน 43 รายการ: บัญชีครู/นักเรียนสังเคราะห์คง ID/role/profile เดิมหลังเปลี่ยนรหัส, รหัสเดิมผิดถูกปฏิเสธ, isolated verifier ไม่แทน session เดิม, รหัสใหม่เข้าได้และรหัสเก่าเข้าไม่ได้; limiter สี่คำขอพร้อมกันอนุญาตหนึ่ง/ให้รอสาม และ anon/authenticated เรียกไม่ได้ ข้อมูลจำลอง users/profiles/personal organizations/counters ถูกล้างครบ ส่วน reporter ของการ sign-out ซ้ำระหว่าง cleanup ยังอยู่ระหว่างตรวจ ไม่ใช้ผลนี้อ้างว่า SMTP หรือ Next Server Action บน hosted UI ผ่านแล้ว
 
 ## ลำดับ rollout
 
