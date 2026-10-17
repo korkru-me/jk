@@ -1,11 +1,12 @@
-# แผนปล่อยระบบบัญชี — 17 ตุลาคม 2026
+# ผลปล่อยระบบบัญชี — 17 ตุลาคม 2026
 
-สถานะ checkpoint นี้: **Staging deploy และตรวจ Auth/Data smoke แล้ว; Production prerequisites ครบ แต่ยังไม่ deploy รุ่นนี้** เจ้าของอนุมัติการปล่อย Staging → Production พร้อม secret/migration/URL/current-password policy แล้ว การสมัคร Resend ยังพักไว้ การเปิดความสามารถที่ต้องใช้ SMTP/Google จริงต้องรายงานแยกจากการนำโค้ดขึ้นเว็บ
+สถานะ checkpoint นี้: **deploy Production สำเร็จแล้ว และตรวจ public pages แบบอ่านอย่างเดียวผ่าน** เจ้าของอนุมัติการปล่อย Staging → Production พร้อม secret/migration/URL/current-password policy แล้ว การสมัคร Resend ยังพักไว้ การเปิดความสามารถที่ต้องใช้ SMTP/Google จริงต้องรายงานแยกจากการนำโค้ดขึ้นเว็บ
 
 ## Source และขอบเขต
 
 - Release branch: `codex/auth-production-release-20261017` เริ่มจาก Production `origin/master` ที่ `e1ccfc0`
 - Cherry-pick งานแชท 13 commits โดยไม่รวมสาม commits ประวัติ/synchronization ก่อนหน้า พร้อม release fixes ที่ตรวจต่อเนื่องจนถึง candidate `a83ecfc`
+- Release source/checkpoint `6dbc891` ถูก push แล้วและ merge ผ่าน [PR #57](https://github.com/korkru-me/jk/pull/57) เข้า `master` เป็น `3230edfcfd35a17670af6064d4f94f005e0de0fe` เอกสารผลหลัง deploy นี้เก็บต่อใน release branch สำหรับส่งต่องาน
 - รวมหน้า signup/login/ยืนยันอีเมล/เอกสารติดต่อและนโยบาย, การเปลี่ยนรหัสครูและนักเรียน, โค้ดเชื่อมวิธีเข้าใช้บัญชีเดียวกัน, recovery safeguards, quota alerts และขนาดแบรนด์บนหน้าบัญชี
 - ไม่รวม `20261009142610_atomic_seb_exam_start.sql` และไม่เปิด native SEB เพิ่ม ไม่แก้ไฟล์งาน local ที่พักไว้นอก release นี้
 
@@ -13,11 +14,12 @@
 
 - Full unit suite ผ่าน 3,657 cases; TypeScript, token lint และ production webpack build ผ่าน รวม error mapping ของ provider สำหรับ `current_password_invalid`/`current_password_mismatch`/`current_password_required`
 - Node.js ของ Vercel project `jk` เป็น 24 ซึ่งผ่านข้อกำหนด Node ≥22 ของ `svix@2.8.0`
-- Production ปัจจุบันยังเป็น deployment **Ready ของ `master` `e1ccfc0`** ไม่ใช่ release ใหม่นี้
+- Production ของ Vercel project `jk` เป็น **READY** ที่ `master` `3230edfcfd35a17670af6064d4f94f005e0de0fe`, deployment `dpl_5GZHMrNuCekqXk49LPd9gcCf4jwR` (`jk-mg6vl6aj4-korkru-mes-projects.vercel.app`); project target ยืนยัน aliases `www.korkru.com` และ `korkru.com` ชี้รุ่นนี้
 - Staging deployment `dpl_JAPz9zrcyqafBcDDKpLaBH5jKKvz` เป็น **READY** ที่ SHA `aa21bd53547709808ea1daefcb2b992a3fb69460`; ไฟล์ auth/app ตรงกับ release `a83ecfc` ความต่างที่เหลือเป็นประวัติ QA/docs ของ Staging
 - Hosted Staging Auth/Data smoke **ผ่าน 43 รายการ ไม่ผ่าน 0 รายการ**: บัญชีครู/นักเรียนสังเคราะห์คง ID/role/profile หลังเปลี่ยนรหัส, รหัสปัจจุบันผิดถูกปฏิเสธ, isolated verifier ไม่แทน session เดิม, รหัสใหม่เข้าได้และรหัสเก่าเข้าไม่ได้; limiter สี่คำขอพร้อมกันอนุญาตหนึ่ง/ให้รอสาม และ anon/authenticated เรียกไม่ได้
 - Cleanup ยืนยัน `sessions`, `authUsers`, `publicProfiles`, `organizations`, `limiterBuckets` เป็น `true` ครบ
 - Hosted `/login`, `/signup`, `/terms`, `/privacy`, `/contact` ตอบ HTTP 200 ครบ มีป้าย STAGING และ SHA ตรงกับ deployment ทุกหน้า; login/signup แสดงโลโก้กวางขนาดใหญ่
+- หลัง deploy ตรวจ GET Production `/`, `/login`, `/signup`, `/terms`, `/privacy`, `/contact` ตอบ HTTP 200 ครบ, tier เป็น production และไม่มีป้าย Staging; login/signup มีขนาดกวาง `h-18 sm:h-20` และ wordmark `text-2xl` ตามรุ่นที่ตรวจ local แล้ว `https://korkru.com` redirect HTTP 308 ไป `https://www.korkru.com/` ไม่มีการสร้างบัญชี ส่งอีเมล หรือแก้ข้อมูลผู้ใช้ Production เพื่อทดสอบ
 - **ยังไม่ได้ยืนยัน hosted Next ServerAction E2E, SMTP/อีเมลจริง หรือ Google จริง** ผล Auth/Data API, public-page smoke และ local/mock ไม่ครอบคลุมการทดสอบเหล่านี้ รายละเอียดอยู่ใน `AUTH_SIGNUP_ROLLOUT.md` และ `ACCOUNT_SIGN_IN_METHODS.md`
 
 ## Hosted configuration ที่อ่านพบ
@@ -41,11 +43,11 @@ Production ยังมี backlog SEB เดิม 13 รายการ แล
 
 ยืนยัน `AUTH_FLOW_SECRET` แบบ sensitive คนละค่าสำหรับ Vercel Production และ Preview เฉพาะ `staging` พร้อม Google linking/Resend flags เป็น false และ tier Production แล้ว ไม่บันทึก secret ใน Git หรือรายงานผล การทดสอบ Staging พบรหัสปฏิเสธจริง `current_password_invalid` (HTTP 400) จึงรองรับใน error mapping ด้วย
 
-## ขั้นตอน Production ที่ยังรอ
+## การส่งต่องานหลัง deploy
 
-1. เปิดและ merge PR ผ่าน workflow ของ `master` โดยคงขอบเขต release ที่ตรวจแล้ว
-2. รอ Production deployment เป็น Ready ตรวจ SHA และ alias จริง
-3. ทำ public smoke test แบบอ่านอย่างเดียว แล้วบันทึกผล Production แยกจาก Staging
+ขั้นตอน merge, Production Ready, SHA/alias และ public-page verification เสร็จแล้วตามหลักฐานข้างต้น โค้ดแอปบน `master` ตรงกับ release `6dbc891`; เอกสารผลหลัง deploy บน release branch เป็นการบันทึกผลเพิ่มเติมสำหรับผู้ทำงานต่อ
+
+ลบเฉพาะโปรเจกต์ Vercel ที่สร้างผิดชื่อ `korkru-auth-release-20261017` (`prj_sr0sFH9YR2U2XoHZUlHl6lWFkGuo`) หลังเจ้าของอนุมัติและตรวจว่าไม่มี deployment แล้ว เว็บจริงใช้ project `jk` (`prj_m6IlsevARmDhdOC9pqkfHezZQMJt`) ตามเดิม
 
 Counter schema และ `AUTH_FLOW_SECRET` ต้องพร้อมก่อนแอปรุ่นใหม่ เพราะ email actions จะ fail closed หากขาด dependency นี้ ทั้ง signup/ส่งซ้ำ/ลืมรหัส/ขอตั้งรหัสจาก settings; prerequisites เหล่านี้ยืนยันแล้วตามข้างต้น
 
