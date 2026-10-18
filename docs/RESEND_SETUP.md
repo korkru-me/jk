@@ -2,12 +2,12 @@
 
 เจ้าของเลือก Resend Free และผู้รับแจ้งเตือน `korkru.me@gmail.com` เมื่อ 17 ตุลาคม 2026 ต่อมาเพิ่มการเตือนเป็น **80%, 90%, 97%** (แทน 100% เพราะโควตาที่หมดแล้วส่งเตือนผ่าน Resend ไม่ได้) สำหรับ Free 100 ฉบับ/วัน คือ 80, 90, 97 ฉบับ ไม่มีการอัปเกรดแพ็กเกจหรือเปิดค่าใช้จ่ายส่วนเกินอัตโนมัติ
 
-**สถานะล่าสุด 17 ตุลาคม 2026: สมัคร Resend และต่อ custom SMTP บน Staging แล้ว; quota alerts ยังปิด** โค้ดระบบบัญชีและ webhook ขึ้น Production ในรอบก่อนแล้ว รอบนี้เจ้าของกลับมาทำ Resend ต่อและพักงาน SEB โดยยังไม่เปิด Production SMTP หรือ Google
+**สถานะล่าสุด 18 ตุลาคม 2026: ต่อ custom SMTP บน Staging แล้ว; เจ้าของทดสอบ signup และ recovery core flow ผ่าน; quota alerts ยังปิด** โค้ดระบบบัญชีและ webhook ขึ้น Production ในรอบก่อนแล้ว รอบนี้เจ้าของกลับมาทำ Resend ต่อและพักงาน SEB โดยยังไม่เปิด Production SMTP หรือ Google
 
 - บัญชี Resend สร้างแล้ว; `mail.korkru.com` ขึ้น Verified ใน region Tokyo ตรวจ public DNS พบ TXT `resend._domainkey.mail`, CNAME `rsend.mail` → `rsend-apne1.forge.rmta.net` และ `send.mail` → `send.forge.rmta.net` โดย CNAME เป็น DNS only
 - เจ้าของสร้าง Sending access key และกรอก custom SMTP เอง ไม่ส่ง key มาในแชท การอ่าน configuration ยืนยัน Staging ใช้ `smtp.resend.com:465`, username `resend`, sender `auth@mail.korkru.com`, ชื่อ `KorKru Staging` และมี SMTP password โดยไม่อ่าน/บันทึกค่าลับ
 - Staging Site URL เป็น `https://staging.korkru.com`, email autoconfirm ปิด, Require current password เปิด และ signup/recovery templates ยังคง `{{ .ConfirmationURL }}` ตามเดิม
-- **เจ้าของรายงานว่าได้รับอีเมลสมัคร กดยืนยัน และเข้า Staging สำเร็จแล้ว** แยกจาก independent hosted E2E; recovery และ quota-alert delivery ยังต้องตรวจต่อ
+- **เจ้าของรายงานว่าได้รับอีเมลสมัคร กดยืนยัน และเข้า Staging สำเร็จแล้ว** และวันที่ 18 ตุลาคมทดสอบ recovery ด้วยอีเมลใหม่ผ่าน: ได้รับอีเมล → เปิด reset form → ลองรหัสเดิมมีคำเตือนใต้ช่อง → ส่งรหัสอื่น → หน้า login มี banner “เปลี่ยนรหัสผ่านแล้ว” ตามภาพเวลา 22:10:54 → เข้าได้ด้วยรหัสใหม่ที่กรอกไว้ เป็น manual/owner-reported core-flow proof พร้อมภาพ แยกจาก independent hosted E2E ยังไม่ได้รายงาน manual รหัสเก่าถูกปฏิเสธ/เปิดลิงก์ใช้แล้วซ้ำ; quota-alert delivery ยังต้องตรวจต่อ
 - `RESEND_QUOTA_ALERTS_ENABLED=false`; ยังไม่มี Full access monitor key/webhook signing secret ที่ตั้งค่าในรอบนี้ จึงยังไม่ส่งเตือน 80/90/97% จริง
 
 รอบ release ก่อนมี migration จำกัดคำขอส่งอีเมลและ `AUTH_FLOW_SECRET` พร้อมแล้ว อ่าน `docs/AUTH_SIGNUP_ROLLOUT.md` ประกอบ; SMTP เพียงอย่างเดียวไม่ทดแทน dependency ของ email actions
@@ -87,7 +87,7 @@ API ตอบ `alert_accepted` แปลว่า Resend รับคำขอ�
 
 ## ตรวจบน Staging ก่อนเปิดจริง
 
-1. ใช้บัญชีสังเคราะห์กดลืมรหัสผ่าน ตรวจอีเมล คลิกลิงก์กลับ **Staging** ตั้งรหัสใหม่และ login ด้วยรหัสใหม่ ตรวจลิงก์ใช้แล้ว/หมดอายุและการยืนยันรหัสไม่ตรง
+1. Core flow กดลืมรหัสผ่าน → อีเมล → reset form → same-password warning → ส่งรหัสอื่น → success banner → login ด้วยรหัสใหม่ บน **Staging** เจ้าของรายงานพร้อมภาพว่าผ่านแล้ว ยังต้องบันทึกการลองรหัสเก่าให้ถูกปฏิเสธ ลิงก์ใช้แล้ว/หมดอายุ และการยืนยันรหัสไม่ตรงแบบ manual ด้วยบัญชีทดสอบ
 2. ตรวจ signed `email.sent` ใน Resend ว่า webhook ได้ 200 และ `below_threshold` เมื่อยอดยังไม่ถึง 80 ตรวจ permissions/shape ของ Usage API จริงด้วย key ที่ตั้งค่าแล้ว
 3. คำขอไม่มีลายเซ็น/ลายเซ็นปลอมต้องได้ 400 และไม่อ่าน Usage/ส่งอีเมล Missing configuration ได้ 503
 4. ทดสอบ threshold ด้วย local mock tests (79/80/89/90/96/97/99, retry/concurrency และ self-event ข้ามระดับ) ไม่ส่งให้ถึงโควตาจริง ไม่ลด threshold หรือทำให้โควตา Production หมดเพื่อทดสอบ
@@ -97,6 +97,6 @@ API ตอบ `alert_accepted` แปลว่า Resend รับคำขอ�
 
 หลักฐานรอบเตรียม monitor: TypeScript ผ่าน; Vitest 276 ไฟล์ / 3,447 เคส (รวม monitor 47 เคส) ผ่าน การเรียก Next HTTP จริงกับ provider จำลองผ่านยอด 79/80/90/97 การส่งซ้ำและ self-event ข้ามระดับ; Next MCP ไม่พบ compilation issues การตรวจรุ่นแรกครอบคลุมลายเซ็นปลอม/provider ล้มเหลวและหน้าเดิมใน browser/React ด้วย รอบนั้นไม่มีการส่งอีเมลภายนอก ผล build ของ release ถัดมาบันทึกใน `FEATURE_STATUS.md`
 
-รอบ monitor เดิม Turbopack production build ค้างในสภาพแวดล้อมจำกัดจึงใช้ Webpack ที่ผ่านแทน ส่วน milestone SMTP ล่าสุดอยู่ต้นเอกสาร: อ่าน config ได้และเจ้าของรายงาน signup/email confirmation สำเร็จ แต่ยังไม่อ้างว่า recovery, quota alerts หรือ Production SMTP ผ่าน การแก้หน้า signup/check-email รอบล่าสุดผ่าน TypeScript, token lint, full Vitest 288 ไฟล์ / 3,670 เคส, Node 24 webpack build และ browser จำลอง 21 กรณี; Next MCP errors ว่าง ไม่มี migration ใหม่และไม่มีอีเมลจริงเพิ่มเติมจากการตรวจนี้
+รอบ monitor เดิม Turbopack production build ค้างในสภาพแวดล้อมจำกัดจึงใช้ Webpack ที่ผ่านแทน ส่วน milestone SMTP ล่าสุดอยู่ต้นเอกสาร: อ่าน config ได้ เจ้าของรายงาน signup/email confirmation และ fresh recovery core flow สำเร็จพร้อมภาพ แยกจากการตรวจจำลองของ agent ยังไม่อ้างว่า quota alerts หรือ Production SMTP ผ่าน การแก้หน้า signup/check-email ผ่าน TypeScript, token lint, full Vitest 288 ไฟล์ / 3,670 เคส, Node 24 webpack build และ browser จำลอง 21 กรณี; แพตช์ recovery ถัดมาผ่าน full suite 311 ไฟล์ / 4,129 เคส, browser จำลอง 25 กรณี, TypeScript/token lint/build และ Next MCP errors ว่างตาม `docs/AUTH_SIGNUP_ROLLOUT.md` ไม่มี migration ใหม่หรืออีเมลจริงเพิ่มเติมจากการตรวจของ agent
 
 อ้างอิงตรวจ 17 ตุลาคม 2026: [Pricing](https://resend.com/pricing), [Usage API](https://resend.com/docs/api-reference/usage/retrieve-usage), [Verify webhooks](https://resend.com/docs/webhooks/verify-webhooks-requests), [Email sent payload](https://resend.com/docs/webhooks/emails/sent), [Idempotency](https://resend.com/docs/dashboard/emails/idempotency-keys), [Retries](https://resend.com/docs/webhooks/retries-and-replays)
