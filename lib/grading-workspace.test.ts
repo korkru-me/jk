@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { questionReviewCounts, reviewStatus, scoreParts, sortGradingStudents, type GradingAnswer, type GradingStudent } from './grading-workspace'
+import { isFullyManualQuestion, questionReviewCounts, reviewStatus, scoreParts, sortGradingStudents, type GradingAnswer, type GradingStudent } from './grading-workspace'
 import type { Question, QuestionType } from './types'
 
 const question = (type: QuestionType = 'mcq', extra_data: Question['extra_data'] = {}): Question => ({
@@ -15,6 +15,61 @@ const student = (id: string, overrides: Partial<GradingStudent> = {}): GradingSt
   id, name: `นักเรียน ${id}`, gradeLevel: null, sectionNumber: null, classNumber: null,
   studentCode: null, classroom: null, submissionId: null, attemptNumber: null, score: null,
   maxScore: 0, ...overrides,
+})
+
+describe('fully manual questions have no automatic answer key to correct', () => {
+  const textBlank = { id: 1, type: 'text' as const, answer: '', case_sensitive: false }
+  const fixedBlank = { ...textBlank, id: 2, type: 'fixed' as const, answer: 'A' }
+  const manualPart = { id: 'manual', type: 'fill_blank' as const, text: '[___1]', score: 1, blanks: [textBlank] }
+
+  it.each(['essay', 'file_upload'] as const)('recognizes %s regardless of old leftover answer fields', type => {
+    const q = question(type)
+    q.answer_formula = '5'
+    expect(isFullyManualQuestion(q)).toBe(true)
+  })
+
+  it('recognizes every unrestricted blank and legacy question-level manual mode', () => {
+    expect(isFullyManualQuestion(question('fill_blank', { blanks: [textBlank, { ...textBlank, id: 2 }] }))).toBe(true)
+    const { type: _type, ...legacyBlank } = textBlank
+    expect(isFullyManualQuestion(question('fill_blank', { grading_mode: 'manual', blanks: [legacyBlank] } as Question['extra_data']))).toBe(true)
+  })
+
+  it('keeps fixed/dropdown keys in mixed blanks, including per-blank overrides of legacy mode', () => {
+    for (const type of ['fixed', 'dropdown'] as const) {
+      expect(isFullyManualQuestion(question('fill_blank', {
+        grading_mode: 'manual', blanks: [textBlank, { ...fixedBlank, type, options: ['A', 'B'] }],
+      }))).toBe(false)
+    }
+  })
+
+  it('recognizes a composite made entirely of unrestricted blanks', () => {
+    expect(isFullyManualQuestion(question('composite', { parts: [manualPart, { ...manualPart, id: 'second', blanks: [] }] }))).toBe(true)
+  })
+
+  it('keeps a composite key when any part is automatic', () => {
+    expect(isFullyManualQuestion(question('composite', { parts: [manualPart, { ...manualPart, id: 'fixed', blanks: [fixedBlank] }] }))).toBe(false)
+    expect(isFullyManualQuestion(question('composite', { parts: [manualPart, { id: 'tf', type: 'true_false', text: 'ข้อความ', score: 1, correct_answer: true }] }))).toBe(false)
+  })
+
+  it('keeps the true/false key while a teacher reviews the explanation', () => {
+    expect(isFullyManualQuestion(question('true_false', { correct_answer: true, explanation_mode: 'always', score_answer: 1, score_explanation: 1 }))).toBe(false)
+  })
+
+  it('keeps the numeric answer key when a work image requires teacher review', () => {
+    const q = question('written')
+    q.requires_work_image = true
+    expect(isFullyManualQuestion(q)).toBe(false)
+  })
+
+  it.each(['mcq', 'written', 'matching', 'true_false', 'ordering', 'classify', 'image_label'] as const)('keeps the automatic %s key', type => {
+    expect(isFullyManualQuestion(question(type))).toBe(false)
+  })
+
+  it.each(['fill_blank', 'composite'] as const)('does not infer manual grading from missing/empty %s metadata', type => {
+    expect(isFullyManualQuestion(question(type))).toBe(false)
+    expect(isFullyManualQuestion(question(type, { blanks: [], parts: [] }))).toBe(false)
+    expect(isFullyManualQuestion({ question_type: type, extra_data: null })).toBe(false)
+  })
 })
 
 describe('grading workspace review and point components', () => {

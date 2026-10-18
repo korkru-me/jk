@@ -4,7 +4,7 @@ import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { ArrowDownUp, ArrowLeft, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock3, PencilLine } from 'lucide-react'
 import type { GradingAnswer, GradingStudent, GradingWorkspaceData } from '@/lib/grading-workspace'
-import { scoreParts, sortGradingStudents } from '@/lib/grading-workspace'
+import { isFullyManualQuestion, scoreParts, sortGradingStudents } from '@/lib/grading-workspace'
 import { pendingWorkForReview } from '@/lib/grading-review-status'
 import type { saveGradingDrafts, publishGradingDrafts } from '@/lib/actions/grading-drafts'
 import type { GradingScoreDraftSource } from '@/lib/grading-score-drafts'
@@ -129,7 +129,10 @@ function QuestionDisclosure({ data, question, configure, correctionActions }: { 
     <div className="flex flex-wrap items-center justify-between gap-2 bg-muted/40 px-3 py-2">
       <div className="flex flex-wrap items-center gap-2"><span className="text-xs font-medium">โจทย์</span><Badge variant="outline">{TYPE_LABEL[question.question_type] ?? question.question_type}</Badge></div>
       <div className="flex flex-wrap items-center gap-1.5">
-        {correctionActions === undefined ? <><Button variant="ghost" className="pointer-coarse:min-h-11" render={<Link href={`/questions/${question.id}/edit`} />}><PencilLine data-icon="inline-start" />แก้เฉลย</Button><VoidQuestionButton assignmentId={data.assignment.id} questionId={question.id} isVoid={data.voidedQuestionIds.includes(question.id)} /></> : correctionActions}
+        {correctionActions === undefined ? <>
+          {!isFullyManualQuestion(question) && <Button variant="ghost" className="pointer-coarse:min-h-11" render={<Link href={`/questions/${question.id}/edit`} />}><PencilLine data-icon="inline-start" />แก้เฉลย</Button>}
+          <VoidQuestionButton assignmentId={data.assignment.id} questionId={question.id} isVoid={data.voidedQuestionIds.includes(question.id)} />
+        </> : correctionActions}
         <CollapsibleTrigger render={<Button variant="ghost" className="pointer-coarse:min-h-11" />}>{open ? 'ซ่อนโจทย์' : 'แสดงโจทย์'}{open ? <ChevronUp data-icon="inline-end" /> : <ChevronDown data-icon="inline-end" />}</CollapsibleTrigger>
       </div>
     </div>
