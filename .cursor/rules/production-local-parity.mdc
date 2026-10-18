@@ -1,0 +1,38 @@
+---
+description: After every successful Production deployment, sync the released changes to the primary localhost port 3000 and verify them before handoff
+alwaysApply: true
+---
+
+# Production and primary local parity
+
+- Permanent owner preference: every successful Production deployment must be
+  followed by syncing the released changes to the primary `localhost:3000`.
+  This applies across all chats, agents, branches, and release worktrees.
+- Identify the actual checkout/process serving port 3000. A preview on port
+  3054, another worktree, or a screen-lab route alone does not verify parity.
+- Record the exact commit of the Ready Production deployment and its canonical
+  domain. Fetch Git and use that release as the source of the changes to sync.
+- Inspect the primary branch, upstream, and working tree before integrating.
+  Fast-forward only a clean, compatible branch; otherwise integrate the released
+  scope and its required dependencies without replacing unrelated/newer work.
+  Review overlapping edits against the release base and merge compatible changes.
+- Preserve uncommitted files and concurrent agents' branches/indexes. Never
+  reset, blanket-copy, or broadly stash the primary checkout to force parity.
+  Commit/push the handoff from an isolated branch when the primary is shared.
+- Sync application code and required local dependencies/configuration only.
+  Preserve local environment settings; never copy Production credentials or
+  real user data to local or Staging to make the environments look alike.
+- Use the existing primary dev server, or start it on port 3000 with the local
+  environment. Restart only when necessary and safe; preserve active `.next`
+  caches and coordinate any restart affecting another agent's work.
+- Verify affected routes and behavior on the actual port 3000. For UI changes,
+  inspect the rendered UI at relevant desktop/mobile sizes and save evidence.
+  Verify authenticated UI with safe local fixtures where possible; a login
+  redirect, matching source files, or a successful build alone is insufficient.
+- Follow `staging-testing.mdc` for integration, database, Auth, and hosted tests.
+  Local fixture checks do not replace Staging validation before a release.
+- Run the `AGENTS.md` checks appropriate to the integrated changes.
+- Before declaring the release complete, report the deployed commit, primary
+  checkout/port, sync result, checks performed, and any remaining discrepancy.
+  If safe sync or verification is blocked, state the gap and leave it open.
+- See `docs/RELEASE_WORKFLOW.md` for the release completion checklist.

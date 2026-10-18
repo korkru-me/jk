@@ -100,7 +100,8 @@ export function requiresTeacherAnswer(question: ManualShape): boolean {
   return false
 }
 
-function manualOnly(question: ManualShape): boolean {
+/** Mixed questions still have an automatic answer key even when a part needs teacher review. */
+export function isFullyManualQuestion(question: ManualShape): boolean {
   if (question.question_type === 'essay' || question.question_type === 'file_upload') return true
   const extra = question.extra_data as Question['extra_data']
   if (question.question_type === 'fill_blank' && extra && 'blanks' in extra) {
@@ -134,7 +135,7 @@ export function scoreParts(answer: GradingAnswer, question: Question): GradingSc
     && answer.gradingPartsConfigured === false
   const teacherAnswer = !!answer.answerReviewedAt || (!explicit && !!answer.scoreEditedBy)
   const pendingAnswer = answerMax > 0 && !teacherAnswer && (requiresTeacherAnswer(rules) || answer.isCorrect === null)
-  const onlyManual = manualOnly(rules)
+  const onlyManual = isFullyManualQuestion(rules)
   const answerScore = pendingAnswer && onlyManual ? 0
     : bounded(explicit ? answer.answerScore : answer.score, answerMax)
   const teacherWork = !!answer.workReviewedAt

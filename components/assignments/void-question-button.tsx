@@ -17,12 +17,13 @@ interface Props {
   assignmentId: string
   questionId: string
   isVoid: boolean
+  size?: 'xs' | 'sm'
   prepare?: typeof prepareVoidQuestion
   apply?: typeof voidAssignmentQuestion
   onComplete?: () => void
 }
 
-export function VoidQuestionButton({ assignmentId, questionId, isVoid, prepare = prepareVoidQuestion, apply = voidAssignmentQuestion, onComplete }: Props) {
+export function VoidQuestionButton({ assignmentId, questionId, isVoid, size = 'sm', prepare = prepareVoidQuestion, apply = voidAssignmentQuestion, onComplete }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -76,7 +77,7 @@ export function VoidQuestionButton({ assignmentId, questionId, isVoid, prepare =
   if (isVoid) return <Badge variant="secondary">โมฆะ · ไม่นับคะแนน</Badge>
 
   return <>
-    <Button ref={trigger} type="button" size="sm" variant="destructive" className="pointer-coarse:min-h-11" disabled={busy} onClick={prepareChange}>
+    <Button ref={trigger} type="button" size={size} variant="destructive" className="pointer-coarse:min-h-11" disabled={busy} onClick={prepareChange}>
       <Ban data-icon="inline-start" /> ทำข้อเป็นโมฆะ
     </Button>
     <Dialog open={open} onOpenChange={(next, details) => {
