@@ -1,4 +1,68 @@
 -- Assignment-local grading parts. The original answer weight never changes.
+-- Deployment must be transactional. Match finalization's header -> answer lock
+-- order before the backfill; existing attempts resume against the new triggers.
+LOCK TABLE public.submissions IN ACCESS EXCLUSIVE MODE;
+LOCK TABLE public.submission_answers IN ACCESS EXCLUSIVE MODE;
+
+-- This migration intentionally removes old automatic attachment credit. Keep
+-- only the grading fields needed to review/restore that change; never snapshot
+-- student answers, answer keys, random values or attachments into this table.
+CREATE TABLE public.grading_rollout_backups (
+  migration_version text NOT NULL,
+  source_table text NOT NULL CHECK (source_table IN ('submission_answers','submissions')),
+  source_id uuid NOT NULL,
+  grading_before jsonb NOT NULL,
+  captured_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  migration_role text NOT NULL DEFAULT current_user,
+  PRIMARY KEY (migration_version,source_table,source_id)
+);
+ALTER TABLE public.grading_rollout_backups ENABLE ROW LEVEL SECURITY;
+-- Override project default privileges too: service callers may inspect these
+-- release snapshots, but only the migration/table owner may change them.
+REVOKE ALL ON public.grading_rollout_backups FROM PUBLIC,anon,authenticated,service_role;
+GRANT SELECT ON public.grading_rollout_backups TO service_role;
+
+DO $$
+DECLARE v_research_headers bigint;
+BEGIN
+  IF EXISTS(SELECT 1 FROM public.submission_answers WHERE max_score IS NULL OR max_score<0
+    OR max_score::text IN ('NaN','Infinity','-Infinity') OR score<0 OR score>max_score
+    OR score::text IN ('NaN','Infinity','-Infinity')) THEN
+    RAISE EXCEPTION USING ERRCODE='22023',MESSAGE='Invalid existing answer scores require review before grading rollout'; END IF;
+  -- The historical reset below does not rebuild streak counters. Refuse a
+  -- rollout which would silently leave those previously computed counters stale.
+  IF EXISTS(SELECT 1 FROM public.submission_answers a JOIN public.questions q ON q.id=a.question_id
+    JOIN public.submissions s ON s.id=a.submission_id JOIN public.assignments task ON task.id=s.assignment_id
+    WHERE q.question_type='file_upload' AND a.score_edited_by IS NULL AND NOT a.is_void
+      AND task.completion_rule='streak' AND (a.score<>0 OR a.is_correct IS NOT NULL)) THEN
+    RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='Attachment grades in streak attempts require a separate rollout review'; END IF;
+  -- Production's existing research trigger may re-point a measurement to an
+  -- arbitrary historical attempt during a whole-table header rewrite. Do not
+  -- change research observations as a side effect of this grading rollout.
+  IF to_regclass('public.education_research_measurements') IS NOT NULL
+    AND to_regclass('public.education_research_participants') IS NOT NULL THEN
+    EXECUTE 'SELECT count(*) FROM public.submissions s
+      JOIN public.education_research_measurements m ON m.assignment_id=s.assignment_id AND m.source_type=''korkru_exam''
+      JOIN public.education_research_participants p ON p.project_id=m.project_id AND p.org_id=m.org_id AND p.student_id=s.student_id
+      WHERE s.status IN (''submitted'',''graded'')' INTO v_research_headers;
+    IF v_research_headers>0 THEN
+      RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='Research-linked finished attempts require a separate grading rollout review'; END IF;
+  END IF;
+END $$;
+
+INSERT INTO public.grading_rollout_backups(migration_version,source_table,source_id,grading_before)
+  SELECT '20261018040444','submission_answers',a.id,jsonb_build_object(
+    'score',a.score,'is_correct',a.is_correct,'max_score',a.max_score,
+    'score_edited_by',a.score_edited_by,'score_edited_at',a.score_edited_at)
+  FROM public.submission_answers a JOIN public.questions q ON q.id=a.question_id
+  WHERE q.question_type='file_upload' AND a.score_edited_by IS NULL AND NOT a.is_void;
+INSERT INTO public.grading_rollout_backups(migration_version,source_table,source_id,grading_before)
+  SELECT '20261018040444','submissions',s.id,jsonb_build_object(
+    'total_score',s.total_score,'max_score',s.max_score,'status',s.status,
+    'answer_revision',s.answer_revision,'current_streak',s.current_streak,
+    'best_streak',s.best_streak,'streak_reached',s.streak_reached)
+  FROM public.submissions s WHERE s.status IN ('submitted','graded');
+
 CREATE TABLE public.assignment_question_grading_parts (
   assignment_id uuid NOT NULL REFERENCES public.assignments(id) ON DELETE CASCADE,
   question_id uuid NOT NULL REFERENCES public.questions(id) ON DELETE CASCADE,
@@ -43,8 +107,13 @@ FROM public.questions q WHERE q.id=a.question_id AND q.question_type='file_uploa
 UPDATE public.submission_answers SET answer_max_score=max_score,work_max_score=0,
   answer_score=score,work_score=NULL,
   answer_reviewed_at=CASE WHEN score_edited_by IS NOT NULL THEN COALESCE(score_edited_at,clock_timestamp()) ELSE NULL END;
-UPDATE public.submissions s SET total_score=(SELECT COALESCE(sum(a.score),0) FROM public.submission_answers a WHERE a.submission_id=s.id)
-WHERE s.status IN ('submitted','graded');
+WITH totals AS MATERIALIZED (
+  SELECT s.id,COALESCE(sum(a.score),0) AS total_score FROM public.submissions s
+  LEFT JOIN public.submission_answers a ON a.submission_id=s.id
+  WHERE s.status IN ('submitted','graded') GROUP BY s.id
+)
+UPDATE public.submissions s SET total_score=totals.total_score FROM totals
+WHERE s.id=totals.id AND s.total_score IS DISTINCT FROM totals.total_score;
 
 ALTER TABLE public.submission_answers ADD CONSTRAINT submission_answer_grading_parts_valid CHECK (
   answer_max_score >= 0 AND work_max_score >= 0 AND answer_max_score+work_max_score=max_score
@@ -218,9 +287,13 @@ REVOKE ALL ON FUNCTION public.normalize_question_change_review_status() FROM PUB
 GRANT EXECUTE ON FUNCTION public.normalize_question_change_review_status() TO service_role;
 -- Legacy automatic file grades were removed above; reflect any newly pending
 -- review in their finished headers as well as in the stored answer scores.
-UPDATE public.submissions s SET status=CASE WHEN public.has_pending_grading_review(s.id)
-  THEN 'submitted'::public.submission_status ELSE 'graded'::public.submission_status END
-WHERE s.status IN ('submitted','graded');
+WITH review_status AS MATERIALIZED (
+  SELECT s.id,CASE WHEN public.has_pending_grading_review(s.id)
+    THEN 'submitted'::public.submission_status ELSE 'graded'::public.submission_status END AS status
+  FROM public.submissions s WHERE s.status IN ('submitted','graded')
+)
+UPDATE public.submissions s SET status=review_status.status FROM review_status
+WHERE s.id=review_status.id AND s.status IS DISTINCT FROM review_status.status;
 
 CREATE FUNCTION public.save_grading_review(p_actor_id uuid,p_assignment_id uuid,p_answer_id uuid,
   p_expected_score_edited_at timestamptz,p_answer_score numeric,p_work_score numeric,
