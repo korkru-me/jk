@@ -6,7 +6,8 @@ import { ArrowDownUp, ArrowLeft, CheckCircle2, ChevronDown, ChevronLeft, Chevron
 import type { GradingAnswer, GradingStudent, GradingWorkspaceData } from '@/lib/grading-workspace'
 import { scoreParts, sortGradingStudents } from '@/lib/grading-workspace'
 import { pendingWorkForReview } from '@/lib/grading-review-status'
-import type { saveGradingReview } from '@/lib/actions/grading-review'
+import type { saveGradingDrafts, publishGradingDrafts } from '@/lib/actions/grading-drafts'
+import type { GradingScoreDraftSource } from '@/lib/grading-score-drafts'
 import type { Question } from '@/lib/types'
 import { TYPE_LABEL } from '@/lib/question-display'
 import { cn } from '@/lib/utils'
@@ -24,6 +25,8 @@ import { GradingScoreAllocation, type GradingScoreAllocationProps } from './grad
 import { VoidQuestionButton } from './void-question-button'
 import { GradingBatchProvider, GradingBatchSaveButton, useGradingBatch } from './grading-batch-provider'
 import { useGradingNavigationGuard } from './grading-navigation-guard'
+import { GradingQuickScoresProvider, GradingQuickScoreSettings } from './grading-quick-scores'
+import { GradingUniformScores } from './grading-uniform-scores'
 
 export interface GradingReviewQuery {
   classroom?: string
@@ -35,7 +38,8 @@ export interface GradingReviewQuery {
 interface CommonProps {
   data: GradingWorkspaceData
   query?: GradingReviewQuery
-  save?: typeof saveGradingReview
+  saveDrafts?: typeof saveGradingDrafts
+  publish?: typeof publishGradingDrafts
   configure?: GradingScoreAllocationProps['configure']
   correctionActions?: ReactNode | false
 }
@@ -100,16 +104,18 @@ function AnswerStatus({ answer, question }: { answer: GradingAnswer; question: Q
 
 function AnswerCard({ data, student, question, answer, person, occurrence, sequence }: CommonProps & { student: GradingStudent; question: Question; answer?: GradingAnswer; person?: boolean; occurrence?: number; sequence?: number }) {
   const number = sequence ?? data.questions.findIndex(item => item.id === question.id) + 1
+  const { savedDrafts } = useGradingBatch()
+  const savedDraft = answer && savedDrafts[answer.id]
   return <Card radius="md" className="@container/review-answer px-3 py-2.5">
     <article className="flex min-w-0 flex-col gap-2" aria-label={person ? `ข้อ ${number} ${question.title}` : `คำตอบของ ${student.name}`}>
       <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
         {person ? <div className="flex min-w-0 flex-wrap items-center gap-2"><h3 className="text-sm font-semibold">ข้อ {number} · {question.title}</h3><Badge variant="outline">{TYPE_LABEL[question.question_type] ?? question.question_type}</Badge>{occurrence && <span className="text-xs text-muted-foreground">ครั้งที่ตอบ {occurrence}</span>}</div> : <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5"><h3 className="text-sm font-semibold">{student.name}</h3><p className="text-xs text-muted-foreground">{student.classroom || 'ไม่ระบุชั้น/ห้อง'} · เลขที่ {student.classNumber ?? '—'} · รหัส {student.studentCode || '—'}{student.attemptNumber && student.attemptNumber > 1 ? ` · รอบที่ ${student.attemptNumber}` : ''}{occurrence ? ` · ครั้งที่ตอบ ${occurrence}` : ''}</p></div>}
-        {answer ? <AnswerStatus answer={answer} question={question} /> : <Badge variant="secondary">{student.submissionId ? 'ไม่ได้รับโจทย์ข้อนี้' : 'ยังไม่ส่งคำตอบ'}</Badge>}
+        {answer ? <div className="flex flex-wrap items-center gap-1.5"><AnswerStatus answer={answer} question={question} />{savedDraft && <Badge variant="secondary">มีร่างที่บันทึกแล้ว</Badge>}</div> : <Badge variant="secondary">{student.submissionId ? 'ไม่ได้รับโจทย์ข้อนี้' : 'ยังไม่ส่งคำตอบ'}</Badge>}
       </div>
       {person && <GradingQuestionContent question={question} answer={answer} />}
-      {answer ? <div className="grid min-w-0 gap-3 @min-[48rem]/review-answer:grid-cols-[minmax(0,1fr)_18rem]">
+      {answer ? <div className="grid min-w-0 gap-3 @min-[48rem]/review-answer:grid-cols-[minmax(0,1fr)_25rem]">
         <GradingAnswerContent question={question} answer={answer} showQuestionVariant={!person} workLabel={`วิธีทำที่แนบของ ${student.name} ข้อ ${number}${occurrence ? ` ครั้งที่ตอบ ${occurrence}` : ''}`} />
-        <div className="min-w-0"><GradingScoreFields question={question} answer={answer} disabled={data.reviewAvailable === false} studentName={student.name} occurrence={occurrence} /></div>
+        <div className="min-w-0"><GradingScoreFields question={question} answer={answer} disabled={data.reviewAvailable === false || data.draftsAvailable === false || scoreParts(answer, question).needsAllocation || data.voidedQuestionIds.includes(question.id)} studentName={student.name} occurrence={occurrence} /></div>
       </div> : <p className="text-sm text-muted-foreground">{student.submissionId ? 'ไม่มีคำตอบของข้อนี้ในรอบที่เลือก จึงไม่นับเป็นข้อรอตรวจ' : 'จะแสดงคำตอบเมื่อนักเรียนส่งงานแล้ว'}</p>}
       {person && answer && scoreParts(answer, question).needsAllocation && <p className="text-xs text-muted-foreground">ยังไม่ได้กำหนดสัดส่วนคะแนนคำตอบและวิธีทำ <Link href={`${data.baseHref}/questions/${question.id}`} className="text-primary underline underline-offset-2">กำหนดสัดส่วนคะแนน</Link></p>}
     </article>
@@ -118,7 +124,7 @@ function AnswerCard({ data, student, question, answer, person, occurrence, seque
 
 function QuestionDisclosure({ data, question, configure, correctionActions }: { data: GradingWorkspaceData; question: Question; configure?: GradingScoreAllocationProps['configure']; correctionActions?: ReactNode | false }) {
   const [open, setOpen] = useState(true)
-  const { hasUnsavedChanges, busy } = useGradingBatch()
+  const { hasUnsavedChanges, unpublishedCount, busy } = useGradingBatch()
   return <Card radius="md" className="overflow-hidden"><Collapsible open={open} onOpenChange={setOpen}>
     <div className="flex flex-wrap items-center justify-between gap-2 bg-muted/40 px-3 py-2">
       <div className="flex flex-wrap items-center gap-2"><span className="text-xs font-medium">โจทย์</span><Badge variant="outline">{TYPE_LABEL[question.question_type] ?? question.question_type}</Badge></div>
@@ -128,12 +134,12 @@ function QuestionDisclosure({ data, question, configure, correctionActions }: { 
       </div>
     </div>
     <CollapsibleContent><div className="px-3 py-2.5"><GradingQuestionContent question={question} /></div></CollapsibleContent>
-    <GradingScoreAllocation data={data} question={question} configure={configure} disabled={hasUnsavedChanges || busy} />
+    <GradingScoreAllocation data={data} question={question} configure={configure} disabled={hasUnsavedChanges || unpublishedCount > 0 || busy} />
   </Collapsible></Card>
 }
 
 function reviewDraftKey(data: GradingWorkspaceData, focus: string, query: GradingReviewQuery = {}) {
-  return JSON.stringify([data.assignment.id, focus, query.classroom ?? 'all', query.sort ?? 'classroom', query.dir ?? 'asc', query.page ?? 1])
+  return JSON.stringify([data.assignment.id, data.viewerId ?? 'browser', focus, query.classroom ?? 'all', query.sort ?? 'classroom', query.dir ?? 'asc', query.page ?? 1])
 }
 
 function ReviewSaveFooter({ children }: { children: ReactNode }) {
@@ -141,14 +147,39 @@ function ReviewSaveFooter({ children }: { children: ReactNode }) {
   return <Card radius="md" className="@container/grading-footer sticky bottom-2 flex min-w-0 flex-row flex-wrap items-center justify-between gap-x-3 gap-y-2 bg-background px-3 py-2">
     {error && <Alert variant="destructive" className="w-full py-1.5"><AlertDescription>{error}</AlertDescription></Alert>}
     <div className="min-w-0 flex-1 basis-full @min-[36rem]/grading-footer:basis-auto">{children}</div>
-    <GradingBatchSaveButton className="ml-auto" />
+    <GradingBatchSaveButton className="w-full @min-[36rem]/grading-footer:w-auto" />
   </Card>
 }
 
+function scopeSources(data: GradingWorkspaceData, include: (answer: GradingAnswer) => boolean): GradingScoreDraftSource[] {
+  const questions = new Map(data.questions.map(question => [question.id, question]))
+  return data.answers.filter(include).flatMap(answer => {
+    const question = questions.get(answer.questionId)
+    if (!question) return []
+    const parts = scoreParts(answer, question)
+    return [{ answerId: answer.id, scoreEditedAt: answer.scoreEditedAt, parts,
+      disabled: data.reviewAvailable === false || data.draftsAvailable === false || answer.isVoid
+        || parts.maxScore <= 0 || parts.needsAllocation || data.voidedQuestionIds.includes(question.id) }]
+  })
+}
+
+function ReviewDraftToolbar({ data }: { data: GradingWorkspaceData }) {
+  const { savedDrafts, dirtyCount } = useGradingBatch()
+  const savedCount = Object.keys(savedDrafts).length
+  return <>
+    <div className="flex min-w-0 flex-wrap items-center gap-2"><GradingQuickScoreSettings /><GradingBatchSaveButton removeOnly />{savedCount > 0 && <Badge variant="secondary">ร่างที่บันทึกแล้ว {savedCount} คำตอบ · ยังไม่ส่งคะแนนนักเรียน</Badge>}{dirtyCount > 0 && <Badge variant="statusWarning">ยังไม่บันทึก {dirtyCount} คำตอบ</Badge>}</div>
+  </>
+}
+
 export function QuestionGradingReview(props: CommonProps & { questionId: string }) {
-  return <GradingBatchProvider key={reviewDraftKey(props.data, `question:${props.questionId}`, props.query)} assignmentId={props.data.assignment.id} save={props.save} disabled={props.data.reviewAvailable === false}>
-    <QuestionReviewBody {...props} />
-  </GradingBatchProvider>
+  const sources = scopeSources(props.data, answer => answer.questionId === props.questionId)
+  return <GradingQuickScoresProvider assignmentId={props.data.assignment.id} viewerId={props.data.viewerId}>
+    <GradingBatchProvider key={reviewDraftKey(props.data, `question:${props.questionId}`, props.query)} assignmentId={props.data.assignment.id}
+      savedDrafts={props.data.savedDrafts} sources={sources} saveDrafts={props.saveDrafts} publish={props.publish}
+      disabled={props.data.reviewAvailable === false || props.data.draftsAvailable === false}>
+      <QuestionReviewBody {...props} />
+    </GradingBatchProvider>
+  </GradingQuickScoresProvider>
 }
 
 function QuestionReviewBody({ data, questionId, query = {}, configure, correctionActions }: CommonProps & { questionId: string }) {
@@ -162,9 +193,11 @@ function QuestionReviewBody({ data, questionId, query = {}, configure, correctio
   const path = `${data.baseHref}/questions/${questionId}`
   return <div className="flex min-w-0 flex-col gap-3">
     <GradingWorkspaceHeader data={data} title="ตรวจคำตอบรายข้อ" />
+    <ReviewDraftToolbar data={data} />
     <div className="flex flex-wrap items-center justify-between gap-2"><Button variant="ghost" className="pointer-coarse:min-h-11" render={<Link href={hrefFor(data.baseHref, query, { view: 'questions', page: undefined })} />}><ArrowLeft data-icon="inline-start" />กลับตารางรายข้อ</Button><StepNavigation previous={index > 0 ? hrefFor(`${data.baseHref}/questions/${data.questions[index - 1].id}`, query, { page: 1 }) : undefined} next={index < data.questions.length - 1 ? hrefFor(`${data.baseHref}/questions/${data.questions[index + 1].id}`, query, { page: 1 }) : undefined} label={`ข้อ ${index + 1} / ${data.questions.length}`} unit="ข้อ" /></div>
     <h2 className="text-base font-semibold">ข้อ {index + 1} · {question.title}</h2>
     <QuestionDisclosure key={question.id} data={data} question={question} configure={configure} correctionActions={correctionActions} />
+    <GradingUniformScores data={data} question={question} />
     <div className="flex flex-wrap items-center justify-between gap-2"><ReviewFilters data={data} query={query} path={path} navigate={navigate} /><span className="text-xs text-muted-foreground">{students.length} คน · 30 คนต่อหน้า</span></div>
     {rows.length ? <div className="flex flex-col gap-2">{rows.flatMap(student => {
       const answers = data.answers.filter(answer => answer.studentId === student.id && answer.questionId === questionId).sort((a, b) => a.orderIndex - b.orderIndex)
@@ -176,9 +209,14 @@ function QuestionReviewBody({ data, questionId, query = {}, configure, correctio
 }
 
 export function StudentGradingReview(props: CommonProps & { studentId: string }) {
-  return <GradingBatchProvider key={reviewDraftKey(props.data, `student:${props.studentId}`, props.query)} assignmentId={props.data.assignment.id} save={props.save} disabled={props.data.reviewAvailable === false}>
-    <StudentReviewBody {...props} />
-  </GradingBatchProvider>
+  const sources = scopeSources(props.data, answer => answer.studentId === props.studentId)
+  return <GradingQuickScoresProvider assignmentId={props.data.assignment.id} viewerId={props.data.viewerId}>
+    <GradingBatchProvider key={reviewDraftKey(props.data, `student:${props.studentId}`, props.query)} assignmentId={props.data.assignment.id}
+      savedDrafts={props.data.savedDrafts} sources={sources} saveDrafts={props.saveDrafts} publish={props.publish}
+      disabled={props.data.reviewAvailable === false || props.data.draftsAvailable === false}>
+      <StudentReviewBody {...props} />
+    </GradingBatchProvider>
+  </GradingQuickScoresProvider>
 }
 
 function StudentReviewBody({ data, studentId, query = {} }: CommonProps & { studentId: string }) {
@@ -192,11 +230,12 @@ function StudentReviewBody({ data, studentId, query = {} }: CommonProps & { stud
   const reviewedAnswers = answers.flatMap(answer => { const question = data.questions.find(item => item.id === answer.questionId); return question ? [{ answer, question }] : [] })
   const pendingCount = answers.filter(answer => { const question = data.questions.find(item => item.id === answer.questionId); return question && scoreParts(answer, question).pending }).length
   const streak = data.assignment.completionRule === 'streak'
-  const scoreLabel = streak ? 'ผลการทำงาน' : 'คะแนนปัจจุบัน'
+  const scoreLabel = streak ? 'ผลการทำงานที่ส่งแล้ว' : 'คะแนนที่ส่งแล้ว'
   const scoreValue = !answers.length ? 'ยังไม่มีผลคะแนน' : streak ? student.streakReached ? 'ผ่านเกณฑ์' : 'ยังไม่ผ่านเกณฑ์' : student.maxScore > 0 ? `${(student.score ?? 0).toLocaleString('th-TH', { maximumFractionDigits: 2 })}/${student.maxScore.toLocaleString('th-TH', { maximumFractionDigits: 2 })}` : 'ไม่มีข้อที่นับคะแนน'
   const stepper = (position: 'ด้านบน' | 'ด้านล่าง') => <StepNavigation previous={index > 0 ? hrefFor(`${data.baseHref}/students/${roster[index - 1].id}`, query) : undefined} next={index < roster.length - 1 ? hrefFor(`${data.baseHref}/students/${roster[index + 1].id}`, query) : undefined} label={`${index + 1} / ${roster.length} คน`} unit="คน" position={position} />
   return <div className="flex min-w-0 flex-col gap-3">
     <GradingWorkspaceHeader data={data} title="ตรวจคำตอบรายคน" />
+    <ReviewDraftToolbar data={data} />
     <div className="flex flex-wrap items-center justify-between gap-2"><Button variant="ghost" className="pointer-coarse:min-h-11" render={<Link href={hrefFor(data.baseHref, query, { view: 'students' })} />}><ArrowLeft data-icon="inline-start" />กลับตารางรายคน</Button>{stepper('ด้านบน')}</div>
     <Card radius="md" className="flex flex-wrap items-center justify-between gap-2 bg-primary/5 px-3 py-2.5"><div><h2 className="text-base font-semibold">{student.name}</h2><p className="text-xs text-foreground/75">{student.classroom || 'ไม่ระบุชั้น/ห้อง'} · เลขที่ {student.classNumber ?? '—'} · รหัสนักเรียน {student.studentCode || '—'}{student.attemptNumber ? ` · ครั้งที่ ${student.attemptNumber}` : ''}</p></div><div className="flex flex-wrap items-center gap-2"><span className="text-xs text-foreground/75">{scoreLabel}</span><strong className="text-sm tabular-nums text-primary">{scoreValue}</strong><Badge variant={pendingCount ? 'statusWarning' : 'statusSuccess'}>{pendingCount ? `รอตรวจ ${pendingCount} ข้อ` : answers.length ? 'ตรวจครบแล้ว' : 'ยังไม่ส่งคำตอบ'}</Badge></div></Card>
     {reviewedAnswers.length ? <><p className="text-xs text-muted-foreground">คำตอบทั้งหมด {reviewedAnswers.length} ข้อ · ครูแก้คะแนนได้ทุกข้อ · ส่วนที่รอตรวจแสดง 0 ชั่วคราว</p><div className="flex flex-col gap-2">{reviewedAnswers.map(({ question, answer }, index) => {

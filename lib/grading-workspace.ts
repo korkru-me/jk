@@ -1,3 +1,4 @@
+import type { GradingSavedDraft } from './grading-draft-types'
 import { getBlankType } from './fill-blank'
 import type { GradingConfig } from './assignment-attempt'
 import type { SubmissionTiming } from './late-submission'
@@ -67,6 +68,10 @@ export interface GradingWorkspaceData {
   baseHref: string
   /** Older local schemas remain readable, while score mutations need the RPC migration. */
   reviewAvailable?: boolean
+  /** Private to this verified grader; never part of the student result DTO. */
+  savedDrafts?: GradingSavedDraft[]
+  draftsAvailable?: boolean
+  viewerId?: string
   gradingParts?: Record<string, GradingPartsPolicy>
   questionMaxScores?: Record<string, number>
 }

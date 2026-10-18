@@ -1,3 +1,4 @@
+import type { GradingSavedDraft } from './grading-draft-types'
 import 'server-only'
 
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -295,12 +296,19 @@ export async function loadGradingWorkspace(assignmentId: string, scope: GradingW
   const questionMaxScores = Object.fromEntries(questions.map(question => [question.id,
     assignment.question_points?.[question.id] ?? naturalMaxScore(question.question_type, question.extra_data, question.answer_parts, question.question_type === 'matching' ? question.mcq_options?.length ?? 0 : 0),
   ]))
+  // Service-only RPC repeats actor and exact-assignment authorization and has
+  // no PostgREST row cap. Keep only official answer IDs selected by this reader.
+  const draftResult = await reader.rpc('read_grading_drafts', { p_actor_id: user.id, p_assignment_id: assignmentId })
+  if (draftResult.error?.code === '42501') return null
+  const draftsAvailable = !draftResult.error && Array.isArray(draftResult.data)
+  const officialAnswerIds = new Set(officialAnswers.map(answer => answer.id))
+  const savedDrafts: GradingSavedDraft[] = draftsAvailable ? (draftResult.data as GradingSavedDraft[]).filter(draft => officialAnswerIds.has(draft.answerId)) : []
   return {
     data: { assignment: { id: assignment.id, title: assignment.title, classroomName: assignment.classrooms?.name ?? null, type: assignment.type,
       displayMaxScore: assignment.display_max_score, completionRule: assignment.completion_rule === 'streak' ? 'streak' : 'fixed', streakTarget: assignment.streak_target },
     students, questions, answers: officialAnswers, inProgressCount: submissions.filter(row => row.status === 'in_progress' && !row.closed_at).length,
     pendingFinalizationCount: submissions.filter(row => row.status === 'in_progress' && !!row.closed_at).length,
-    voidedQuestionIds: [...gradingState.voidedIds].filter(id => assignedIds.has(id)), baseHref: `/assignments/${assignmentId}/results`, gradingParts, questionMaxScores, reviewAvailable },
+    voidedQuestionIds: [...gradingState.voidedIds].filter(id => assignedIds.has(id)), baseHref: `/assignments/${assignmentId}/results`, gradingParts, questionMaxScores, reviewAvailable, viewerId: user.id, draftsAvailable, savedDrafts },
     sidebarAssignment: { id: assignment.id, classroom_id: assignment.classroom_id, status: assignment.status, title: assignment.title, type: assignment.type, mode: assignment.mode,
       question_ids: assignment.question_ids, random_question_count: assignment.random_question_count, completion_rule: assignment.completion_rule, streak_target: assignment.streak_target, classrooms: assignment.classrooms },
     pendingCount, availableQuestionCount: questions.length, missingQuestionCount: loadedQuestions.missingQuestionIds.length, duplicateQuestionCount: loadedQuestions.duplicateQuestionCount,
