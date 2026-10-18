@@ -11,7 +11,7 @@ export default function ForgotPasswordPage() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-muted p-4">
       {/* Logo mark */}
       <Link href="/" className="mb-8 flex items-center gap-2.5">
-        <BrandLogo subtitle="คลังข้อสอบอัจฉริยะ" />
+        <BrandLogo size="large" subtitle="คลังข้อสอบอัจฉริยะ" />
       </Link>
 
       <Card padding="2xl" elevation="sm" className="w-full max-w-md">
