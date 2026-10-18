@@ -156,6 +156,10 @@ export type RegradableAnswer = Pick<GradableAnswer, 'id' | 'student_answer' | 'm
   score: number | null
   is_correct: boolean | null
   score_edited_by?: string | null
+  /** Component reviews supersede the legacy whole-question override marker. */
+  answer_reviewed_at?: string | null
+  answer_max_score?: number | null
+  work_max_score?: number | null
   option_order?: number[] | null
   grading_config?: GradingConfig | null
   is_void?: boolean
@@ -175,7 +179,7 @@ export type RegradedAnswer = {
 
 function isManualOnly(question: Question): boolean {
   const extra = (question.extra_data ?? {}) as Data
-  if (question.question_type === 'essay') return true
+  if (question.question_type === 'essay' || question.question_type === 'file_upload') return true
   if (question.question_type === 'fill_blank') {
     const blanks = list(extra.blanks)
     return blanks.length > 0 && blanks.every(blank => getBlankType(extra, blank as any) === 'text')
@@ -241,7 +245,9 @@ export function regradeAnswer(
     }
   }
   const config = gradingSnapshot(next)
-  if (options.preserveTeacherOverrides !== false && answer.score_edited_by) return preservedScore(answer, skeleton.correct_answer, config, 'teacher_override')
+  const hasParts = answer.answer_max_score != null && answer.work_max_score != null
+  const teacherAnswer = hasParts ? !!answer.answer_reviewed_at : !!answer.score_edited_by
+  if (options.preserveTeacherOverrides !== false && teacherAnswer) return preservedScore(answer, skeleton.correct_answer, config, 'teacher_override')
   if (isManualOnly(next)) return preservedScore(answer, skeleton.correct_answer, config, 'manual_only')
   const grade = gradeAnswer({
     ...answer, correct_answer: skeleton.correct_answer,

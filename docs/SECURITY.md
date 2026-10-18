@@ -1,5 +1,13 @@
 # Security และ privacy guardrails
 
+## Grading workspace boundaries — local, 18 October 2026
+
+Grading readers require a verified active teacher/admin (or trusted super admin) with management access to the exact assignment before service-role learner reads. Summary DTOs omit student response bodies, frozen keys, random values, emails and private profile fields; detail reads bind to authorized official submission IDs and the selected question/student window. Question content still passes assignment provenance checks. URL filter state never supplies resource authority or trusted score bounds.
+
+Private work preview signing validates the complete `students/<student>/<submission>/<answer>/<upload>/preview.webp|png` namespace before issuing 300-second URLs; it never signs scene JSON or unrelated paths. Public attachment rendering allows only the configured project's known buckets; PDF rendering fetches with omitted credentials, validates MIME/signature and a streamed 10 MiB cap, then uses a typed PDF Blob in the browser's native viewer. The viewer receives neither the stored public URL nor HTML; iframe sandbox blocks Chrome's PDF viewer and is deliberately omitted after byte validation. Signing failure shows unavailable evidence, never fabricated content.
+
+The new policy/audit data has RLS with browser grants revoked. Service-only invoker RPCs repeat active actor, role, assignment and submission membership checks, lock rows, enforce numeric component bounds and reject stale revisions before any mutation. A work-only review cannot silently claim ownership of an automatic answer. Missing migration disables new writes without bypassing to direct updates. The synthetic grading lab disables external mutations/polling and is unavailable in production, including its local asset route.
+
 ## Grading corrections — local implementation, 18 October 2026
 
 Bank changes require verified active actor and exact bank-edit authority before service reads. Link enumeration reads assignment IDs; learner data is read only after canManageAssignment. Void checks management of the selected assignment. HMAC acknowledgement binds actor/question/edit/revision/scope, expires and is checked against fresh data; browser scores and target lists are not trusted. Manual overrides and unmanageable assignments are preserved.

@@ -1,5 +1,13 @@
 # Architecture
 
+## Grading workspace — local, 18 October 2026
+
+`lib/grading-workspace.server.ts` เป็น reader ร่วมของ results overview และ question/student detail ตรวจ verified actor, active role และ exact assignment management ก่อนสร้าง service reader จากนั้นโหลดโจทย์ตาม provenance และเลือก official attempt ด้วย scoring เดิม อ่าน summary ทุกหน้าของข้อมูล แยก full answer body เฉพาะข้อ/นักเรียนในหน้า 30 คนที่เลือก ตัวกรองและ sort ใช้กติกาเดียวกับ UI ไม่ส่ง access_code/email/private profile ใน DTO
+
+`components/assignments/grading-*` ใช้ Card/Tabs/Table และ header ร่วม หน้ารายละเอียดแสดงคำตอบ/รูปทันทีพร้อมช่องคะแนนสองส่วน Actions `lib/actions/grading-review.ts` เรียก service-only atomic RPC พร้อม expected timestamp ไม่ fallback เขียนคะแนน/หัวรอบแยกกัน `scoreParts` ใน pure module เป็นนิยามร่วมของ pending/source/display การบันทึกสำเร็จ revalidate results layout, submission และคะแนนที่เกี่ยวข้อง
+
+Development-only `/exam-screen-lab/grading-workspace` ประกอบคอมโพเนนต์จริงกับ fixture สังเคราะห์และ action ใน sessionStorage แยกจาก Auth/DB/Storage ภายนอก ทั้งหน้าและ asset route ปิดใน production การตรวจ browser ใน lab ยืนยัน UI ได้ แต่ไม่ถือเป็นการทดสอบ Supabase integration หรืออนุมัติ rollout
+
 ## Automatic regrading and void decisions — local, 18 October 2026
 
 Question forms share QuestionUpdateConfirmationProvider. Save prepares an impact summary and opaque HMAC receipt bound to actor, question revision, normalized edit and exact authorized scope. Checkbox acknowledgement releases the save; server recomputes the plan and verifies the receipt before the atomic SQL RPC. assignment-regrading uses the normal key builder/evaluator with saved random values, manual grades and assignment weights. Signing uses server-only GRADING_CONFIRMATION_SECRET or the service-role secret; receipts expire after 15 minutes and carry no learner payload.
