@@ -17,6 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { scoreParts, type GradingStudent, type GradingWorkspaceData } from '@/lib/grading-workspace'
+import { gradingReviewPresentation } from '@/lib/grading-review-status'
 import { questionExcerpt, TYPE_LABEL } from '@/lib/question-display'
 import { isTrueFalseGroupQuestion } from '@/lib/true-false-group'
 import { sortStudentsByRules, type SortableStudentProfile, type StudentSortDir, type StudentSortKey } from '@/lib/student-sort'
@@ -86,22 +87,22 @@ export function GradingOverview({ data, initialQuery, tools }: Props) {
     .map(student => student.submissionId!)), [data.students])
   const questionById = useMemo(() => new Map(data.questions.map(question => [question.id, question])), [data.questions])
   const reviewSummary = useMemo(() => {
-    const questions = new Map<string, { automatic: number; teacher: number; pendingAnswer: number; pendingWork: number; needsAllocation: number; count: number; hasWork: boolean }>()
+    const questions = new Map<string, { automatic: number; teacher: number; pendingAnswer: number; pendingWork: number; count: number; hasWork: boolean }>()
     const pendingStudents = new Set<string>()
     for (const answer of data.answers) {
       if (!submittedIds.has(answer.submissionId)) continue
       const question = questionById.get(answer.questionId)
       if (!question) continue
-      const item = questions.get(answer.questionId) ?? { automatic: 0, teacher: 0, pendingAnswer: 0, pendingWork: 0, needsAllocation: 0, count: 0, hasWork: false }
+      const item = questions.get(answer.questionId) ?? { automatic: 0, teacher: 0, pendingAnswer: 0, pendingWork: 0, count: 0, hasWork: false }
       item.count++
       if (!answer.isVoid && !data.voidedQuestionIds.includes(answer.questionId)) {
         const parts = scoreParts(answer, question)
-        if (parts.answer.source === 'automatic' && !parts.answer.pending) item.automatic++
-        if (parts.hasWork) item.hasWork = true
-        if (parts.answer.source === 'teacher' || parts.work.source === 'teacher') item.teacher++
-        if (parts.answer.pending) item.pendingAnswer++
-        if (parts.work.pending) item.pendingWork++
-        if (parts.needsAllocation) item.needsAllocation++
+        const status = gradingReviewPresentation(parts)
+        if (status.automatic) item.automatic++
+        if (parts.hasWork || status.pendingWork) item.hasWork = true
+        if (status.teacher) item.teacher++
+        if (status.pendingAnswer) item.pendingAnswer++
+        if (status.pendingWork) item.pendingWork++
         if (parts.pending) pendingStudents.add(answer.studentId)
       }
       questions.set(answer.questionId, item)
@@ -200,8 +201,7 @@ export function GradingOverview({ data, initialQuery, tools }: Props) {
                       {summary.teacher > 0 && <Badge variant="secondary"><UserRoundCheck aria-hidden="true" />ครูตรวจแล้ว {formatCount(summary.teacher)} รายการ</Badge>}
                       {summary.pendingAnswer > 0 && <Badge variant="statusWarning"><Clock aria-hidden="true" />รอตรวจคำตอบ {formatCount(summary.pendingAnswer)} รายการ</Badge>}
                       {summary.pendingWork > 0 && <Badge variant="statusWarning"><Clock aria-hidden="true" />รอตรวจวิธีทำ {formatCount(summary.pendingWork)} รายการ</Badge>}
-                      {summary.needsAllocation > 0 && <Badge variant="statusWarning"><Clock aria-hidden="true" />รอกำหนดสัดส่วนคะแนน {formatCount(summary.needsAllocation)} รายการ</Badge>}
-                      {summary.automatic + summary.teacher + summary.pendingAnswer + summary.pendingWork + summary.needsAllocation === 0 && <Badge variant="secondary">ไม่นับคะแนน</Badge>}
+                      {summary.automatic + summary.teacher + summary.pendingAnswer + summary.pendingWork === 0 && <Badge variant="secondary">ไม่นับคะแนน</Badge>}
                     </>}
                   </div></TableCell>
                   <TableCell className="px-3"><Button size="sm" variant="outline" className="pointer-coarse:min-h-11" render={<Link href={detailHref('questions', question.id)} prefetch={false} />}>ตรวจ/ดูคำตอบ<ArrowUpRight data-icon="inline-end" /></Button></TableCell>

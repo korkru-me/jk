@@ -14,6 +14,12 @@ readWithVoidedScoreMetadata projects the optional removed-weight column on the o
 
 `components/assignments/grading-*` ใช้ Card/Tabs/Table และ header ร่วม หน้ารายละเอียดแสดงคำตอบ/รูปทันทีพร้อมช่องคะแนนสองส่วน Actions `lib/actions/grading-review.ts` เรียก service-only atomic RPC พร้อม expected timestamp ไม่ fallback เขียนคะแนน/หัวรอบแยกกัน `scoreParts` ใน pure module เป็นนิยามร่วมของ pending/source/display การบันทึกสำเร็จ revalidate results layout, submission และคะแนนที่เกี่ยวข้อง
 
+`GradingBatchProvider` ครอบหนึ่งหน้า/ตัวกรองของการตรวจรายข้อหรือรายคน เก็บ string draft และ expected revision ที่แก้ครั้งแรกต่อคำตอบ ผ่าน `grading-score-drafts` เพื่อตรวจทั้งชุดก่อนเขียน ส่งเฉพาะส่วนที่ touched ไปยัง action เดิมตามลำดับ แต่ละคำตอบยังเป็น transaction ของตนเอง ไม่อ้าง atomic ทั้ง batch แถวที่ล้มเหลว/ผลเครือข่ายไม่ชัดยังเก็บร่างและ revision เดิม แถวที่ยืนยันสำเร็จไม่ส่งซ้ำและรอ revision ใหม่ก่อนปลดล็อก มีปุ่ม retry เฉพาะการอ่านหาก refresh ไม่ได้ข้อมูลใหม่ ไม่เก็บร่างคะแนนใน persistent browser storage
+
+`gradingReviewPresentation` แยกสถานะงานตรวจจากการแบ่งคะแนน: วิธีทำที่ยังไม่แบ่งคะแนนยังแสดง pending โดยไม่แก้ `scoreParts`/คะแนนเต็ม `grading-navigation-guard` ป้องกันลิงก์และการเปลี่ยนตัวกรองผ่าน callback กลาง ใช้ beforeunload เฉพาะร่าง/งานบันทึกค้าง และ Navigation API ยกเลิกหรือคืน exact entry ของ Back/Forward ใน browser ที่รองรับก่อนยืนยัน ไม่เพิ่ม sentinel หรือเขียนทับข้อมูล Next history กรณีไม่มี API จะเปลี่ยน document ของ entry ปัจจุบันผ่าน query ชั่วคราว `__gradingDocument` แล้วลบ query นี้พร้อม merge marker แยกชื่อโดยรักษาข้อมูล Next การ reload หรือ replace URL เดิมอย่างเดียวไม่รับรองขอบเขต document จากนั้นใช้ document navigation ในหน้าตรวจ เพื่อให้ Back เป็น document exit ที่ beforeunload เตือนได้โดยไม่เดาดัชนี history
+
+`confirmPageExit` เป็น callback event ฝั่ง client ที่ topbar รอคำยืนยันก่อนเรียก logout เดิม ป้องกันกรณีเมนู portal ถูก unmount ขณะรอคำตอบ ซึ่งการเก็บ DOM form แล้ว requestSubmit ซ้ำไม่รับรองว่าจะเรียก action ได้ ไม่มีการเปลี่ยนสิทธิ์/session หรือการทำงานของ server logout
+
 Development-only `/exam-screen-lab/grading-workspace` ประกอบคอมโพเนนต์จริงกับ fixture สังเคราะห์และ action ใน sessionStorage แยกจาก Auth/DB/Storage ภายนอก ทั้งหน้าและ asset route ปิดใน production การตรวจ browser ใน lab ยืนยัน UI ได้ แต่ไม่ถือเป็นการทดสอบ Supabase integration หรืออนุมัติ rollout
 
 ## Automatic regrading and void decisions — local, 18 October 2026

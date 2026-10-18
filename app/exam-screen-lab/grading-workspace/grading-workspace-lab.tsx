@@ -21,7 +21,7 @@ import { createGradingLab, LAB_BASE, LAB_STORAGE, LAB_TIME, labId, recomputeLab 
 type Scenario = 'default' | 'unconfigured' | 'void' | 'streak' | 'readonly'
 
 export function GradingWorkspaceLabShell({ children }: { children: ReactNode }) {
-  return <div onClickCapture={event => {
+  return <div data-navigation-boundary={LAB_BASE} onClickCapture={event => {
     const anchor = (event.target as HTMLElement).closest('a')
     const href = anchor?.getAttribute('href')
     if (href && !href.startsWith(LAB_BASE) && !href.startsWith('blob:')) { event.preventDefault(); event.stopPropagation(); toast.info('ห้องทดลองนี้เปิดเฉพาะหน้าตรวจให้คะแนน') }
