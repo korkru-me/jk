@@ -6,6 +6,11 @@ const mocks = vi.hoisted(() => ({
   getUser: vi.fn(), getSession: vi.fn(), updateUser: vi.fn(), signOut: vi.fn(), profileRead: vi.fn(), profileUpdate: vi.fn(),
   hasGrant: vi.fn(), clearGrant: vi.fn(),
   issueIntent: vi.fn(), clearIntent: vi.fn(),
+  redirect: vi.fn(), redirectSignal: new Error('synthetic redirect signal'),
+}))
+vi.mock('next/navigation', async (importOriginal) => ({
+  ...await importOriginal<typeof import('next/navigation')>(),
+  redirect: mocks.redirect,
 }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn(async () => ({ auth: mocks })) }))
 vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: vi.fn(() => ({ from: () => ({
@@ -17,17 +22,32 @@ vi.mock('@/lib/auth/signup-email.server', () => ({ rememberSignupEmail: mocks.re
 vi.mock('@/lib/auth/recovery-grant.server', () => ({ hasRecoveryGrant: mocks.hasGrant, clearRecoveryGrant: mocks.clearGrant }))
 vi.mock('@/lib/auth/recovery-intent.server', () => ({ issueRecoveryIntent: mocks.issueIntent, clearRecoveryIntent: mocks.clearIntent }))
 import { completeProfile, forgotPassword, loginWithGoogle, register, resendSignupConfirmation, resetPassword, sendMagicLink } from '../actions/auth'
+import { RedirectType } from 'next/navigation'
 
 function signup(accept = true) {
   const form = new FormData()
   Object.entries({ role: 'student', full_name: 'นักเรียนทดสอบ', email: 'Student@Example.COM', password: 'password1', confirm_password: 'password1', accept_terms: String(accept) }).forEach(([key, value]) => form.set(key, value))
   return form
 }
+function resetForm() {
+  const form = new FormData()
+  form.set('password', 'newpassword1')
+  form.set('confirm_password', 'newpassword1')
+  return form
+}
+function prepareRecoveryReset() {
+  mocks.getUser.mockResolvedValue({ data: { user: { id: 'verified-user' } } })
+  mocks.getSession.mockResolvedValue({ data: { session: { access_token: 'synthetic-session' } } })
+  mocks.hasGrant.mockResolvedValue(true)
+  mocks.updateUser.mockResolvedValue({ error: null })
+  mocks.signOut.mockResolvedValue({ error: null })
+}
 beforeEach(() => {
   vi.stubEnv('NEXT_PUBLIC_SITE_URL', 'https://fixture.invalid')
   mocks.reserve.mockResolvedValue({ allowed: true })
   mocks.issueIntent.mockResolvedValue('n'.repeat(43))
   mocks.signUp.mockResolvedValue({ data: { session: null, user: { id: 'synthetic' } }, error: null })
+  mocks.redirect.mockImplementation(() => { throw mocks.redirectSignal })
   for (const name of ['resend', 'resetPasswordForEmail', 'signInWithOtp'] as const) mocks[name].mockResolvedValue({ error: null })
 })
 afterEach(() => { vi.unstubAllEnvs(); vi.resetAllMocks() })
@@ -133,28 +153,106 @@ describe('public email actions', () => {
   })
 
   it('does not let an existing login alone reset the password', async () => {
-    mocks.getUser.mockResolvedValue({ data: { user: { id: 'verified-user' } } })
-    mocks.getSession.mockResolvedValue({ data: { session: { access_token: 'synthetic-session' } } })
+    prepareRecoveryReset()
     mocks.hasGrant.mockResolvedValue(false)
-    const form = new FormData()
-    form.set('password', 'newpassword1')
-    form.set('confirm_password', 'newpassword1')
-    expect(await resetPassword(form)).toHaveProperty('error')
+    expect(await resetPassword(resetForm())).toHaveProperty('error')
     expect(mocks.updateUser).not.toHaveBeenCalled()
+    expect(mocks.clearGrant).not.toHaveBeenCalled()
+    expect(mocks.signOut).not.toHaveBeenCalled()
+    expect(mocks.redirect).not.toHaveBeenCalled()
   })
 
-  it('clears the valid recovery grant and revokes sessions after a reset', async () => {
-    mocks.getUser.mockResolvedValue({ data: { user: { id: 'verified-user' } } })
-    mocks.getSession.mockResolvedValue({ data: { session: { access_token: 'synthetic-session' } } })
-    mocks.hasGrant.mockResolvedValue(true)
-    mocks.updateUser.mockResolvedValue({ error: null })
-    mocks.signOut.mockResolvedValue({ error: null })
-    const form = new FormData()
-    form.set('password', 'newpassword1')
-    form.set('confirm_password', 'newpassword1')
-    expect(await resetPassword(form)).toEqual({ success: true })
+  it.each(['user', 'session'])('does not mutate credentials or navigate without the verified %s', async (missing) => {
+    prepareRecoveryReset()
+    if (missing === 'user') mocks.getUser.mockResolvedValue({ data: { user: null } })
+    else mocks.getSession.mockResolvedValue({ data: { session: null } })
+    expect(await resetPassword(resetForm())).toHaveProperty('error')
+    expect(mocks.updateUser).not.toHaveBeenCalled()
+    expect(mocks.clearGrant).not.toHaveBeenCalled()
+    expect(mocks.signOut).not.toHaveBeenCalled()
+    expect(mocks.redirect).not.toHaveBeenCalled()
+  })
+
+  it('navigates to the durable success result only after updating the password and clearing recovery access', async () => {
+    prepareRecoveryReset()
+    await expect(resetPassword(resetForm())).rejects.toBe(mocks.redirectSignal)
     expect(mocks.hasGrant).toHaveBeenCalledWith('verified-user', 'synthetic-session')
+    expect(mocks.updateUser).toHaveBeenCalledExactlyOnceWith({ password: 'newpassword1' })
     expect(mocks.clearGrant).toHaveBeenCalledOnce()
-    expect(mocks.signOut).toHaveBeenCalledWith({ scope: 'global' })
+    expect(mocks.signOut).toHaveBeenCalledExactlyOnceWith({ scope: 'global' })
+    expect(mocks.redirect).toHaveBeenCalledExactlyOnceWith('/login?password_changed=1', RedirectType.replace)
+    expect(mocks.updateUser.mock.invocationCallOrder[0]).toBeLessThan(mocks.clearGrant.mock.invocationCallOrder[0])
+    expect(mocks.clearGrant.mock.invocationCallOrder[0]).toBeLessThan(mocks.signOut.mock.invocationCallOrder[0])
+    expect(mocks.signOut.mock.invocationCallOrder[0]).toBeLessThan(mocks.redirect.mock.invocationCallOrder[0])
+  })
+
+  it.each(['returned error', 'thrown exception'])('preserves the completed password update and redirects with a warning after a sign-out %s', async (failure) => {
+    prepareRecoveryReset()
+    if (failure === 'returned error') mocks.signOut.mockResolvedValue({ error: { code: 'unexpected_failure' } })
+    else mocks.signOut.mockRejectedValue(new Error('private provider failure'))
+    await expect(resetPassword(resetForm())).rejects.toBe(mocks.redirectSignal)
+    expect(mocks.updateUser).toHaveBeenCalledExactlyOnceWith({ password: 'newpassword1' })
+    expect(mocks.clearGrant).toHaveBeenCalledOnce()
+    expect(mocks.signOut).toHaveBeenCalledExactlyOnceWith({ scope: 'global' })
+    expect(mocks.redirect).toHaveBeenCalledExactlyOnceWith('/login?password_changed=1&sessions_revoked=0', RedirectType.replace)
+    expect(mocks.clearGrant.mock.invocationCallOrder[0]).toBeLessThan(mocks.signOut.mock.invocationCallOrder[0])
+    expect(mocks.signOut.mock.invocationCallOrder[0]).toBeLessThan(mocks.redirect.mock.invocationCallOrder[0])
+  })
+
+  it('waits for grant clearing and session revocation to finish before navigating', async () => {
+    prepareRecoveryReset()
+    const cleared = Promise.withResolvers<void>()
+    const revoked = Promise.withResolvers<{ error: null }>()
+    mocks.clearGrant.mockReturnValue(cleared.promise)
+    mocks.signOut.mockReturnValue(revoked.promise)
+    const navigation = expect(resetPassword(resetForm())).rejects.toBe(mocks.redirectSignal)
+    try {
+      await vi.waitFor(() => expect(mocks.clearGrant).toHaveBeenCalledOnce(), { interval: 1 })
+      expect(mocks.signOut).not.toHaveBeenCalled()
+      expect(mocks.redirect).not.toHaveBeenCalled()
+      cleared.resolve()
+      await vi.waitFor(() => expect(mocks.signOut).toHaveBeenCalledOnce(), { interval: 1 })
+      expect(mocks.redirect).not.toHaveBeenCalled()
+    } finally {
+      cleared.resolve()
+      revoked.resolve({ error: null })
+    }
+    await navigation
+    expect(mocks.redirect).toHaveBeenCalledExactlyOnceWith('/login?password_changed=1', RedirectType.replace)
+  })
+
+  it('retains the recovery grant and stays on the form when Auth rejects the password update', async () => {
+    prepareRecoveryReset()
+    mocks.updateUser.mockResolvedValue({ error: { code: 'weak_password', message: 'private password policy details' } })
+    const result = await resetPassword(resetForm())
+    expect(result).toHaveProperty('error')
+    expect(JSON.stringify(result)).not.toContain('private password policy')
+    expect(mocks.updateUser).toHaveBeenCalledOnce()
+    expect(mocks.clearGrant).not.toHaveBeenCalled()
+    expect(mocks.signOut).not.toHaveBeenCalled()
+    expect(mocks.redirect).not.toHaveBeenCalled()
+  })
+
+  it('attaches password reuse to the password field without consuming the recovery grant', async () => {
+    prepareRecoveryReset()
+    mocks.updateUser.mockResolvedValue({ error: { code: 'same_password', status: 422, message: 'private provider password history' } })
+    const result = await resetPassword(resetForm())
+    expect(result).toEqual({ error: 'รหัสผ่านใหม่ต้องแตกต่างจากรหัสผ่านเดิม', field: 'password' })
+    expect(JSON.stringify(result)).not.toContain('private provider')
+    expect(mocks.clearGrant).not.toHaveBeenCalled()
+    expect(mocks.signOut).not.toHaveBeenCalled()
+    expect(mocks.redirect).not.toHaveBeenCalled()
+  })
+
+  it('does not mistake another 422 password-policy error for password reuse', async () => {
+    prepareRecoveryReset()
+    mocks.updateUser.mockResolvedValue({ error: { code: 'weak_password', status: 422, message: 'private provider policy reason' } })
+    const result = await resetPassword(resetForm())
+    expect(result).toHaveProperty('error')
+    expect(result.error).not.toBe('รหัสผ่านใหม่ต้องแตกต่างจากรหัสผ่านเดิม')
+    expect(JSON.stringify(result)).not.toContain('private provider')
+    expect(mocks.clearGrant).not.toHaveBeenCalled()
+    expect(mocks.signOut).not.toHaveBeenCalled()
+    expect(mocks.redirect).not.toHaveBeenCalled()
   })
 })

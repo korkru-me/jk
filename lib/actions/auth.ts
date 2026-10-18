@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { redirect } from 'next/navigation'
+import { redirect, RedirectType } from 'next/navigation'
 import { isAuthRetryableFetchError } from '@supabase/supabase-js'
 import { reserveAuthEmail } from '@/lib/auth/email-request-limit.server'
 import { rememberSignupEmail } from '@/lib/auth/signup-email.server'
@@ -336,6 +336,9 @@ export async function resetPassword(formData: FormData) {
 
   const { error } = await supabase.auth.updateUser({ password: parsed.data.password })
   if (error) {
+    if (error.code === 'same_password') {
+      return { error: 'รหัสผ่านใหม่ต้องแตกต่างจากรหัสผ่านเดิม', field: 'password' as const }
+    }
     const connectionError = authConnectionError(error)
     if (connectionError) return { error: connectionError }
     return { error: 'ไม่สามารถตั้งรหัสผ่านใหม่ได้ กรุณาขอลิงก์ใหม่แล้วลองอีกครั้ง' }
@@ -343,11 +346,18 @@ export async function resetPassword(formData: FormData) {
 
   // Invalidate refresh tokens on other devices after a credential reset.
   await clearRecoveryGrant()
+  let sessionsRevoked = false
   try {
     const { error: signOutError } = await supabase.auth.signOut({ scope: 'global' })
-    if (!signOutError) return { success: true }
+    sessionsRevoked = !signOutError
   } catch { /* Credential update succeeded; report revocation separately. */ }
-  return { success: true, warning: 'ตั้งรหัสผ่านแล้ว แต่ยังยุติการเข้าสู่ระบบทุกอุปกรณ์ไม่สำเร็จ กรุณาเข้าสู่ระบบใหม่และติดต่อผู้ดูแล' }
+
+  // Cookie cleanup re-renders the current page and removes its recovery form.
+  // Navigate as part of this action so that the expired-link gate cannot replace
+  // a successful result. This notice never grants a session or recovery access.
+  redirect(sessionsRevoked
+    ? '/login?password_changed=1'
+    : '/login?password_changed=1&sessions_revoked=0', RedirectType.replace)
 }
 
 export async function logout() {
