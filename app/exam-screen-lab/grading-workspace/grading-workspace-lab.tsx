@@ -18,10 +18,10 @@ import type { GradingWorkspaceData } from '@/lib/grading-workspace'
 import { scoreParts } from '@/lib/grading-workspace'
 import type { ConfigureGradingPartsInput, GradingReviewActionResult } from '@/lib/actions/grading-review'
 import type { GradingDraftError, PublishGradingDraftsInput, PublishGradingDraftsResult, SaveGradingDraftsInput, SaveGradingDraftsResult } from '@/lib/grading-draft-types'
-import { createGradingLab, LAB_BASE, LAB_LEGACY_STORAGE, LAB_STORAGE, LAB_TIME, labId, recomputeLab } from './fixture'
+import { createGradingLab, LAB_BASE, LAB_LEGACY_STORAGE, LAB_LONG_QUESTION_TITLE, LAB_STORAGE, LAB_TIME, labId, recomputeLab } from './fixture'
 import { createGradingLabState, migrateLegacyGradingLab, parseGradingLabState, publishLabDrafts, saveLabDrafts, type GradingLabState } from './grading-workspace-lab-state'
 
-type Scenario = 'default' | 'unconfigured' | 'void' | 'streak' | 'readonly'
+type Scenario = 'default' | 'long-question' | 'unconfigured' | 'void' | 'streak' | 'readonly'
 
 export function GradingWorkspaceLabShell({ children }: { children: ReactNode }) {
   return <div data-navigation-boundary={LAB_BASE} onClickCapture={event => {
@@ -34,7 +34,7 @@ export function GradingWorkspaceLabShell({ children }: { children: ReactNode }) 
 }
 
 function scenarioData(scenario: Scenario) {
-  let data = createGradingLab()
+  let data = createGradingLab({ longQuestion: scenario === 'long-question' })
   if (scenario === 'unconfigured') {
     data.gradingParts = {}
     data.answers = data.answers.map(answer => answer.questionId === data.questions[1].id ? { ...answer, gradingPartsConfigured: false, answerScore: (answer.answerScore ?? 0) / 2 * 5, score: (answer.answerScore ?? 0) / 2 * 5, answerMaxScore: 5, workScore: 0, workMaxScore: 0, workReviewedAt: null } : answer)
@@ -53,6 +53,7 @@ function scenarioData(scenario: Scenario) {
 }
 
 function inferScenario(data: GradingWorkspaceData): Scenario {
+  if (data.questions[1]?.title === LAB_LONG_QUESTION_TITLE) return 'long-question'
   return data.reviewAvailable === false ? 'readonly' : data.assignment.completionRule === 'streak' ? 'streak' : data.voidedQuestionIds.length ? 'void' : !data.gradingParts?.[data.questions[1].id] ? 'unconfigured' : 'default'
 }
 
@@ -205,7 +206,7 @@ export function GradingWorkspaceLab({ questionId, studentId }: { questionId?: st
 
   return <div data-grading-lab-content className="flex min-w-0 flex-col gap-2">
     <LabSidebar data={data} />
-    <div className="flex flex-wrap items-center justify-between gap-2"><Badge variant="outline"><FlaskConical aria-hidden="true" />LOCAL · ข้อมูลจำลองเท่านั้น</Badge><div className="flex flex-wrap items-center gap-2"><label className="sr-only" htmlFor="grading-lab-scenario">สถานการณ์จำลอง</label><NativeSelect id="grading-lab-scenario" value={scenario} onChange={event => { void changeScenario(event.target.value as Scenario) }} className="w-auto pointer-coarse:min-h-11"><option value="default">ตัวอย่างปกติ</option><option value="unconfigured">ยังไม่กำหนดสัดส่วน</option><option value="void">มีข้อโมฆะ</option><option value="streak">โจทย์ซ้ำแบบ streak</option><option value="readonly">ฐานข้อมูลยังไม่พร้อม</option></NativeSelect><Button type="button" variant="ghost" className="pointer-coarse:min-h-11" onClick={() => { void reset() }}><RotateCcw data-icon="inline-start" />เริ่มใหม่</Button><Button type="button" variant={failNext ? 'navigation' : 'outline'} className="pointer-coarse:min-h-11" onClick={() => { fail.current = !fail.current; setFailNext(fail.current) }}>{failNext ? 'คำสั่งครั้งหน้าจะขัดข้อง' : 'ลองบันทึกขัดข้อง'}</Button></div></div>
+    <div className="flex flex-wrap items-center justify-between gap-2"><Badge variant="outline"><FlaskConical aria-hidden="true" />LOCAL · ข้อมูลจำลองเท่านั้น</Badge><div className="flex flex-wrap items-center gap-2"><label className="sr-only" htmlFor="grading-lab-scenario">สถานการณ์จำลอง</label><NativeSelect id="grading-lab-scenario" value={scenario} onChange={event => { void changeScenario(event.target.value as Scenario) }} className="w-auto pointer-coarse:min-h-11"><option value="default">ตัวอย่างปกติ</option><option value="long-question">โจทย์ยาว · ภาพและสูตร</option><option value="unconfigured">ยังไม่กำหนดสัดส่วน</option><option value="void">มีข้อโมฆะ</option><option value="streak">โจทย์ซ้ำแบบ streak</option><option value="readonly">ฐานข้อมูลยังไม่พร้อม</option></NativeSelect><Button type="button" variant="ghost" className="pointer-coarse:min-h-11" onClick={() => { void reset() }}><RotateCcw data-icon="inline-start" />เริ่มใหม่</Button><Button type="button" variant={failNext ? 'navigation' : 'outline'} className="pointer-coarse:min-h-11" onClick={() => { fail.current = !fail.current; setFailNext(fail.current) }}>{failNext ? 'คำสั่งครั้งหน้าจะขัดข้อง' : 'ลองบันทึกขัดข้อง'}</Button></div></div>
     <p className="text-xs text-muted-foreground">ข้อมูลจำลองเก็บในเบราว์เซอร์นี้ เปิดใหม่ได้ · แจ้งเตือนจำลอง {lab.notificationCount} รายการ · ไม่ส่งการแจ้งเตือนจริง</p>
     {!ready ? <p role="status" className="text-sm text-muted-foreground">กำลังเตรียมห้องทดลอง…</p> : questionId ? <QuestionGradingReview data={data} questionId={questionId} query={query} saveDrafts={saveDrafts} publish={publish} configure={configure} correctionActions={false} /> : studentId ? <StudentGradingReview data={data} studentId={studentId} query={query} saveDrafts={saveDrafts} publish={publish} /> : <GradingOverview key={`${params.get('view')}-${scenario}`} data={data} initialQuery={{ ...query, view: params.get('view') === 'students' ? 'students' : 'questions' }} />}
     <div className="flex flex-wrap items-center gap-2 text-xs"><Link href={LAB_BASE} className="text-primary underline underline-offset-2">ตารางรายข้อ</Link><Link href={`${LAB_BASE}?view=students`} className="text-primary underline underline-offset-2">ตารางรายคน</Link><Link href={`${LAB_BASE}/questions/${data.questions[1].id}`} className="text-primary underline underline-offset-2">ตัวอย่างตรวจวิธีทำ</Link><Link href={`${LAB_BASE}/students/${data.students[0].id}`} className="text-primary underline underline-offset-2">ตัวอย่างตรวจรายคน</Link></div>
