@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card'
 import type { GradingWorkspaceData } from '@/lib/grading-workspace'
 
 export type GradingWorkspaceHeaderData = Pick<GradingWorkspaceData,
-  'assignment' | 'students' | 'inProgressCount' | 'pendingFinalizationCount'
+  'assignment' | 'students' | 'inProgressCount' | 'pendingFinalizationCount' | 'reviewAvailable' | 'draftsAvailable'
 >
 
 function formatNumber(value: number) {
@@ -47,6 +47,7 @@ export function GradingWorkspaceHeader({ data, title = 'ตรวจให้ค
           </ul>
           {data.pendingFinalizationCount > 0 && <p className="text-xs text-muted-foreground">ปิดรอบแล้ว รอระบบสรุปผล {formatNumber(data.pendingFinalizationCount)} รอบ</p>}
         </div>
+        {(data.reviewAvailable === false || data.draftsAvailable === false) && <p role="status" className="w-full text-xs text-warning">ยังแก้คะแนนไม่ได้: ฐานข้อมูลที่หน้านี้เชื่อมต่อยังไม่พร้อมใช้งานระบบบันทึกคะแนนรุ่นใหม่ ไม่ต้องกดปลดล็อก กรุณาให้ผู้ดูแลอัปเดตระบบก่อน</p>}
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </div>
     </Card>

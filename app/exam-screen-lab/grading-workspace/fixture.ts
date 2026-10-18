@@ -1,11 +1,20 @@
 import type { GradingAnswer, GradingWorkspaceData } from '@/lib/grading-workspace'
 import { scoreParts } from '@/lib/grading-workspace'
+import type { GradingSavedDraft } from '@/lib/grading-draft-types'
 import type { Question } from '@/lib/types'
 
 export const LAB_BASE = '/exam-screen-lab/grading-workspace'
-export const LAB_STORAGE = 'korkru:grading-workspace-lab:v1'
+export const LAB_STORAGE = 'korkru:grading-workspace-lab:v2'
+export const LAB_LEGACY_STORAGE = 'korkru:grading-workspace-lab:v1'
 export const LAB_TIME = '2026-10-18T02:00:00.000Z'
 export const labId = (type: number, index: number) => `00000000-0000-4000-${String(type).padStart(4, '0')}-${String(index).padStart(12, '0')}`
+
+export interface GradingLabData extends GradingWorkspaceData {
+  assignment: GradingWorkspaceData['assignment'] & { showResults: 'immediate' }
+  viewerId: string
+  draftsAvailable: boolean
+  savedDrafts: GradingSavedDraft[]
+}
 
 const names = ['กานต์พิชชา ใจดี','กิตติภพ วงศ์สวัสดิ์','จิราพร แก้วประเสริฐ','ชนาธิป ศรีสุข','ณัฐกานต์ พูนผล','ณัฐวุฒิ แสงทอง','ธนพร วิริยะ','ธนวัฒน์ รุ่งเรือง','นภัสสร สุขสันต์','นวพล พรหมมา','นันทิชา เมธาวี','ปกรณ์ สายชล','ปณิตา ศรีวิไล','ปริญญา จันทร์หอม','ปวีณา รัตนชัย','พงศกร บุญช่วย','พัชราภา อารีย์','พิชญ์สินี พิมพ์ใจ','ภูริณัฐ ดีพร้อม','มนัสวี จงเจริญ','เมธาวี ศิลป์งาม','รวิภา แสนดี','รัชชานนท์ เพียรดี','ลลิตา ทองแท้','วรัญญา อุดมสุข','วรเมธ แก้วใส','ศศิธร สุวรรณ','ศุภกร พัฒนะ','สุชาดา รุ่งอรุณ','สุรเชษฐ์ คงมั่น','อภิชญา แสงแก้ว','อิทธิพล ยิ้มแย้ม']
 
@@ -21,7 +30,7 @@ function question(index: number, patch: Partial<Question>): Question {
   }
 }
 
-export function createGradingLab(): GradingWorkspaceData {
+export function createGradingLab(): GradingLabData {
   const questions = [
     question(1, { question_type: 'mcq', title: 'อัตราเร็วเฉลี่ย', question_text: 'รถเคลื่อนที่ได้ระยะทาง 120 เมตร ในเวลา 20 วินาที รถมีอัตราเร็วเฉลี่ยเท่าใด', mcq_options: [{ text: '4 เมตรต่อวินาที', is_correct: false }, { text: '6 เมตรต่อวินาที', is_correct: true }, { text: '12 เมตรต่อวินาที', is_correct: false }, { text: '24 เมตรต่อวินาที', is_correct: false }] }),
     question(2, { question_type: 'written', title: 'อัตราเร็วของการเดิน', question_text: 'นักเรียนเดินเป็นระยะทาง 20 เมตร ใช้เวลา 4 วินาที จงหาอัตราเร็วเฉลี่ย พร้อมแนบภาพแสดงวิธีทำ', answer_formula: '5', answer_unit: 'เมตรต่อวินาที', requires_work_image: true }),
@@ -47,10 +56,10 @@ export function createGradingLab(): GradingWorkspaceData {
     const correctAnswer = q.question_type === 'mcq' ? 'MCQ:1' : q.question_type === 'written' ? '5' : q.question_type === 'essay' || q.question_type === 'file_upload' ? '' : q.question_type === 'true_false' ? 'false' : q.question_type === 'matching' ? 'MATCH:["เมตร","เมตรต่อวินาที"]' : 'FILL_MANUAL:2'
     answers.push({ id: labId(8400, index * 10 + questionIndex + 1), submissionId: student.submissionId, studentId: student.id, questionId: q.id, randomValues: {}, correctAnswer, studentAnswer, isCorrect: manual ? checked ? true : null : !wrong, score: answerScore + workScore, maxScore: maxScores[questionIndex], optionOrder: null, orderIndex: questionIndex, workImages: workMax ? [`${LAB_BASE}/assets/work-${index}.svg`] : [], scoreEditedBy: checked ? labId(8000, 1) : null, scoreEditedAt: checked || workChecked ? LAB_TIME : null, answerScore, answerMaxScore: answerMax, workScore, workMaxScore: workMax, answerReviewedAt: checked ? LAB_TIME : null, workReviewedAt: workChecked ? LAB_TIME : null, gradingPartsConfigured: true })
   }
-  return recomputeLab({ assignment: { id: labId(8000, 2), title: 'การเคลื่อนที่แนวตรง', classroomName: 'ฟิสิกส์ 1 · ม.4/1 และ ม.4/2', type: 'exercise', displayMaxScore: null, completionRule: 'fixed' }, students, questions, answers, inProgressCount: 0, pendingFinalizationCount: 0, voidedQuestionIds: [], baseHref: LAB_BASE, reviewAvailable: true, gradingParts: { [questions[1].id]: { workShare: 0.6, updatedAt: LAB_TIME } }, questionMaxScores: Object.fromEntries(questions.map((q, index) => [q.id, maxScores[index]])) })
+  return recomputeLab({ assignment: { id: labId(8000, 2), title: 'การเคลื่อนที่แนวตรง', classroomName: 'ฟิสิกส์ 1 · ม.4/1 และ ม.4/2', type: 'exercise', displayMaxScore: null, completionRule: 'fixed', showResults: 'immediate' }, students, questions, answers, inProgressCount: 0, pendingFinalizationCount: 0, voidedQuestionIds: [], baseHref: LAB_BASE, reviewAvailable: true, viewerId: labId(8000, 1), draftsAvailable: true, savedDrafts: [], gradingParts: { [questions[1].id]: { workShare: 0.6, updatedAt: LAB_TIME } }, questionMaxScores: Object.fromEntries(questions.map((q, index) => [q.id, maxScores[index]])) })
 }
 
-export function recomputeLab(data: GradingWorkspaceData): GradingWorkspaceData {
+export function recomputeLab<T extends GradingWorkspaceData>(data: T): T {
   return { ...data, students: data.students.map(student => {
     const answers = data.answers.filter(answer => answer.studentId === student.id)
     let score = 0, maxScore = 0, bestStreak = 0, currentStreak = 0

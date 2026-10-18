@@ -1,5 +1,13 @@
 # Data model และ invariants
 
+## Private grading drafts — local migration 20261018133739
+
+ยังไม่ apply: `grading_score_drafts` keyed ด้วย `(actor_id, assignment_id, answer_id)` เก็บคะแนนส่วนที่แตะ, `base_score_edited_at` และ `updated_at` แบบ compare-and-set ร่างไม่เปลี่ยนคะแนนจริง/ยอดรวม/สถานะรอบ และไม่มี student reader หรือ browser grant อ่านได้ `read_grading_drafts` ตรวจ actor active และสิทธิ์ exact assignment ซ้ำ ตัวโหลดครูส่งเฉพาะร่างของตนใน official scope
+
+`save_grading_drafts` บันทึกร่างเท่านั้น `publish_grading_drafts` เรียก scoring RPC เดิมทั้งชุดใน transaction เดียว แล้วลบร่างรุ่นที่ตรงและสร้าง `grade_published` หนึ่งรายการต่อผู้เรียนที่ได้รับผล ไม่มีคะแนน/เฉลยใน notification และ student route คง reveal/ownership เดิม `grading_draft_requests` เก็บ receipt โดย `(actor_id,request_id)` ตรวจ payload ตรงเพื่อให้ retry หลัง commit แต่ response หายไม่แจ้งซ้ำ ร่างที่คะแนนจริงเปลี่ยนแล้วห้าม publish ทับ แต่ลบร่างของตนด้วย expected draft version ที่ตรงได้
+
+ตารางเปิด RLS และถอน PUBLIC/anon/authenticated grants; RPC เป็น SECURITY INVOKER fixed search_path service-only หลัง server action ตรวจสิทธิ์ ใช้ lock ลำดับแน่นอนและ rollback ทั้งชุดเมื่อแถวใดผิด Migration ต้องมี `20261018005611` และ `20261018040444` ก่อน ไม่ใช้ข้าม ledger ที่ต่างกัน
+
 ## Grading workspace — local migration 20261018040444
 
 ยังไม่ apply: `assignment_question_grading_parts` เก็บ `work_share` และ revision `updated_at` ต่อ assignment/question แทนการเปลี่ยนคะแนนเต็มเดิม `submission_answers` เพิ่ม `answer_score`, `answer_max_score`, `work_score`, `work_max_score`, `answer_reviewed_at`, `work_reviewed_at` โดยคะแนนเต็มสองส่วนรวมเท่า `max_score` เดิม และคะแนนรวมเป็นผลบวกของสองส่วนที่ให้จริง `NULL` คะแนน/เวลาตรวจหมายถึงยังไม่ตรวจ ส่วนคะแนน 0 ที่ครูยืนยันมีเวลาตรวจชัดเจน การไม่มี policy ต่างจากครูกำหนดวิธีทำ 0 คะแนนเอง

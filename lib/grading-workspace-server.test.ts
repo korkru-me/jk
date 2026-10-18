@@ -41,12 +41,12 @@ function answer(overrides: Row = {}): Row {
     random_values: { x: 17 }, correct_answer: 'PRIVATE_CORRECT_KEY', student_answer: 'PRIVATE_RESPONSE', option_order: [1, 0], work_images: [], math_input_modes: { '0': 'deg' }, ...overrides }
 }
 
-interface FakeOptions { missingPolicies?: boolean; missingRegrading?: boolean; failTable?: string; signingFails?: boolean; superAdmin?: boolean }
+interface FakeOptions { missingPolicies?: boolean; missingRegrading?: boolean; failTable?: string; signingFails?: boolean; superAdmin?: boolean; missingDrafts?: boolean; draftRows?: unknown[]; draftPermissionDenied?: boolean }
 function client(tables: Record<string, Row[]>, options: FakeOptions = {}) {
   const queries: QueryLog[] = []
   const sign = vi.fn(async (paths: string[], expires: number) => ({ data: options.signingFails ? null : paths.map(path => ({ path, signedUrl: `https://signed.test/${path}?token=local`, error: null })), error: options.signingFails ? { message: 'failed' } : null, expires }))
   const fake = {
-    rpc: vi.fn(async () => ({ data: options.superAdmin === true, error: null })),
+    rpc: vi.fn(async (name: string) => name === 'read_grading_drafts' ? ({ data: options.missingDrafts || options.draftPermissionDenied ? null : options.draftRows ?? [], error: options.draftPermissionDenied ? { code: '42501' } : options.missingDrafts ? { code: 'PGRST202' } : null }) : ({ data: options.superAdmin === true, error: null })),
     storage: { from: vi.fn(() => ({ createSignedUrls: sign })) },
     from(table: string) {
       const log: QueryLog = { table, columns: '', eq: [], in: [], order: '', descending: false, from: 0, to: Infinity, single: false }
@@ -122,6 +122,24 @@ describe('authenticated grading workspace reader', () => {
     const summary = admin.queries.filter(query => query.table === 'submission_answers')
     expect(summary.every(query => !query.columns.split(',').map(column => column.trim()).includes('student_answer'))).toBe(true)
     expect(admin.queries.find(query => query.table === 'student_profiles')?.columns).toBe('student_id, grade_level, section_number, class_number, student_code')
+  })
+  it('loads private drafts only through the verified actor and exact assignment, preserving public grades', async () => {
+    const saved = { answerId, expectedScoreEditedAt: null, updatedAt: now, answerScore: 0 }
+    const { admin } = install({ draftRows: [saved, { ...saved, answerId: uuid(999) }] })
+    const result = await loadGradingWorkspace(assignmentId)
+    expect(admin.value.rpc).toHaveBeenCalledWith('read_grading_drafts', { p_actor_id: actorId, p_assignment_id: assignmentId })
+    expect(result?.data).toMatchObject({ viewerId: actorId, draftsAvailable: true, savedDrafts: [saved] })
+    expect(result?.data.answers[0].score).toBe(1)
+    expect(result?.data.students[0].score).toBe(1)
+  })
+  it('keeps older schemas readable and clearly marks private-draft mutations unavailable', async () => {
+    install({ missingDrafts: true })
+    const result = await loadGradingWorkspace(assignmentId)
+    expect(result?.data).toMatchObject({ draftsAvailable: false, savedDrafts: [], reviewAvailable: true })
+  })
+  it('does not return a teacher page when the repeated draft authorization detects revoked access', async () => {
+    install({ draftPermissionDenied: true })
+    expect(await loadGradingWorkspace(assignmentId)).toBeNull()
   })
   it('rejects an unassigned question before any service learner reads', async () => {
     install()
