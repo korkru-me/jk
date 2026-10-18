@@ -7,7 +7,7 @@
 - บัญชี Resend สร้างแล้ว; `mail.korkru.com` ขึ้น Verified ใน region Tokyo ตรวจ public DNS พบ TXT `resend._domainkey.mail`, CNAME `rsend.mail` → `rsend-apne1.forge.rmta.net` และ `send.mail` → `send.forge.rmta.net` โดย CNAME เป็น DNS only
 - เจ้าของสร้าง Sending access key และกรอก custom SMTP เอง ไม่ส่ง key มาในแชท การอ่าน configuration ยืนยัน Staging ใช้ `smtp.resend.com:465`, username `resend`, sender `auth@mail.korkru.com`, ชื่อ `KorKru Staging` และมี SMTP password โดยไม่อ่าน/บันทึกค่าลับ
 - Staging Site URL เป็น `https://staging.korkru.com`, email autoconfirm ปิด, Require current password เปิด และ signup/recovery templates ยังคง `{{ .ConfirmationURL }}` ตามเดิม
-- **เจ้าของรายงานว่าได้รับอีเมลสมัคร กดยืนยัน และเข้า Staging สำเร็จแล้ว** และวันที่ 18 ตุลาคมทดสอบ recovery ด้วยอีเมลใหม่ผ่าน: ได้รับอีเมล → เปิด reset form → ลองรหัสเดิมมีคำเตือนใต้ช่อง → ส่งรหัสอื่น → หน้า login มี banner “เปลี่ยนรหัสผ่านแล้ว” ตามภาพเวลา 22:10:54 → เข้าได้ด้วยรหัสใหม่ที่กรอกไว้ เป็น manual/owner-reported core-flow proof พร้อมภาพ แยกจาก independent hosted E2E ยังไม่ได้รายงาน manual รหัสเก่าถูกปฏิเสธ/เปิดลิงก์ใช้แล้วซ้ำ; quota-alert delivery ยังต้องตรวจต่อ
+- **เจ้าของรายงานว่าได้รับอีเมลสมัคร กดยืนยัน และเข้า Staging สำเร็จแล้ว** และวันที่ 18 ตุลาคมทดสอบ recovery ด้วยอีเมลใหม่ผ่าน: ได้รับอีเมล → เปิด reset form → ลองรหัสเดิมมีคำเตือนใต้ช่อง → ส่งรหัสอื่น → หน้า login มี banner “เปลี่ยนรหัสผ่านแล้ว” ตามภาพเวลา 22:10:54 → เข้าได้ด้วยรหัสใหม่ที่กรอกไว้ ต่อมายืนยันว่ารหัสก่อน reset รอบล่าสุดถูกปฏิเสธด้วย “อีเมลหรือรหัสผ่านไม่ถูกต้อง” ตามภาพเวลา 22:17:18 และรหัสใหม่ยังเข้าได้ตามปกติ เป็น manual/owner-reported proof พร้อมภาพ แยกจาก independent hosted E2E ส่วนลิงก์ใช้แล้วซ้ำ/หมดอายุยังไม่ได้รายงาน; quota-alert delivery ยังต้องตรวจต่อ
 - `RESEND_QUOTA_ALERTS_ENABLED=false`; ยังไม่มี Full access monitor key/webhook signing secret ที่ตั้งค่าในรอบนี้ จึงยังไม่ส่งเตือน 80/90/97% จริง
 
 รอบ release ก่อนมี migration จำกัดคำขอส่งอีเมลและ `AUTH_FLOW_SECRET` พร้อมแล้ว อ่าน `docs/AUTH_SIGNUP_ROLLOUT.md` ประกอบ; SMTP เพียงอย่างเดียวไม่ทดแทน dependency ของ email actions
@@ -87,7 +87,7 @@ API ตอบ `alert_accepted` แปลว่า Resend รับคำขอ�
 
 ## ตรวจบน Staging ก่อนเปิดจริง
 
-1. Core flow กดลืมรหัสผ่าน → อีเมล → reset form → same-password warning → ส่งรหัสอื่น → success banner → login ด้วยรหัสใหม่ บน **Staging** เจ้าของรายงานพร้อมภาพว่าผ่านแล้ว ยังต้องบันทึกการลองรหัสเก่าให้ถูกปฏิเสธ ลิงก์ใช้แล้ว/หมดอายุ และการยืนยันรหัสไม่ตรงแบบ manual ด้วยบัญชีทดสอบ
+1. Core flow กดลืมรหัสผ่าน → อีเมล → reset form → same-password warning → ส่งรหัสอื่น → success banner → login ด้วยรหัสใหม่ บน **Staging** เจ้าของรายงานพร้อมภาพว่าผ่านแล้ว รวมการลองรหัสก่อน reset ถูกปฏิเสธและรหัสใหม่ยังเข้าได้ตามปกติ ส่วนลิงก์ใช้แล้ว/หมดอายุ และการยืนยันรหัสไม่ตรงแบบ manual ด้วยบัญชีทดสอบยังไม่ได้รายงาน
 2. ตรวจ signed `email.sent` ใน Resend ว่า webhook ได้ 200 และ `below_threshold` เมื่อยอดยังไม่ถึง 80 ตรวจ permissions/shape ของ Usage API จริงด้วย key ที่ตั้งค่าแล้ว
 3. คำขอไม่มีลายเซ็น/ลายเซ็นปลอมต้องได้ 400 และไม่อ่าน Usage/ส่งอีเมล Missing configuration ได้ 503
 4. ทดสอบ threshold ด้วย local mock tests (79/80/89/90/96/97/99, retry/concurrency และ self-event ข้ามระดับ) ไม่ส่งให้ถึงโควตาจริง ไม่ลด threshold หรือทำให้โควตา Production หมดเพื่อทดสอบ
