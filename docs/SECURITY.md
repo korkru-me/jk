@@ -1,5 +1,9 @@
 # Security และ privacy guardrails
 
+## Classroom streaming — local, 18 October 2026
+
+The streamed classroom fallback is emitted after the existing verified actor and exact owner/co-teacher checks, never from a guessed URL or a client-provided classroom name. It exposes only id/name/description/type and the authorized navigation set. Roster, scores, invitation tokens and private student profiles stay out of this early DTO. Every deferred tab request repeats route authorization; view-only co-teachers cannot request score/manager data or invitations through a forged view parameter. Score reads are further restricted to the current classroom roster. Missing optional score metadata does not bypass authorization or suppress unrelated database failures.
+
 ## Grading workspace boundaries — local, 18 October 2026
 
 Grading readers require a verified active teacher/admin (or trusted super admin) with management access to the exact assignment before service-role learner reads. Summary DTOs omit student response bodies, frozen keys, random values, emails and private profile fields; detail reads bind to authorized official submission IDs and the selected question/student window. Question content still passes assignment provenance checks. URL filter state never supplies resource authority or trusted score bounds.
