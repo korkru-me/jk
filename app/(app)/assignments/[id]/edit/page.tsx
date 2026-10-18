@@ -18,7 +18,7 @@ import { AssignmentGroupTargetsCard } from '@/components/assignments/assignment-
 import type { AssignmentGroupOption, GroupTargets } from '@/components/assignments/group-target-picker'
 import { canManageAssignment } from '@/lib/auth/assignment-access'
 import { loadAssignmentQuestionsByProvenance } from '@/lib/assignment-question-access.server'
-import { AssignmentEditSidebar } from './_components/assignment-edit-sidebar'
+import { AssignmentWorkspaceSidebar } from '../_components/assignment-workspace-sidebar'
 import type { AssignmentSidebarSummary } from '../_components/assignment-context-sidebar'
 
 export const metadata = { title: 'ตั้งค่างานที่มอบหมาย — KorKru' }
@@ -93,8 +93,9 @@ export default async function EditAssignmentPage({
 
   return (
     <div className="assignment-edit-stage flex max-w-5xl flex-col gap-4">
-      <AssignmentEditSidebar
+      <AssignmentWorkspaceSidebar
         assignment={assignment as unknown as AssignmentSidebarSummary}
+        currentSection="edit"
         availableQuestionCount={questions.length}
         missingQuestionCount={missingQuestionCount}
         duplicateQuestionCount={duplicateQuestionCount}

@@ -1,5 +1,9 @@
 # Architecture
 
+## Grading workspace sidebar — 18 October 2026 (local only)
+
+The authorized results route now mounts AssignmentWorkspaceSidebar, extracted from the existing edit-page sidebar controller. Edit and results register their exact path with the existing shell context and share lifecycle actions/confirmation UI; AssignmentContextNavigation recognizes results as the active section. The existing RLS-scoped assignment select adds only the summary fields and classroom description required by that navigation. Pending hand-ins are deduplicated from the already-loaded official-attempt answers, matching the results worklist rather than adding another query. Management authorization, scoring, server actions and schema are unchanged.
+
 ## การโหลดตัวอย่างโจทย์ — 17 ตุลาคม 2026
 
 `question-preview.tsx` เป็น client-only loading boundary ที่ใช้ import request ร่วมกันและล้าง cache ของ request ที่ล้มเหลว พร้อม error/retry และ timeout 15 วินาที หน้าเลือกประเภทเตรียม renderer ล่วงหน้า; evaluator แยกเป็น import อีกก้อนสำหรับ `written` หรือโจทย์ที่มีตัวแปรเท่านั้น `question-preview-content` รับ evaluator ผ่าน prop และอ่านกติกาคะแนนจาก `lib/question-scoring.ts` ซึ่งไม่ import mathjs; `assignment-attempt` ใช้และ re-export กติกาชุดเดียวกันโดยไม่เปลี่ยนผลคะแนน ตัวอย่างเริ่มสุ่ม/สลับตัวเลือกหลัง mount ใน browser และไม่มีการอ่าน/เขียนฐานข้อมูลเมื่อเปิดหน้าเลือกประเภท
