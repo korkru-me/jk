@@ -1,5 +1,11 @@
 # Feature status
 
+## ซิงก์กรอบโจทย์กลับโลคอลหลัก — 18 ตุลาคม 2026
+
+- พบว่า `localhost:3000` ใช้ primary checkout `korkru` ที่ยังไม่มีดีไซน์ PR #59/#60 ขณะที่พอร์ต 3054 ใช้ checkout แยก ซิงก์หน้าสร้างโจทย์ หน้านำเข้า พรีวิวและ helper ที่จำเป็นรวม 12 paths จาก Production source `237f44e` กลับไปที่ primary working copy แล้ว
+- คง implementation ตรวจคะแนนของ primary `lib/assignment-attempt.ts` และงานอื่นที่กำลังแก้ไว้ เพิ่ม lightweight preview scoring ที่มีฟังก์ชันเหมือนของ primary โดยไม่เปลี่ยน grader ใช้ branch `codex/local-question-ui-sync-20261018` บันทึกแพตช์แยกเพื่อไม่ commit ลง branch ที่มีงานตรวจคะแนนทำอยู่
+- ตรวจ server พอร์ต 3000 ตัวจริง: compile สอง route ผ่าน, 320/390/1440px ไม่ล้น, กรอบหัวสี/ล่างขาวและ Eye พร้อม “ดูตัวอย่างโจทย์” ถูกต้อง เปิดตัวอย่างครบ 11 ประเภทและปุ่มเลือกไฟล์เรียก input ได้โดยไม่เลือกไฟล์ ไม่มี runtime/config errors TypeScript/token lint/build และ unit 298 files / 3,842 cases ผ่านใน checkout แยก ไม่ทดสอบข้อมูลจริงหรือเขียนฐานข้อมูล ไม่มี migration ดู `docs/LOCAL_QUESTION_UI_SYNC_20261018.md`
+
 ## เผยแพร่งานตรวจคะแนนและการโหลดห้องเรียน — 18 ตุลาคม 2026
 
 งานตรวจคะแนนรายข้อ/รายคน, private drafts/แจ้งคะแนน, แก้เฉลยย้อนหลัง/โมฆะ, เมนูงาน และการโหลดห้องเรียนในหัวข้อด้านล่างเผยแพร่แล้วผ่าน PR #61 / master `237f44e` บน `https://www.korkru.com` ทั้งสาม migration `20261018005611`, `20261018040444`, `20261018133739` apply และบันทึก ledger ทั้ง Staging/Production แล้ว ข้อความ local-only/ยังไม่ apply ในหัวข้อเฟสเหล่านี้เป็นประวัติ ณ เวลาทำงาน ไม่ใช่สถานะปัจจุบัน รายละเอียดและข้อจำกัดอยู่ใน [GRADING_RELEASE_20261018.md](GRADING_RELEASE_20261018.md)
