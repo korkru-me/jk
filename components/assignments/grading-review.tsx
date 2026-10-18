@@ -28,6 +28,7 @@ import { GradingBatchProvider, GradingBatchSaveButton, useGradingBatch } from '.
 import { useGradingNavigationGuard } from './grading-navigation-guard'
 import { GradingQuickScoresProvider, GradingQuickScoreSettings } from './grading-quick-scores'
 import { GradingUniformScores } from './grading-uniform-scores'
+import { GradingKeywordsProvider, GradingKeywordTools } from './grading-keywords'
 
 export interface GradingReviewQuery {
   classroom?: string
@@ -190,25 +191,26 @@ function ReviewWorkspaceHeader({ data, title }: { data: GradingWorkspaceData; ti
   } />
 }
 
-function ReviewDraftToolbar({ data, question }: { data: GradingWorkspaceData; question?: Question }) {
+function ReviewDraftToolbar({ data, question, hasEssayAnswers = false }: { data: GradingWorkspaceData; question?: Question; hasEssayAnswers?: boolean }) {
   const { savedDrafts, dirtyCount } = useGradingBatch()
   return <div className="flex min-w-0 flex-wrap items-center gap-2">
     <GradingQuickScoreSettings />
     {question && <GradingUniformScores key={question.id} data={data} question={question} />}
     {Object.keys(savedDrafts).length > 0 && <GradingBatchSaveButton removeOnly />}
+    {(question?.question_type === 'essay' || hasEssayAnswers) && <GradingKeywordTools />}
     {dirtyCount > 0 && <Badge variant="statusWarning" className="h-auto min-h-5 max-w-full whitespace-normal">ยังไม่บันทึก {dirtyCount} คำตอบ</Badge>}
   </div>
 }
 
 export function QuestionGradingReview(props: CommonProps & { questionId: string }) {
   const sources = scopeSources(props.data, answer => answer.questionId === props.questionId)
-  return <GradingQuickScoresProvider assignmentId={props.data.assignment.id} viewerId={props.data.viewerId}>
+  return <GradingKeywordsProvider assignmentId={props.data.assignment.id} viewerId={props.data.viewerId}><GradingQuickScoresProvider assignmentId={props.data.assignment.id} viewerId={props.data.viewerId}>
     <GradingBatchProvider key={reviewDraftKey(props.data, `question:${props.questionId}`, props.query)} assignmentId={props.data.assignment.id}
       savedDrafts={props.data.savedDrafts} sources={sources} saveDrafts={props.saveDrafts} publish={props.publish}
       disabled={props.data.reviewAvailable === false || props.data.draftsAvailable === false}>
       <QuestionReviewBody {...props} />
     </GradingBatchProvider>
-  </GradingQuickScoresProvider>
+  </GradingQuickScoresProvider></GradingKeywordsProvider>
 }
 
 function QuestionReviewBody({ data, questionId, query = {}, configure, correctionActions }: CommonProps & { questionId: string }) {
@@ -237,13 +239,13 @@ function QuestionReviewBody({ data, questionId, query = {}, configure, correctio
 
 export function StudentGradingReview(props: CommonProps & { studentId: string }) {
   const sources = scopeSources(props.data, answer => answer.studentId === props.studentId)
-  return <GradingQuickScoresProvider assignmentId={props.data.assignment.id} viewerId={props.data.viewerId}>
+  return <GradingKeywordsProvider assignmentId={props.data.assignment.id} viewerId={props.data.viewerId}><GradingQuickScoresProvider assignmentId={props.data.assignment.id} viewerId={props.data.viewerId}>
     <GradingBatchProvider key={reviewDraftKey(props.data, `student:${props.studentId}`, props.query)} assignmentId={props.data.assignment.id}
       savedDrafts={props.data.savedDrafts} sources={sources} saveDrafts={props.saveDrafts} publish={props.publish}
       disabled={props.data.reviewAvailable === false || props.data.draftsAvailable === false}>
       <StudentReviewBody {...props} />
     </GradingBatchProvider>
-  </GradingQuickScoresProvider>
+  </GradingQuickScoresProvider></GradingKeywordsProvider>
 }
 
 function StudentReviewBody({ data, studentId, query = {} }: CommonProps & { studentId: string }) {
@@ -263,7 +265,7 @@ function StudentReviewBody({ data, studentId, query = {} }: CommonProps & { stud
   return <div className="flex min-w-0 flex-col gap-3">
     <div className="flex flex-wrap items-center justify-between gap-2"><Button variant="ghost" size="sm" className="pointer-coarse:min-h-11" render={<Link href={hrefFor(data.baseHref, query, { view: 'students' })} />}><ArrowLeft data-icon="inline-start" />กลับตารางรายคน</Button>{stepper('ด้านบน')}</div>
     <ReviewWorkspaceHeader data={data} title="ตรวจคำตอบรายคน" />
-    <ReviewDraftToolbar data={data} />
+    <ReviewDraftToolbar data={data} hasEssayAnswers={reviewedAnswers.some(({ question }) => question.question_type === 'essay')} />
     <Card radius="md" className="flex flex-wrap items-center justify-between gap-2 bg-primary/5 px-3 py-2.5"><div><h2 className="text-base font-semibold">{student.name}</h2><p className="text-xs text-foreground/75">{student.classroom || 'ไม่ระบุชั้น/ห้อง'} · เลขที่ {student.classNumber ?? '—'} · รหัสนักเรียน {student.studentCode || '—'}{student.attemptNumber ? ` · ครั้งที่ ${student.attemptNumber}` : ''}</p></div><div className="flex flex-wrap items-center gap-2"><span className="text-xs text-foreground/75">{scoreLabel}</span><strong className="text-sm tabular-nums text-primary">{scoreValue}</strong><Badge variant={pendingCount ? 'statusWarning' : 'statusSuccess'}>{pendingCount ? `รอตรวจ ${pendingCount} ข้อ` : answers.length ? 'ตรวจครบแล้ว' : 'ยังไม่ส่งคำตอบ'}</Badge></div></Card>
     {reviewedAnswers.length ? <><p className="text-xs text-muted-foreground">คำตอบทั้งหมด {reviewedAnswers.length} ข้อ · ครูแก้คะแนนได้ทุกข้อ · ส่วนที่รอตรวจแสดง 0 ชั่วคราว</p><div className="flex flex-col gap-2">{reviewedAnswers.map(({ question, answer }, index) => {
       const repeats = reviewedAnswers.filter(item => item.question.id === question.id)
