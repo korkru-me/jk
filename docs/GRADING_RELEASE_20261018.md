@@ -26,4 +26,8 @@ Staging branch `6ccd858` / Vercel `dpl_9qsJFePjXjktCazFKHJkEtBQaFm1` READY แ�
 
 Runner รองรับ service JWT เดิมและ opaque `sb_secret_` โดยบังคับ project URL/anon JWT ของ Staging และผ่าน read-only schema/RPC ก่อนสร้างข้อมูล มี 19 offline fence checks ผ่าน รุ่นแรกพบ fixture essay ส่ง null ในช่อง NOT NULL แก้เป็นค่าว่างและล้าง fixture รอบที่ล้มเหลวครบแล้ว
 
-release ผ่าน TypeScript, lint:tokens และ production build แยก `.next-grading-release-build` ด้วย placeholder keys (ไม่มี network/data QA ใน build) คืน tsconfig ที่ Next สร้างชั่วคราวแล้ว กำลังทดสอบ UI จริงด้วย fixture ชั่วคราวก่อน Production apply/deploy
+release ผ่าน TypeScript, lint:tokens และ production build แยก `.next-grading-release-build` ด้วย placeholder keys (ไม่มี network/data QA ใน build) คืน tsconfig ที่ Next สร้างชั่วคราวแล้ว
+
+UI จริงบน Staging ผ่านทั้งรายข้อ/รายคน: ปุ่มเปอร์เซ็นต์กรอกคะแนนได้, กรอกเอง 0.75 ได้, คำเตือนออกจากหน้ายังไม่บันทึก, บันทึกร่างผ่าน server action/รีโหลดแล้วยังอยู่, คะแนนและ notification สาธารณะไม่เปลี่ยนระหว่างร่าง, เติมเฉพาะวิธีทำ 0.9 ให้ทั้งสองคนโดยไม่แตะคะแนนคำตอบ, popup แจ้งผลกระทบก่อนเผยแพร่ และ publish สำเร็จ/กลับตารางได้ไม่มีคำเตือน ร่างรายคนที่บันทึกแล้วเปลี่ยนคนได้ตามปกติ
+
+Production ใช้สาม SQL สำเร็จใน transaction เดียวเมื่อ 18 ตุลาคม 2026 หลังตรวจ preflight ซ้ำ: 5,161 answers / 3,916 active answers / 115 finished headers / invalid 0 / เครดิตไฟล์เดิม 3 / affected streak 0 / mapped research 0 บันทึก ledger applied เฉพาะสามเวอร์ชันแล้ว ไม่มีการสร้างข้อมูล QA หรือกดเผยแพร่คะแนนทดสอบใน Production ขั้นถัดไปตรวจ catalog และเผยแพร่โค้ดผ่าน PR/master แล้วตรวจ Vercel/domain
