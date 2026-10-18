@@ -1,10 +1,13 @@
-export const DEFAULT_GRADING_QUICK_SCORES = [100, 90, 80, 70, 60, 50, 40] as const
+export const DEFAULT_GRADING_QUICK_SCORES = [100, 90, 80, 70, 60, 50] as const
 export const GRADING_QUICK_SCORE_COUNT = DEFAULT_GRADING_QUICK_SCORES.length
 
+function hasValidPercentages(value: unknown): value is number[] {
+  return Array.isArray(value) && Array.from(value).every(percentage => typeof percentage === 'number'
+    && Number.isFinite(percentage) && percentage >= 0 && percentage <= 100)
+}
+
 export function isGradingQuickScores(value: unknown): value is number[] {
-  return Array.isArray(value) && value.length === GRADING_QUICK_SCORE_COUNT
-    && value.every(percentage => typeof percentage === 'number'
-      && Number.isFinite(percentage) && percentage >= 0 && percentage <= 100)
+  return hasValidPercentages(value) && value.length === GRADING_QUICK_SCORE_COUNT
 }
 
 /** Browser preferences contain only percentages, never student scores or drafts. */
@@ -17,7 +20,11 @@ export function parseGradingQuickScores(raw: string | null): number[] {
   if (!raw || raw.length > 2048) return [...DEFAULT_GRADING_QUICK_SCORES]
   try {
     const value: unknown = JSON.parse(raw)
-    return isGradingQuickScores(value) ? [...value] : [...DEFAULT_GRADING_QUICK_SCORES]
+    if (isGradingQuickScores(value)) return [...value]
+    // Preserve the first six choices from the old seven-button preference,
+    // only when the complete saved set is valid, including the removed tail.
+    if (hasValidPercentages(value) && value.length === 7) return value.slice(0, GRADING_QUICK_SCORE_COUNT)
+    return [...DEFAULT_GRADING_QUICK_SCORES]
   } catch {
     return [...DEFAULT_GRADING_QUICK_SCORES]
   }

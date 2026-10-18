@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { ChevronDown, SlidersHorizontal } from 'lucide-react'
-import { DEFAULT_GRADING_QUICK_SCORES, gradingQuickScore, gradingQuickScoresStorageKey, isGradingQuickScores, readGradingQuickScores, writeGradingQuickScores } from '@/lib/grading-quick-scores'
+import { DEFAULT_GRADING_QUICK_SCORES, GRADING_QUICK_SCORE_COUNT, gradingQuickScore, gradingQuickScoresStorageKey, isGradingQuickScores, readGradingQuickScores, writeGradingQuickScores } from '@/lib/grading-quick-scores'
 import { useGradingDisclosure } from './use-grading-disclosure'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -53,19 +53,19 @@ export function GradingQuickScoreSettings() {
   if (!context) return null
   const values = fields.map(value => value.trim() === '' ? NaN : Number(value))
   const valid = isGradingQuickScores(values)
-  const invalidMessage = 'กรอกเปอร์เซ็นต์ 0–100 ให้ครบทั้ง 7 ปุ่ม'
-  return <Collapsible ref={root} open={open} onOpenChange={setOpen} className="min-w-0">
-    <CollapsibleTrigger render={<Button type="button" size="sm" variant="outline" className="pointer-coarse:min-h-11" />}>
+  const invalidMessage = `กรอกเปอร์เซ็นต์ 0–100 ให้ครบทั้ง ${GRADING_QUICK_SCORE_COUNT} ปุ่ม`
+  return <Collapsible ref={root} open={open} onOpenChange={setOpen} className="contents">
+    <CollapsibleTrigger render={<Button type="button" size="sm" variant="outline" className="shrink-0 pointer-coarse:min-h-11" />}>
       <SlidersHorizontal data-icon="inline-start" aria-hidden="true" />ตั้งค่าปุ่มให้คะแนนเร็ว<ChevronDown data-icon="inline-end" aria-hidden="true" />
     </CollapsibleTrigger>
-    <CollapsibleContent>
+    <CollapsibleContent className="@container/quick-settings order-last w-full min-w-0 basis-full">
       <div className="flex min-w-0 flex-col gap-2 pt-2">
         <p className="text-xs text-muted-foreground">กำหนดเปอร์เซ็นต์ที่ใช้กับทุกช่องคะแนนในงานนี้</p>
-        <FieldGroup className="grid grid-cols-4 gap-2 sm:grid-cols-7">
+        <FieldGroup className="grid grid-cols-2 gap-2 @min-[24rem]/quick-settings:grid-cols-3 @min-[40rem]/quick-settings:grid-cols-6">
           {fields.map((value, index) => {
             const invalid = !Number.isFinite(values[index]) || values[index] < 0 || values[index] > 100
             return <Field key={index} className="min-w-0 gap-1" data-invalid={invalid} data-disabled={!context.ready}>
-              <FieldLabel htmlFor={`${id}-${index}`} className="text-xs text-muted-foreground">ปุ่ม {index + 1} · %</FieldLabel>
+              <FieldLabel htmlFor={`${id}-${index}`} className="whitespace-nowrap text-xs text-muted-foreground">ปุ่ม {index + 1} · %</FieldLabel>
               <Input id={`${id}-${index}`} type="number" min={0} max={100} step="any" inputMode="decimal" value={value}
                 disabled={!context.ready} aria-invalid={invalid} aria-describedby={invalid ? `${id}-error` : undefined}
                 onChange={event => {
