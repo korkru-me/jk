@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { ArrowDownUp, ArrowLeft, BookOpen, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock3, PencilLine } from 'lucide-react'
+import { ArrowDownWideNarrow, ArrowLeft, ArrowUpNarrowWide, BookOpen, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock3, PencilLine } from 'lucide-react'
 import type { GradingAnswer, GradingStudent, GradingWorkspaceData } from '@/lib/grading-workspace'
 import { isFullyManualQuestion, scoreParts, sortGradingStudents } from '@/lib/grading-workspace'
 import { pendingWorkForReview } from '@/lib/grading-review-status'
@@ -17,6 +17,7 @@ import { Card } from '@/components/ui/card'
 import { NativeSelect } from '@/components/ui/native-select'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty'
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { GradingWorkspaceHeader } from './grading-workspace-header'
 import { GradingAnswerContent, GradingQuestionContent } from './grading-answer-content'
@@ -58,17 +59,23 @@ function orderedStudents(students: GradingStudent[], query: GradingReviewQuery) 
 
 function ReviewFilters({ data, query, path, navigate }: { data: GradingWorkspaceData; query: GradingReviewQuery; path: string; navigate: (href: string) => void }) {
   const { busy } = useGradingBatch()
+  const id = useId()
+  const descending = query.dir === 'desc'
+  const directionLabel = descending ? 'มากไปน้อย' : 'น้อยไปมาก'
+  const toggleLabel = `เรียงจาก${directionLabel} · กดเพื่อเรียงจาก${descending ? 'น้อยไปมาก' : 'มากไปน้อย'}`
   const rooms = [...new Set(data.students.map(student => student.classroom).filter((room): room is string => !!room))].sort((a, b) => a.localeCompare(b, 'th', { numeric: true }))
   function change(patch: Partial<GradingReviewQuery>) { navigate(hrefFor(path, { ...query, ...patch, page: 1 })) }
-  return <div className="flex flex-wrap items-center gap-x-3 gap-y-2" aria-busy={busy}>
-    <label className="flex items-center gap-1.5 text-xs text-muted-foreground">ชั้น/ห้อง
-      <NativeSelect className="w-auto max-w-40 pointer-coarse:min-h-11" aria-label="กรองชั้นและห้อง" value={query.classroom ?? 'all'} disabled={busy} onChange={event => change({ classroom: event.target.value })}><option value="all">ทุกห้อง</option>{rooms.map(room => <option key={room} value={room}>{room}</option>)}</NativeSelect>
-    </label>
-    <label className="flex items-center gap-1.5 text-xs text-muted-foreground">เรียงตาม
-      <NativeSelect className="w-auto max-w-40 pointer-coarse:min-h-11" aria-label="เรียงคำตอบนักเรียน" value={query.sort ?? 'classroom'} disabled={busy} onChange={event => change({ sort: event.target.value as GradingReviewQuery['sort'] })}><option value="classroom">ชั้น/ห้อง</option><option value="code">รหัสนักเรียน</option><option value="number">เลขที่</option><option value="name">ชื่อ–สกุล</option></NativeSelect>
-    </label>
-    <Button type="button" variant="outline" className="pointer-coarse:min-h-11" disabled={busy} onClick={() => change({ dir: query.dir === 'desc' ? 'asc' : 'desc' })}><ArrowDownUp data-icon="inline-start" />{query.dir === 'desc' ? 'มาก→น้อย' : 'น้อย→มาก'}</Button>
-  </div>
+  return <FieldGroup className="min-w-0 max-w-full flex-1 basis-[32rem] flex-row flex-wrap items-center gap-x-3 gap-y-2" aria-busy={busy}>
+    <Field orientation="horizontal" className="w-auto max-w-full shrink-0 gap-1.5">
+      <FieldLabel htmlFor={`${id}-classroom`} className="whitespace-nowrap text-xs text-foreground/80">ชั้น/ห้อง</FieldLabel>
+      <NativeSelect id={`${id}-classroom`} className="h-7 w-auto max-w-40 bg-card font-medium text-foreground pointer-coarse:min-h-11" aria-label="กรองชั้นและห้อง" value={query.classroom ?? 'all'} disabled={busy} onChange={event => change({ classroom: event.target.value })}><option value="all">ทุกห้อง</option>{rooms.map(room => <option key={room} value={room}>{room}</option>)}</NativeSelect>
+    </Field>
+    <Field orientation="horizontal" className="w-auto max-w-full shrink-0 gap-1.5">
+      <FieldLabel htmlFor={`${id}-sort`} className="whitespace-nowrap text-xs text-foreground/80">เรียงตาม</FieldLabel>
+      <NativeSelect id={`${id}-sort`} className="h-7 w-auto max-w-40 bg-card font-medium text-foreground pointer-coarse:min-h-11" aria-label="เรียงคำตอบนักเรียน" value={query.sort ?? 'classroom'} disabled={busy} onChange={event => change({ sort: event.target.value as GradingReviewQuery['sort'] })}><option value="classroom">ชั้น/ห้อง</option><option value="code">รหัสนักเรียน</option><option value="number">เลขที่</option><option value="name">ชื่อ–สกุล</option></NativeSelect>
+    </Field>
+    <Button type="button" size="sm" variant="outline" className="pointer-coarse:min-h-11" disabled={busy} aria-label={toggleLabel} title={toggleLabel} onClick={() => change({ dir: descending ? 'asc' : 'desc' })}>{descending ? <ArrowDownWideNarrow data-icon="inline-start" aria-hidden="true" /> : <ArrowUpNarrowWide data-icon="inline-start" aria-hidden="true" />}{directionLabel}</Button>
+  </FieldGroup>
 }
 
 function StepNavigation({ previous, next, label, unit, position = 'ด้านบน' }: { previous?: string; next?: string; label: string; unit: 'ข้อ' | 'คน'; position?: 'ด้านบน' | 'ด้านล่าง' }) {
