@@ -24,9 +24,10 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { isClassroomSectionPath } from '@/lib/classroom-navigation'
+import { isClassroomDetailPath, isClassroomSectionPath } from '@/lib/classroom-navigation'
 import { isAssignmentStudentPreviewPath } from '@/lib/assignment-preview-navigation'
 import { Separator } from '@/components/ui/separator'
+import { Skeleton } from '@/components/ui/skeleton'
 import { sidebarSearchKey, useSidebarContext } from './sidebar-context'
 import { SidebarDisplayProvider, SidebarLabel, SidebarSectionLabel, useSidebarCompact } from './sidebar-display'
 import type { UserRole } from '@/lib/types'
@@ -355,7 +356,11 @@ export function Sidebar({
         {/* Nav */}
         {contextualContent || usesClassroomSidebar ? (
           <div className="flex-1 overflow-y-auto overflow-x-hidden p-3">
-            {contextualContent ?? <ClassroomSectionNavigation pathname={pathname} onNavigate={onClose} />}
+            {contextualContent ?? (isClassroomDetailPath(pathname) ? <div className="flex flex-col gap-3" role="status" aria-label="กำลังเปิดห้องเรียน">
+              <Link href="/classrooms" onClick={onClose} className="flex items-center gap-2 px-3.5 py-2 text-sm text-muted-foreground"><ChevronLeft className="size-4" aria-hidden="true" />ห้องเรียนทั้งหมด</Link>
+              <p className="px-3.5 text-xs text-muted-foreground">กำลังเปิดห้องเรียน…</p>
+              <Skeleton className="h-16 w-full rounded-lg" /><Skeleton className="h-8 w-4/5" /><Skeleton className="h-8 w-3/4" />
+            </div> : <ClassroomSectionNavigation pathname={pathname} onNavigate={onClose} />)}
           </div>
         ) : (
           <nav aria-label="เมนูหลัก" className="flex flex-1 flex-col gap-1 overflow-y-auto overflow-x-hidden p-3">

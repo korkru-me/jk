@@ -92,6 +92,7 @@ export async function createClassroomGroup(
     .select(GROUP_COLUMNS)
     .single()
   if (error || !data) return { ok: false, error: writeError(error) }
+  revalidatePath(`/classrooms/${classroomId}`)
   return { ok: true, group: data as ClassroomGroup }
 }
 
@@ -126,6 +127,7 @@ export async function updateClassroomGroup(
     .maybeSingle()
   if (error) return { ok: false, error: writeError(error) }
   if (!data) return { ok: false, error: STALE }
+  revalidatePath(`/classrooms/${classroomId}`)
   return { ok: true, group: data as ClassroomGroup }
 }
 
@@ -190,6 +192,7 @@ export async function reorderClassroomGroups(classroomId: string, orderedIds: st
   ))
   const failed = results.find(r => r.error)
   if (failed) return { ok: false, error: writeError(failed.error) }
+  revalidatePath(`/classrooms/${classroomId}`)
   return { ok: true }
 }
 
@@ -228,5 +231,6 @@ export async function moveStudentsToGroup(
           { onConflict: 'classroom_id,student_id' },
         )
   if (error) return { ok: false, error: writeError(error) }
+  revalidatePath(`/classrooms/${classroomId}`)
   return { ok: true }
 }

@@ -29,7 +29,7 @@ function reader(rows = rooms, failTable = '', submissionRows = subs, removedById
         if (selected !== 'id, voided_max_score') throw new Error('Unexpected unbounded test query')
         return Promise.resolve({
           data: metadataError ? null : selectedIds.map(id => ({ id, voided_max_score: removedById[id] ?? 0 })),
-          error: metadataError ? { code: metadataError } : null,
+          error: metadataError ? { code: metadataError, message: metadataError === '42703' ? 'column submissions.voided_max_score does not exist' : 'request failed' } : null,
         }).then(resolve)
       },
     }

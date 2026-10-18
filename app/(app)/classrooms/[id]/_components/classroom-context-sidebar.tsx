@@ -43,7 +43,7 @@ interface ClassroomContextSidebarProps {
   navigationItems: readonly ClassroomNavigationItem[]
   activeItem?: ClassroomNavigationKey
   assignmentCreationActive?: boolean
-  studentCount: number
+  studentCount?: number
   onNavigate: (item: ClassroomNavigationKey) => void
   onSwitchClassroom?: (classroomId: string) => void
   managementActions?: ReactNode
@@ -203,7 +203,7 @@ export function ClassroomContextNavigation({
                 data-classroom-selected={selected}
                 className="w-full justify-start"
                 aria-current={selected ? 'page' : undefined}
-                endAdornment={item.key === 'students' ? <Badge variant="secondary">{studentCount}</Badge> : undefined}
+                endAdornment={item.key === 'students' && studentCount !== undefined ? <Badge variant="secondary">{studentCount}</Badge> : undefined}
                 onClick={() => {
                   onNavigate(item.key)
                   onClose?.()

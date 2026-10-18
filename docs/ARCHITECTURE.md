@@ -1,5 +1,13 @@
 # Architecture
 
+## Classroom entry streaming and tab-scoped data — local, 18 October 2026
+
+The teacher classroom route returns a Suspense boundary only after verified authentication and exact owner/co-teacher authorization. Its early ClassroomEntryLoading projects id/name/description/type and registers the contextual sidebar without roster counts, class codes or invitation tokens. Neutral detail loading replaces the unrelated generic classroom navigation before this authorized payload arrives. TeacherClassroomContent resolves dependencies as promises and loads only the requested tab's extra data.
+
+Real ClassroomDetailClient payloads carry loadedNavigationItem. Changing tabs requests the corresponding server payload while showing a pending panel; Back/Forward uses Next's router payloads and query/back state. Existing eager fixtures retain local tab navigation. The classroom-keyed boundary preserves room identity, and deferred group/profile state follows refreshed props. Summary and scoring algorithms remain unchanged.
+
+readWithVoidedScoreMetadata projects the optional removed-weight column on the original roster-scoped, paginated submission read. It retries the old projection only for a specific missing-column error; other failures propagate. Existing hydration consumers skip additional reads when valid metadata is already present. No schema/RLS or external deployment change.
+
 ## Grading workspace — local, 18 October 2026
 
 `lib/grading-workspace.server.ts` เป็น reader ร่วมของ results overview และ question/student detail ตรวจ verified actor, active role และ exact assignment management ก่อนสร้าง service reader จากนั้นโหลดโจทย์ตาม provenance และเลือก official attempt ด้วย scoring เดิม อ่าน summary ทุกหน้าของข้อมูล แยก full answer body เฉพาะข้อ/นักเรียนในหน้า 30 คนที่เลือก ตัวกรองและ sort ใช้กติกาเดียวกับ UI ไม่ส่ง access_code/email/private profile ใน DTO
