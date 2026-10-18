@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { ArrowDownUp, ArrowLeft, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock3, PencilLine } from 'lucide-react'
+import { ArrowDownUp, ArrowLeft, BookOpen, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock3, PencilLine } from 'lucide-react'
 import type { GradingAnswer, GradingStudent, GradingWorkspaceData } from '@/lib/grading-workspace'
 import { isFullyManualQuestion, scoreParts, sortGradingStudents } from '@/lib/grading-workspace'
 import { pendingWorkForReview } from '@/lib/grading-review-status'
@@ -106,7 +106,7 @@ function AnswerCard({ data, student, question, answer, person, occurrence, seque
   const number = sequence ?? data.questions.findIndex(item => item.id === question.id) + 1
   const { savedDrafts } = useGradingBatch()
   const savedDraft = answer && savedDrafts[answer.id]
-  return <Card radius="md" className="@container/review-answer px-3 py-2.5">
+  return <Card radius="md" className="@container/review-answer px-3 py-2.5" data-grading-answer>
     <article className="flex min-w-0 flex-col gap-2" aria-label={person ? `ข้อ ${number} ${question.title}` : `คำตอบของ ${student.name}`}>
       <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
         {person ? <div className="flex min-w-0 flex-wrap items-center gap-2"><h3 className="text-sm font-semibold">ข้อ {number} · {question.title}</h3><Badge variant="outline">{TYPE_LABEL[question.question_type] ?? question.question_type}</Badge>{occurrence && <span className="text-xs text-muted-foreground">ครั้งที่ตอบ {occurrence}</span>}</div> : <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5"><h3 className="text-sm font-semibold">{student.name}</h3><p className="text-xs text-muted-foreground">{student.classroom || 'ไม่ระบุชั้น/ห้อง'} · เลขที่ {student.classNumber ?? '—'} · รหัส {student.studentCode || '—'}{student.attemptNumber && student.attemptNumber > 1 ? ` · รอบที่ ${student.attemptNumber}` : ''}{occurrence ? ` · ครั้งที่ตอบ ${occurrence}` : ''}</p></div>}
@@ -122,23 +122,32 @@ function AnswerCard({ data, student, question, answer, person, occurrence, seque
   </Card>
 }
 
-function QuestionDisclosure({ data, question, configure, correctionActions }: { data: GradingWorkspaceData; question: Question; configure?: GradingScoreAllocationProps['configure']; correctionActions?: ReactNode | false }) {
+function QuestionDisclosure({ data, question, number, configure, correctionActions }: { data: GradingWorkspaceData; question: Question; number: number; configure?: GradingScoreAllocationProps['configure']; correctionActions?: ReactNode | false }) {
   const [open, setOpen] = useState(true)
   const { hasUnsavedChanges, unpublishedCount, busy } = useGradingBatch()
-  return <Card radius="md" className="overflow-hidden"><Collapsible open={open} onOpenChange={setOpen}>
-    <div className="flex flex-wrap items-center justify-between gap-2 bg-muted/40 px-3 py-2">
-      <div className="flex flex-wrap items-center gap-2"><span className="text-xs font-medium">โจทย์</span><Badge variant="outline">{TYPE_LABEL[question.question_type] ?? question.question_type}</Badge></div>
-      <div className="flex flex-wrap items-center gap-1.5">
-        {correctionActions === undefined ? <>
-          {!isFullyManualQuestion(question) && <Button variant="ghost" size="xs" className="pointer-coarse:min-h-11" render={<Link href={`/questions/${question.id}/edit`} />}><PencilLine data-icon="inline-start" />แก้เฉลย</Button>}
-          <VoidQuestionButton assignmentId={data.assignment.id} questionId={question.id} isVoid={data.voidedQuestionIds.includes(question.id)} size="xs" />
-        </> : correctionActions}
-        <CollapsibleTrigger render={<Button variant="ghost" size="xs" className="pointer-coarse:min-h-11" />}>{open ? 'ซ่อนโจทย์' : 'แสดงโจทย์'}{open ? <ChevronUp data-icon="inline-end" /> : <ChevronDown data-icon="inline-end" />}</CollapsibleTrigger>
-      </div>
-    </div>
-    <CollapsibleContent><div className="px-3 py-2.5"><GradingQuestionContent question={question} /></div></CollapsibleContent>
+  return <>
+    {/* The shell scroller has p-6; -top-4 leaves a two-spacing gap below its topbar. */}
+    <Card radius="md" className="@container/grading-question sticky -top-4 z-10 shrink-0 overflow-hidden border-tint-2/40 bg-card shadow-sm" data-grading-question>
+      <Collapsible open={open} onOpenChange={setOpen} className="flex max-h-[calc(var(--app-height,100dvh)*0.4)] flex-col overflow-y-auto bg-tint-2/5">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-tint-2/20 bg-tint-2/10 px-3 py-2">
+          <div className="flex min-w-0 flex-1 basis-full items-center gap-2 @min-[40rem]/grading-question:basis-auto">
+            <BookOpen aria-hidden="true" className="size-4 shrink-0 text-tint-2" />
+            <h2 className="min-w-0 flex-1 line-clamp-2 text-sm font-semibold [overflow-wrap:anywhere]" title={question.title}>ข้อ {number} · {question.title}</h2>
+            <Badge variant="outline">{TYPE_LABEL[question.question_type] ?? question.question_type}</Badge>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {correctionActions === undefined ? <>
+              {!isFullyManualQuestion(question) && <Button variant="ghost" size="xs" className="pointer-coarse:min-h-11" render={<Link href={`/questions/${question.id}/edit`} />}><PencilLine data-icon="inline-start" />แก้เฉลย</Button>}
+              <VoidQuestionButton assignmentId={data.assignment.id} questionId={question.id} isVoid={data.voidedQuestionIds.includes(question.id)} size="xs" />
+            </> : correctionActions}
+            <CollapsibleTrigger render={<Button variant="ghost" size="xs" className="pointer-coarse:min-h-11" />}>{open ? 'ซ่อนโจทย์' : 'แสดงโจทย์'}{open ? <ChevronUp data-icon="inline-end" /> : <ChevronDown data-icon="inline-end" />}</CollapsibleTrigger>
+          </div>
+        </div>
+        <CollapsibleContent role="region" aria-label={`เนื้อหาโจทย์ข้อ ${number}`} tabIndex={0} className="min-h-0 overflow-y-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"><div className="px-3 py-2.5"><GradingQuestionContent question={question} /></div></CollapsibleContent>
+      </Collapsible>
+    </Card>
     <GradingScoreAllocation data={data} question={question} configure={configure} disabled={hasUnsavedChanges || unpublishedCount > 0 || busy} />
-  </Collapsible></Card>
+  </>
 }
 
 function reviewDraftKey(data: GradingWorkspaceData, focus: string, query: GradingReviewQuery = {}) {
@@ -204,12 +213,11 @@ function QuestionReviewBody({ data, questionId, query = {}, configure, correctio
   const page = Math.min(Math.max(1, Math.floor(query.page ?? 1)), Math.max(1, Math.ceil(students.length / 30)))
   const rows = students.slice((page - 1) * 30, page * 30)
   const path = `${data.baseHref}/questions/${questionId}`
-  return <div className="flex min-w-0 flex-col gap-3">
+  return <div className="flex min-w-0 flex-col gap-3 [&_[data-grading-answer]_:is(input,button,a,iframe)]:scroll-mt-[calc(var(--app-height,100dvh)*0.4+var(--spacing)*3+2px)] [&_[data-grading-answer]_:is(input,button,a,iframe)]:scroll-mb-30">
     <div className="flex flex-wrap items-center justify-between gap-2"><Button variant="ghost" size="sm" className="pointer-coarse:min-h-11" render={<Link href={hrefFor(data.baseHref, query, { view: 'questions', page: undefined })} />}><ArrowLeft data-icon="inline-start" />กลับตารางรายข้อ</Button><StepNavigation previous={index > 0 ? hrefFor(`${data.baseHref}/questions/${data.questions[index - 1].id}`, query, { page: 1 }) : undefined} next={index < data.questions.length - 1 ? hrefFor(`${data.baseHref}/questions/${data.questions[index + 1].id}`, query, { page: 1 }) : undefined} label={`ข้อ ${index + 1} / ${data.questions.length}`} unit="ข้อ" /></div>
     <ReviewWorkspaceHeader data={data} title="ตรวจคำตอบรายข้อ" />
     <ReviewDraftToolbar data={data} question={question} />
-    <h2 className="text-base font-semibold">ข้อ {index + 1} · {question.title}</h2>
-    <QuestionDisclosure key={question.id} data={data} question={question} configure={configure} correctionActions={correctionActions} />
+    <QuestionDisclosure key={question.id} data={data} question={question} number={index + 1} configure={configure} correctionActions={correctionActions} />
     <div className="flex flex-wrap items-center justify-between gap-2"><ReviewFilters data={data} query={query} path={path} navigate={navigate} /><span className="text-xs text-muted-foreground">{students.length} คน · 30 คนต่อหน้า</span></div>
     {rows.length ? <div className="flex flex-col gap-2">{rows.flatMap(student => {
       const answers = data.answers.filter(answer => answer.studentId === student.id && answer.questionId === questionId).sort((a, b) => a.orderIndex - b.orderIndex)
