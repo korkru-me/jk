@@ -17,7 +17,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { scoreParts, type GradingStudent, type GradingWorkspaceData } from '@/lib/grading-workspace'
-import { questionExcerpt } from '@/lib/question-display'
+import { questionExcerpt, TYPE_LABEL } from '@/lib/question-display'
+import { isTrueFalseGroupQuestion } from '@/lib/true-false-group'
 import { sortStudentsByRules, type SortableStudentProfile, type StudentSortDir, type StudentSortKey } from '@/lib/student-sort'
 import type { ClassifyConfig, CompositeConfig, FileUploadConfig, FillBlankConfig, ImageLabelConfig, MatchingConfig, MatchingPair, MCQOption, OrderingConfig, Question, RandomQuestionConfig, TrueFalseConfig } from '@/lib/types'
 
@@ -34,8 +35,7 @@ export interface GradingOverviewQuery {
 interface Props {
   data: GradingWorkspaceData
   initialQuery?: GradingOverviewQuery
-  actions?: ReactNode
-  /** Existing exports, late adjustments and streak tools can stay in a compact disclosure. */
+  /** Late adjustments and streak tools stay in a compact disclosure. */
   tools?: ReactNode
 }
 
@@ -65,7 +65,7 @@ function WorkspacePagination({ page, total, label, onChange }: {
   </div>
 }
 
-export function GradingOverview({ data, initialQuery, actions, tools }: Props) {
+export function GradingOverview({ data, initialQuery, tools }: Props) {
   const [view, setView] = useState<'questions' | 'students'>(initialQuery?.view ?? 'questions')
   const [classroom, setClassroom] = useState(initialQuery?.classroom ?? 'all')
   const [sort, setSort] = useState<StudentOrder>(initialQuery?.sort ?? 'classroom')
@@ -145,7 +145,7 @@ export function GradingOverview({ data, initialQuery, actions, tools }: Props) {
   }
 
   return <div className="flex min-w-0 flex-col gap-3" data-grading-overview>
-    <GradingWorkspaceHeader data={data} actions={actions} />
+    <GradingWorkspaceHeader data={data} />
     <Tabs value={view} onValueChange={value => setView(value === 'students' ? 'students' : 'questions')} className="gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <TabsList aria-label="มุมมองการตรวจ" className="pointer-coarse:min-h-11">
@@ -176,8 +176,8 @@ export function GradingOverview({ data, initialQuery, actions, tools }: Props) {
 
       <TabsContent value="questions" className="flex flex-col gap-2">
         <Card radius="md" className="min-w-0 overflow-hidden">
-          <Table className="min-w-[560px]">
-            <TableHeader><TableRow className="bg-muted/50"><TableHead className="w-16 px-3">ลำดับ</TableHead><TableHead className="px-3">โจทย์</TableHead><TableHead className="px-3">สถานะการตรวจ</TableHead><TableHead className="px-3">คำตอบนักเรียน</TableHead></TableRow></TableHeader>
+          <Table className="min-w-[680px]">
+            <TableHeader><TableRow className="bg-muted/50"><TableHead className="w-16 px-3">ลำดับ</TableHead><TableHead className="px-3">โจทย์</TableHead><TableHead className="px-3">ประเภทข้อสอบ</TableHead><TableHead className="px-3">สถานะการตรวจ</TableHead><TableHead className="px-3">คำตอบนักเรียน</TableHead></TableRow></TableHeader>
             <TableBody>
               {data.questions.slice(questionOffset, questionOffset + PAGE_SIZE).map((question, index) => {
                 const position = questionOffset + index + 1
@@ -193,7 +193,8 @@ export function GradingOverview({ data, initialQuery, actions, tools }: Props) {
                       <Button type="button" size="icon-sm" variant="outline" className="pointer-coarse:min-h-11 pointer-coarse:min-w-11" aria-label={`ดูตัวอย่างโจทย์ข้อ ${position}`} onClick={event => openPreview(question, event.currentTarget)}><Eye /></Button>
                     </div>
                   </TableCell>
-                  <TableCell className="px-3 whitespace-normal"><div className="flex min-w-48 flex-wrap gap-1.5">
+                  <TableCell className="px-3 text-muted-foreground">{isTrueFalseGroupQuestion(question) ? 'ถูก–ผิดแบบชุด' : question.question_type === 'true_false' ? 'ถูก–ผิด' : TYPE_LABEL[question.question_type] ?? 'ไม่ระบุประเภท'}</TableCell>
+                  <TableCell className="px-3 whitespace-normal"><div className="flex min-w-80 flex-wrap gap-1.5">
                     {isVoid ? <Badge variant="secondary">โมฆะ · ไม่นับคะแนน</Badge> : !summary?.count ? <span className="text-xs text-muted-foreground">ยังไม่มีคำตอบที่ส่งแล้ว</span> : <>
                       {summary.automatic > 0 && <Badge variant="statusSuccess"><CheckCircle2 aria-hidden="true" />{summary.hasWork ? 'ระบบตรวจคำตอบแล้ว' : 'ตรวจแล้วโดยระบบ'} {formatCount(summary.automatic)} รายการ</Badge>}
                       {summary.teacher > 0 && <Badge variant="secondary"><UserRoundCheck aria-hidden="true" />ครูตรวจแล้ว {formatCount(summary.teacher)} รายการ</Badge>}
@@ -206,7 +207,7 @@ export function GradingOverview({ data, initialQuery, actions, tools }: Props) {
                   <TableCell className="px-3"><Button size="sm" variant="outline" className="pointer-coarse:min-h-11" render={<Link href={detailHref('questions', question.id)} prefetch={false} />}>ตรวจ/ดูคำตอบ<ArrowUpRight data-icon="inline-end" /></Button></TableCell>
                 </TableRow>
               })}
-              {data.questions.length === 0 && <TableRow><TableCell colSpan={4}><Empty className="gap-2 p-4"><EmptyHeader><EmptyTitle>ยังไม่มีโจทย์ในงานนี้</EmptyTitle></EmptyHeader></Empty></TableCell></TableRow>}
+              {data.questions.length === 0 && <TableRow><TableCell colSpan={5}><Empty className="gap-2 p-4"><EmptyHeader><EmptyTitle>ยังไม่มีโจทย์ในงานนี้</EmptyTitle></EmptyHeader></Empty></TableCell></TableRow>}
             </TableBody>
           </Table>
         </Card>

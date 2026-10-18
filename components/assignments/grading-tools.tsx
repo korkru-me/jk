@@ -1,7 +1,7 @@
 'use client'
 
 import { useId, useMemo, useRef, useState } from 'react'
-import { ChevronDown, Download, Settings2 } from 'lucide-react'
+import { ChevronDown, Settings2 } from 'lucide-react'
 import { unstable_rethrow, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { COVER_PRESETS } from '@/app/(app)/classrooms/_components/classroom-meta'
@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/native-select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { applyLateColorScoreAdjustment } from '@/lib/actions/late-submission-adjustments'
-import { scoreParts, type GradingStudent, type GradingWorkspaceData } from '@/lib/grading-workspace'
+import type { GradingStudent, GradingWorkspaceData } from '@/lib/grading-workspace'
 import type { LateBandColorId } from '@/lib/late-submission'
 import { summarizeStreakResults } from '@/lib/streak-results'
 import { cn } from '@/lib/utils'
@@ -32,13 +32,6 @@ function streakSummary(data: GradingWorkspaceData) {
   })), data.answers.map(answer => ({ submission_id: answer.submissionId, score: answer.score, max_score: answer.isVoid ? 0 : answer.maxScore })))
 }
 
-/** Quote embedded quotes/newlines and keep formula-like text inert in spreadsheets. */
-function csvCell(value: string | number | null | undefined) {
-  let text = value == null ? '' : String(value)
-  if (typeof value === 'string' && /^[=+\-@\t\r]/.test(text)) text = `'${text}`
-  return `"${text.replaceAll('"', '""')}"`
-}
-
 function colorLabel(color: string) {
   return COVER_PRESETS.find(preset => preset.id === color)?.label ?? color
 }
@@ -49,47 +42,6 @@ function signed(value: number) {
 
 function ColorChip({ color }: { color: string }) {
   return <Badge variant="outline"><span className={cn('size-2 rounded-full', groupPreset(color).solid)} aria-hidden="true" />{colorLabel(color)}</Badge>
-}
-
-export function GradingExportButton({ data }: { data: GradingWorkspaceData }) {
-  function download() {
-    const streak = data.assignment.completionRule === 'streak'
-    const summary = streak ? streakSummary(data) : null
-    const questions = new Map(data.questions.map(question => [question.id, question]))
-    const pendingSubmissions = new Set<string>()
-    for (const answer of data.answers) {
-      const question = questions.get(answer.questionId)
-      if (question && !data.voidedQuestionIds.includes(answer.questionId) && scoreParts(answer, question).pending) pendingSubmissions.add(answer.submissionId)
-    }
-    const headers = ['ชั้น', 'ห้อง', 'เลขที่', 'รหัสนักเรียน', 'ชื่อ–สกุล']
-    const rows: (string | number | null | undefined)[][] = [streak
-      ? [...headers, 'ผล', 'เกณฑ์ถูกติดต่อกัน', 'ติดกันมากสุด', 'จำนวนข้อที่ทำ', 'ตอบถูก']
-      : [...headers, 'คะแนน', 'คะแนนเต็ม', 'สถานะการตรวจ']]
-    for (const student of data.students) {
-      const identity = [student.gradeLevel, student.sectionNumber ?? student.classroom, student.classNumber, student.studentCode, student.name]
-      const submitted = finished(student)
-      if (streak) {
-        const result = submitted ? summary?.byId.get(student.submissionId!) : null
-        rows.push([...identity, !submitted ? student.status === 'in_progress' ? 'กำลังทำ' : 'ยังไม่ส่ง' : result?.reached ? 'ผ่าน' : 'ยังไม่ผ่าน',
-          data.assignment.streakTarget, result?.best, result?.asked, result?.correct])
-      } else {
-        const status = !submitted ? student.status === 'in_progress' ? 'กำลังทำ' : 'ยังไม่ส่ง'
-          : student.maxScore <= 0 ? 'ไม่มีข้อที่นับคะแนน'
-            : pendingSubmissions.has(student.submissionId!) ? 'มีข้อรอตรวจ' : 'ตรวจครบแล้ว'
-        rows.push([...identity, submitted ? student.score : null, submitted ? student.maxScore : null, status])
-      }
-    }
-    const csv = '\uFEFF' + rows.map(row => row.map(csvCell).join(',')).join('\r\n')
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = `${data.assignment.title.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').slice(0, 100) || 'คะแนน'}_ผลการตรวจ.csv`
-    document.body.appendChild(anchor)
-    anchor.click()
-    anchor.remove()
-    URL.revokeObjectURL(url)
-  }
-  return <Button type="button" size="sm" variant="outline" className="pointer-coarse:min-h-11" onClick={download}><Download data-icon="inline-start" />ส่งออก CSV</Button>
 }
 
 interface AdjustmentConfirmation {
