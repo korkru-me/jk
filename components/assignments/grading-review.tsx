@@ -73,9 +73,9 @@ function ReviewFilters({ data, query, path, navigate }: { data: GradingWorkspace
 
 function StepNavigation({ previous, next, label, unit, position = 'ด้านบน' }: { previous?: string; next?: string; label: string; unit: 'ข้อ' | 'คน'; position?: 'ด้านบน' | 'ด้านล่าง' }) {
   return <nav aria-label={`เปลี่ยน${unit} ${position}`} className="flex flex-wrap items-center gap-1.5">
-    {previous ? <Button variant="outline" className="pointer-coarse:min-h-11" render={<Link href={previous} />}><ChevronLeft data-icon="inline-start" />{unit}ก่อนหน้า</Button> : <Button variant="outline" disabled><ChevronLeft data-icon="inline-start" />{unit}ก่อนหน้า</Button>}
+    {previous ? <Button variant="outline" size="sm" className="pointer-coarse:min-h-11" render={<Link href={previous} />}><ChevronLeft data-icon="inline-start" />{unit}ก่อนหน้า</Button> : <Button variant="outline" size="sm" className="pointer-coarse:min-h-11" disabled><ChevronLeft data-icon="inline-start" />{unit}ก่อนหน้า</Button>}
     <span className={cn('text-xs tabular-nums text-muted-foreground', position === 'ด้านล่าง' && 'hidden @min-[36rem]/grading-footer:inline')}>{label}</span>
-    {next ? <Button variant="outline" className="pointer-coarse:min-h-11" render={<Link href={next} />}>{unit}ถัดไป<ChevronRight data-icon="inline-end" /></Button> : <Button variant="outline" disabled>{unit}ถัดไป<ChevronRight data-icon="inline-end" /></Button>}
+    {next ? <Button variant="outline" size="sm" className="pointer-coarse:min-h-11" render={<Link href={next} />}>{unit}ถัดไป<ChevronRight data-icon="inline-end" /></Button> : <Button variant="outline" size="sm" className="pointer-coarse:min-h-11" disabled>{unit}ถัดไป<ChevronRight data-icon="inline-end" /></Button>}
   </nav>
 }
 
@@ -130,10 +130,10 @@ function QuestionDisclosure({ data, question, configure, correctionActions }: { 
       <div className="flex flex-wrap items-center gap-2"><span className="text-xs font-medium">โจทย์</span><Badge variant="outline">{TYPE_LABEL[question.question_type] ?? question.question_type}</Badge></div>
       <div className="flex flex-wrap items-center gap-1.5">
         {correctionActions === undefined ? <>
-          {!isFullyManualQuestion(question) && <Button variant="ghost" className="pointer-coarse:min-h-11" render={<Link href={`/questions/${question.id}/edit`} />}><PencilLine data-icon="inline-start" />แก้เฉลย</Button>}
-          <VoidQuestionButton assignmentId={data.assignment.id} questionId={question.id} isVoid={data.voidedQuestionIds.includes(question.id)} />
+          {!isFullyManualQuestion(question) && <Button variant="ghost" size="xs" className="pointer-coarse:min-h-11" render={<Link href={`/questions/${question.id}/edit`} />}><PencilLine data-icon="inline-start" />แก้เฉลย</Button>}
+          <VoidQuestionButton assignmentId={data.assignment.id} questionId={question.id} isVoid={data.voidedQuestionIds.includes(question.id)} size="xs" />
         </> : correctionActions}
-        <CollapsibleTrigger render={<Button variant="ghost" className="pointer-coarse:min-h-11" />}>{open ? 'ซ่อนโจทย์' : 'แสดงโจทย์'}{open ? <ChevronUp data-icon="inline-end" /> : <ChevronDown data-icon="inline-end" />}</CollapsibleTrigger>
+        <CollapsibleTrigger render={<Button variant="ghost" size="xs" className="pointer-coarse:min-h-11" />}>{open ? 'ซ่อนโจทย์' : 'แสดงโจทย์'}{open ? <ChevronUp data-icon="inline-end" /> : <ChevronDown data-icon="inline-end" />}</CollapsibleTrigger>
       </div>
     </div>
     <CollapsibleContent><div className="px-3 py-2.5"><GradingQuestionContent question={question} /></div></CollapsibleContent>
