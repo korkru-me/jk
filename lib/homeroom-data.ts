@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { rescaleToDisplayMax } from '@/lib/scoring'
+import { withVoidedScoreMetadata } from '@/lib/voided-score-metadata.server'
 
 export interface HomeroomAssignmentRow {
   id: string
@@ -89,7 +90,7 @@ export async function getHomeroomAggregate(
 
   const displayMaxByAssignment = new Map((assignmentRows ?? []).map((a: any) => [a.id as string, a.display_max_score as number | null]))
   const submissions = rescaleToDisplayMax(
-    (submissionRows ?? []) as HomeroomSubmissionRow[],
+    await withVoidedScoreMetadata(admin, (submissionRows ?? []) as HomeroomSubmissionRow[]),
     row => displayMaxByAssignment.get(row.assignment_id) ?? null
   )
 

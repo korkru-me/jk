@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState, useTransition } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import {
@@ -107,6 +107,8 @@ interface Props {
   groups: ClassroomGroup[]
   groupMembers: Record<string, string>
   initialNavigationItem: ClassroomNavigationKey
+  /** Real routes load tab-specific data on navigation; older fixtures provide every tab. */
+  loadedNavigationItem?: ClassroomNavigationKey
   initialPeopleView: PeopleView
   backHref: string
   /** Keeps the local presentation fixture inside its synthetic route. */
@@ -118,7 +120,7 @@ export function ClassroomDetailClient({
   classroomAssignments, practiceLibraries, recentWork, assignmentCategories, classroomSubmissions, classroomExtensions,
   homeroomAssignments, homeroomSubmissions, studentNotes, studentProfiles, ownerName, posts,
   pendingReviewByAssignment, seenByPost, crossPostTargets,
-  groups, groupMembers, initialNavigationItem, initialPeopleView, backHref, navigationPathname,
+  groups, groupMembers, initialNavigationItem, loadedNavigationItem, initialPeopleView, backHref, navigationPathname,
 }: Props) {
   const router = useRouter()
   const navigationPath = navigationPathname ?? `/classrooms/${classroom.id}`
@@ -127,7 +129,10 @@ export function ClassroomDetailClient({
     () => classroomNavigationFor(classroom.classroom_type, canManage),
     [classroom.classroom_type, canManage],
   )
-  const [activeTab, setActiveTab] = useState<ClassroomNavigationKey>(initialNavigationItem)
+  const [localActiveTab, setActiveTab] = useState<ClassroomNavigationKey>(initialNavigationItem)
+  const [navigationPending, startNavigation] = useTransition()
+  const [requestedTab, setRequestedTab] = useState<ClassroomNavigationKey>(initialNavigationItem)
+  const activeTab = loadedNavigationItem ?? localActiveTab
   const [peopleView, setPeopleView] = useState<PeopleView>(initialPeopleView)
   const classroomMeta = parseDescription(classroom.description)
   const savedCover = coverOf(classroomMeta)
@@ -146,6 +151,11 @@ export function ClassroomDetailClient({
   // another is opened, and the งาน tabs read the same arrangement to count
   // each งาน only against the students it was handed to.
   const [groupState, setGroupState] = useState<GroupState>({ groups, members: groupMembers })
+  useLayoutEffect(() => {
+    if (loadedNavigationItem === undefined) return
+    setGroupState({ groups, members: groupMembers })
+    setPeopleView(initialPeopleView)
+  }, [groups, groupMembers, initialPeopleView, loadedNavigationItem])
   const groupStudents = useMemo(() => students.map(student => {
     const profile = studentProfiles[student.id]
     return {
@@ -182,12 +192,17 @@ export function ClassroomDetailClient({
       router.push(classroomNavigationPath(classroom.id, nextItem))
       return
     }
+    if (loadedNavigationItem !== undefined && nextItem !== loadedNavigationItem) {
+      setRequestedTab(nextItem)
+      startNavigation(() => router.push(classroomNavigationHref(window.location.href, nextItem), { scroll: false }))
+      return
+    }
     setActiveTab(nextItem)
 
     const nextUrl = classroomNavigationHref(window.location.href, nextItem)
     const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`
     if (nextUrl !== currentUrl) window.history.pushState(null, '', nextUrl)
-  }, [classroom.id, navigationPath, router])
+  }, [classroom.id, loadedNavigationItem, navigationPath, router])
 
   const changePeopleView = useCallback((nextView: PeopleView) => {
     setPeopleView(nextView)
@@ -209,6 +224,7 @@ export function ClassroomDetailClient({
       const params = new URLSearchParams(window.location.search)
       const rawView = params.get('view')
       const nextItem = resolveClassroomNavigationKey(params.get('view'), navigationItems)
+      if (loadedNavigationItem !== undefined && nextItem !== loadedNavigationItem) return
       const nextPeopleView = rawView === 'groups' || params.get('people') === 'groups' ? 'groups' : 'students'
       setActiveTab(nextItem)
       setPeopleView(nextPeopleView)
@@ -225,9 +241,12 @@ export function ClassroomDetailClient({
     }
 
     syncNavigationFromHistory()
+    // Next restores server payloads on Back/Forward; eager fixtures also
+    // synchronize their local tabs directly from the browser's history.
+    if (loadedNavigationItem !== undefined) return
     window.addEventListener('popstate', syncNavigationFromHistory)
     return () => window.removeEventListener('popstate', syncNavigationFromHistory)
-  }, [navigationItems])
+  }, [navigationItems, loadedNavigationItem])
 
   const renderContextualSidebar = useCallback((onNavigate?: () => void) => (
     <ClassroomContextNavigation
@@ -236,7 +255,7 @@ export function ClassroomDetailClient({
       backHref={backHref}
       overviewHref={navigationPath}
       navigationItems={navigationItems}
-      activeItem={activeTab}
+      activeItem={navigationPending ? requestedTab : activeTab}
       studentCount={students.length}
       onNavigate={navigateTo}
       onSwitchClassroom={switchClassroom}
@@ -245,7 +264,7 @@ export function ClassroomDetailClient({
         ? <ClassroomSettingsDialog classroom={classroom} placement="sidebar" />
         : undefined}
     />
-  ), [activeTab, backHref, classroom, isOwner, navigateTo, navigationItems, navigationPath, students.length, switchableClassrooms, switchClassroom])
+  ), [activeTab, backHref, classroom, isOwner, navigateTo, navigationItems, navigationPath, navigationPending, requestedTab, students.length, switchableClassrooms, switchClassroom])
 
   useContextualSidebar(navigationPath, renderContextualSidebar, classroom.id)
 
@@ -291,11 +310,11 @@ export function ClassroomDetailClient({
                 <span className="font-semibold">{students.length}</span>
                 <span className={coverMuted}>นักเรียน</span>
               </div>
-              <div className="flex items-center gap-2 text-sm">
+              {(!isHomeroom || loadedNavigationItem === undefined || activeTab === 'overview' || activeTab === 'homeroom') && <div className="flex items-center gap-2 text-sm">
                 <BookOpen className={`w-4 h-4 ${coverMuted}`} />
                 <span className="font-semibold">{isHomeroom ? homeroomAssignments.length : assignmentCount}</span>
                 <span className={coverMuted}>{isHomeroom ? 'การบ้านที่ติดตาม' : 'ชุดข้อสอบ'}</span>
-              </div>
+              </div>}
             </div>
           </div>
 
@@ -317,7 +336,8 @@ export function ClassroomDetailClient({
       </div>
 
       {/* Tab content */}
-      <div>
+      <div aria-busy={navigationPending}>
+        {navigationPending ? <TabLoading /> : <>
         {activeTab === 'overview' && (
           <ClassroomOverview
             classroomId={classroom.id}
@@ -423,6 +443,7 @@ export function ClassroomDetailClient({
             />
           </div>
         )}
+        </>}
       </div>
     </ClassroomTheme>
   )

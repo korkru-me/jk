@@ -15,7 +15,10 @@ export type LearningAssignment = WorkSettings & { created_at?: string; assignmen
 export type LearningSubmission = Pick<Submission,
   'id' | 'assignment_id' | 'total_score' | 'max_score' | 'score_adjustment' |
   'status' | 'attempt_number' | 'created_at'
-> & { assignments: (WorkSettings & { classrooms: { name: string } | null }) | null }
+> & {
+  voided_max_score?: number | null
+  assignments: (WorkSettings & { classrooms: { name: string } | null }) | null
+}
 
 export type StudentWorkItem = {
   type?: Assignment['type']
@@ -97,7 +100,8 @@ export function buildStudentLearningData({ classrooms, assignments, submissions,
     const submission = { ...official.representative, total_score: official.total_score, max_score: official.max_score }
     officialByAssignment.set(id, submission)
     const settings = submission.assignments
-    if (settings?.type === 'exercise' && computePassed(submission.total_score, submission.max_score, settings.passing_type, settings.passing_value) === false) continue
+    if (settings?.type === 'exercise' && settings.passing_type != null && settings.passing_value != null
+      && computePassed(submission.total_score, submission.max_score, settings.passing_type, settings.passing_value) !== true) continue
     doneIds.add(id)
   }
 

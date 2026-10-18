@@ -1,7 +1,7 @@
 import { getBlankType, isBlankCorrect } from '@/lib/fill-blank'
 import { evaluateStudentAnswer } from '@/lib/math/evaluator'
 import { mathInputPartKey, readMathInputMode } from '@/lib/math/input-mode'
-import { gradeValue } from '@/lib/assignment-attempt'
+import { gradeValue, type GradingConfig } from '@/lib/assignment-attempt'
 import { partLabels, type PartLabelStyle } from '@/lib/part-labels'
 import { CLASSIFY_PREFIX, CLASSIFY_UNSET, parseClassifyGrid } from '@/lib/classify'
 import {
@@ -98,6 +98,8 @@ export interface FeedbackInput {
   student_answer: string | null
   math_input_modes?: Record<string, import('@/lib/types').MathInputMode> | null
   question: FeedbackQuestion
+  /** Same frozen rubric used by gradeAnswer for this attempt. */
+  grading_config?: GradingConfig | null
   /** gradeAnswer's verdict for this same row — never recomputed here, so the
    *  panel can never disagree with the score that gets banked. */
   isCorrect: boolean | null
@@ -164,7 +166,8 @@ function rowStatus(correct: boolean): FeedbackRow['status'] {
  * is worse than no panel.
  */
 export function buildAnswerFeedback(input: FeedbackInput): AnswerFeedback {
-  const { question, revealAnswerKey } = input
+  const { revealAnswerKey } = input
+  const question = { ...input.question, ...input.grading_config }
   const correctAns = input.correct_answer ?? ''
   const studentAns = input.student_answer ?? ''
 
@@ -178,15 +181,19 @@ export function buildAnswerFeedback(input: FeedbackInput): AnswerFeedback {
   const reveal = (value: string) => (revealAnswerKey ? { correct: value } : {})
   const unitOf = (unit: string | null | undefined) => (unit ? { unit } : {})
 
-  // ─── ส่งไฟล์งาน — "did a file arrive" is the whole grade ──────────────────
+  // ─── ส่งไฟล์งาน — received files still need a teacher's review ────────────
   if (question.question_type === 'file_upload') {
     const files = parseJson<unknown[]>(studentAns, [])
     const submitted = Array.isArray(files) && files.length > 0
     return {
       ...base,
+      verdict: 'pending',
+      score: 0,
+      revealed: false,
+      note: 'รอครูตรวจไฟล์งานและให้คะแนน',
       rows: [{
         student: submitted ? `แนบไฟล์แล้ว ${files.length} ไฟล์` : 'ยังไม่ได้แนบไฟล์',
-        status: rowStatus(submitted),
+        status: 'pending',
       }],
     }
   }

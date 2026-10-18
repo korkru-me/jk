@@ -4,6 +4,7 @@ import { getStudentGroups } from './classroom-groups-server'
 import { fetchAllRows } from './supabase/fetch-all-rows'
 import { buildStudentLearningData, type LearningAssignment, type LearningSubmission } from '@/app/(app)/dashboard/_components/student-learning-data'
 import type { StudentClassroom } from '@/app/(app)/classrooms/_components/student-view'
+import { withVoidedScoreMetadata } from './voided-score-metadata.server'
 
 /** Call after verified Auth and the homeroom's exact membership check. Uses
  * the learning-home projection and only this student's memberships/attempts. */
@@ -31,6 +32,6 @@ export async function loadStudentLearningCalendar(admin: SupabaseClient, student
   if (assignments.error) throw new Error('โหลดกำหนดส่งงานไม่สำเร็จ กรุณาลองใหม่')
   return buildStudentLearningData({ classrooms, groupOf,
     assignments: assignments.rows as unknown as LearningAssignment[],
-    submissions: submissions.rows as unknown as LearningSubmission[],
+    submissions: (await withVoidedScoreMetadata(admin, submissions.rows)) as unknown as LearningSubmission[],
   }).calendarEvents
 }

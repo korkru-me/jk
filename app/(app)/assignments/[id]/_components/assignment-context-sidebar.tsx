@@ -47,7 +47,7 @@ export type AssignmentSidebarSummary = Pick<
 
 interface AssignmentContextNavigationProps {
   assignment: AssignmentSidebarSummary
-  currentSection?: 'detail' | 'edit'
+  currentSection?: 'detail' | 'edit' | 'results'
   pendingCount?: number
   pendingReviewCapped?: boolean
   gradeHref: string
@@ -179,7 +179,8 @@ export function AssignmentContextNavigation({
             ? `ตรวจให้คะแนน ${pendingCount}${pendingReviewCapped ? '+' : ''} ชิ้น`
             : 'ตรวจให้คะแนน / ดูคำตอบ'}
           size="sm"
-          variant="ghost"
+          variant={currentSection === 'results' ? 'navigation' : 'ghost'}
+          aria-current={currentSection === 'results' ? 'page' : undefined}
           render={<Link href={gradeHref} onClick={onClose} />}
           className="w-full justify-start"
         >

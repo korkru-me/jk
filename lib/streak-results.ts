@@ -91,6 +91,7 @@ export function summarizeStreakResults(
   // against a few hundred answer rows is otherwise a scan per student.
   const rowsBySubmission = new Map<string, StreakAnswerInput[]>()
   for (const a of answers) {
+    if (a.max_score <= 0) continue
     const list = rowsBySubmission.get(a.submission_id)
     if (list) list.push(a)
     else rowsBySubmission.set(a.submission_id, [a])

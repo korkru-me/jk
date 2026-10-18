@@ -14,6 +14,7 @@ import { CompositeForm } from '@/components/questions/composite-form'
 import { TrueFalseGroupForm } from '@/components/questions/true-false-group-form'
 import { ClassifyForm } from '@/components/questions/classify-form'
 import { ImageLabelForm } from '@/components/questions/image-label-form'
+import { QuestionUpdateConfirmationProvider } from '@/components/questions/question-update-confirmation'
 import { isTrueFalseGroupQuestion } from '@/lib/true-false-group'
 import type { Question } from '@/lib/types'
 
@@ -47,26 +48,28 @@ export default async function EditQuestionPage({ params }: EditQuestionPageProps
   const q = { ...(question as Question), shared_org_ids: sharedOrgIds }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">แก้ไขโจทย์</h1>
-        <p className="text-sm text-muted-foreground mt-1 truncate">{q.title}</p>
+    <QuestionUpdateConfirmationProvider>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">แก้ไขโจทย์</h1>
+          <p className="text-sm text-muted-foreground mt-1 truncate">{q.title}</p>
+        </div>
+        {q.question_type === 'mcq' && <McqForm mode="edit" question={q} allTags={allTags} presets={presets} isOwner={isOwner} />}
+        {q.question_type === 'true_false' && <TrueFalseForm mode="edit" question={q} allTags={allTags} isOwner={isOwner} />}
+        {q.question_type === 'fill_blank' && <FillBlankForm mode="edit" question={q} allTags={allTags} isOwner={isOwner} />}
+        {q.question_type === 'ordering' && <OrderingForm mode="edit" question={q} allTags={allTags} isOwner={isOwner} />}
+        {q.question_type === 'matching' && <MatchingForm mode="edit" question={q} allTags={allTags} isOwner={isOwner} />}
+        {q.question_type === 'essay' && <EssayForm mode="edit" question={q} allTags={allTags} isOwner={isOwner} />}
+        {q.question_type === 'file_upload' && <FileUploadForm mode="edit" question={q} allTags={allTags} isOwner={isOwner} />}
+        {q.question_type === 'classify' && <ClassifyForm mode="edit" question={q} allTags={allTags} isOwner={isOwner} />}
+        {q.question_type === 'image_label' && <ImageLabelForm mode="edit" question={q} allTags={allTags} isOwner={isOwner} />}
+        {q.question_type === 'written' && <RandomNumericForm mode="edit" question={q} allTags={allTags} presets={presets} isOwner={isOwner} />}
+        {q.question_type === 'composite' && (
+          isTrueFalseGroupQuestion(q)
+            ? <TrueFalseGroupForm mode="edit" question={q} allTags={allTags} isOwner={isOwner} />
+            : <CompositeForm mode="edit" question={q} allTags={allTags} isOwner={isOwner} />
+        )}
       </div>
-      {q.question_type === 'mcq' && <McqForm mode="edit" question={q} allTags={allTags} presets={presets} isOwner={isOwner} />}
-      {q.question_type === 'true_false' && <TrueFalseForm mode="edit" question={q} allTags={allTags} isOwner={isOwner} />}
-      {q.question_type === 'fill_blank' && <FillBlankForm mode="edit" question={q} allTags={allTags} isOwner={isOwner} />}
-      {q.question_type === 'ordering' && <OrderingForm mode="edit" question={q} allTags={allTags} isOwner={isOwner} />}
-      {q.question_type === 'matching' && <MatchingForm mode="edit" question={q} allTags={allTags} isOwner={isOwner} />}
-      {q.question_type === 'essay' && <EssayForm mode="edit" question={q} allTags={allTags} isOwner={isOwner} />}
-      {q.question_type === 'file_upload' && <FileUploadForm mode="edit" question={q} allTags={allTags} isOwner={isOwner} />}
-      {q.question_type === 'classify' && <ClassifyForm mode="edit" question={q} allTags={allTags} isOwner={isOwner} />}
-      {q.question_type === 'image_label' && <ImageLabelForm mode="edit" question={q} allTags={allTags} isOwner={isOwner} />}
-      {q.question_type === 'written' && <RandomNumericForm mode="edit" question={q} allTags={allTags} presets={presets} isOwner={isOwner} />}
-      {q.question_type === 'composite' && (
-        isTrueFalseGroupQuestion(q)
-          ? <TrueFalseGroupForm mode="edit" question={q} allTags={allTags} isOwner={isOwner} />
-          : <CompositeForm mode="edit" question={q} allTags={allTags} isOwner={isOwner} />
-      )}
-    </div>
+    </QuestionUpdateConfirmationProvider>
   )
 }

@@ -8,7 +8,7 @@ export function computePassed(
   passingType: PassingType | null,
   passingValue: number | null
 ): boolean | null {
-  if (!passingType || passingValue == null || score == null) return null
+  if (!passingType || passingValue == null || score == null || maxScore <= 0) return null
   if (passingType === 'percent') {
     const pct = maxScore > 0 ? (score / maxScore) * 100 : 0
     return pct >= passingValue
@@ -50,31 +50,21 @@ export function isAttemptExpired(startedAt: string, durationMinutes: number | nu
 
 // Whether a ข้อ can be checked on its own during a แบบฝึกหัด.
 //
-// ข้อเขียน has no answer key — only a teacher can score it — so pressing ตรวจ
-// could never answer more than "รอครูตรวจ", and revealing the model answer
-// while the student is still writing would hand them the essay. It is the one
-// type the button is withheld from entirely; everything else, including a
+// Writing and uploaded files need a teacher's judgement. Pressing ตรวจ cannot
+// award either of them points. Everything else, including a
 // ช่องกรอกที่ครูตรวจเอง inside a เติมคำ, has something honest to say.
 //
 // Lives here rather than next to buildAnswerFeedback so the exam page can ask
 // the question without importing the evaluator that grades the answer.
 export function isInstantCheckable(questionType: string): boolean {
-  return questionType !== 'essay'
+  return questionType !== 'essay' && questionType !== 'file_upload'
 }
 
 // Whether a ข้อ may be drawn into a "ถูกติดต่อกัน" pool.
 //
-// Stricter than isInstantCheckable, and deliberately a separate question. A
-// ส่งไฟล์งาน is instant-checkable — gradeAnswer gives it full marks the moment
-// any file is attached, which is honest feedback for a แบบฝึกหัด where the
-// teacher reads the file afterwards. But full marks is also what advances a
-// streak, so in this mode the same rule turns a blank photo into a free step
-// toward passing, over and over. It is excluded here without touching
-// isInstantCheckable, which ordinary แบบฝึกหัด still rely on.
-//
-// ข้อเขียน is excluded for the reason it always is: nothing can decide it
-// while the student is still in the attempt, and a streak cannot wait for a
-// teacher.
+// Neither writing nor an uploaded file has an immediate automatic verdict,
+// and a streak cannot wait for a teacher. Keep this separate from the live
+// check gate so future check-only feedback cannot accidentally grant a step.
 export function isStreakEligible(questionType: string): boolean {
-  return isInstantCheckable(questionType) && questionType !== 'file_upload'
+  return isInstantCheckable(questionType)
 }

@@ -62,7 +62,7 @@ export async function gradeAndFinalizeSubmission(
   // score. Re-grading them would be wrong twice over: the student never saw
   // them this time, and any score a teacher gave or adjusted by hand would be
   // recomputed — an essay would drop back to pending and score 0.
-  const gradable = answers.filter((a: any) => !a.carried_over)
+  const gradable = answers.filter((a: any) => !a.carried_over && !a.is_void)
 
   // A URL-shaped string is not evidence of an uploaded answer. Re-inspect
   // every legacy photo/file before the final grade so a tampered client cannot
@@ -161,7 +161,7 @@ export async function gradeAndFinalizeSubmission(
     const { data: artifacts, error } = await admin.from('student_work_artifacts')
       .select('submission_answer_id, part_key').in('submission_answer_id', frozenAnswers.map((a: any) => a.id))
     if (error) return { error: 'รอบปิดแล้ว แต่ยังตรวจวิธีทำไม่สำเร็จ ระบบจะลองใหม่' }
-    missingWorkImage = missingWorking(frozenAnswers.filter((a: any) => !a.carried_over),
+    missingWorkImage = missingWorking(frozenAnswers.filter((a: any) => !a.carried_over && !a.is_void),
       new Set((artifacts ?? []).map(a => `${a.submission_answer_id}:${a.part_key}`)))
   }
   const updates = frozenAnswers.filter((a: any) => !a.carried_over).map((a: any) => gradeAnswer(a))

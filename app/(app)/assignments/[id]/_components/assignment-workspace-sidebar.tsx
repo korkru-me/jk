@@ -3,24 +3,28 @@
 import { useCallback, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { AssignmentContextNavigation, type AssignmentSidebarSummary } from '../../_components/assignment-context-sidebar'
+import { AssignmentContextNavigation, type AssignmentSidebarSummary } from './assignment-context-sidebar'
 import { useContextualSidebar } from '@/components/layout/sidebar-context'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { deleteAssignment, updateAssignmentStatus } from '@/lib/actions/assignments'
 
-interface AssignmentEditSidebarProps {
+interface AssignmentWorkspaceSidebarProps {
   assignment: AssignmentSidebarSummary
+  currentSection: 'edit' | 'results'
+  pendingCount?: number
   availableQuestionCount: number
   missingQuestionCount: number
   duplicateQuestionCount: number
 }
 
-export function AssignmentEditSidebar({
+export function AssignmentWorkspaceSidebar({
   assignment: a,
+  currentSection,
+  pendingCount = 0,
   availableQuestionCount,
   missingQuestionCount,
   duplicateQuestionCount,
-}: AssignmentEditSidebarProps) {
+}: AssignmentWorkspaceSidebarProps) {
   const [isPending, startTransition] = useTransition()
   const [confirm, confirmDialog] = useConfirm()
   const router = useRouter()
@@ -64,7 +68,8 @@ export function AssignmentEditSidebar({
   const renderContextualSidebar = useCallback((onNavigate?: () => void) => (
     <AssignmentContextNavigation
       assignment={a}
-      currentSection="edit"
+      currentSection={currentSection}
+      pendingCount={pendingCount}
       gradeHref={`/assignments/${a.id}/results`}
       availableQuestionCount={availableQuestionCount}
       missingQuestionCount={missingQuestionCount}
@@ -75,9 +80,9 @@ export function AssignmentEditSidebar({
       onDelete={handleDelete}
       onClose={onNavigate}
     />
-  ), [a, availableQuestionCount, close, duplicateQuestionCount, handleDelete, isPending, missingQuestionCount, publish])
+  ), [a, availableQuestionCount, close, currentSection, duplicateQuestionCount, handleDelete, isPending, missingQuestionCount, pendingCount, publish])
 
-  useContextualSidebar(`/assignments/${a.id}/edit`, renderContextualSidebar)
+  useContextualSidebar(`/assignments/${a.id}/${currentSection}`, renderContextualSidebar)
 
   return confirmDialog
 }

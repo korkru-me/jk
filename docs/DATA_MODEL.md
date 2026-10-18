@@ -1,5 +1,29 @@
 # Data model และ invariants
 
+## Private grading drafts — local migration 20261018133739
+
+ยังไม่ apply: `grading_score_drafts` keyed ด้วย `(actor_id, assignment_id, answer_id)` เก็บคะแนนส่วนที่แตะ, `base_score_edited_at` และ `updated_at` แบบ compare-and-set ร่างไม่เปลี่ยนคะแนนจริง/ยอดรวม/สถานะรอบ และไม่มี student reader หรือ browser grant อ่านได้ `read_grading_drafts` ตรวจ actor active และสิทธิ์ exact assignment ซ้ำ ตัวโหลดครูส่งเฉพาะร่างของตนใน official scope
+
+`save_grading_drafts` บันทึกร่างเท่านั้น `publish_grading_drafts` เรียก scoring RPC เดิมทั้งชุดใน transaction เดียว แล้วลบร่างรุ่นที่ตรงและสร้าง `grade_published` หนึ่งรายการต่อผู้เรียนที่ได้รับผล ไม่มีคะแนน/เฉลยใน notification และ student route คง reveal/ownership เดิม `grading_draft_requests` เก็บ receipt โดย `(actor_id,request_id)` ตรวจ payload ตรงเพื่อให้ retry หลัง commit แต่ response หายไม่แจ้งซ้ำ ร่างที่คะแนนจริงเปลี่ยนแล้วห้าม publish ทับ แต่ลบร่างของตนด้วย expected draft version ที่ตรงได้
+
+ตารางเปิด RLS และถอน PUBLIC/anon/authenticated grants; RPC เป็น SECURITY INVOKER fixed search_path service-only หลัง server action ตรวจสิทธิ์ ใช้ lock ลำดับแน่นอนและ rollback ทั้งชุดเมื่อแถวใดผิด Migration ต้องมี `20261018005611` และ `20261018040444` ก่อน ไม่ใช้ข้าม ledger ที่ต่างกัน
+
+## Grading workspace — local migration 20261018040444
+
+ยังไม่ apply: `assignment_question_grading_parts` เก็บ `work_share` และ revision `updated_at` ต่อ assignment/question แทนการเปลี่ยนคะแนนเต็มเดิม `submission_answers` เพิ่ม `answer_score`, `answer_max_score`, `work_score`, `work_max_score`, `answer_reviewed_at`, `work_reviewed_at` โดยคะแนนเต็มสองส่วนรวมเท่า `max_score` เดิม และคะแนนรวมเป็นผลบวกของสองส่วนที่ให้จริง `NULL` คะแนน/เวลาตรวจหมายถึงยังไม่ตรวจ ส่วนคะแนน 0 ที่ครูยืนยันมีเวลาตรวจชัดเจน การไม่มี policy ต่างจากครูกำหนดวิธีทำ 0 คะแนนเอง
+
+RPC `save_grading_review` และ `configure_assignment_question_grading_parts` เปิดเฉพาะ service role หลังตรวจ actor ที่ active และสิทธิ์ exact assignment ล็อกงาน/รอบ/คำตอบและตรวจ expected revision ก่อนเขียนพร้อม audit/คะแนนรวม/สถานะและ streak ใน transaction เดียว การเปลี่ยนส่วนแบ่งไม่เปลี่ยนคะแนนเต็มของแต่ละ attempt, ไม่เปลี่ยนงานอื่น และปฏิเสธระหว่างมีรอบกำลังทำหรือการกระจายคะแนนเดิมที่ทำไม่ได้อย่างถูกต้อง
+
+Trigger แปลงคะแนนอัตโนมัติเต็มดิบเป็นส่วนคำตอบเพียงครั้งเดียว รักษาคะแนนวิธีทำและการตรวจของครูเมื่อแก้เฉลยย้อนหลัง; finalizer/evaluator ยังส่งคะแนนเต็มดิบตามเดิม Wrong-only carry เก็บคะแนน/เพดาน/เวลาตรวจทั้งสองส่วน รวมถึงกู้ snapshot สำหรับ native SEB รุ่นเดิมที่ยังคัดลอกเพียงคะแนนรวม ข้อส่งไฟล์เก่าที่ยังไม่มีครูตรวจกลับเป็น pending และรวมยอดใหม่โดยไม่ให้คะแนนจากการแนบไฟล์
+
+## Grading corrections — local migration 20261018005611
+
+ยังไม่ apply ภายนอก: `submission_answers.grading_config` เก็บชนิด/ความคลาดเคลื่อน/ส่วนคำตอบ/extra_data สำหรับตรวจตาม revision ตอนสร้างรอบ Backfill กติกาปัจจุบันให้แถวเก่าโดยไม่เปลี่ยนคะแนนหรือ correct_answer เดิม กู้กติกาในอดีตที่ไม่เคยบันทึกไม่ได้ `is_void` และ `void_original_max_score` เก็บการตัดคะแนนและน้ำหนักเดิม `submissions.voided_max_score` รวมคะแนนเต็มที่ตัด ให้ display_max_score ลดตามสเกลเดิมแม้สุ่มได้คนละข้อ
+
+`assignment_void_questions` มี PK (assignment_id,question_id), reason, created_by, created_at และกำกับรอบใหม่ `question_grading_change_batches`/`question_grading_change_items` เก็บผู้แก้ เหตุผล ก่อน/หลัง เฉลยและแถวคำตอบ ทุกตารางเปิด RLS และไม่ให้ browser อ่าน/เขียนโดยตรง ไม่ลบคำตอบเมื่อโมฆะ
+
+RPC `apply_question_grading_change` ใช้ service role หลังตรวจสิทธิ์ ล็อกโจทย์/งาน/รอบ/คำตอบ ตรวจชุดเป้าหมายกับ expected snapshot ก่อนเขียนเฉลย/คะแนน/ค่ารวม/audit ใน transaction เดียว Trigger ตรวจ revision ตอนสร้างคำตอบ `p_requires_unused_question` ป้องกัน structural change หากมีคำตอบแทรกหลังวางแผน `discard_empty_grading_attempt` ล็อกรอบของนักเรียนและลบได้เฉพาะ in_progress ที่ไม่มีคำตอบ ใช้กู้ explicit SQL revision conflict ไม่ลบรอบจาก transport error ที่อาจบันทึกแล้ว
+
 ## Prepared auth-email counters — 17 October 2026
 
 Migration `20261017111034_auth_email_request_limits.sql` adds operational `auth_email_request_limits`, keyed only by domain-separated HMAC email/IP bucket strings. It contains request counts, window starts and expiry, no raw email/IP/user/tenant records. RLS is enabled; PUBLIC/anon/authenticated grants are revoked. Only service_role can reserve through the fixed invoker RPC or purge expired rows. Network buckets are locked/checked before recipient allocation, all bucket locks follow one order, and hosted pg_cron schedules hourly expiry cleanup. This schema has not been applied; Staging already had local-only `20261015132234`, so remote writes stopped for parity review. Auth policy version/date remains editable user metadata and introduces no legal audit or role-authority table.

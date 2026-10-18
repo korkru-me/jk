@@ -1,9 +1,11 @@
+import { Suspense } from 'react'
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getAuthUser } from '@/lib/auth/server'
 import type { Classroom, User } from '@/lib/types'
 import { ClassroomDetailClient } from './_components/classroom-detail-client'
+import { ClassroomEntryLoading } from './_components/classroom-entry-loading'
 import { StudentClassroomView, type StudentAssignmentRow } from './_components/student-classroom-view'
 import { HomeroomStudentView } from './_components/homeroom-student-view'
 import { getClassroomPosts, getPostSeenByPost } from '@/lib/actions/classroom-posts'
@@ -27,12 +29,14 @@ import {
 import {
   classroomNavigationFor,
   resolveClassroomNavigationKey,
+  type ClassroomNavigationKey,
 } from '@/lib/classroom-navigation'
 import { backHrefFromSearchParams } from '@/lib/back-link'
 import { ClassroomRecentViewTracker } from './_components/classroom-recent-view-tracker'
 import { isPracticeLibraryEnabled } from '@/lib/practice-question'
 import { loadClassroomPracticeLibraries } from '@/lib/classroom-practice-libraries.server'
 import { loadClassroomRecentWork } from '@/lib/classroom-recent-work.server'
+import { readWithVoidedScoreMetadata, withVoidedScoreMetadata } from '@/lib/voided-score-metadata.server'
 
 export default async function ClassroomDetailPage({
   params,
@@ -158,7 +162,7 @@ export default async function ClassroomDetailPage({
       : { data: [] }
     const publishedIds = (assignmentRows ?? []).map((a: any) => a.id)
 
-    const { data: rawSubRows } = publishedIds.length > 0
+    const { data: queriedSubRows } = publishedIds.length > 0
       ? await fetchAllRows((from, to) => admin
           .from('submissions')
           .select('id, assignment_id, status, total_score, score_adjustment, max_score, streak_reached, attempt_number, started_at')
@@ -167,6 +171,7 @@ export default async function ClassroomDetailPage({
           .order('id').range(from, to)).then(({ rows, error }) => ({ data: rows, error }))
       : { data: [] }
 
+    const rawSubRows = await withVoidedScoreMetadata(admin, queriedSubRows ?? [])
     const displayMaxByAssignment = new Map((assignmentRows ?? []).map((a: any) => [a.id as string, a.display_max_score as number | null]))
     const subRows = rescaleToDisplayMax(
       (rawSubRows ?? []) as any[],
@@ -269,307 +274,6 @@ export default async function ClassroomDetailPage({
   // client is readable in the RSC payload even where the tab hides it.
   const canManageInvites = isOwner || myCoTeacherPermission === 'admin'
 
-  // These datasets are independent after authorization. Start them together
-  // instead of waiting for six sequential network round-trips.
-  const [
-    { data: coTeacherRows },
-    { data: inviteRows },
-    { data: memberships },
-    assignmentLinkRows,
-    assignmentCategoryRows,
-    { data: ownerProfile },
-    { data: otherClassroomRows },
-    { data: coTeachingClassroomRows },
-    posts,
-    { data: groupRows },
-    { data: groupMemberRows },
-    practiceLibraries,
-  ] = await Promise.all([
-    admin
-      .from('classroom_co_teachers')
-      .select('id, user_id, permission, created_at, users(id, full_name, email)')
-      .eq('classroom_id', id)
-      .order('created_at', { ascending: true }),
-    canManageInvites
-      ? admin
-          .from('classroom_invitations')
-          .select('id, token, permission, email, expires_at, created_at')
-          .eq('classroom_id', id)
-          .is('used_at', null)
-          .gt('expires_at', new Date().toISOString())
-          .order('created_at', { ascending: false })
-      : Promise.resolve({ data: [] as { id: string; token: string; permission: string; email: string | null; expires_at: string; created_at: string }[] }),
-    admin
-      .from('classroom_students')
-      .select('student_id, roster_order, users!inner(id, full_name, email)')
-      .eq('classroom_id', id),
-    c.classroom_type === 'subject'
-      ? getAssignmentClassroomLinks(admin, id)
-      : Promise.resolve([] as AssignmentClassroomLinkRow[]),
-    c.classroom_type === 'subject' && canManage
-      ? getAssignmentCategories(admin, id)
-      : Promise.resolve([] as AssignmentCategory[]),
-    admin.from('users').select('full_name').eq('id', c.teacher_id).single(),
-    admin
-      .from('classrooms')
-      .select('id, name, description, classroom_type, status, deleted_at')
-      .eq('teacher_id', authUser.id)
-      .neq('id', id),
-    admin
-      .from('classroom_co_teachers')
-      .select('classrooms(id, name, description, classroom_type, status, deleted_at)')
-      .eq('user_id', authUser.id),
-    getClassroomPosts(id),
-    // กลุ่มย่อย: only subject rooms have the tab, and only the room's own
-    // teaching staff (owner or any co-teacher) get the arrangement.
-    hasGroups
-      ? admin
-          .from('classroom_groups')
-          .select('id, classroom_id, name, color, position')
-          .eq('classroom_id', id)
-          .order('position')
-          .order('created_at')
-      : Promise.resolve({ data: [] as ClassroomGroup[] }),
-    hasGroups
-      ? admin
-          .from('classroom_group_members')
-          .select('student_id, group_id')
-          .eq('classroom_id', id)
-      : Promise.resolve({ data: [] as { student_id: string; group_id: string }[] }),
-    showPracticeLibraries
-      ? loadClassroomPracticeLibraries(supabase, id, isOwner ? 'classroom_owner'
-        : myCoTeacherPermission === 'admin' ? 'co_teacher_admin'
-        : myCoTeacherPermission === 'manage' ? 'co_teacher_manage' : 'co_teacher_view')
-      : Promise.resolve(null),
-  ])
-
-  // Co-teacher roster + active invites
-  const coTeachers = (coTeacherRows ?? []).map((t: any) => ({
-    id: t.id as string,
-    userId: t.user_id as string,
-    permission: t.permission as 'admin' | 'manage' | 'view',
-    createdAt: t.created_at as string,
-    fullName: t.users?.full_name ?? '',
-    email: t.users?.email ?? '',
-  }))
-
-  const invites = (inviteRows ?? []).map((i: any) => ({
-    id: i.id as string,
-    token: i.token as string,
-    permission: i.permission as 'admin' | 'manage' | 'view',
-    email: i.email as string | null,
-    expiresAt: i.expires_at as string,
-    createdAt: i.created_at as string,
-  }))
-
-  // A teacher-defined roster order is shared by the score matrix. Students
-  // that have not been arranged yet follow alphabetically after saved rows.
-  const students = (memberships ?? [])
-    .map((m: any) => ({ ...m.users, roster_order: m.roster_order as number | null }))
-    .sort((a: any, b: any) => (
-      (a.roster_order ?? Number.MAX_SAFE_INTEGER) - (b.roster_order ?? Number.MAX_SAFE_INTEGER)
-      || a.full_name.localeCompare(b.full_name, 'th')
-    )) as (Pick<User, 'id' | 'full_name' | 'email'> & { roster_order: number | null })[]
-
-  // Assignments linked to this classroom (via assignment_classrooms, not the
-  // legacy single classroom_id column, so multi-classroom assignments count too)
-  const linkedAssignmentIds = Array.from(new Set((assignmentLinkRows ?? []).map((l: any) => l.assignment_id)))
-  const recentWorkPromise = c.classroom_type === 'subject' && canManage
-    ? loadClassroomRecentWork(supabase, id, authUser.id, linkedAssignmentIds, showPracticeLibraries)
-    : Promise.resolve(null)
-  const displayOrderByAssignment = new Map(
-    (assignmentLinkRows ?? []).map((l: any) => [l.assignment_id as string, l.display_order as number | null])
-  )
-  const groupIdsByAssignment = new Map(
-    (assignmentLinkRows ?? []).map((l: any) => [l.assignment_id as string, (l.group_ids ?? null) as string[] | null])
-  )
-  const categoryByAssignment = new Map(
-    (assignmentLinkRows ?? []).map((l: any) => [l.assignment_id as string, (l.category_id ?? null) as string | null])
-  )
-  const assignmentCategories = (assignmentCategoryRows ?? []) as AssignmentCategory[]
-  const groups = (groupRows ?? []) as ClassroomGroup[]
-  // Members of students still on the roster only; the FK cascade makes a
-  // leftover impossible, but the roster read and this one are not atomic.
-  const rosterIdSet = new Set(students.map(s => s.id))
-  const groupMembers: Record<string, string> = Object.fromEntries(
-    ((groupMemberRows ?? []) as { student_id: string; group_id: string }[])
-      .filter(m => rosterIdSet.has(m.student_id))
-      .map(m => [m.student_id, m.group_id])
-  )
-
-  const assignmentCount = linkedAssignmentIds.length
-
-  let classroomAssignments: {
-    id: string; title: string; type: string; mode: string; status: string
-    start_at: string | null; end_at: string | null; question_ids: string[]; random_question_count: number | null
-    completion_rule: string | null; streak_target: number | null; created_at: string
-    passing_type: 'score' | 'percent' | null; passing_value: number | null
-    max_attempts: number | null; score_strategy: 'best' | 'average' | 'latest'
-    display_order: number | null
-    group_ids: string[] | null
-    category_id: string | null
-  }[] = []
-  let classroomSubmissions: {
-    id: string; assignment_id: string; student_id: string; status: string
-    total_score: number | null; max_score: number; submitted_at: string | null; attempt_number: number
-  }[] = []
-  let classroomExtensions: {
-    id: string; assignment_id: string; student_id: string; extended_end_at: string; note: string | null
-  }[] = []
-  // Auto-grading leaves `is_correct` null exactly on the answers a teacher has
-  // to read (essays, manual fill-blanks). Answer rows are capped to keep this
-  // classroom-level read bounded; the assignment tab shows the counts per งาน.
-  const PENDING_REVIEW_ROW_CAP = 1000
-  // How many hand-ins are waiting per งาน, keyed by assignment id.
-  let pendingReviewByAssignment: Record<string, number> = {}
-  if (c.classroom_type === 'subject' && canManage && linkedAssignmentIds.length > 0) {
-    const rosterIds = new Set(students.map(s => s.id))
-    const [{ data: assignmentRows }, { data: submissionRows }, { data: extensionRows }, { data: pendingAnswerRows }] = await Promise.all([
-      admin
-        .from('assignments')
-        .select('id, title, type, mode, status, start_at, end_at, question_ids, random_question_count, completion_rule, streak_target, created_at, passing_type, passing_value, max_attempts, score_strategy, display_max_score')
-        .in('id', linkedAssignmentIds)
-        .order('created_at', { ascending: false }),
-      admin
-        .from('submissions')
-        .select('id, assignment_id, student_id, status, total_score, score_adjustment, max_score, submitted_at, attempt_number')
-        .in('assignment_id', linkedAssignmentIds),
-      admin
-        .from('assignment_extensions')
-        .select('id, assignment_id, student_id, extended_end_at, note')
-        .in('assignment_id', linkedAssignmentIds),
-      admin
-        .from('submission_answers')
-        .select('submission_id, submissions!inner(assignment_id, student_id, status)')
-        .in('submissions.assignment_id', linkedAssignmentIds)
-        .neq('submissions.status', 'in_progress')
-        .is('is_correct', null)
-        .limit(PENDING_REVIEW_ROW_CAP),
-    ])
-
-    // Same rows, also split per งาน so the "งานที่มอบหมาย" tab can put the
-    // count on the งาน it belongs to instead of only on the overview total.
-    const pendingSubmissionIdsByAssignment = new Map<string, Set<string>>()
-    for (const row of (pendingAnswerRows ?? []) as any[]) {
-      if (!rosterIds.has(row.submissions?.student_id)) continue
-      const assignmentId = row.submissions?.assignment_id as string | undefined
-      if (!assignmentId) continue
-      let set = pendingSubmissionIdsByAssignment.get(assignmentId)
-      if (!set) { set = new Set<string>(); pendingSubmissionIdsByAssignment.set(assignmentId, set) }
-      set.add(row.submission_id as string)
-    }
-    pendingReviewByAssignment = Object.fromEntries(
-      Array.from(pendingSubmissionIdsByAssignment, ([assignmentId, set]) => [assignmentId, set.size])
-    )
-    classroomAssignments = (assignmentRows ?? []).map(a => ({
-      ...a,
-      display_order: displayOrderByAssignment.get(a.id) ?? null,
-      group_ids: groupIdsByAssignment.get(a.id) ?? null,
-      category_id: categoryByAssignment.get(a.id) ?? null,
-    }))
-    const displayMaxByAssignment = new Map((assignmentRows ?? []).map(a => [a.id as string, (a as any).display_max_score as number | null]))
-    classroomSubmissions = rescaleToDisplayMax(
-      submissionRows ?? [],
-      row => displayMaxByAssignment.get(row.assignment_id) ?? null
-    )
-    classroomExtensions = extensionRows ?? []
-  }
-
-  const isHomeroomAdvisor = c.classroom_type === 'homeroom' && canManage
-  const studentIds = students.map(s => s.id)
-
-  // Once the roster is known, aggregate work, private notes, and profile
-  // rows are independent. Load them together rather than in three serial
-  // stages. The explicit author relationship also removes the old follow-up
-  // users query for note author names.
-  const [
-    { assignments: homeroomAssignments, submissions: homeroomSubmissions },
-    { data: noteRows },
-    { data: profileRows },
-  ] = await Promise.all([
-    isHomeroomAdvisor
-      ? getHomeroomAggregate(admin, id, studentIds)
-      : Promise.resolve({ assignments: [], submissions: [] }),
-    isHomeroomAdvisor
-      ? admin
-          .from('student_notes')
-          .select('id, student_id, body, created_at, author:users!student_notes_author_id_fkey(full_name)')
-          .eq('classroom_id', id)
-          .order('created_at', { ascending: false })
-      : Promise.resolve({ data: [] as any[] }),
-    canManage && studentIds.length > 0
-      ? admin
-          .from('student_profiles')
-          .select(isHomeroomAdvisor
-            ? 'student_id, nickname, date_of_birth, gender, food_allergy, chronic_disease, grade_level, section_number, school_name, student_code, class_number, address, phone, guardians'
-            : 'student_id, grade_level, section_number, class_number, student_code')
-          .in('student_id', studentIds)
-      : Promise.resolve({ data: [] as any[] }),
-  ])
-
-  const studentNotes: StudentNoteRow[] = (noteRows ?? []).map((n: any) => ({
-    id: n.id as string,
-    student_id: n.student_id as string,
-    author_name: n.author?.full_name ?? 'ครู',
-    body: n.body as string,
-    created_at: n.created_at as string,
-  }))
-
-  // Roster columns (grade/section/class number) go to any teacher who can
-  // manage this classroom, subject or homeroom, so they can see and sort by
-  // them. The rest of student_profiles (DOB, health, address, guardians) is
-  // sensitive and only ever leaves the server for the homeroom advisor —
-  // subject teachers get those fields nulled out before this ever reaches
-  // the client bundle, not just hidden in the UI.
-  const studentProfiles: Record<string, StudentProfileRow> = Object.fromEntries(
-    (profileRows ?? []).map((p: any) => [p.student_id, isHomeroomAdvisor ? p : {
-      student_id: p.student_id,
-      grade_level: p.grade_level,
-      section_number: p.section_number,
-      class_number: p.class_number,
-      student_code: p.student_code,
-      nickname: null, date_of_birth: null, gender: null, food_allergy: null, chronic_disease: null,
-      school_name: null, address: null, phone: null, guardians: [],
-    }])
-  )
-
-  const ownedClassroomList = (otherClassroomRows ?? []) as {
-    id: string; name: string; description: string | null; classroom_type: string
-    status: string; deleted_at: string | null
-  }[]
-  const switchableClassrooms: Array<Pick<Classroom, 'id' | 'name' | 'description'>> = []
-  const seenSwitchableClassroomIds = new Set<string>()
-  const switchableCandidates = [
-    c,
-    ...ownedClassroomList.filter(row => row.status === 'active' && !row.deleted_at),
-    ...(coTeachingClassroomRows ?? [])
-      .map((row: any) => row.classrooms)
-      .filter((row: any) => row?.status === 'active' && !row.deleted_at),
-  ]
-  for (const candidate of switchableCandidates) {
-    if (!seenSwitchableClassroomIds.has(candidate.id)) {
-      seenSwitchableClassroomIds.add(candidate.id)
-      switchableClassrooms.push({
-        id: candidate.id,
-        name: candidate.name,
-        description: candidate.description,
-      })
-    }
-  }
-  // Reusing or cross-posting an announcement is available in every other
-  // active classroom this teacher can manage, including co-taught rooms. The
-  // switchable list was already filtered to active, non-deleted classrooms.
-  const crossPostTargets = switchableClassrooms
-    .filter(row => row.id !== c.id)
-    .map(({ id: classroomId, name }) => ({ id: classroomId, name }))
-
-  // Who has seen each announcement. Only the teaching side can read these rows
-  // (post_reads_select), and only this side has any use for them.
-  const acknowledgementsEnabled = isAnnouncementAcknowledgementEnabled(process.env)
-  const acknowledgementStatus = canManage && acknowledgementsEnabled ? await getClassroomAnnouncementAcknowledgementStatus(id) : {}
-  const displayPosts = canManage && acknowledgementsEnabled
-    ? posts.map(post => ({ ...post, acknowledgementStatus: acknowledgementStatus[post.id] ?? { round: 1, remindedAt: null, studentIds: [] } })) : posts
-  const seenByPost = canManage && !acknowledgementsEnabled ? await getPostSeenByPost(posts.map(p => p.id)) : {}
   const initialNavigationItem = resolveClassroomNavigationKey(
     sp.view,
     classroomNavigationFor(c.classroom_type, canManage),
@@ -578,37 +282,303 @@ export default async function ClassroomDetailPage({
   const rawPeopleView = Array.isArray(sp.people) ? sp.people[0] : sp.people
   const initialPeopleView = rawView === 'groups' || rawPeopleView === 'groups' ? 'groups' : 'students'
   const backHref = backHrefFromSearchParams(sp, '/classrooms')
+  // This shell contains only classroom metadata after the exact teaching
+  // relationship check above; roster, scores and invitation tokens stay behind it.
+  const summary = { id: c.id, name: c.name, description: c.description, classroom_type: c.classroom_type }
+  return (
+    <Suspense key={id} fallback={
+      <ClassroomEntryLoading classroom={summary} canManage={canManage} initialNavigationItem={initialNavigationItem} backHref={backHref} />
+    }>
+      <TeacherClassroomContent
+        classroom={c}
+        supabase={supabase}
+        admin={admin}
+        actorId={authUser.id}
+        isOwner={isOwner}
+        canManage={canManage}
+        hasGroups={hasGroups}
+        canManageInvites={canManageInvites}
+        myCoTeacherPermission={myCoTeacherPermission}
+        showPracticeLibraries={showPracticeLibraries}
+        initialNavigationItem={initialNavigationItem}
+        initialPeopleView={initialPeopleView}
+        backHref={backHref}
+      />
+    </Suspense>
+  )
+}
+
+type TeacherSubmissionRow = {
+  id: string; assignment_id: string; student_id: string; status: string
+  total_score: number | null; score_adjustment: number | null; max_score: number
+  submitted_at: string | null; attempt_number: number; voided_max_score?: number
+}
+
+/** Invoked only by the authenticated, exact-authorized teaching branch above. */
+async function TeacherClassroomContent({
+  classroom: c, supabase, admin, actorId, isOwner, canManage, hasGroups,
+  canManageInvites, myCoTeacherPermission, showPracticeLibraries,
+  initialNavigationItem, initialPeopleView, backHref,
+}: {
+  classroom: Classroom
+  supabase: Awaited<ReturnType<typeof createClient>>
+  admin: ReturnType<typeof createAdminClient>
+  actorId: string
+  isOwner: boolean
+  canManage: boolean
+  hasGroups: boolean
+  canManageInvites: boolean
+  myCoTeacherPermission: 'admin' | 'manage' | 'view' | undefined
+  showPracticeLibraries: boolean
+  initialNavigationItem: ClassroomNavigationKey
+  initialPeopleView: 'students' | 'groups'
+  backHref: string
+}) {
+  const id = c.id
+  const isOverview = initialNavigationItem === 'overview'
+  const isAssignments = initialNavigationItem === 'assignments'
+  const isCoTeachers = initialNavigationItem === 'coteachers'
+  const isScores = initialNavigationItem === 'scores'
+  const needsProgress = isOverview || isAssignments || isScores || initialNavigationItem === 'ability'
+  const isHomeroomAdvisor = c.classroom_type === 'homeroom' && canManage
+  const needsPrivateProfiles = isHomeroomAdvisor && (initialNavigationItem === 'students' || initialNavigationItem === 'homeroom')
+
+  const membershipsPromise = fetchAllRows((from, to) => admin
+    .from('classroom_students')
+    .select('student_id, roster_order, users!inner(id, full_name, email)')
+    .eq('classroom_id', id).order('student_id').range(from, to))
+  const linksPromise = c.classroom_type === 'subject'
+    ? getAssignmentClassroomLinks(admin, id)
+    : Promise.resolve([] as AssignmentClassroomLinkRow[])
+  const postsPromise = isOverview ? getClassroomPosts(id) : Promise.resolve([])
+  const acknowledgementsEnabled = isAnnouncementAcknowledgementEnabled(process.env)
+  // Start receipt reads with announcements, independently of score/profile reads.
+  const announcementStatusPromise = postsPromise.then(async posts => {
+    const acknowledgementStatus = isOverview && canManage && acknowledgementsEnabled
+      ? await getClassroomAnnouncementAcknowledgementStatus(id) : {}
+    const seenByPost = isOverview && canManage && !acknowledgementsEnabled
+      ? await getPostSeenByPost(posts.map(post => post.id)) : {}
+    return {
+      posts: canManage && acknowledgementsEnabled
+        ? posts.map(post => ({ ...post, acknowledgementStatus: acknowledgementStatus[post.id] ?? { round: 1, remindedAt: null, studentIds: [] } }))
+        : posts,
+      seenByPost,
+    }
+  })
+
+  const studentDataPromise = membershipsPromise.then(async ({ rows: memberships, error }) => {
+    if (error) throw error
+    const studentIds = memberships.map(membership => membership.student_id)
+    const [homeroomWork, { data: noteRows }, { data: profileRows }] = await Promise.all([
+      isHomeroomAdvisor && (isOverview || initialNavigationItem === 'homeroom')
+        ? getHomeroomAggregate(admin, id, studentIds)
+        : Promise.resolve({ assignments: [], submissions: [] }),
+      needsPrivateProfiles
+        ? admin.from('student_notes')
+            .select('id, student_id, body, created_at, author:users!student_notes_author_id_fkey(full_name)')
+            .eq('classroom_id', id).order('created_at', { ascending: false })
+        : Promise.resolve({ data: [] }),
+      canManage && !isCoTeachers && studentIds.length > 0
+        ? admin.from('student_profiles')
+            .select(needsPrivateProfiles
+              ? 'student_id, nickname, date_of_birth, gender, food_allergy, chronic_disease, grade_level, section_number, school_name, student_code, class_number, address, phone, guardians'
+              : 'student_id, grade_level, section_number, class_number, student_code')
+            .in('student_id', studentIds)
+        : Promise.resolve({ data: [] }),
+    ])
+    return { homeroomWork, noteRows, profileRows }
+  })
+
+  const recentWorkPromise = isAssignments && canManage
+    ? linksPromise.then(links => loadClassroomRecentWork(supabase, id, actorId,
+        Array.from(new Set(links.map(link => link.assignment_id))), showPracticeLibraries))
+    : Promise.resolve(null)
+
+  const workPromise = Promise.all([membershipsPromise, linksPromise]).then(async ([membershipResult, links]) => {
+    if (membershipResult.error) throw membershipResult.error
+    const assignmentIds = Array.from(new Set(links.map(link => link.assignment_id)))
+    const studentIds = membershipResult.rows.map(membership => membership.student_id)
+    const rosterIds = new Set(studentIds)
+    if (c.classroom_type !== 'subject' || !canManage || assignmentIds.length === 0 || isCoTeachers) {
+      return { assignments: [], submissions: [] as TeacherSubmissionRow[], extensions: [], pendingReviewByAssignment: {} }
+    }
+    // Preserve all attempts used by official-score/completion selection, while
+    // restricting a shared assignment to this classroom's current roster.
+    const [{ data: assignmentRows }, submissionResult, { data: extensionRows }, { data: pendingAnswerRows }] = await Promise.all([
+      admin.from('assignments')
+        .select('id, title, type, mode, status, start_at, end_at, question_ids, random_question_count, completion_rule, streak_target, created_at, passing_type, passing_value, max_attempts, score_strategy, display_max_score')
+        .in('id', assignmentIds).order('created_at', { ascending: false }),
+      needsProgress && studentIds.length > 0
+        ? readWithVoidedScoreMetadata(async includeVoided => {
+            const result = await fetchRowsInChunks<TeacherSubmissionRow, string>(assignmentIds, async ids => {
+              const pageResult = await fetchAllRows((from, to) => admin.from('submissions')
+                .select(`id, assignment_id, student_id, status, total_score, score_adjustment, max_score, submitted_at, attempt_number${includeVoided ? ', voided_max_score' : ''}`)
+                .in('assignment_id', ids).in('student_id', studentIds)
+                .order('id').range(from, to).returns<TeacherSubmissionRow[]>())
+              return { data: pageResult.rows, error: pageResult.error }
+            })
+            return { data: result.rows, error: result.error }
+          })
+        : Promise.resolve({ data: [] as TeacherSubmissionRow[], error: null }),
+      isScores && studentIds.length > 0
+        ? admin.from('assignment_extensions')
+            .select('id, assignment_id, student_id, extended_end_at, note')
+            .in('assignment_id', assignmentIds).in('student_id', studentIds)
+        : Promise.resolve({ data: [] }),
+      needsProgress && studentIds.length > 0
+        ? admin.from('submission_answers')
+            .select('submission_id, submissions!inner(assignment_id, student_id, status)')
+            .in('submissions.assignment_id', assignmentIds).in('submissions.student_id', studentIds)
+            .neq('submissions.status', 'in_progress').is('is_correct', null).limit(1000)
+        : Promise.resolve({ data: [] }),
+    ])
+    if (submissionResult.error) throw submissionResult.error
+    const pendingSubmissionIdsByAssignment = new Map<string, Set<string>>()
+    // The Supabase relationship boundary currently infers the to-one join as an
+    // array; its existing runtime shape is a single submissions object.
+    for (const row of (pendingAnswerRows ?? []) as unknown as {
+      submission_id: string; submissions: { assignment_id: string; student_id: string } | null
+    }[]) {
+      if (!row.submissions || !rosterIds.has(row.submissions.student_id)) continue
+      const assignmentId = row.submissions.assignment_id
+      let set = pendingSubmissionIdsByAssignment.get(assignmentId)
+      if (!set) { set = new Set<string>(); pendingSubmissionIdsByAssignment.set(assignmentId, set) }
+      set.add(row.submission_id)
+    }
+    const linkByAssignment = new Map(links.map(link => [link.assignment_id, link]))
+    const displayMaxByAssignment = new Map((assignmentRows ?? []).map(assignment => [assignment.id, assignment.display_max_score as number | null]))
+    return {
+      assignments: (assignmentRows ?? []).map(assignment => ({
+        ...assignment,
+        display_order: linkByAssignment.get(assignment.id)?.display_order ?? null,
+        group_ids: linkByAssignment.get(assignment.id)?.group_ids ?? null,
+        category_id: linkByAssignment.get(assignment.id)?.category_id ?? null,
+      })),
+      submissions: rescaleToDisplayMax(submissionResult.data ?? [], row => displayMaxByAssignment.get(row.assignment_id) ?? null),
+      extensions: extensionRows ?? [],
+      pendingReviewByAssignment: Object.fromEntries(Array.from(pendingSubmissionIdsByAssignment, ([assignmentId, set]) => [assignmentId, set.size])),
+    }
+  })
+
+  const [
+    { data: coTeacherRows }, { data: inviteRows }, membershipResult, assignmentLinkRows,
+    assignmentCategoryRows, { data: ownerProfile }, { data: otherClassroomRows },
+    { data: coTeachingClassroomRows }, { data: groupRows }, { data: groupMemberRows },
+    practiceLibraries, studentData, work, announcementStatus, recentWork,
+  ] = await Promise.all([
+    isCoTeachers
+      ? admin.from('classroom_co_teachers')
+          .select('id, user_id, permission, created_at, users(id, full_name, email)')
+          .eq('classroom_id', id).order('created_at', { ascending: true })
+      : Promise.resolve({ data: [] }),
+    isCoTeachers && canManageInvites
+      ? admin.from('classroom_invitations').select('id, token, permission, email, expires_at, created_at')
+          .eq('classroom_id', id).is('used_at', null).gt('expires_at', new Date().toISOString())
+          .order('created_at', { ascending: false })
+      : Promise.resolve({ data: [] }),
+    membershipsPromise,
+    linksPromise,
+    c.classroom_type === 'subject' && canManage && !isCoTeachers
+      ? getAssignmentCategories(admin, id) : Promise.resolve([] as AssignmentCategory[]),
+    admin.from('users').select('full_name').eq('id', c.teacher_id).single(),
+    admin.from('classrooms').select('id, name, description, classroom_type, status, deleted_at')
+      .eq('teacher_id', actorId).neq('id', id),
+    admin.from('classroom_co_teachers').select('classrooms(id, name, description, classroom_type, status, deleted_at)')
+      .eq('user_id', actorId),
+    hasGroups && !isCoTeachers
+      ? admin.from('classroom_groups').select('id, classroom_id, name, color, position')
+          .eq('classroom_id', id).order('position').order('created_at')
+      : Promise.resolve({ data: [] as ClassroomGroup[] }),
+    hasGroups && !isCoTeachers
+      ? admin.from('classroom_group_members').select('student_id, group_id').eq('classroom_id', id)
+      : Promise.resolve({ data: [] as { student_id: string; group_id: string }[] }),
+    isAssignments && showPracticeLibraries
+      ? loadClassroomPracticeLibraries(supabase, id, isOwner ? 'classroom_owner'
+          : myCoTeacherPermission === 'admin' ? 'co_teacher_admin'
+          : myCoTeacherPermission === 'manage' ? 'co_teacher_manage' : 'co_teacher_view')
+      : Promise.resolve(null),
+    studentDataPromise,
+    workPromise,
+    announcementStatusPromise,
+    recentWorkPromise,
+  ])
+  if (membershipResult.error) throw membershipResult.error
+
+  const coTeachers = (coTeacherRows ?? []).map((teacher: any) => ({
+    id: teacher.id as string, userId: teacher.user_id as string,
+    permission: teacher.permission as 'admin' | 'manage' | 'view', createdAt: teacher.created_at as string,
+    fullName: teacher.users?.full_name ?? '', email: teacher.users?.email ?? '',
+  }))
+  const invites = (inviteRows ?? []).map(invite => ({
+    id: invite.id as string, token: invite.token as string, permission: invite.permission as 'admin' | 'manage' | 'view',
+    email: invite.email as string | null, expiresAt: invite.expires_at as string, createdAt: invite.created_at as string,
+  }))
+  const students = membershipResult.rows
+    .map((membership: any) => ({ ...membership.users, roster_order: membership.roster_order as number | null }))
+    .sort((a: any, b: any) => (a.roster_order ?? Number.MAX_SAFE_INTEGER) - (b.roster_order ?? Number.MAX_SAFE_INTEGER)
+      || a.full_name.localeCompare(b.full_name, 'th')) as (Pick<User, 'id' | 'full_name' | 'email'> & { roster_order: number | null })[]
+  const rosterIds = new Set(students.map(student => student.id))
+  const groupMembers = Object.fromEntries((groupMemberRows ?? [])
+    .filter(member => rosterIds.has(member.student_id)).map(member => [member.student_id, member.group_id]))
+  const studentNotes: StudentNoteRow[] = (studentData.noteRows ?? []).map((note: any) => ({
+    id: note.id as string, student_id: note.student_id as string, author_name: note.author?.full_name ?? 'ครู',
+    body: note.body as string, created_at: note.created_at as string,
+  }))
+  // Sensitive profile fields are absent from reads outside the advisor's people
+  // and homeroom tabs, and normalized to the existing safe DTO elsewhere.
+  const studentProfiles: Record<string, StudentProfileRow> = Object.fromEntries(
+    (studentData.profileRows ?? []).map((profile: any) => [profile.student_id, needsPrivateProfiles ? profile : {
+      student_id: profile.student_id, grade_level: profile.grade_level, section_number: profile.section_number,
+      class_number: profile.class_number, student_code: profile.student_code,
+      nickname: null, date_of_birth: null, gender: null, food_allergy: null, chronic_disease: null,
+      school_name: null, address: null, phone: null, guardians: [],
+    }]),
+  )
+  const switchableClassrooms: Array<Pick<Classroom, 'id' | 'name' | 'description'>> = []
+  const seenClassroomIds = new Set<string>()
+  const candidates = [c, ...(otherClassroomRows ?? []).filter(room => room.status === 'active' && !room.deleted_at),
+    ...(coTeachingClassroomRows ?? []).map((row: any) => row.classrooms)
+      .filter((room: any) => room?.status === 'active' && !room.deleted_at)]
+  for (const room of candidates) {
+    if (seenClassroomIds.has(room.id)) continue
+    seenClassroomIds.add(room.id)
+    switchableClassrooms.push({ id: room.id, name: room.name, description: room.description })
+  }
+  const crossPostTargets = switchableClassrooms.filter(room => room.id !== id)
+    .map(room => ({ id: room.id, name: room.name }))
 
   return (
     <>
       {isOwner && <ClassroomRecentViewTracker classroomId={id} />}
       <ClassroomDetailClient
+        key={id}
         classroom={c}
         switchableClassrooms={switchableClassrooms}
         students={students}
-        assignmentCount={assignmentCount ?? 0}
+        assignmentCount={new Set(assignmentLinkRows.map(link => link.assignment_id)).size}
         isOwner={isOwner}
         canManage={canManage}
         coTeachers={coTeachers}
         invites={invites}
-        classroomAssignments={classroomAssignments}
+        classroomAssignments={work.assignments}
         practiceLibraries={practiceLibraries}
-        recentWork={await recentWorkPromise}
-        assignmentCategories={assignmentCategories}
-        classroomSubmissions={classroomSubmissions}
-        classroomExtensions={classroomExtensions}
-        homeroomAssignments={homeroomAssignments}
-        homeroomSubmissions={homeroomSubmissions}
+        recentWork={recentWork}
+        assignmentCategories={assignmentCategoryRows}
+        classroomSubmissions={work.submissions}
+        classroomExtensions={work.extensions}
+        homeroomAssignments={studentData.homeroomWork.assignments}
+        homeroomSubmissions={studentData.homeroomWork.submissions}
         studentNotes={studentNotes}
         studentProfiles={studentProfiles}
         ownerName={ownerProfile?.full_name ?? 'ครูหลัก'}
-        posts={displayPosts}
-        pendingReviewByAssignment={pendingReviewByAssignment}
-        seenByPost={seenByPost}
+        posts={announcementStatus.posts}
+        pendingReviewByAssignment={work.pendingReviewByAssignment}
+        seenByPost={announcementStatus.seenByPost}
         crossPostTargets={crossPostTargets}
-        groups={groups}
+        groups={groupRows ?? []}
         groupMembers={groupMembers}
         initialNavigationItem={initialNavigationItem}
+        loadedNavigationItem={initialNavigationItem}
         initialPeopleView={initialPeopleView}
         backHref={backHref}
       />

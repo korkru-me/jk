@@ -1,5 +1,39 @@
 # Architecture
 
+## Classroom entry streaming and tab-scoped data — local, 18 October 2026
+
+The teacher classroom route returns a Suspense boundary only after verified authentication and exact owner/co-teacher authorization. Its early ClassroomEntryLoading projects id/name/description/type and registers the contextual sidebar without roster counts, class codes or invitation tokens. Neutral detail loading replaces the unrelated generic classroom navigation before this authorized payload arrives. TeacherClassroomContent resolves dependencies as promises and loads only the requested tab's extra data.
+
+Real ClassroomDetailClient payloads carry loadedNavigationItem. Changing tabs requests the corresponding server payload while showing a pending panel; Back/Forward uses Next's router payloads and query/back state. Existing eager fixtures retain local tab navigation. The classroom-keyed boundary preserves room identity, and deferred group/profile state follows refreshed props. Summary and scoring algorithms remain unchanged.
+
+readWithVoidedScoreMetadata projects the optional removed-weight column on the original roster-scoped, paginated submission read. It retries the old projection only for a specific missing-column error; other failures propagate. Existing hydration consumers skip additional reads when valid metadata is already present. No schema/RLS or external deployment change.
+
+## Grading workspace — local, 18 October 2026
+
+`lib/grading-workspace.server.ts` เป็น reader ร่วมของ results overview และ question/student detail ตรวจ verified actor, active role และ exact assignment management ก่อนสร้าง service reader จากนั้นโหลดโจทย์ตาม provenance และเลือก official attempt ด้วย scoring เดิม อ่าน summary ทุกหน้าของข้อมูล แยก full answer body เฉพาะข้อ/นักเรียนในหน้า 30 คนที่เลือก ตัวกรองและ sort ใช้กติกาเดียวกับ UI ไม่ส่ง access_code/email/private profile ใน DTO
+
+`components/assignments/grading-*` ใช้ Card/Tabs/Table และ header ร่วม หน้ารายละเอียดแสดงคำตอบ/รูปทันทีพร้อมช่องคะแนนสองส่วน Actions `lib/actions/grading-review.ts` เรียก service-only atomic RPC พร้อม expected timestamp ไม่ fallback เขียนคะแนน/หัวรอบแยกกัน `scoreParts` ใน pure module เป็นนิยามร่วมของ pending/source/display การบันทึกสำเร็จ revalidate results layout, submission และคะแนนที่เกี่ยวข้อง
+
+`GradingBatchProvider` ครอบหนึ่งหน้า/ตัวกรองของการตรวจรายข้อหรือรายคน เก็บ string draft และ expected revision ที่แก้ครั้งแรกต่อคำตอบ ผ่าน `grading-score-drafts` เพื่อตรวจทั้งชุดก่อนเขียน ส่งเฉพาะส่วนที่ touched ไปยัง action เดิมตามลำดับ แต่ละคำตอบยังเป็น transaction ของตนเอง ไม่อ้าง atomic ทั้ง batch แถวที่ล้มเหลว/ผลเครือข่ายไม่ชัดยังเก็บร่างและ revision เดิม แถวที่ยืนยันสำเร็จไม่ส่งซ้ำและรอ revision ใหม่ก่อนปลดล็อก มีปุ่ม retry เฉพาะการอ่านหาก refresh ไม่ได้ข้อมูลใหม่ ไม่เก็บร่างคะแนนใน persistent browser storage
+
+`gradingReviewPresentation` แยกสถานะงานตรวจจากการแบ่งคะแนน: วิธีทำที่ยังไม่แบ่งคะแนนยังแสดง pending โดยไม่แก้ `scoreParts`/คะแนนเต็ม `grading-navigation-guard` ป้องกันลิงก์และการเปลี่ยนตัวกรองผ่าน callback กลาง ใช้ beforeunload เฉพาะร่าง/งานบันทึกค้าง และ Navigation API ยกเลิกหรือคืน exact entry ของ Back/Forward ใน browser ที่รองรับก่อนยืนยัน ไม่เพิ่ม sentinel หรือเขียนทับข้อมูล Next history กรณีไม่มี API จะเปลี่ยน document ของ entry ปัจจุบันผ่าน query ชั่วคราว `__gradingDocument` แล้วลบ query นี้พร้อม merge marker แยกชื่อโดยรักษาข้อมูล Next การ reload หรือ replace URL เดิมอย่างเดียวไม่รับรองขอบเขต document จากนั้นใช้ document navigation ในหน้าตรวจ เพื่อให้ Back เป็น document exit ที่ beforeunload เตือนได้โดยไม่เดาดัชนี history
+
+`confirmPageExit` เป็น callback event ฝั่ง client ที่ topbar รอคำยืนยันก่อนเรียก logout เดิม ป้องกันกรณีเมนู portal ถูก unmount ขณะรอคำตอบ ซึ่งการเก็บ DOM form แล้ว requestSubmit ซ้ำไม่รับรองว่าจะเรียก action ได้ ไม่มีการเปลี่ยนสิทธิ์/session หรือการทำงานของ server logout
+
+Development-only `/exam-screen-lab/grading-workspace` ประกอบคอมโพเนนต์จริงกับ fixture สังเคราะห์และ action ใน sessionStorage แยกจาก Auth/DB/Storage ภายนอก ทั้งหน้าและ asset route ปิดใน production การตรวจ browser ใน lab ยืนยัน UI ได้ แต่ไม่ถือเป็นการทดสอบ Supabase integration หรืออนุมัติ rollout
+
+## Automatic regrading and void decisions — local, 18 October 2026
+
+Question forms share QuestionUpdateConfirmationProvider. Save prepares an impact summary and opaque HMAC receipt bound to actor, question revision, normalized edit and exact authorized scope. Checkbox acknowledgement releases the save; server recomputes the plan and verifies the receipt before the atomic SQL RPC. assignment-regrading uses the normal key builder/evaluator with saved random values, manual grades and assignment weights. Signing uses server-only GRADING_CONFIRMATION_SECRET or the service-role secret; receipts expire after 15 minutes and carry no learner payload.
+
+question-regrading.server enumerates linked IDs after bank-edit authorization, checks canManageAssignment before learner reads and paginates collections. Active attempts block mutation. RPC repeats authorization and exact scope checks under locks and commits audit/key/scores/streak metadata together. Void applies to one manageable assignment, including later inserts. Missing/failed RPC never falls back to partial writes. Frozen grading_config also governs instant-check feedback.
+
+Authorized score consumers hydrate removed-weight metadata via voided-score-metadata.server before shared rescaling/completion logic. Narrow missing-column/table compatibility keeps old schema readable; grading mutations require the new migration. Local exam-screen lab uses injected in-memory actions with LOCAL labels; this is not an authenticated Supabase integration test. No external schema/deployment changed.
+
+## Grading workspace sidebar — 18 October 2026 (local only)
+
+The authorized results route now mounts AssignmentWorkspaceSidebar, extracted from the existing edit-page sidebar controller. Edit and results register their exact path with the existing shell context and share lifecycle actions/confirmation UI; AssignmentContextNavigation recognizes results as the active section. The existing RLS-scoped assignment select adds only the summary fields and classroom description required by that navigation. Pending hand-ins are deduplicated from the already-loaded official-attempt answers, matching the results worklist rather than adding another query. Management authorization, scoring, server actions and schema are unchanged.
+
 ## การโหลดตัวอย่างโจทย์ — 17 ตุลาคม 2026
 
 `question-preview.tsx` เป็น client-only loading boundary ที่ใช้ import request ร่วมกันและล้าง cache ของ request ที่ล้มเหลว พร้อม error/retry และ timeout 15 วินาที หน้าเลือกประเภทเตรียม renderer ล่วงหน้า; evaluator แยกเป็น import อีกก้อนสำหรับ `written` หรือโจทย์ที่มีตัวแปรเท่านั้น `question-preview-content` รับ evaluator ผ่าน prop และอ่านกติกาคะแนนจาก `lib/question-scoring.ts` ซึ่งไม่ import mathjs; `assignment-attempt` ใช้และ re-export กติกาชุดเดียวกันโดยไม่เปลี่ยนผลคะแนน ตัวอย่างเริ่มสุ่ม/สลับตัวเลือกหลัง mount ใน browser และไม่มีการอ่าน/เขียนฐานข้อมูลเมื่อเปิดหน้าเลือกประเภท

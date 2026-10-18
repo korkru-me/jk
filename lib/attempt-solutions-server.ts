@@ -1,4 +1,5 @@
 import 'server-only'
+import { withVoidedScoreMetadata } from '@/lib/voided-score-metadata.server'
 
 import type { createAdminClient } from '@/lib/supabase/admin'
 import {
@@ -69,6 +70,8 @@ export async function loadSolutionRelease(
     return { state: 'off' }
   }
 
+  const scoreRows = await withVoidedScoreMetadata(admin, attempts.rows).catch(() => null)
+  if (!scoreRows) return { state: 'off' }
   return resolveSolutionRelease({
     showSolutions: true,
     status: assignment.status,
@@ -81,7 +84,7 @@ export async function loadSolutionRelease(
     passingType: assignment.passing_type,
     passingValue: assignment.passing_value,
     displayMaxScore: assignment.display_max_score,
-    attempts: attempts.rows as SolutionReleaseAttempt[],
+    attempts: scoreRows as SolutionReleaseAttempt[],
   })
 }
 
