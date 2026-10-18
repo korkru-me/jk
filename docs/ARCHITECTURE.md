@@ -12,6 +12,8 @@ readWithVoidedScoreMetadata projects the optional removed-weight column on the o
 
 ## Grading workspace — local, 18 October 2026
 
+19 October 2026: `GradingKeywordsProvider` holds a tab-scoped display preference shared by question/student grading views outside the keyed score batch. Only teacher-entered keywords are kept in sessionStorage under assignment/viewer scope; no response body, score, permission, dirty flag or server action is persisted or changed by this tool. `lib/grading-keywords.ts` caps/normalizes the keyword list and returns original text slices with merged literal Unicode match ranges. The optional essay renderer in `SubmissionAnswerReview` is supplied only by the teacher grading content and emits React text/mark nodes; default student rendering and all nonessay branches remain unchanged. No HTML parsing, canonical Unicode rewriting or database work is involved.
+
 `lib/grading-workspace.server.ts` เป็น reader ร่วมของ results overview และ question/student detail ตรวจ verified actor, active role และ exact assignment management ก่อนสร้าง service reader จากนั้นโหลดโจทย์ตาม provenance และเลือก official attempt ด้วย scoring เดิม อ่าน summary ทุกหน้าของข้อมูล แยก full answer body เฉพาะข้อ/นักเรียนในหน้า 30 คนที่เลือก ตัวกรองและ sort ใช้กติกาเดียวกับ UI ไม่ส่ง access_code/email/private profile ใน DTO
 
 `components/assignments/grading-*` ใช้ Card/Tabs/Table และ header ร่วม หน้ารายละเอียดแสดงคำตอบ/รูปทันทีพร้อมช่องคะแนนสองส่วน Actions `lib/actions/grading-review.ts` เรียก service-only atomic RPC พร้อม expected timestamp ไม่ fallback เขียนคะแนน/หัวรอบแยกกัน `scoreParts` ใน pure module เป็นนิยามร่วมของ pending/source/display การบันทึกสำเร็จ revalidate results layout, submission และคะแนนที่เกี่ยวข้อง

@@ -1,4 +1,5 @@
 import { CheckCircle2, XCircle, FileText } from 'lucide-react'
+import type { ReactNode } from 'react'
 import type { AnswerPart, FillBlankItem, SubmittedFile } from '@/lib/types'
 import { getBlankType, isBlankCorrect } from '@/lib/fill-blank'
 import { CLASSIFY_UNSET, parseClassifyGrid } from '@/lib/classify'
@@ -27,6 +28,7 @@ export function SubmissionAnswerReview({
   extraData,
   mcqOptions,
   workImages,
+  renderEssayAnswer,
 }: {
   studentAnswer: string | null
   correctAnswer: string | null
@@ -37,6 +39,7 @@ export function SubmissionAnswerReview({
   extraData?: Record<string, unknown>
   mcqOptions: Array<{ text: string; is_correct: boolean; index?: number; image_url?: string; left_text?: string; right_text?: string; left_image?: string }> | null
   workImages?: (string | null)[] | null
+  renderEssayAnswer?: (text: string) => ReactNode
 }) {
   correctAnswer = correctAnswer ?? ''
   // Translate stored structured answers using the existing feedback formatter;
@@ -209,7 +212,7 @@ export function SubmissionAnswerReview({
         )}
         <div className="space-y-1">
           <p className="text-xs text-muted-foreground">คำตอบคุณ:</p>
-          <p className="whitespace-pre-wrap break-words font-medium">{studentAnswer?.trim() || '—'}</p>
+          <p className="whitespace-pre-wrap break-words font-medium">{studentAnswer?.trim() ? renderEssayAnswer?.(studentAnswer.trim()) ?? studentAnswer.trim() : '—'}</p>
         </div>
       </div>
     )
