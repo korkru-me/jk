@@ -8,6 +8,7 @@
 
 ## Milestones และสิ่งที่ยังไม่เปิด
 
+- งานขยายกวาง `2afdb04` push แล้วบน branch recovery เดิม และรวม Staging `7c42c25` Vercel `dpl_9aYteyaoWP6hbTud9YXv3dJz6HNH` Ready; อ่าน `/forgot-password` และ `/reset-password` ได้ HTTP 200 พร้อม badge/source revision ตรงรุ่นใหม่และ large-deer classes ทั้งคู่ เป็น read-only page checks ไม่มีการส่งเมลหรือเปลี่ยน credential เพิ่ม
 - รอบอีเมลใหม่ 18 ตุลาคม เจ้าของส่งภาพ Staging แสดงฟอร์ม reset และคำเตือน same-password ใต้ช่องถูกต้องแล้ว รอผลบันทึกรหัสอื่น/เข้าสู่ระบบรอบนี้ เพิ่มขนาดกวางบนหน้าลืม/ตั้งรหัสใหม่ให้ตรงหน้า login ด้วย variant large เดิม; browser 320/390/1200px, React props, TypeScript/token lint/build และ Next MCP ผ่าน ไม่มีการเปลี่ยน Auth logic หรือ unit test ใหม่จากงานสัดส่วนโลโก้นี้
 - Resend account สร้างแล้ว; `mail.korkru.com` Verified ใน Tokyo และ public DNS ตรงกับค่าที่กำหนด เจ้าของสร้าง Sending access key และกรอกเอง ไม่ส่ง key มาในแชท
 - อ่าน Staging configuration ยืนยัน custom SMTP `smtp.resend.com:465`, username `resend`, sender `auth@mail.korkru.com` / `KorKru Staging`, มี password; canonical Site URL เป็น `https://staging.korkru.com`, autoconfirm ปิดและ Require current password เปิด Signup/recovery templates ยังใช้ `{{ .ConfirmationURL }}` รายละเอียดและ tracking ที่ปิดเป็นค่าเริ่มต้นอยู่ใน `RESEND_SETUP.md`
