@@ -43,11 +43,11 @@ export function GradingUniformScores({ data, question }: { data: GradingWorkspac
     setError(''); setNotice(`ใส่ร่าง ${plan.targets.length} คำตอบแล้ว กดบันทึกร่าง หรือบันทึกและแจ้งนักเรียน`)
   }
 
-  return <Collapsible ref={root} open={open} onOpenChange={setOpen} className="min-w-0">
+  return <Collapsible ref={root} open={open} onOpenChange={setOpen} className="contents">
     <CollapsibleTrigger render={<Button type="button" size="sm" variant="outline" className="pointer-coarse:min-h-11" />}>
       <Users data-icon="inline-start" aria-hidden="true" />ให้คะแนนเท่ากันทั้งข้อ<ChevronDown data-icon="inline-end" aria-hidden="true" />
     </CollapsibleTrigger>
-    <CollapsibleContent>
+    <CollapsibleContent className="order-last w-full min-w-0 basis-full">
       <div className="flex min-w-0 flex-col gap-2 pt-2">
         <p className="text-xs text-muted-foreground">ทุกห้องและทุกหน้า · {people} คน · {scope.targets.length} คำตอบของข้อนี้</p>
         {scope.excludedCount > 0 && <p className="text-xs text-muted-foreground">ไม่รวม {scope.excludedCount} คำตอบที่ไม่มีส่วนคะแนนนี้หรือแก้คะแนนไม่ได้</p>}

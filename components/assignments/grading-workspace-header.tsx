@@ -12,10 +12,11 @@ function formatNumber(value: number) {
   return value.toLocaleString('th-TH', { maximumFractionDigits: 1 })
 }
 
-export function GradingWorkspaceHeader({ data, title = 'ตรวจให้คะแนน', actions }: {
+export function GradingWorkspaceHeader({ data, title = 'ตรวจให้คะแนน', actions, status }: {
   data: GradingWorkspaceHeaderData
   title?: string
   actions?: ReactNode
+  status?: ReactNode
 }) {
   const submitted = data.students.filter(student => student.submissionId != null
     && (student.status == null || student.status === 'submitted' || student.status === 'graded'))
@@ -44,6 +45,7 @@ export function GradingWorkspaceHeader({ data, title = 'ตรวจให้ค
             <li className="flex items-center gap-1.5"><Users aria-hidden="true" className="size-3.5 text-primary" />ส่งแล้ว <strong className="font-semibold text-foreground">{formatNumber(submitted.length)} คน</strong></li>
             <li className="flex items-center gap-1.5"><ChartNoAxesColumn aria-hidden="true" className="size-3.5 text-primary" />{middleLabel} <strong className="font-semibold text-foreground">{middleValue}</strong></li>
             <li className="flex items-center gap-1.5"><Timer aria-hidden="true" className="size-3.5 text-primary" />กำลังทำ <strong className="font-semibold text-foreground">{formatNumber(data.inProgressCount)} คน</strong></li>
+            {status && <li className="min-w-0 max-w-full">{status}</li>}
           </ul>
           {data.pendingFinalizationCount > 0 && <p className="text-xs text-muted-foreground">ปิดรอบแล้ว รอระบบสรุปผล {formatNumber(data.pendingFinalizationCount)} รอบ</p>}
         </div>

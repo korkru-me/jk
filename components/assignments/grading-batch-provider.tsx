@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, useTransition, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { FilePenLine, LoaderCircle, Save } from 'lucide-react'
+import { FilePenLine, LoaderCircle, Save, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { saveGradingDrafts, publishGradingDrafts } from '@/lib/actions/grading-drafts'
 import type { SaveGradingReviewInput } from '@/lib/actions/grading-review'
@@ -206,7 +206,7 @@ export function GradingBatchSaveButton({ className, removeOnly = false }: { clas
   const focus = useRef<HTMLElement | null>(null)
   const trigger = useRef<HTMLButtonElement | null>(null)
   return <div className={cn('flex flex-wrap items-center justify-end gap-1.5', className)}>
-    {removeOnly ? (Object.keys(batch.savedDrafts).length > 0 && <Button type="button" size="sm" variant="ghost" className="pointer-coarse:min-h-11" disabled={batch.workflowDisabled || batch.busy || batch.dirtyCount > 0} onClick={event => { trigger.current = event.currentTarget; setConfirm('remove') }}>ลบร่าง</Button>) : batch.awaitingRefresh ? <Button size="sm" variant="outline" className="pointer-coarse:min-h-11" onClick={batch.refreshScores}>โหลดคะแนนล่าสุดอีกครั้ง</Button> : batch.uncertain ? <Button size="sm" className="pointer-coarse:min-h-11" disabled={batch.writing} onClick={() => void batch.retryWrite()}>ลองคำสั่งเดิมอีกครั้ง</Button> : <>
+    {removeOnly ? (Object.keys(batch.savedDrafts).length > 0 && <Button type="button" size="sm" variant="outline" className="pointer-coarse:min-h-11" disabled={batch.workflowDisabled || batch.busy || batch.dirtyCount > 0} onClick={event => { trigger.current = event.currentTarget; setConfirm('remove') }}><Trash2 data-icon="inline-start" aria-hidden="true" />ลบร่าง</Button>) : batch.awaitingRefresh ? <Button size="sm" variant="outline" className="pointer-coarse:min-h-11" onClick={batch.refreshScores}>โหลดคะแนนล่าสุดอีกครั้ง</Button> : batch.uncertain ? <Button size="sm" className="pointer-coarse:min-h-11" disabled={batch.writing} onClick={() => void batch.retryWrite()}>ลองคำสั่งเดิมอีกครั้ง</Button> : <>
       <Button type="button" size="sm" variant="outline" className="pointer-coarse:min-h-11" disabled={batch.workflowDisabled || batch.busy || !batch.dirtyCount} aria-label="บันทึกร่างคะแนน" title="บันทึกร่างคะแนน โดยยังไม่ส่งให้นักเรียน" onClick={() => void batch.saveDraft()}><FilePenLine data-icon="inline-start" />บันทึกร่าง</Button>
       <Button type="button" size="sm" className="pointer-coarse:min-h-11" aria-label="บันทึกและแจ้งนักเรียน" title="บันทึกและแจ้งคะแนนนักเรียน" disabled={!batch.canSave} onClick={event => { trigger.current = event.currentTarget; setConfirm('publish') }}>{batch.busy ? <LoaderCircle data-icon="inline-start" className="motion-safe:animate-spin" /> : <Save data-icon="inline-start" />}ส่งคะแนน{batch.unpublishedCount > 0 ? ` (${batch.unpublishedCount})` : ''}</Button>
     </>}

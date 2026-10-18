@@ -43,7 +43,7 @@ export function GradingQuickScoresProvider({ assignmentId, viewerId, children }:
   return <GradingQuickScoresContext.Provider value={value}>{children}</GradingQuickScoresContext.Provider>
 }
 
-export function GradingQuickScoreSettings({ actions }: { actions?: ReactNode }) {
+export function GradingQuickScoreSettings() {
   const context = useContext(GradingQuickScoresContext)
   const { open, setOpen, root } = useGradingDisclosure()
   const [fields, setFields] = useState(() => DEFAULT_GRADING_QUICK_SCORES.map(String))
@@ -54,14 +54,11 @@ export function GradingQuickScoreSettings({ actions }: { actions?: ReactNode }) 
   const values = fields.map(value => value.trim() === '' ? NaN : Number(value))
   const valid = isGradingQuickScores(values)
   const invalidMessage = `กรอกเปอร์เซ็นต์ 0–100 ให้ครบทั้ง ${GRADING_QUICK_SCORE_COUNT} ปุ่ม`
-  return <Collapsible ref={root} open={open} onOpenChange={setOpen} className="@container/quick-settings w-full min-w-0">
-    <div className="flex min-w-0 flex-wrap items-center gap-2">
-      <CollapsibleTrigger render={<Button type="button" size="sm" variant="outline" className="shrink-0 pointer-coarse:min-h-11" />}>
-        <SlidersHorizontal data-icon="inline-start" aria-hidden="true" />ตั้งค่าปุ่มให้คะแนนเร็ว<ChevronDown data-icon="inline-end" aria-hidden="true" />
-      </CollapsibleTrigger>
-      {actions}
-    </div>
-    <CollapsibleContent>
+  return <Collapsible ref={root} open={open} onOpenChange={setOpen} className="contents">
+    <CollapsibleTrigger render={<Button type="button" size="sm" variant="outline" className="shrink-0 pointer-coarse:min-h-11" />}>
+      <SlidersHorizontal data-icon="inline-start" aria-hidden="true" />ตั้งค่าปุ่มให้คะแนนเร็ว<ChevronDown data-icon="inline-end" aria-hidden="true" />
+    </CollapsibleTrigger>
+    <CollapsibleContent className="@container/quick-settings order-last w-full min-w-0 basis-full">
       <div className="flex min-w-0 flex-col gap-2 pt-2">
         <p className="text-xs text-muted-foreground">กำหนดเปอร์เซ็นต์ที่ใช้กับทุกช่องคะแนนในงานนี้</p>
         <FieldGroup className="grid grid-cols-2 gap-2 @min-[24rem]/quick-settings:grid-cols-3 @min-[40rem]/quick-settings:grid-cols-6">

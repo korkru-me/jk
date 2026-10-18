@@ -166,14 +166,22 @@ function scopeSources(data: GradingWorkspaceData, include: (answer: GradingAnswe
   })
 }
 
-function ReviewDraftToolbar({ data }: { data: GradingWorkspaceData }) {
-  const { savedDrafts, dirtyCount } = useGradingBatch()
+function ReviewWorkspaceHeader({ data, title }: { data: GradingWorkspaceData; title: string }) {
+  const { savedDrafts } = useGradingBatch()
   const savedCount = Object.keys(savedDrafts).length
-  return <GradingQuickScoreSettings actions={<>
-    <GradingBatchSaveButton removeOnly />
-    {savedCount > 0 && <Badge variant="secondary" className="h-auto min-h-5 max-w-full whitespace-normal">ร่างที่บันทึกแล้ว {savedCount} คำตอบ · ยังไม่ส่งคะแนนนักเรียน</Badge>}
+  return <GradingWorkspaceHeader data={data} title={title} status={savedCount > 0 &&
+    <Badge variant="statusWarning" role="status" className="h-auto min-h-5 max-w-full whitespace-normal"><Clock3 data-icon="inline-start" aria-hidden="true" />ร่างที่บันทึกแล้ว {savedCount} คำตอบ · ยังไม่ส่งคะแนนนักเรียน</Badge>
+  } />
+}
+
+function ReviewDraftToolbar({ data, question }: { data: GradingWorkspaceData; question?: Question }) {
+  const { savedDrafts, dirtyCount } = useGradingBatch()
+  return <div className="flex min-w-0 flex-wrap items-center gap-2">
+    <GradingQuickScoreSettings />
+    {question && <GradingUniformScores key={question.id} data={data} question={question} />}
+    {Object.keys(savedDrafts).length > 0 && <GradingBatchSaveButton removeOnly />}
     {dirtyCount > 0 && <Badge variant="statusWarning" className="h-auto min-h-5 max-w-full whitespace-normal">ยังไม่บันทึก {dirtyCount} คำตอบ</Badge>}
-  </>} />
+  </div>
 }
 
 export function QuestionGradingReview(props: CommonProps & { questionId: string }) {
@@ -197,12 +205,11 @@ function QuestionReviewBody({ data, questionId, query = {}, configure, correctio
   const rows = students.slice((page - 1) * 30, page * 30)
   const path = `${data.baseHref}/questions/${questionId}`
   return <div className="flex min-w-0 flex-col gap-3">
-    <GradingWorkspaceHeader data={data} title="ตรวจคำตอบรายข้อ" />
-    <ReviewDraftToolbar data={data} />
-    <div className="flex flex-wrap items-center justify-between gap-2"><Button variant="ghost" className="pointer-coarse:min-h-11" render={<Link href={hrefFor(data.baseHref, query, { view: 'questions', page: undefined })} />}><ArrowLeft data-icon="inline-start" />กลับตารางรายข้อ</Button><StepNavigation previous={index > 0 ? hrefFor(`${data.baseHref}/questions/${data.questions[index - 1].id}`, query, { page: 1 }) : undefined} next={index < data.questions.length - 1 ? hrefFor(`${data.baseHref}/questions/${data.questions[index + 1].id}`, query, { page: 1 }) : undefined} label={`ข้อ ${index + 1} / ${data.questions.length}`} unit="ข้อ" /></div>
+    <div className="flex flex-wrap items-center justify-between gap-2"><Button variant="ghost" size="sm" className="pointer-coarse:min-h-11" render={<Link href={hrefFor(data.baseHref, query, { view: 'questions', page: undefined })} />}><ArrowLeft data-icon="inline-start" />กลับตารางรายข้อ</Button><StepNavigation previous={index > 0 ? hrefFor(`${data.baseHref}/questions/${data.questions[index - 1].id}`, query, { page: 1 }) : undefined} next={index < data.questions.length - 1 ? hrefFor(`${data.baseHref}/questions/${data.questions[index + 1].id}`, query, { page: 1 }) : undefined} label={`ข้อ ${index + 1} / ${data.questions.length}`} unit="ข้อ" /></div>
+    <ReviewWorkspaceHeader data={data} title="ตรวจคำตอบรายข้อ" />
+    <ReviewDraftToolbar data={data} question={question} />
     <h2 className="text-base font-semibold">ข้อ {index + 1} · {question.title}</h2>
     <QuestionDisclosure key={question.id} data={data} question={question} configure={configure} correctionActions={correctionActions} />
-    <GradingUniformScores data={data} question={question} />
     <div className="flex flex-wrap items-center justify-between gap-2"><ReviewFilters data={data} query={query} path={path} navigate={navigate} /><span className="text-xs text-muted-foreground">{students.length} คน · 30 คนต่อหน้า</span></div>
     {rows.length ? <div className="flex flex-col gap-2">{rows.flatMap(student => {
       const answers = data.answers.filter(answer => answer.studentId === student.id && answer.questionId === questionId).sort((a, b) => a.orderIndex - b.orderIndex)
@@ -239,9 +246,9 @@ function StudentReviewBody({ data, studentId, query = {} }: CommonProps & { stud
   const scoreValue = !answers.length ? 'ยังไม่มีผลคะแนน' : streak ? student.streakReached ? 'ผ่านเกณฑ์' : 'ยังไม่ผ่านเกณฑ์' : student.maxScore > 0 ? `${(student.score ?? 0).toLocaleString('th-TH', { maximumFractionDigits: 2 })}/${student.maxScore.toLocaleString('th-TH', { maximumFractionDigits: 2 })}` : 'ไม่มีข้อที่นับคะแนน'
   const stepper = (position: 'ด้านบน' | 'ด้านล่าง') => <StepNavigation previous={index > 0 ? hrefFor(`${data.baseHref}/students/${roster[index - 1].id}`, query) : undefined} next={index < roster.length - 1 ? hrefFor(`${data.baseHref}/students/${roster[index + 1].id}`, query) : undefined} label={`${index + 1} / ${roster.length} คน`} unit="คน" position={position} />
   return <div className="flex min-w-0 flex-col gap-3">
-    <GradingWorkspaceHeader data={data} title="ตรวจคำตอบรายคน" />
+    <div className="flex flex-wrap items-center justify-between gap-2"><Button variant="ghost" size="sm" className="pointer-coarse:min-h-11" render={<Link href={hrefFor(data.baseHref, query, { view: 'students' })} />}><ArrowLeft data-icon="inline-start" />กลับตารางรายคน</Button>{stepper('ด้านบน')}</div>
+    <ReviewWorkspaceHeader data={data} title="ตรวจคำตอบรายคน" />
     <ReviewDraftToolbar data={data} />
-    <div className="flex flex-wrap items-center justify-between gap-2"><Button variant="ghost" className="pointer-coarse:min-h-11" render={<Link href={hrefFor(data.baseHref, query, { view: 'students' })} />}><ArrowLeft data-icon="inline-start" />กลับตารางรายคน</Button>{stepper('ด้านบน')}</div>
     <Card radius="md" className="flex flex-wrap items-center justify-between gap-2 bg-primary/5 px-3 py-2.5"><div><h2 className="text-base font-semibold">{student.name}</h2><p className="text-xs text-foreground/75">{student.classroom || 'ไม่ระบุชั้น/ห้อง'} · เลขที่ {student.classNumber ?? '—'} · รหัสนักเรียน {student.studentCode || '—'}{student.attemptNumber ? ` · ครั้งที่ ${student.attemptNumber}` : ''}</p></div><div className="flex flex-wrap items-center gap-2"><span className="text-xs text-foreground/75">{scoreLabel}</span><strong className="text-sm tabular-nums text-primary">{scoreValue}</strong><Badge variant={pendingCount ? 'statusWarning' : 'statusSuccess'}>{pendingCount ? `รอตรวจ ${pendingCount} ข้อ` : answers.length ? 'ตรวจครบแล้ว' : 'ยังไม่ส่งคำตอบ'}</Badge></div></Card>
     {reviewedAnswers.length ? <><p className="text-xs text-muted-foreground">คำตอบทั้งหมด {reviewedAnswers.length} ข้อ · ครูแก้คะแนนได้ทุกข้อ · ส่วนที่รอตรวจแสดง 0 ชั่วคราว</p><div className="flex flex-col gap-2">{reviewedAnswers.map(({ question, answer }, index) => {
       const repeats = reviewedAnswers.filter(item => item.question.id === question.id)
