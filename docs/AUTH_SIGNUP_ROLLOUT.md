@@ -8,6 +8,7 @@
 
 ## Milestones และสิ่งที่ยังไม่เปิด
 
+- เพิ่มสีและไอคอนให้ notice ผลเปลี่ยนรหัสเด่นชัดบน login ตามเจ้าของขอ: success เขียวพร้อม CircleCheck; revocation warning เหลืองพร้อม TriangleAlert เป็น presentation เท่านั้น ไม่เปลี่ยนหลักฐานกู้รหัส/การ redirect/ข้อความ สองสถานะผ่าน contrast ขั้นต่ำ 5.81:1 ใน browser matrix 12 กรณี และ TypeScript/token lint/build/Next MCP ผ่าน
 - งานขยายกวาง `2afdb04` push แล้วบน branch recovery เดิม และรวม Staging `7c42c25` Vercel `dpl_9aYteyaoWP6hbTud9YXv3dJz6HNH` Ready; อ่าน `/forgot-password` และ `/reset-password` ได้ HTTP 200 พร้อม badge/source revision ตรงรุ่นใหม่และ large-deer classes ทั้งคู่ เป็น read-only page checks ไม่มีการส่งเมลหรือเปลี่ยน credential เพิ่ม
 - รอบอีเมลใหม่ 18 ตุลาคม เจ้าของทดสอบ Staging core flow ผ่าน: ได้รับ recovery email → เปิด reset form → ใช้รหัสเดิมแล้วเห็น same-password ใต้ช่อง → เปลี่ยนเป็นรหัสอื่นและส่ง → หน้า login แสดง banner “เปลี่ยนรหัสผ่านแล้ว” ตามภาพเวลา 22:10:54 → login ด้วยรหัสใหม่ได้ เจ้าของระบุว่าช่องรหัสผ่านกรอกค่าใหม่ไว้แล้ว **เป็น manual/owner-reported core-flow proof พร้อมภาพ ไม่ใช่ agent independent hosted E2E** ยังไม่ได้รายงานการลองรหัสเก่าให้ถูกปฏิเสธหรือเปิดลิงก์ใช้แล้วซ้ำ
 - เพิ่มขนาดกวางบนหน้าลืม/ตั้งรหัสใหม่ให้ตรงหน้า login ด้วย variant large เดิม; browser 320/390/1200px, React props, TypeScript/token lint/build และ Next MCP ผ่าน ไม่มีการเปลี่ยน Auth logic หรือ unit test ใหม่จากงานสัดส่วนโลโก้นี้

@@ -10,6 +10,10 @@ const alertVariants = cva(
         default: "bg-card text-card-foreground",
         destructive:
           "bg-card text-destructive *:data-[slot=alert-description]:text-destructive/90 *:[svg]:text-current",
+        success:
+          "border-success/30 bg-success/10 text-[color:color-mix(in_oklab,var(--success)_55%,var(--foreground))] *:data-[slot=alert-description]:text-current *:data-[slot=alert-title]:font-semibold",
+        warning:
+          "border-warning/30 bg-warning/10 text-[color:color-mix(in_oklab,var(--warning)_55%,var(--foreground))] *:data-[slot=alert-description]:text-current *:data-[slot=alert-title]:font-semibold",
       },
     },
     defaultVariants: {
