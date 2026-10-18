@@ -16,9 +16,10 @@ export interface GradingScoreAllocationProps {
   data: GradingWorkspaceData
   question: Question
   configure?: typeof configureGradingParts
+  disabled?: boolean
 }
 
-export function GradingScoreAllocation({ data, question, configure = configureGradingParts }: GradingScoreAllocationProps) {
+export function GradingScoreAllocation({ data, question, configure = configureGradingParts, disabled = false }: GradingScoreAllocationProps) {
   const router = useRouter()
   const id = useId()
   const policy = data.gradingParts?.[question.id]
@@ -39,7 +40,7 @@ export function GradingScoreAllocation({ data, question, configure = configureGr
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (busy || data.reviewAvailable === false) return
+    if (busy || disabled || data.reviewAvailable === false) return
     const answerMaxScore = answerDraft.trim() ? Number(answerDraft) : NaN
     const workMaxScore = workDraft.trim() ? Number(workDraft) : NaN
     if (!Number.isFinite(answerMaxScore) || !Number.isFinite(workMaxScore) || answerMaxScore < 0 || workMaxScore < 0 || Math.abs(answerMaxScore + workMaxScore - total) > 0.000001) {
@@ -66,10 +67,10 @@ export function GradingScoreAllocation({ data, question, configure = configureGr
   }
 
   return <form onSubmit={submit} className="flex flex-col gap-2 border-t border-border px-3 py-2.5" aria-label="กำหนดสัดส่วนคะแนนคำตอบและวิธีทำ">
-    <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-medium">{policy ? 'สัดส่วนคะแนน' : 'ยังไม่ได้กำหนดสัดส่วนคะแนน'}</p><p className="text-xs text-muted-foreground">คะแนนเต็มรวม {total} คะแนน</p></div>
+    <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-medium">{policy ? 'สัดส่วนคะแนน' : 'ยังไม่ได้กำหนดสัดส่วนคะแนน'}{disabled && <span className="ml-2 font-normal text-muted-foreground">บันทึกคะแนนที่แก้ไขก่อนเปลี่ยนสัดส่วน</span>}</p><p className="text-xs text-muted-foreground">คะแนนเต็มรวม {total} คะแนน</p></div>
     <FieldGroup className="flex-row flex-wrap items-end gap-x-3 gap-y-2">
-      {(['answer', 'work'] as const).map(part => <Field key={part} className="w-auto gap-1" data-invalid={!!error}><FieldLabel htmlFor={`${id}-${part}`} className="text-xs text-muted-foreground">{part === 'answer' ? 'คะแนนคำตอบ' : 'คะแนนวิธีทำ'}</FieldLabel><Input id={`${id}-${part}`} required type="number" step="any" min={0} max={total} value={part === 'answer' ? answerDraft : workDraft} onChange={event => change(part, event.target.value)} disabled={data.reviewAvailable === false || busy || total <= 0} aria-invalid={!!error} aria-describedby={error ? `${id}-error` : undefined} className="w-20 text-center tabular-nums pointer-coarse:min-h-11" /></Field>)}
-      <Button type="submit" variant="outline" disabled={data.reviewAvailable === false || busy || total <= 0} className="pointer-coarse:min-h-11">{busy && <LoaderCircle data-icon="inline-start" className="animate-spin" />}{busy ? 'กำลังบันทึก' : 'บันทึกสัดส่วน'}</Button>
+      {(['answer', 'work'] as const).map(part => <Field key={part} className="w-auto gap-1" data-invalid={!!error}><FieldLabel htmlFor={`${id}-${part}`} className="text-xs text-muted-foreground">{part === 'answer' ? 'คะแนนคำตอบ' : 'คะแนนวิธีทำ'}</FieldLabel><Input id={`${id}-${part}`} required type="number" step="any" min={0} max={total} value={part === 'answer' ? answerDraft : workDraft} onChange={event => change(part, event.target.value)} disabled={disabled || data.reviewAvailable === false || busy || total <= 0} aria-invalid={!!error} aria-describedby={error ? `${id}-error` : undefined} className="w-20 text-center tabular-nums pointer-coarse:min-h-11" /></Field>)}
+      <Button type="submit" variant="outline" disabled={disabled || data.reviewAvailable === false || busy || total <= 0} className="pointer-coarse:min-h-11">{busy && <LoaderCircle data-icon="inline-start" className="animate-spin" />}{busy ? 'กำลังบันทึก' : 'บันทึกสัดส่วน'}</Button>
     </FieldGroup>
     {!policy && <p className="text-xs text-muted-foreground">กำหนดก่อนตรวจวิธีทำ คะแนนเต็มของข้อนี้คงเดิม และใช้กับนักเรียนทุกคนในงานนี้</p>}
     {error && <Alert id={`${id}-error`} variant="destructive" className="py-1.5"><AlertDescription>{error}</AlertDescription></Alert>}
