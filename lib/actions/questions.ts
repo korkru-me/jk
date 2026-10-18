@@ -13,6 +13,7 @@ import { sanitizeRichTextForStorage } from '@/lib/rich-text-sanitize'
 import type { Variable, LogicRule, MCQOption, AnswerPart, Question, QuestionType, Difficulty, Visibility, MatchingPair, TrueFalseConfig, FillBlankConfig, OrderingConfig, RandomQuestionConfig, FileUploadConfig, CompositeConfig, MatchingConfig, ClassifyConfig, ImageLabelConfig } from '@/lib/types'
 import { safeQuestionsRedirect } from '@/lib/question-return'
 import { questionSearchOrClauses } from '@/lib/question-search'
+import { planQuestionRegrading, commitQuestionRegrading } from '@/lib/question-regrading.server'
 
 export interface QuestionFormData {
   title: string
@@ -55,6 +56,8 @@ export interface QuestionFormData {
   set_ids?: string[]
   /** Where to redirect after a successful save. Defaults to '/questions'. */
   redirect_to?: string
+  /** Server-signed acknowledgement of the exact edit and affected score revisions. */
+  regrade_confirmation?: string
 }
 
 /** Replaces every question_shares row for a question with exactly `orgIds`. */
@@ -210,7 +213,7 @@ export async function updateQuestion(id: string, data: QuestionFormData) {
 
   const { data: existing } = await supabase
     .from('questions')
-    .select('created_by, org_id, visibility, team_edit_allowed, is_research_snapshot, requires_work_image')
+    .select('*')
     .eq('id', id)
     .maybeSingle()
   if (!existing) return { error: 'ไม่พบโจทย์นี้' }
@@ -228,9 +231,7 @@ export async function updateQuestion(id: string, data: QuestionFormData) {
     : { orgId: existing.org_id as string }
   if ('error' in orgResult) return orgResult
 
-  const { error } = await supabase
-    .from('questions')
-    .update(withContentFingerprint({
+  const patch = withContentFingerprint({
       org_id: orgResult.orgId,
       category_id: data.category_id || null,
       grade_level: data.grade_level || null,
@@ -257,10 +258,26 @@ export async function updateQuestion(id: string, data: QuestionFormData) {
         ? (data.requires_work_image ?? existing.requires_work_image ?? false)
         : false,
       team_edit_allowed: isOwner ? (data.team_edit_allowed ?? true) : existing.team_edit_allowed,
-    }))
-    .eq('id', id)
-
-  if (error) return { error: error.message }
+    })
+  let affectedAssignmentIds: string[] = []
+  try {
+    const plan = await planQuestionRegrading(id, data, user.id)
+    if (plan.previous.updated_at !== existing.updated_at) return { error: 'โจทย์เปลี่ยนระหว่างบันทึก กรุณากดบันทึกและยืนยันใหม่' }
+    if (plan.requiresConfirmation) {
+      const result = await commitQuestionRegrading(plan, data.regrade_confirmation, patch)
+      if ('error' in result) return result
+      affectedAssignmentIds = result.assignmentIds
+      for (const target of plan.changes) {
+        for (const submission of target.submissions) revalidatePath(`/submissions/${submission.id}`)
+      }
+    } else {
+      const { data: saved, error } = await supabase.from('questions').update(patch)
+        .eq('id', id).eq('updated_at', existing.updated_at).select('id').maybeSingle()
+      if (error || !saved) return { error: 'โจทย์เปลี่ยนระหว่างบันทึก กรุณาเปิดหน้าแก้ไขใหม่' }
+    }
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'บันทึกเฉลยและตรวจคะแนนใหม่ไม่สำเร็จ' }
+  }
 
   if (isOwner) {
     const visibility = data.visibility
@@ -272,6 +289,16 @@ export async function updateQuestion(id: string, data: QuestionFormData) {
 
   revalidatePath('/questions')
   revalidatePath(`/questions/${id}/edit`)
+  for (const assignmentId of affectedAssignmentIds) {
+    revalidatePath(`/assignments/${assignmentId}`)
+    revalidatePath(`/assignments/${assignmentId}/results`)
+    revalidatePath(`/assignments/${assignmentId}/analytics`)
+  }
+  if (affectedAssignmentIds.length > 0) {
+    revalidatePath('/classrooms', 'layout')
+    revalidatePath('/assignments')
+    revalidatePath('/dashboard')
+  }
   // `redirect_to` comes from the browser, so it is only ever allowed to be the
   // question bank and the view the teacher started the edit from.
   redirect(safeQuestionsRedirect(data.redirect_to))

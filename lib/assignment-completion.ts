@@ -1,5 +1,6 @@
 import { computePassed, type PassingType } from '@/lib/grading'
 import type { AssignmentType, ScoreStrategy } from '@/lib/types'
+import { rescaleToDisplayMax } from '@/lib/scoring'
 
 export interface CompletionAssignment {
   type?: AssignmentType
@@ -14,6 +15,7 @@ export interface CompletionAttempt {
   status: string
   total_score?: number | null
   max_score?: number
+  voided_max_score?: number | null
   score_adjustment?: number | null
   streak_reached?: boolean | null
 }
@@ -53,17 +55,8 @@ export function findPassingCompletion<T extends CompletionAttempt>(assignment: C
   return attempts.find(attempt => {
     if (attempt.status !== 'submitted' && attempt.status !== 'graded') return false
     if (choice === 'streak') return attempt.streak_reached === true
-    const rawScore = attempt.total_score ?? null
-    const rawMax = attempt.max_score ?? 0
-    const displayMax = assignment.display_max_score
-    const scaledScore = rawScore != null && displayMax != null && rawMax > 0
-      ? Math.round(rawScore * displayMax / rawMax * 100) / 100
-      : rawScore
-    const max = displayMax ?? rawMax
-    const score = scaledScore == null
-      ? null
-      : Math.round(Math.min(max, Math.max(0, scaledScore + (attempt.score_adjustment ?? 0))) * 100) / 100
-    return computePassed(score, max, assignment.passing_type ?? null, assignment.passing_value ?? null) === true
+    const [visible] = rescaleToDisplayMax([{ ...attempt, total_score: attempt.total_score ?? null, max_score: attempt.max_score ?? 0 }], () => assignment.display_max_score ?? null)
+    return computePassed(visible.total_score, visible.max_score, assignment.passing_type ?? null, assignment.passing_value ?? null) === true
   }) ?? null
 }
 

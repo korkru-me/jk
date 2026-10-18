@@ -58,6 +58,16 @@ function buildSkeletonBase(
       rng: isSharedRandomSeed(sharedRandomSeed) ? questionRandom(sharedRandomSeed, q.id) : undefined,
     }
   )
+  return buildQuestionAnswerKeyAtValues(q, randomValues)
+}
+
+// Re-marking an existing attempt must use the values the student actually saw.
+// This path deliberately does not sample variables or shuffle any options.
+export function buildQuestionAnswerKeyAtValues(
+  q: Question,
+  randomValues: Record<string, number>,
+): Omit<AssignmentAttemptSkeleton, 'order_index' | 'option_order'> {
+  const extraData = q.extra_data as any
   const parts = (q as any).answer_parts as import('@/lib/types').AnswerPart[] | null
 
   if (q.question_type === 'true_false') {
@@ -225,7 +235,7 @@ function buildSkeletonBase(
   }
 
   const formula = parts?.[0]?.formula ?? q.answer_formula
-  return { question_id: q.id, random_values: randomValues, correct_answer: String(evaluateFormula(formula, randomValues)), max_score: naturalMaxScore(q.question_type, extraData, parts) }
+  return { question_id: q.id, random_values: randomValues, correct_answer: String(evaluateFormula(formula, { ...randomValues })), max_score: naturalMaxScore(q.question_type, extraData, parts) }
 }
 
 // Pre-computes each question's correct answer, max_score, and per-attempt
@@ -447,13 +457,17 @@ export type GradableAnswer = {
   correct_answer: string
   student_answer: string | null
   max_score: number
+  is_void?: boolean
+  grading_config?: GradingConfig | null
   math_input_modes?: Record<string, import('@/lib/types').MathInputMode> | null
-  questions: {
-    question_type: string
-    answer_tolerance: number
-    answer_parts: AnswerPart[] | null
-    extra_data: any
-  } | null
+  questions: GradingConfig | null
+}
+
+export type GradingConfig = {
+  question_type: string
+  answer_tolerance: number
+  answer_parts: AnswerPart[] | null
+  extra_data: any
 }
 
 export type GradedAnswer = { id: string; is_correct: boolean | null; score: number }
@@ -465,6 +479,8 @@ export type GradedAnswer = { id: string; is_correct: boolean | null; score: numb
 // in one place is what guarantees a preview's score actually matches what a
 // real submission would be graded as.
 export function gradeAnswer(a: GradableAnswer): GradedAnswer {
+  if (a.is_void) return { id: a.id, is_correct: true, score: 0 }
+  if (a.grading_config) a = { ...a, questions: a.grading_config }
   const correctAns: string = a.correct_answer ?? ''
   const studentAns: string = a.student_answer ?? ''
 

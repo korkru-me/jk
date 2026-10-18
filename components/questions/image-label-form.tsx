@@ -14,7 +14,8 @@ import { GeneralInfoSection } from './general-info-section'
 import { QuestionImageUpload } from './question-image-upload'
 import { SolutionSection } from './solution-section'
 import { QuestionPreview } from './question-preview'
-import { createQuestion, updateQuestion } from '@/lib/actions/questions'
+import { createQuestion } from '@/lib/actions/questions'
+import { useQuestionUpdate } from '@/components/questions/question-update-confirmation'
 import { readDuplicateSeed } from '@/lib/question-duplicate'
 import { imageLabelMarkerCount, normalizeImageLabelMode } from '@/lib/image-label'
 import { imageLabelMarkerClass } from '@/components/exam/image-label-input'
@@ -297,6 +298,7 @@ export function ImageLabelForm({ allTags, mode = 'create', question, isOwner = t
   const router = useRouter()
   const editorRef = useRef<RichTextEditorHandle>(null)
   const [saving, setSaving] = useState(false)
+  const updateQuestion = useQuestionUpdate()
   const returnTo = questionsReturnTo(useSearchParams())
 
   const existingConfig = question?.extra_data as ImageLabelConfig | undefined
@@ -463,6 +465,11 @@ export function ImageLabelForm({ allTags, mode = 'create', question, isOwner = t
     const result = mode === 'edit' && question
       ? await updateQuestion(question.id, payload)
       : await createQuestion(payload)
+
+    if (result && 'cancelled' in result && result.cancelled) {
+      setSaving(false)
+      return
+    }
 
     if (result?.error) {
       toast.error(result.error)

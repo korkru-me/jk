@@ -1,5 +1,13 @@
 # Security และ privacy guardrails
 
+## Grading corrections — local implementation, 18 October 2026
+
+Bank changes require verified active actor and exact bank-edit authority before service reads. Link enumeration reads assignment IDs; learner data is read only after canManageAssignment. Void checks management of the selected assignment. HMAC acknowledgement binds actor/question/edit/revision/scope, expires and is checked against fresh data; browser scores and target lists are not trusted. Manual overrides and unmanageable assignments are preserved.
+
+Service-only SECURITY INVOKER RPC uses fixed search_path, repeats actor/owner/team checks, whitelists question fields, validates complete snapshots/numeric bounds and commits key/score/audit together. Private audit/void tables have RLS and revoked browser grants. Completed-answer fence remains; grading bypass requires service role plus transaction-local context and cannot change inputs/random values/order. Insert revision fence and locked empty-attempt cleanup prevent mixed-rubric answers and deletion of committed attempts.
+
+Validation uses synthetic browser state, server mocks and throwaway PGlite, not deployed RLS tests. Migration is pending and linked history differs. No remote repair, database mutation, push or deployment performed.
+
 ## Signup/email safeguards — 17 October 2026 (prepared)
 
 Public auth-email actions validate inputs and reserve bounded shared email/IP counters before sending. The server-only fixed RPC is an explicitly permitted anonymous reservation operation: it accepts only keyed HMACs, performs no user/profile/tenant reads, takes no client-selected SQL/table/function, and exposes no browser grants. RLS remains enabled with no anon/authenticated policies; service_role has only this intended application path, while normal account mutations still require verified identity and exact-resource authorization. Failures/configuration gaps reject sending. The limiter cannot protect direct public Supabase Auth calls; hosted rate limits and current-password enforcement must be configured/tested. CAPTCHA is not wired in this phase.

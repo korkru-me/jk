@@ -58,6 +58,22 @@ function check(over: {
 }
 
 describe('buildAnswerFeedback — verdict', () => {
+  it('uses the frozen tolerance for feedback when a shared question changes outside this assignment', () => {
+    const grading_config = { question_type: 'written', answer_tolerance: 0.01, answer_parts: null, extra_data: {} }
+    const graded = gradeAnswer({
+      id: 'frozen-attempt', correct_answer: '10', student_answer: '10.2', max_score: 1,
+      questions: { ...grading_config, answer_tolerance: 0.5 }, grading_config,
+    })
+    const feedback = buildAnswerFeedback({
+      correct_answer: '10', student_answer: '10.2', grading_config,
+      question: { ...grading_config, answer_tolerance: 0.5, answer_unit: null, mcq_options: null },
+      isCorrect: graded.is_correct, score: graded.score, maxScore: 1, revealAnswerKey: true,
+    })
+    expect(feedback.verdict).toBe('wrong')
+    expect(feedback.score).toBe(0)
+    expect(feedback.rows[0].status).toBe('wrong')
+  })
+
   it('reads ถูก straight off the score gradeAnswer banked', () => {
     const f = check({ correct: '10', student: '10' })
     expect(f.verdict).toBe('correct')

@@ -1,5 +1,13 @@
 # Data model และ invariants
 
+## Grading corrections — local migration 20261018005611
+
+ยังไม่ apply ภายนอก: `submission_answers.grading_config` เก็บชนิด/ความคลาดเคลื่อน/ส่วนคำตอบ/extra_data สำหรับตรวจตาม revision ตอนสร้างรอบ Backfill กติกาปัจจุบันให้แถวเก่าโดยไม่เปลี่ยนคะแนนหรือ correct_answer เดิม กู้กติกาในอดีตที่ไม่เคยบันทึกไม่ได้ `is_void` และ `void_original_max_score` เก็บการตัดคะแนนและน้ำหนักเดิม `submissions.voided_max_score` รวมคะแนนเต็มที่ตัด ให้ display_max_score ลดตามสเกลเดิมแม้สุ่มได้คนละข้อ
+
+`assignment_void_questions` มี PK (assignment_id,question_id), reason, created_by, created_at และกำกับรอบใหม่ `question_grading_change_batches`/`question_grading_change_items` เก็บผู้แก้ เหตุผล ก่อน/หลัง เฉลยและแถวคำตอบ ทุกตารางเปิด RLS และไม่ให้ browser อ่าน/เขียนโดยตรง ไม่ลบคำตอบเมื่อโมฆะ
+
+RPC `apply_question_grading_change` ใช้ service role หลังตรวจสิทธิ์ ล็อกโจทย์/งาน/รอบ/คำตอบ ตรวจชุดเป้าหมายกับ expected snapshot ก่อนเขียนเฉลย/คะแนน/ค่ารวม/audit ใน transaction เดียว Trigger ตรวจ revision ตอนสร้างคำตอบ `p_requires_unused_question` ป้องกัน structural change หากมีคำตอบแทรกหลังวางแผน `discard_empty_grading_attempt` ล็อกรอบของนักเรียนและลบได้เฉพาะ in_progress ที่ไม่มีคำตอบ ใช้กู้ explicit SQL revision conflict ไม่ลบรอบจาก transport error ที่อาจบันทึกแล้ว
+
 ## Prepared auth-email counters — 17 October 2026
 
 Migration `20261017111034_auth_email_request_limits.sql` adds operational `auth_email_request_limits`, keyed only by domain-separated HMAC email/IP bucket strings. It contains request counts, window starts and expiry, no raw email/IP/user/tenant records. RLS is enabled; PUBLIC/anon/authenticated grants are revoked. Only service_role can reserve through the fixed invoker RPC or purge expired rows. Network buckets are locked/checked before recipient allocation, all bucket locks follow one order, and hosted pg_cron schedules hourly expiry cleanup. This schema has not been applied; Staging already had local-only `20261015132234`, so remote writes stopped for parity review. Auth policy version/date remains editable user metadata and introduces no legal audit or role-authority table.

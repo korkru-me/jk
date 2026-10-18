@@ -7,6 +7,8 @@ import { toast } from 'sonner'
 import { CheckCircle2, XCircle, Clock, ChevronLeft, ChevronRight, ArrowUpDown, ClipboardCheck } from 'lucide-react'
 import { ExportButton } from '@/components/assignments/export-button'
 import { ScoreEditor } from '@/components/assignments/score-editor'
+import { VoidQuestionButton } from '@/components/assignments/void-question-button'
+import { Badge } from '@/components/ui/badge'
 import { computePassed } from '@/lib/grading'
 import { formatElapsed, summarizeStreakResults, type StreakAttemptStat } from '@/lib/streak-results'
 import { sortStudents, STUDENT_SORT_LABEL, type StudentSortKey, type StudentSortDir, type SortableStudentProfile } from '@/lib/student-sort'
@@ -93,6 +95,7 @@ interface Props {
   /** Arrived from a ตรวจให้คะแนน button — start with the filter switched on. */
   initialPendingOnly: boolean
   adjustmentBatches: ScoreAdjustmentBatchRow[]
+  voidedQuestionIds?: string[]
   /** Memory-only lab pages inject a no-write action. */
   applyAdjustmentAction?: typeof applyLateColorScoreAdjustment
 }
@@ -208,7 +211,7 @@ export function ResultsClient({
   assignmentId, assignmentTitle, classroomName, passingType, passingValue,
   completionRule, streakTarget,
   questions, submitted, answers, profiles, inProgressCount, pendingFinalizationCount = 0, initialPendingOnly,
-  adjustmentBatches, applyAdjustmentAction = applyLateColorScoreAdjustment,
+  adjustmentBatches, voidedQuestionIds = [], applyAdjustmentAction = applyLateColorScoreAdjustment,
 }: Props) {
   const router = useRouter()
   const [isAdjusting, startAdjusting] = useTransition()
@@ -238,6 +241,7 @@ export function ResultsClient({
   // Never starts on when there is nothing to show — a teacher who follows the
   // button after finishing should land on the ordinary table, not an empty one.
   const [pendingOnly, setPendingOnly] = useState(initialPendingOnly && pendingAnswerCount > 0)
+  const effectivePendingOnly = pendingOnly && pendingAnswerCount > 0
   const [timingFilter, setTimingFilter] = useState<'all' | 'on_time' | 'unclassified' | LateBandColorId>('all')
   const [adjustmentDraft, setAdjustmentDraft] = useState('')
   const [adjustmentReason, setAdjustmentReason] = useState('')
@@ -266,10 +270,14 @@ export function ResultsClient({
     return map
   }, [answers])
 
-  const avgScore = submitted.length > 0
-    ? submitted.reduce((sum, s) => sum + (s.total_score ?? 0), 0) / submitted.length
+  const scoredRows = submitted.filter(row => row.max_score > 0)
+  const avgScore = scoredRows.length > 0
+    ? scoredRows.reduce((sum, s) => sum + (s.total_score ?? 0), 0) / scoredRows.length
     : null
-  const maxScore = submitted[0]?.max_score ?? questions.length
+  const maxScore = scoredRows[0]?.max_score ?? 0
+  const mixedCeilings = scoredRows.some(row => row.max_score !== maxScore)
+  const averagePercent = scoredRows.length > 0
+    ? scoredRows.reduce((sum, row) => sum + (row.total_score ?? 0) / row.max_score * 100, 0) / scoredRows.length : null
   const hasPassingThreshold = passingType != null && passingValue != null
   const passCount = submitted.filter(
     s => computePassed(s.total_score, s.max_score, passingType, passingValue) === true
@@ -293,12 +301,12 @@ export function ResultsClient({
   // Rows the tables actually draw. Filtering here rather than inside each
   // table keeps every view — รายคน, รายข้อ, ถูกติดต่อกัน — on one definition.
   const visibleRows = useMemo(() => sortedRows.filter(row => {
-    if (pendingOnly && !pendingBySubmission.has(row.id)) return false
+    if (effectivePendingOnly && !pendingBySubmission.has(row.id)) return false
     if (timingFilter === 'all') return true
     if (timingFilter === 'on_time') return row.timing.status === 'on_time'
     if (timingFilter === 'unclassified') return row.timing.status === 'unclassified' || row.timing.status === 'after_close'
     return row.timing.status === 'late' && row.timing.band.color === timingFilter
-  }), [pendingOnly, sortedRows, pendingBySubmission, timingFilter])
+  }), [effectivePendingOnly, sortedRows, pendingBySubmission, timingFilter])
 
   const selectedColorGroup = lateGroups.find(([color]) => color === timingFilter)
   const parsedAdjustment = Number(adjustmentDraft)
@@ -331,12 +339,12 @@ export function ResultsClient({
   // the stepper skips it. The index still counts against the full ชุด, so
   // "ข้อที่ 5 / 12" keeps meaning the fifth ข้อ, not the fifth one shown.
   const effectiveQuestionIndex = useMemo(() => {
-    if (!pendingOnly) return activeQuestionIndex
+    if (!effectivePendingOnly) return activeQuestionIndex
     const current = questions[activeQuestionIndex]
     if (current && pendingQuestionIds.has(current.id)) return activeQuestionIndex
     const first = questions.findIndex(q => pendingQuestionIds.has(q.id))
     return first === -1 ? activeQuestionIndex : first
-  }, [pendingOnly, activeQuestionIndex, questions, pendingQuestionIds])
+  }, [effectivePendingOnly, activeQuestionIndex, questions, pendingQuestionIds])
 
   const activeQuestion = questions[effectiveQuestionIndex]
 
@@ -417,9 +425,9 @@ export function ResultsClient({
           <p className="text-2xl font-bold text-foreground mt-1">{submitted.length}</p>
         </Card>
         <Card radius="md" padding="md" className="text-center">
-          <p className="text-xs text-muted-foreground">คะแนนเฉลี่ย</p>
+          <p className="text-xs text-muted-foreground">{mixedCeilings ? 'คะแนนเฉลี่ย (%)' : 'คะแนนเฉลี่ย'}</p>
           <p className="text-2xl font-bold text-foreground mt-1">
-            {avgScore !== null ? avgScore.toFixed(1) : '—'}/{maxScore}
+            {mixedCeilings ? `${averagePercent?.toFixed(1)}%` : avgScore !== null ? `${avgScore.toFixed(1)}/${maxScore}` : '—'}
           </p>
         </Card>
         <Card radius="md" padding="md" className="text-center">
@@ -434,7 +442,7 @@ export function ResultsClient({
             <p className="text-2xl font-bold mt-1">
               <span className="text-success">{passCount}</span>
               <span className="text-muted-foreground/40"> / </span>
-              <span className="text-destructive">{submitted.length - passCount}</span>
+              <span className="text-destructive">{scoredRows.length - passCount}</span>
             </p>
           </Card>
         )}
@@ -455,14 +463,14 @@ export function ResultsClient({
           </p>
           <Button
             size="sm"
-            variant={pendingOnly ? 'default' : 'outline'}
+            variant={effectivePendingOnly ? 'default' : 'outline'}
             onClick={() => setPendingOnly(v => !v)}
-            aria-pressed={pendingOnly}
-            className={pendingOnly
+            aria-pressed={effectivePendingOnly}
+            className={effectivePendingOnly
               ? 'shrink-0 border-0 bg-warning text-warning-foreground hover:bg-warning/90'
               : 'shrink-0 border-warning/40 bg-transparent text-warning hover:bg-warning/15 hover:text-warning'}
           >
-            {pendingOnly ? 'กำลังดูเฉพาะที่รอตรวจ' : 'ดูเฉพาะที่รอตรวจ'}
+            {effectivePendingOnly ? 'กำลังดูเฉพาะที่รอตรวจ' : 'ดูเฉพาะที่รอตรวจ'}
           </Button>
         </div>
       ) : initialPendingOnly ? (
@@ -612,18 +620,20 @@ export function ResultsClient({
             passingType={passingType}
             passingValue={passingValue}
             pendingBySubmission={pendingBySubmission}
-            emptyMessage={pendingOnly ? 'ไม่มีนักเรียนที่รอตรวจแล้ว' : undefined}
+            emptyMessage={effectivePendingOnly ? 'ไม่มีนักเรียนที่รอตรวจแล้ว' : undefined}
           />
         )
       ) : (
         <QuestionGrid
+          assignmentId={assignmentId}
+          voidedQuestionIds={voidedQuestionIds}
           questions={questions}
           activeQuestionIndex={effectiveQuestionIndex}
           activeQuestion={activeQuestion}
           onChangeIndex={setActiveQuestionIndex}
           rows={visibleRows}
           answerMap={answerMap}
-          pendingQuestionIds={pendingOnly ? pendingQuestionIds : null}
+          pendingQuestionIds={effectivePendingOnly ? pendingQuestionIds : null}
         />
       )}
 
@@ -778,7 +788,7 @@ function IndividualTable({ rows, hasPassingThreshold, passingType, passingValue,
                   <td className="px-4 py-3 text-center font-bold text-foreground">
                     {/* The total cannot be final while a ข้อ is unscored, so it
                         says so instead of reading like a finished grade. */}
-                    {s.total_score}/{s.max_score}
+                    {s.max_score > 0 ? `${s.total_score}/${s.max_score}` : 'ไม่มีข้อที่นับคะแนน'}
                     {pendingCount > 0 && (
                       <span className="mt-1 flex items-center justify-center gap-0.5 text-[10px] font-semibold text-warning">
                         <Clock className="h-3 w-3" /> รอตรวจ {pendingCount} ข้อ
@@ -792,21 +802,20 @@ function IndividualTable({ rows, hasPassingThreshold, passingType, passingValue,
                   </td>
                   <td className="px-4 py-3 text-center">
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                      pct >= 75 ? 'bg-success/10 text-success'
+                      s.max_score <= 0 ? 'bg-muted text-muted-foreground' : pct >= 75 ? 'bg-success/10 text-success'
                       : pct >= 50 ? 'bg-warning/10 text-warning'
                       : 'bg-destructive/10 text-destructive'
                     }`}>
-                      {pct}%
+                      {s.max_score > 0 ? `${pct}%` : '—'}
                     </span>
                   </td>
                   <td className="px-4 py-3"><SubmissionTimingBadge timing={s.timing} /></td>
                   {hasPassingThreshold && (
                     <td className="px-4 py-3 text-center">
                       <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
-                        passed ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'
+                        passed === null ? 'bg-muted text-muted-foreground' : passed ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'
                       }`}>
-                        {passed ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                        {passed ? 'ผ่าน' : 'ไม่ผ่าน'}
+                        {passed === null ? '—' : passed ? <><CheckCircle2 className="w-3 h-3" /> ผ่าน</> : <><XCircle className="w-3 h-3" /> ไม่ผ่าน</>}
                       </span>
                     </td>
                   )}
@@ -827,7 +836,9 @@ function IndividualTable({ rows, hasPassingThreshold, passingType, passingValue,
 
 // ─── Question mode ─────────────────────────────────────────────────────────
 
-function QuestionGrid({ questions, activeQuestionIndex, activeQuestion, onChangeIndex, rows, answerMap, pendingQuestionIds }: {
+function QuestionGrid({ assignmentId, voidedQuestionIds, questions, activeQuestionIndex, activeQuestion, onChangeIndex, rows, answerMap, pendingQuestionIds }: {
+  assignmentId: string
+  voidedQuestionIds: string[]
   questions: Question[]
   activeQuestionIndex: number
   activeQuestion: Question | undefined
@@ -899,7 +910,13 @@ function QuestionGrid({ questions, activeQuestionIndex, activeQuestion, onChange
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
-        {activeQuestion.title && <p className="text-sm font-medium text-foreground">{activeQuestion.title}</p>}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          {activeQuestion.title && <p className="text-sm font-medium text-foreground">{activeQuestion.title}</p>}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" variant="outline" className="pointer-coarse:min-h-11" render={<Link href={`/questions/${activeQuestion.id}/edit`} />}>แก้เฉลย</Button>
+            <VoidQuestionButton key={`${assignmentId}:${activeQuestion.id}`} assignmentId={assignmentId} questionId={activeQuestion.id} isVoid={voidedQuestionIds.includes(activeQuestion.id)} />
+          </div>
+        </div>
         <QuestionText text={activeQuestion.question_text} />
       </Card>
 
@@ -938,7 +955,7 @@ function QuestionGrid({ questions, activeQuestionIndex, activeQuestion, onChange
                       {formatAnswerShort(activeQuestion, answer)}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      {!answer ? (
+                      {answer?.max_score === 0 ? <span className="text-xs text-muted-foreground">โมฆะ</span> : !answer ? (
                         <span className="text-muted-foreground/40 text-xs">—</span>
                       ) : isPending ? (
                         <Clock className="w-4 h-4 text-warning inline" />
@@ -949,7 +966,7 @@ function QuestionGrid({ questions, activeQuestionIndex, activeQuestion, onChange
                       )}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      {answer ? (
+                      {answer?.max_score === 0 ? <Badge variant="secondary">ไม่นับคะแนน</Badge> : answer ? (
                         <ScoreEditor submissionAnswerId={answer.id} score={answer.score} maxScore={answer.max_score} />
                       ) : (
                         <span className="text-muted-foreground/40 text-xs">—</span>

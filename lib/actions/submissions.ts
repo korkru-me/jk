@@ -34,6 +34,8 @@ import { parseSubmittedFiles } from '@/lib/exam-attachment'
 import { validateStoredExamAttachmentUrl } from '@/lib/exam-attachment-access.server'
 import { loadAssignmentQuestionsByProvenance } from '@/lib/assignment-question-access.server'
 import { completionAttemptLimit, findPassingCompletion } from '@/lib/assignment-completion'
+import { loadAssignmentGradingState, withVoidedScoreMetadata } from '@/lib/voided-score-metadata.server'
+import { gradingSnapshot } from '@/lib/assignment-regrading'
 import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
 import { exerciseWaitingDetails, type ExamWaitingSummary } from '@/lib/exam-waiting-room'
 import { readWithSubmissionRevision } from '@/lib/submission-revision-compatibility'
@@ -245,7 +247,7 @@ async function submissionEntry(
         .eq('assignment_id', assignmentId).eq('student_id', user.id)
         .in('status', ['submitted', 'graded']).order('attempt_number').range(from, to))
       if (error) return { error: 'ตรวจสอบผลการทำงานไม่สำเร็จ กรุณาลองใหม่' }
-      const passed = findPassingCompletion(assignment, rows)
+      const passed = findPassingCompletion(assignment, await withVoidedScoreMetadata(admin, rows))
       const limit = completionAttemptLimit(assignment)
       completedSubmissionId = passed?.id ?? (limit && existing.attempt_number >= limit ? existing.id : null)
     }
@@ -346,7 +348,7 @@ async function submissionEntry(
       .in('status', ['submitted', 'graded'])
       .order('attempt_number').range(from, to))
     if (completedError) return { error: 'ตรวจสอบผลการทำงานไม่สำเร็จ กรุณาลองใหม่' }
-    const passedRun = findPassingCompletion(assignment, completedRuns)
+    const passedRun = findPassingCompletion(assignment, await withVoidedScoreMetadata(admin, completedRuns))
     if (passedRun) return { submissionId: passedRun.id, alreadySubmitted: true }
     const attemptLimit = completionAttemptLimit(assignment)
     if (attemptLimit && existing.attempt_number >= attemptLimit) {
@@ -378,6 +380,8 @@ async function submissionEntry(
     || questionResult.duplicateQuestionCount > 0
   ) return { error: 'ชุดโจทย์ไม่พร้อม กรุณาแจ้งครูผู้สอน' }
   const questions = questionResult.questions
+  const gradingState = await loadAssignmentGradingState(admin, assignmentId)
+  const voidedQuestionIds = gradingState.voidedIds
 
   let skeletons: AssignmentAttemptSkeleton[]
   // Rows copied from the previous attempt, kept out of this attempt's exam
@@ -387,11 +391,7 @@ async function submissionEntry(
   if (retryFromSubmissionId) {
     const { data: previous } = await admin
       .from('submission_answers')
-      .select(`
-        question_id, random_values, correct_answer, student_answer, is_correct,
-        score, max_score, teacher_feedback, order_index, option_order,
-        work_images, math_input_modes, score_edited_by, score_edited_at
-      `)
+      .select('*')
       .eq('submission_id', retryFromSubmissionId)
       .order('order_index')
 
@@ -401,7 +401,15 @@ async function submissionEntry(
     try { split = buildRetryAttempt(
       assignment,
       questions as Question[],
-      previous as unknown as PreviousAttemptAnswer[],
+      previous.map(row => ({
+        question_id: row.question_id, random_values: row.random_values, correct_answer: row.correct_answer,
+        student_answer: row.student_answer, is_correct: row.is_correct, score: row.score, max_score: row.max_score,
+        teacher_feedback: row.teacher_feedback, order_index: row.order_index, option_order: row.option_order,
+        work_images: row.work_images, math_input_modes: row.math_input_modes,
+        score_edited_by: row.score_edited_by, score_edited_at: row.score_edited_at,
+        ...(gradingState.available ? { grading_config: row.grading_config, is_void: row.is_void,
+          void_original_max_score: row.void_original_max_score } : {}),
+      })) as unknown as PreviousAttemptAnswer[],
     ) } catch { return { error: 'ยังสุ่มตัวเลขชุดใหม่ไม่ได้ กรุณาแจ้งครูผู้สอนตรวจช่วงค่าตัวแปร' } }
     // Nothing to come back for: either every question already earned full
     // marks, or the only shortfalls are still waiting on the teacher. Send the
@@ -420,9 +428,9 @@ async function submissionEntry(
     // คลัง between the two, and a งาน whose pool has since fallen below its own
     // target is unpassable. Saying so at the door beats letting the student
     // find out after fifteen ข้อ.
-    const eligible = (questions as Question[]).filter(q => isStreakEligible(q.question_type))
+    const eligible = (questions as Question[]).filter(q => isStreakEligible(q.question_type) && !voidedQuestionIds.has(q.id))
     const target = Number(assignment.streak_target ?? 0)
-    if (eligible.length < target) {
+    if (eligible.length === 0 || (eligible.length < target && !(voidedQuestionIds.size > 0 && assignment.streak_recycle_pool !== false))) {
       return { error: 'โจทย์ที่ระบบตรวจได้ในคลังเหลือน้อยกว่าเกณฑ์ที่ตั้งไว้ กรุณาแจ้งครูผู้สอน' }
     }
     skeletons = []
@@ -515,10 +523,22 @@ async function submissionEntry(
   // asking the database about.
   if (skeletons.length > 0 || carried.length > 0) {
     const { error: answersError } = await admin.from('submission_answers').insert([
-      ...skeletons.map(s => ({ ...s, org_id: orgId, submission_id: submission.id, carried_over: false })),
+      ...skeletons.map(s => {
+        const q = questions.find(question => question.id === s.question_id)!
+        return { ...s, org_id: orgId, submission_id: submission.id, carried_over: false,
+          ...(gradingState.available ? { grading_config: { ...gradingSnapshot(q as Question), question_revision: q.updated_at } } : {}) }
+      }),
       ...carried.map(c => ({ ...c, org_id: orgId, submission_id: submission.id })),
     ])
-    if (answersError) return { error: answersError.message }
+    if (answersError) {
+      // A definite SQL revision conflict rolls the array insert back. The RPC
+      // locks the header and checks it is empty; an ambiguous transport error
+      // must never delete an insert that might already have committed.
+      if (answersError.code === 'PT409') {
+        await admin.rpc('discard_empty_grading_attempt', { p_submission_id: submission.id, p_student_id: user.id })
+      }
+      return { error: answersError.code === 'PT409' ? 'เฉลยเปลี่ยนระหว่างเริ่มงาน กรุณาเริ่มอีกครั้ง' : 'สร้างคำตอบของรอบนี้ไม่สำเร็จ กรุณาลองใหม่' }
+    }
   }
 
   return { submissionId: submission.id,
@@ -766,7 +786,7 @@ export async function checkAnswer(submissionAnswerId: string) {
   const { data: row } = await admin
     .from('submission_answers')
     .select(`
-      id, correct_answer, student_answer, math_input_modes, max_score, option_order,
+      *,
       questions(
         question_type, answer_unit, answer_parts, answer_tolerance, extra_data,
         mcq_options
@@ -777,9 +797,12 @@ export async function checkAnswer(submissionAnswerId: string) {
     .maybeSingle()
 
   if (!row) return { error: 'ไม่พบคำตอบ' }
-  const question = (Array.isArray(row.questions) ? row.questions[0] : row.questions) as
+  const liveQuestion = (Array.isArray(row.questions) ? row.questions[0] : row.questions) as
     (Omit<FeedbackQuestion, 'mcq_options'> & { mcq_options: any[] | null }) | null
-  if (!question) return { error: 'ไม่พบโจทย์' }
+  if (!liveQuestion) return { error: 'ไม่พบโจทย์' }
+  // A shared bank question can be edited outside this assignment's management
+  // scope. Feedback and its type gate must use the same frozen rubric as grading.
+  const question = { ...liveQuestion, ...(row.grading_config as import('@/lib/assignment-attempt').GradingConfig | null) }
   if (!isInstantCheckable(question.question_type)) {
     return { error: 'ข้อเขียนต้องให้ครูตรวจ จึงยังตรวจเองตอนนี้ไม่ได้' }
   }
@@ -790,11 +813,13 @@ export async function checkAnswer(submissionAnswerId: string) {
   // possible array and gradeAnswer reads `questions.question_type` directly:
   // an array there would silently miss every type-keyed branch it has.
   const maxScore = Number(row.max_score ?? 0)
+  if (maxScore === 0) return { error: 'ข้อนี้เป็นโมฆะ ไม่ต้องตอบและไม่นับคะแนน' }
   const graded = gradeAnswer({
     id: row.id,
     correct_answer: row.correct_answer ?? '',
     student_answer: row.student_answer,
     math_input_modes: row.math_input_modes,
+    grading_config: row.grading_config as import('@/lib/assignment-attempt').GradingConfig | null,
     max_score: maxScore,
     questions: {
       question_type: question.question_type,
@@ -837,6 +862,7 @@ export async function checkAnswer(submissionAnswerId: string) {
     student_answer: row.student_answer,
     math_input_modes: row.math_input_modes,
     question: { ...question, mcq_options: displayOptions },
+    grading_config: row.grading_config as import('@/lib/assignment-attempt').GradingConfig | null,
     isCorrect: graded.is_correct,
     score: graded.score,
     maxScore,
@@ -1085,6 +1111,8 @@ export async function drawNextStreakQuestion(
     || questionResult.duplicateQuestionCount > 0
   ) return { error: 'ชุดโจทย์ไม่พร้อม กรุณาแจ้งครูผู้สอน' }
   const poolQuestions = questionResult.questions
+  const nextGradingState = await loadAssignmentGradingState(admin, submission.assignment_id)
+  const voidedIds = nextGradingState.voidedIds
 
   const questionsById = new Map((poolQuestions as Question[]).map(q => [q.id, q]))
   // Authored order, minus ids whose ข้อ was deleted from the คลัง, minus the
@@ -1092,7 +1120,7 @@ export async function drawNextStreakQuestion(
   // counted with before letting the teacher choose this ending.
   const eligibleIds = assignment.question_ids.filter(id => {
     const q = questionsById.get(id)
-    return q != null && isStreakEligible(q.question_type)
+    return q != null && isStreakEligible(q.question_type) && !voidedIds.has(id)
   })
   const askedIds = rows.filter(r => !r.carried_over).map(r => r.question_id as string)
 
@@ -1147,6 +1175,7 @@ export async function drawNextStreakQuestion(
       org_id: assignment.org_id,
       submission_id: submission.id,
       carried_over: false,
+      ...(nextGradingState.available ? { grading_config: { ...gradingSnapshot(question), question_revision: question.updated_at } } : {}),
     })
     .select('id')
     .single()
@@ -1204,6 +1233,7 @@ export async function updateSubmissionAnswerScore(submissionAnswerId: string, ne
     return { error: 'ไม่มีสิทธิ์แก้ไขคะแนนนี้' }
   }
   if (submission?.status === 'in_progress') return { error: 'นักเรียนยังทำไม่เสร็จ แก้คะแนนไม่ได้' }
+  if (sa.max_score <= 0) return { error: 'ข้อนี้เป็นโมฆะ ไม่สามารถแก้คะแนนได้' }
   if (newScore > sa.max_score) return { error: `คะแนนต้องไม่เกิน ${sa.max_score}` }
 
   const { error: updateError } = await admin

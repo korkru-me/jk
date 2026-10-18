@@ -1,5 +1,13 @@
 # Architecture
 
+## Automatic regrading and void decisions — local, 18 October 2026
+
+Question forms share QuestionUpdateConfirmationProvider. Save prepares an impact summary and opaque HMAC receipt bound to actor, question revision, normalized edit and exact authorized scope. Checkbox acknowledgement releases the save; server recomputes the plan and verifies the receipt before the atomic SQL RPC. assignment-regrading uses the normal key builder/evaluator with saved random values, manual grades and assignment weights. Signing uses server-only GRADING_CONFIRMATION_SECRET or the service-role secret; receipts expire after 15 minutes and carry no learner payload.
+
+question-regrading.server enumerates linked IDs after bank-edit authorization, checks canManageAssignment before learner reads and paginates collections. Active attempts block mutation. RPC repeats authorization and exact scope checks under locks and commits audit/key/scores/streak metadata together. Void applies to one manageable assignment, including later inserts. Missing/failed RPC never falls back to partial writes. Frozen grading_config also governs instant-check feedback.
+
+Authorized score consumers hydrate removed-weight metadata via voided-score-metadata.server before shared rescaling/completion logic. Narrow missing-column/table compatibility keeps old schema readable; grading mutations require the new migration. Local exam-screen lab uses injected in-memory actions with LOCAL labels; this is not an authenticated Supabase integration test. No external schema/deployment changed.
+
 ## Grading workspace sidebar — 18 October 2026 (local only)
 
 The authorized results route now mounts AssignmentWorkspaceSidebar, extracted from the existing edit-page sidebar controller. Edit and results register their exact path with the existing shell context and share lifecycle actions/confirmation UI; AssignmentContextNavigation recognizes results as the active section. The existing RLS-scoped assignment select adds only the summary fields and classroom description required by that navigation. Pending hand-ins are deduplicated from the already-loaded official-attempt answers, matching the results worklist rather than adding another query. Management authorization, scoring, server actions and schema are unchanged.

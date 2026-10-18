@@ -42,6 +42,30 @@ describe('combined student learning data', () => {
     expect(data.doneCount).toBe(1)
     expect(data.history[0].score).toEqual({ total: 12, max: 20 })
   })
+  it('keeps the original custom scale after voiding points in every student projection', () => {
+    const a = assignment({ display_max_score: 10, passing_type: 'score', passing_value: 3 })
+    const s = { ...attempt(a, 4), max_score: 10, voided_max_score: 10 }
+    const data = build([a], [s])
+    expect(data.doneCount).toBe(0)
+    expect(data.pendingCountMap.blue).toBe(1)
+    expect(data.pendingWork[0].previousScore).toEqual({ total: 2, max: 5 })
+    expect(data.history[0].score).toEqual({ total: 2, max: 5 })
+    expect(data.calendarEvents[0].done).toBe(false)
+  })
+  it('does not mark work with all points voided as passed', () => {
+    const a = assignment({ display_max_score: 10, passing_type: 'score', passing_value: 0 })
+    const data = build([a], [{ ...attempt(a, 0), max_score: 0, voided_max_score: 10 }])
+    expect(data.doneCount).toBe(0)
+    expect(data.pendingWork[0].previousScore).toEqual({ total: 0, max: 0 })
+    expect(data.calendarEvents[0].done).toBe(false)
+  })
+  it('keeps void metadata and hidden points out of student-facing results', () => {
+    const a = assignment({ display_max_score: 10, passing_type: 'score', passing_value: 3, show_results: 'never' })
+    const data = build([a], [{ ...attempt(a, 4), voided_max_score: 10 }])
+    expect(data.pendingWork[0].previousScore).toBeNull()
+    expect(data.history[0].score).toBeNull()
+    expect(JSON.stringify(data)).not.toContain('voided_max_score')
+  })
   it('keeps hidden scores out of the rendered data and labels gated results correctly', () => {
     for (const show_results of ['never', 'after_due'] as const) {
       const a = assignment({ show_results })

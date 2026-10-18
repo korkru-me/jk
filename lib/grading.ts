@@ -8,7 +8,7 @@ export function computePassed(
   passingType: PassingType | null,
   passingValue: number | null
 ): boolean | null {
-  if (!passingType || passingValue == null || score == null) return null
+  if (!passingType || passingValue == null || score == null || maxScore <= 0) return null
   if (passingType === 'percent') {
     const pct = maxScore > 0 ? (score / maxScore) * 100 : 0
     return pct >= passingValue
