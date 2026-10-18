@@ -422,6 +422,12 @@ export type PreviousAttemptAnswer = {
   math_input_modes?: Record<string, import('@/lib/types').MathInputMode>
   score_edited_by: string | null
   score_edited_at: string | null
+  answer_score?: number | null
+  answer_max_score?: number | null
+  work_score?: number | null
+  work_max_score?: number | null
+  answer_reviewed_at?: string | null
+  work_reviewed_at?: string | null
 }
 
 export type CarriedAttemptAnswer = PreviousAttemptAnswer & { carried_over: true }
@@ -432,6 +438,9 @@ export type CarriedAttemptAnswer = PreviousAttemptAnswer & { carried_over: true 
 // gradeAnswer leaves on an essay (and on a manual fill_blank), and a row
 // nobody has scored yet must not be handed back as if it were wrong.
 function needsRetry(prev: PreviousAttemptAnswer): boolean {
+  // An automatic answer verdict does not decide its separately graded work.
+  // Keep that evidence in the carried row until a teacher has reviewed it.
+  if (Number(prev.work_max_score ?? 0) > 0 && !prev.work_reviewed_at) return false
   return prev.is_correct !== null && Number(prev.score) < Number(prev.max_score)
 }
 
@@ -542,16 +551,10 @@ export function gradeAnswer(a: GradableAnswer): GradedAnswer {
   const correctAns: string = a.correct_answer ?? ''
   const studentAns: string = a.student_answer ?? ''
 
-  // File-upload grading — there's no meaningful "correct answer" to compare
-  // against (unlike every other type below, which keys off a correct_answer
-  // prefix), so this branches explicitly on question_type instead. Full
-  // credit iff the student attached at least one file; zero files = zero
-  // credit. No partial/manual review in this version.
+  // A file arriving is evidence of submission, not evidence that its content
+  // earned points. A teacher reads it and awards the score explicitly.
   if (a.questions?.question_type === 'file_upload') {
-    let files: unknown[] = []
-    try { files = studentAns ? JSON.parse(studentAns) : [] } catch { files = [] }
-    const submitted = Array.isArray(files) && files.length > 0
-    return { id: a.id, is_correct: submitted, score: submitted ? a.max_score : 0 }
+    return { id: a.id, is_correct: null, score: 0 }
   }
 
   // Essay grading — only a teacher can score writing, so the row is left

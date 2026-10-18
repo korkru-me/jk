@@ -181,15 +181,19 @@ export function buildAnswerFeedback(input: FeedbackInput): AnswerFeedback {
   const reveal = (value: string) => (revealAnswerKey ? { correct: value } : {})
   const unitOf = (unit: string | null | undefined) => (unit ? { unit } : {})
 
-  // ─── ส่งไฟล์งาน — "did a file arrive" is the whole grade ──────────────────
+  // ─── ส่งไฟล์งาน — received files still need a teacher's review ────────────
   if (question.question_type === 'file_upload') {
     const files = parseJson<unknown[]>(studentAns, [])
     const submitted = Array.isArray(files) && files.length > 0
     return {
       ...base,
+      verdict: 'pending',
+      score: 0,
+      revealed: false,
+      note: 'รอครูตรวจไฟล์งานและให้คะแนน',
       rows: [{
         student: submitted ? `แนบไฟล์แล้ว ${files.length} ไฟล์` : 'ยังไม่ได้แนบไฟล์',
-        status: rowStatus(submitted),
+        status: 'pending',
       }],
     }
   }

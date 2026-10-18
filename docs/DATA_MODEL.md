@@ -1,5 +1,13 @@
 # Data model และ invariants
 
+## Grading workspace — local migration 20261018040444
+
+ยังไม่ apply: `assignment_question_grading_parts` เก็บ `work_share` และ revision `updated_at` ต่อ assignment/question แทนการเปลี่ยนคะแนนเต็มเดิม `submission_answers` เพิ่ม `answer_score`, `answer_max_score`, `work_score`, `work_max_score`, `answer_reviewed_at`, `work_reviewed_at` โดยคะแนนเต็มสองส่วนรวมเท่า `max_score` เดิม และคะแนนรวมเป็นผลบวกของสองส่วนที่ให้จริง `NULL` คะแนน/เวลาตรวจหมายถึงยังไม่ตรวจ ส่วนคะแนน 0 ที่ครูยืนยันมีเวลาตรวจชัดเจน การไม่มี policy ต่างจากครูกำหนดวิธีทำ 0 คะแนนเอง
+
+RPC `save_grading_review` และ `configure_assignment_question_grading_parts` เปิดเฉพาะ service role หลังตรวจ actor ที่ active และสิทธิ์ exact assignment ล็อกงาน/รอบ/คำตอบและตรวจ expected revision ก่อนเขียนพร้อม audit/คะแนนรวม/สถานะและ streak ใน transaction เดียว การเปลี่ยนส่วนแบ่งไม่เปลี่ยนคะแนนเต็มของแต่ละ attempt, ไม่เปลี่ยนงานอื่น และปฏิเสธระหว่างมีรอบกำลังทำหรือการกระจายคะแนนเดิมที่ทำไม่ได้อย่างถูกต้อง
+
+Trigger แปลงคะแนนอัตโนมัติเต็มดิบเป็นส่วนคำตอบเพียงครั้งเดียว รักษาคะแนนวิธีทำและการตรวจของครูเมื่อแก้เฉลยย้อนหลัง; finalizer/evaluator ยังส่งคะแนนเต็มดิบตามเดิม Wrong-only carry เก็บคะแนน/เพดาน/เวลาตรวจทั้งสองส่วน รวมถึงกู้ snapshot สำหรับ native SEB รุ่นเดิมที่ยังคัดลอกเพียงคะแนนรวม ข้อส่งไฟล์เก่าที่ยังไม่มีครูตรวจกลับเป็น pending และรวมยอดใหม่โดยไม่ให้คะแนนจากการแนบไฟล์
+
 ## Grading corrections — local migration 20261018005611
 
 ยังไม่ apply ภายนอก: `submission_answers.grading_config` เก็บชนิด/ความคลาดเคลื่อน/ส่วนคำตอบ/extra_data สำหรับตรวจตาม revision ตอนสร้างรอบ Backfill กติกาปัจจุบันให้แถวเก่าโดยไม่เปลี่ยนคะแนนหรือ correct_answer เดิม กู้กติกาในอดีตที่ไม่เคยบันทึกไม่ได้ `is_void` และ `void_original_max_score` เก็บการตัดคะแนนและน้ำหนักเดิม `submissions.voided_max_score` รวมคะแนนเต็มที่ตัด ให้ display_max_score ลดตามสเกลเดิมแม้สุ่มได้คนละข้อ

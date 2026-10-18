@@ -41,6 +41,7 @@ import { exerciseWaitingDetails, type ExamWaitingSummary } from '@/lib/exam-wait
 import { readWithSubmissionRevision } from '@/lib/submission-revision-compatibility'
 import { parseRandomValues, sameRandomValues } from '@/lib/math/fresh-random-values'
 import { drawsRandomValues } from '@/lib/math/shared-random'
+import { saveGradingReview } from '@/lib/actions/grading-review'
 
 type EntrySubmissionRow = Pick<Submission, 'id' | 'status' | 'attempt_number' | 'started_at' | 'exam_access_mode'> & { seb_config_revision?: number | null; closed_at?: string | null; close_reason?: 'manual' | 'time_limit' | 'close_time' | null }
 type StreakSubmissionRow = Pick<Submission, 'id' | 'student_id' | 'status' | 'started_at' | 'assignment_id' | 'exam_access_mode' | 'current_streak' | 'best_streak' | 'streak_reached'> & { seb_config_revision?: number | null; assignments: unknown }
@@ -407,6 +408,11 @@ async function submissionEntry(
         teacher_feedback: row.teacher_feedback, order_index: row.order_index, option_order: row.option_order,
         work_images: row.work_images, math_input_modes: row.math_input_modes,
         score_edited_by: row.score_edited_by, score_edited_at: row.score_edited_at,
+        ...(Object.hasOwn(row, 'answer_max_score') ? {
+          answer_score: row.answer_score, answer_max_score: row.answer_max_score,
+          work_score: row.work_score, work_max_score: row.work_max_score,
+          answer_reviewed_at: row.answer_reviewed_at, work_reviewed_at: row.work_reviewed_at,
+        } : {}),
         ...(gradingState.available ? { grading_config: row.grading_config, is_void: row.is_void,
           void_original_max_score: row.void_original_max_score } : {}),
       })) as unknown as PreviousAttemptAnswer[],
@@ -812,8 +818,13 @@ export async function checkAnswer(submissionAnswerId: string) {
   // explicitly rather than passed through, because the embed is typed as a
   // possible array and gradeAnswer reads `questions.question_type` directly:
   // an array there would silently miss every type-keyed branch it has.
-  const maxScore = Number(row.max_score ?? 0)
-  if (maxScore === 0) return { error: 'ข้อนี้เป็นโมฆะ ไม่ต้องตอบและไม่นับคะแนน' }
+  const rawMaxScore = Number(row.max_score ?? 0)
+  if (rawMaxScore <= 0 || row.is_void === true) return { error: 'ข้อนี้เป็นโมฆะ ไม่ต้องตอบและไม่นับคะแนน' }
+  const hasSplit = typeof row.answer_max_score === 'number' && Number.isFinite(row.answer_max_score)
+    && typeof row.work_max_score === 'number' && Number.isFinite(row.work_max_score)
+    && row.answer_max_score >= 0 && row.work_max_score >= 0
+    && Math.abs(row.answer_max_score + row.work_max_score - rawMaxScore) < 0.000001
+  const maxScore = hasSplit ? row.answer_max_score as number : rawMaxScore
   const graded = gradeAnswer({
     id: row.id,
     correct_answer: row.correct_answer ?? '',
@@ -1202,71 +1213,44 @@ export async function drawNextStreakQuestion(
   }
 }
 
-// Manual score override for a teacher grading (or re-grading) one student's
-// answer to one question — e.g. bumping an auto-graded 0 up to partial/full
-// credit, or resolving a pending-manual fill-blank. Bounded to
-// [0, max_score] here, which is the only place that bound is still enforced:
-// migration 20260824053336 revoked UPDATE on submission_answers from
-// `authenticated`, so submission_answers_org_teacher_update can no longer
-// fire and this service-role path, with the checks below, is the security
-// boundary.
+// Compatibility for existing single-score panels. Split scores belong to the
+// grading workspace; every accepted legacy save uses its same atomic RPC.
 export async function updateSubmissionAnswerScore(submissionAnswerId: string, newScore: number) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
-  const admin = createAdminClient()
-
   if (!Number.isFinite(newScore) || newScore < 0) return { error: 'คะแนนไม่ถูกต้อง' }
 
-  const { data: sa } = await admin
+  const { data, error } = await createAdminClient()
     .from('submission_answers')
-    .select('id, submission_id, max_score, submissions(id, status, assignment_id)')
+    .select('*, submissions(id, status, assignment_id)')
     .eq('id', submissionAnswerId)
     .maybeSingle()
 
-  if (!sa) return { error: 'ไม่พบคำตอบ' }
-  const submission = (sa as any).submissions
-  const assignmentId = submission?.assignment_id as string | undefined
+  if (error) return { error: 'อ่านคะแนนปัจจุบันไม่สำเร็จ กรุณาลองใหม่' }
+  if (!data) return { error: 'ไม่พบคำตอบ' }
+  const sa = data as unknown as {
+    max_score: number; work_max_score?: number | null; score_edited_at?: string | null; is_void?: boolean
+    submissions: { id: string; status: string; assignment_id: string } | { id: string; status: string; assignment_id: string }[] | null
+  }
+  const submission = Array.isArray(sa.submissions) ? sa.submissions[0] : sa.submissions
+  const assignmentId = submission?.assignment_id
   // Owner or an admin/manage co-teacher — the same people the database lets
   // manage the assignment row itself. A 'view' co-teacher is not a grader.
   if (!assignmentId || !await canManageAssignment(assignmentId, user.id)) {
     return { error: 'ไม่มีสิทธิ์แก้ไขคะแนนนี้' }
   }
   if (submission?.status === 'in_progress') return { error: 'นักเรียนยังทำไม่เสร็จ แก้คะแนนไม่ได้' }
-  if (sa.max_score <= 0) return { error: 'ข้อนี้เป็นโมฆะ ไม่สามารถแก้คะแนนได้' }
+  if (sa.max_score <= 0 || sa.is_void === true) return { error: 'ข้อนี้เป็นโมฆะ ไม่สามารถแก้คะแนนได้' }
+  if (Number(sa.work_max_score ?? 0) > 0) return { error: 'ข้อนี้แยกคะแนนคำตอบและวิธีทำ กรุณาตรวจจากหน้าตรวจให้คะแนนของงาน' }
   if (newScore > sa.max_score) return { error: `คะแนนต้องไม่เกิน ${sa.max_score}` }
 
-  const { error: updateError } = await admin
-    .from('submission_answers')
-    .update({
-      score: newScore,
-      is_correct: newScore >= sa.max_score,
-      score_edited_by: user.id,
-      score_edited_at: new Date().toISOString(),
-    })
-    .eq('id', submissionAnswerId)
-
-  if (updateError) return { error: updateError.message }
-
-  const { data: allAnswers } = await admin
-    .from('submission_answers')
-    .select('score')
-    .eq('submission_id', sa.submission_id)
-
-  const totalScore = (allAnswers ?? []).reduce((sum: number, a: any) => sum + (a.score ?? 0), 0)
-
-  const { error: subError } = await admin
-    .from('submissions')
-    .update({ total_score: totalScore, status: 'graded' })
-    .eq('id', sa.submission_id)
-
-  if (subError) return { error: subError.message }
-
-  revalidatePath(`/submissions/${sa.submission_id}`)
-  revalidatePath(`/assignments/${submission.assignment_id}`)
-  revalidatePath(`/assignments/${submission.assignment_id}/results`)
-
-  return { success: true, newTotalScore: totalScore }
+  const result = await saveGradingReview({ assignmentId, answerId: submissionAnswerId,
+    expectedScoreEditedAt: typeof sa.score_edited_at === 'string' ? sa.score_edited_at : null,
+    answerScore: newScore,
+  })
+  if ('error' in result) return { error: result.error }
+  return { success: true as const }
 }
 
 export async function submitSubmission(submissionId: string) {

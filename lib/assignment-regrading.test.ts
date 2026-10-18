@@ -54,7 +54,7 @@ describe('answer-key corrections across the eleven question types', () => {
       type: 'ordering', previous: { extra_data: { items: [item('a'), item('b')] } },
       next: { extra_data: { items: [item('b'), item('a')] } }, student: '["b","a"]', expected: 4,
     },
-    { type: 'file_upload', previous: {}, next: {}, student: '[{"url":"/stored-file.png"}]', expected: 4 },
+    { type: 'file_upload', previous: {}, next: {}, student: '[{"url":"/stored-file.png"}]', expected: 0, skipped: true },
     {
       type: 'composite',
       previous: { extra_data: { parts: [{ id: 'p', type: 'mcq', score: 3, text: '', options: mcqOptions() }] } },
@@ -141,6 +141,17 @@ describe('teacher and manual scores', () => {
     const answer = stored(previous, { student_answer: 'MCQ:1', score: 2, score_edited_by: 'teacher' })
     expect(regradeAnswer(previous, next, answer)).toMatchObject({ score: 2, correct_answer: 'MCQ:1', skipped: true, skip_reason: 'teacher_override' })
     expect(regradeAnswer(previous, next, answer, { preserveTeacherOverrides: false })).toMatchObject({ score: 4, skipped: false })
+  })
+
+  it('regrades an automatic answer after a teacher graded only its work component', () => {
+    const previous = question('mcq', { mcq_options: mcqOptions() })
+    const next = { ...previous, mcq_options: mcqOptions(1) }
+    const row = stored(previous, { student_answer: 'MCQ:1', score: 1, score_edited_by: 'teacher',
+      answer_max_score: 2, work_max_score: 2, answer_reviewed_at: null })
+    // The DB apportions this full raw automatic result and preserves work.
+    expect(regradeAnswer(previous, next, row)).toMatchObject({ score: 4, skipped: false })
+    expect(regradeAnswer(previous, next, { ...row, answer_reviewed_at: '2026-10-18T01:00:00Z' }))
+      .toMatchObject({ score: 1, skipped: true, skip_reason: 'teacher_override' })
   })
 
   it('preserves manually scored essays and wholly manual blanks/parts', () => {

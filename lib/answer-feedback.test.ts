@@ -250,15 +250,16 @@ describe('buildAnswerFeedback — the other question types', () => {
     expect(f.rows[0].unit).toBe('m/s')
   })
 
-  it('grades ส่งไฟล์งาน on whether a file arrived', () => {
+  it('reports uploaded files as pending without awarding attachment credit', () => {
     const none = check({ correct: '', student: null, questionType: 'file_upload' })
-    expect(none.verdict).toBe('wrong')
+    expect(none.verdict).toBe('pending')
     const one = check({
       correct: '',
       student: JSON.stringify([{ url: 'u', name: 'n', type: 'image/png' }]),
       questionType: 'file_upload',
     })
-    expect(one.verdict).toBe('correct')
+    expect(one).toMatchObject({ verdict: 'pending', score: 0, revealed: false })
+    expect(one.rows[0]).toMatchObject({ status: 'pending', student: 'แนบไฟล์แล้ว 1 ไฟล์' })
   })
 
   it('survives a student answer that is not valid JSON', () => {
@@ -439,10 +440,11 @@ describe('buildAnswerFeedback — ตารางจำแนก', () => {
 describe('isInstantCheckable', () => {
   it('withholds the button from ข้อเขียน, which has no answer key to check', () => {
     expect(isInstantCheckable('essay')).toBe(false)
+    expect(isInstantCheckable('file_upload')).toBe(false)
   })
 
   it('offers it for every other type, including ones a teacher part-marks', () => {
-    for (const type of ['written', 'mcq', 'true_false', 'fill_blank', 'ordering', 'matching', 'composite', 'file_upload']) {
+    for (const type of ['written', 'mcq', 'true_false', 'fill_blank', 'ordering', 'matching', 'composite']) {
       expect(isInstantCheckable(type)).toBe(true)
     }
   })
