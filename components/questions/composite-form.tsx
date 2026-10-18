@@ -17,7 +17,8 @@ import { QuestionImageUpload } from './question-image-upload'
 import { SolutionSection } from './solution-section'
 import { QuestionPreview } from './question-preview'
 import { LabelStyleToggle } from './answer-set-controls'
-import { createQuestion, updateQuestion } from '@/lib/actions/questions'
+import { createQuestion } from '@/lib/actions/questions'
+import { useQuestionUpdate } from '@/components/questions/question-update-confirmation'
 import { readDuplicateSeed } from '@/lib/question-duplicate'
 import { acceptedAnswers } from '@/lib/fill-blank'
 import { ANSWER_BLANK, splitAnswerBlankHtml } from '@/lib/answer-blank'
@@ -500,6 +501,7 @@ export function CompositeForm({ allTags, mode = 'create', question, isOwner = tr
   // Back to exactly the bank view the teacher edited from — search, filters, page and tab.
   const returnTo = questionsReturnTo(useSearchParams())
   const [saving, setSaving] = useState(false)
+  const updateQuestion = useQuestionUpdate()
   const editorRef = useRef<RichTextEditorHandle>(null)
 
   const existingConfig = question?.extra_data as CompositeConfig | undefined
@@ -660,6 +662,11 @@ export function CompositeForm({ allTags, mode = 'create', question, isOwner = tr
     const result = mode === 'edit' && question
       ? await updateQuestion(question.id, payload)
       : await createQuestion(payload)
+
+    if (result && 'cancelled' in result && result.cancelled) {
+      setSaving(false)
+      return
+    }
 
     if (result?.error) {
       toast.error(result.error)

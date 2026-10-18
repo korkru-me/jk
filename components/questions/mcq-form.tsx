@@ -27,7 +27,8 @@ const McqAutoForm = dynamic(() => import('./mcq-auto-form').then(m => m.McqAutoF
     </p>
   ),
 })
-import { createQuestion, updateQuestion } from '@/lib/actions/questions'
+import { createQuestion } from '@/lib/actions/questions'
+import { useQuestionUpdate } from '@/components/questions/question-update-confirmation'
 import type { QuestionDraftHandoff } from '@/lib/question-draft-handoff'
 import { readDuplicateSeed } from '@/lib/question-duplicate'
 import type { Difficulty, Visibility, MCQOption, FormulaPreset, Question } from '@/lib/types'
@@ -135,6 +136,7 @@ function McqManualForm({ allTags, mode = 'create', question, isOwner = true, dra
   // Back to exactly the bank view the teacher edited from — search, filters, page and tab.
   const returnTo = questionsReturnTo(useSearchParams())
   const [saving, setSaving] = useState(false)
+  const updateQuestion = useQuestionUpdate()
   const editorRef = useRef<RichTextEditorHandle>(null)
 
   const [title, setTitle] = useState(question?.title ?? '')
@@ -244,6 +246,11 @@ function McqManualForm({ allTags, mode = 'create', question, isOwner = true, dra
     const result = mode === 'edit' && question
       ? await updateQuestion(question.id, payload)
       : await createQuestion(payload)
+
+    if (result && 'cancelled' in result && result.cancelled) {
+      setSaving(false)
+      return
+    }
 
     if (result?.error) {
       toast.error(result.error)

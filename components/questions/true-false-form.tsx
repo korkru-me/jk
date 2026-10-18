@@ -13,7 +13,8 @@ import { QuestionImageUpload } from './question-image-upload'
 import { SolutionSection } from './solution-section'
 import { QuestionPreview } from './question-preview'
 import { AnswerPartCard, LabelStyleToggle, AddSubItemButton } from './answer-set-controls'
-import { createQuestion, updateQuestion } from '@/lib/actions/questions'
+import { createQuestion } from '@/lib/actions/questions'
+import { useQuestionUpdate } from '@/components/questions/question-update-confirmation'
 import { readDuplicateSeed } from '@/lib/question-duplicate'
 import { PART_LABEL_SETS, type PartLabelStyle } from '@/lib/part-labels'
 import type { ChoiceScoring, Difficulty, Visibility, TrueFalseExplanationMode, TrueFalseConfig, TrueFalseStatement, TrueFalseAnswerMode, TrueFalseSelectTarget, Question } from '@/lib/types'
@@ -99,6 +100,7 @@ export function TrueFalseForm({ allTags, mode = 'create', question, isOwner = tr
   // Back to exactly the bank view the teacher edited from — search, filters, page and tab.
   const returnTo = questionsReturnTo(useSearchParams())
   const [saving, setSaving] = useState(false)
+  const updateQuestion = useQuestionUpdate()
   const editorRef = useRef<RichTextEditorHandle>(null)
 
   const existingConfig = question?.extra_data as TrueFalseConfig | undefined
@@ -224,6 +226,11 @@ export function TrueFalseForm({ allTags, mode = 'create', question, isOwner = tr
     const result = mode === 'edit' && question
       ? await updateQuestion(question.id, payload)
       : await createQuestion(payload)
+
+    if (result && 'cancelled' in result && result.cancelled) {
+      setSaving(false)
+      return
+    }
 
     if (result?.error) {
       toast.error(result.error)

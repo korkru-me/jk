@@ -33,6 +33,7 @@ import { ClassroomRecentViewTracker } from './_components/classroom-recent-view-
 import { isPracticeLibraryEnabled } from '@/lib/practice-question'
 import { loadClassroomPracticeLibraries } from '@/lib/classroom-practice-libraries.server'
 import { loadClassroomRecentWork } from '@/lib/classroom-recent-work.server'
+import { withVoidedScoreMetadata } from '@/lib/voided-score-metadata.server'
 
 export default async function ClassroomDetailPage({
   params,
@@ -158,7 +159,7 @@ export default async function ClassroomDetailPage({
       : { data: [] }
     const publishedIds = (assignmentRows ?? []).map((a: any) => a.id)
 
-    const { data: rawSubRows } = publishedIds.length > 0
+    const { data: queriedSubRows } = publishedIds.length > 0
       ? await fetchAllRows((from, to) => admin
           .from('submissions')
           .select('id, assignment_id, status, total_score, score_adjustment, max_score, streak_reached, attempt_number, started_at')
@@ -167,6 +168,7 @@ export default async function ClassroomDetailPage({
           .order('id').range(from, to)).then(({ rows, error }) => ({ data: rows, error }))
       : { data: [] }
 
+    const rawSubRows = await withVoidedScoreMetadata(admin, queriedSubRows ?? [])
     const displayMaxByAssignment = new Map((assignmentRows ?? []).map((a: any) => [a.id as string, a.display_max_score as number | null]))
     const subRows = rescaleToDisplayMax(
       (rawSubRows ?? []) as any[],
@@ -469,7 +471,7 @@ export default async function ClassroomDetailPage({
     }))
     const displayMaxByAssignment = new Map((assignmentRows ?? []).map(a => [a.id as string, (a as any).display_max_score as number | null]))
     classroomSubmissions = rescaleToDisplayMax(
-      submissionRows ?? [],
+      await withVoidedScoreMetadata(admin, submissionRows ?? []),
       row => displayMaxByAssignment.get(row.assignment_id) ?? null
     )
     classroomExtensions = extensionRows ?? []

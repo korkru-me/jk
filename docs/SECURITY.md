@@ -1,5 +1,13 @@
 # Security และ privacy guardrails
 
+## Grading corrections — local implementation, 18 October 2026
+
+Bank changes require verified active actor and exact bank-edit authority before service reads. Link enumeration reads assignment IDs; learner data is read only after canManageAssignment. Void checks management of the selected assignment. HMAC acknowledgement binds actor/question/edit/revision/scope, expires and is checked against fresh data; browser scores and target lists are not trusted. Manual overrides and unmanageable assignments are preserved.
+
+Service-only SECURITY INVOKER RPC uses fixed search_path, repeats actor/owner/team checks, whitelists question fields, validates complete snapshots/numeric bounds and commits key/score/audit together. Private audit/void tables have RLS and revoked browser grants. Completed-answer fence remains; grading bypass requires service role plus transaction-local context and cannot change inputs/random values/order. Insert revision fence and locked empty-attempt cleanup prevent mixed-rubric answers and deletion of committed attempts.
+
+Validation uses synthetic browser state, server mocks and throwaway PGlite, not deployed RLS tests. Migration is pending and linked history differs. No remote repair, database mutation, push or deployment performed.
+
 สถานะ 15 ตุลาคม 2026: งานคลังฝึก/ชุดฝึกส่วนตัว/ปักทบทวน รูปโปรไฟล์ รับทราบประกาศ และปิดรอบเมื่อหมดเวลาเผยแพร่ Production แล้วตาม `docs/PRODUCTION_SYNC_20261015.md`; ข้อความ local-only/prepared ในบันทึกเฟสก่อนหน้าบอกสถานะขณะพัฒนา ส่วน native SEB ที่ยังพักไว้ไม่ได้เปิดเพิ่ม
 
 การปิดรอบ (`20261014072745`, apply ทั้ง Staging และ Production แล้ว 15 ตุลาคม 2026): RPC เป็น SECURITY INVOKER, `search_path = ''` และ revoke PUBLIC/anon/authenticated Student action ใช้ Auth ที่ตรวจแล้วและ exact owned row โดย SQL ตรวจ owner/expiry ก่อน forced closure Trigger คำตอบ/วิธีทำใช้ row lock เดียวกับการปิดและปฏิเสธ late writes ระหว่าง cron ticks เขียนคะแนนแบบ atomic และส่ง receipt ที่ไม่มีคะแนนซ่อน Global worker ต้องผ่าน constant-time secret comparison แยก environment Vault dispatch ใช้โดย postgres cron เท่านั้น ไม่เปิดให้ browser/service-role worker อ่าน Responses มีเฉพาะยอดรวม ไม่พิมพ์ข้อมูลนักเรียนหรือ key และไม่ใช้ credential ของ Staging ใน Production

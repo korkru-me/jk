@@ -17,7 +17,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { RichTextEditor } from '@/components/ui/rich-text-editor'
-import { createQuestion, updateQuestion } from '@/lib/actions/questions'
+import { createQuestion } from '@/lib/actions/questions'
+import { useQuestionUpdate } from '@/components/questions/question-update-confirmation'
 import type { QuestionDraftHandoff } from '@/lib/question-draft-handoff'
 import { countAnswerBlanks, extractAnswerBlankNumbers, nextAnswerBlankNumber, numberedAnswerBlank } from '@/lib/answer-blank'
 import { PART_LABEL_SETS } from '@/lib/part-labels'
@@ -49,6 +50,7 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
   // Back to exactly the bank view the teacher edited from — search, filters, page and tab.
   const returnTo = questionsReturnTo(useSearchParams())
   const [saving, setSaving] = useState(false)
+  const updateQuestion = useQuestionUpdate()
   const editorRef = useRef<RichTextEditorHandle>(null)
   const subTextEditorRef = useRef<RichTextEditorHandle>(null)
 
@@ -222,6 +224,11 @@ export function RandomNumericForm({ allTags, presets: initialPresets, mode = 'cr
     const result = mode === 'edit' && question
       ? await updateQuestion(question.id, payload)
       : await createQuestion(payload)
+
+    if (result && 'cancelled' in result && result.cancelled) {
+      setSaving(false)
+      return
+    }
 
     if (result?.error) { toast.error(result.error); setSaving(false) }
   }

@@ -20,13 +20,13 @@ export function SubmissionScoreSummary({ visible, score, maxScore, percentage, p
   return (
     <Card padding="md" className="@container/result-summary overflow-hidden" data-submission-summary>
       <div className="flex flex-wrap items-center gap-3">
-        <div className={cn('flex size-16 shrink-0 items-center justify-center rounded-xl text-xl font-bold tabular-nums', visible ? tone : 'bg-primary/10 text-primary')}>
-          {visible ? score === null ? 'รอผล' : `${percentage}%` : <EyeOff className="size-6" aria-hidden="true" />}
+        <div className={cn('flex size-16 shrink-0 items-center justify-center rounded-xl text-xl font-bold tabular-nums', visible ? maxScore <= 0 ? 'bg-muted text-muted-foreground' : tone : 'bg-primary/10 text-primary')}>
+          {visible ? maxScore <= 0 ? '—' : score === null ? 'รอผล' : `${percentage}%` : <EyeOff className="size-6" aria-hidden="true" />}
         </div>
         <div className="min-w-0 flex-1 space-y-1.5">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-xs font-medium text-muted-foreground">{visible ? 'คะแนนที่ได้' : 'ส่งคำตอบเรียบร้อยแล้ว'}</h1>
-            {visible && <p className="text-2xl font-bold tabular-nums">{score === null ? 'รอผลคะแนน' : `${score}/${maxScore}`}</p>}
+            {visible && <p className="text-2xl font-bold tabular-nums">{maxScore <= 0 ? 'ไม่มีข้อที่นับคะแนน' : score === null ? 'รอผลคะแนน' : `${score}/${maxScore}`}</p>}
             {visible && passed !== null && <Badge variant="outline" className={passed ? 'border-success/25 text-[color-mix(in_oklab,var(--success)_60%,var(--foreground))]' : 'border-destructive/25 text-[color-mix(in_oklab,var(--destructive)_75%,var(--foreground))]'}>{passed ? 'ผ่านเกณฑ์' : 'ยังไม่ผ่านเกณฑ์'}</Badge>}
             {visible && percentage >= 90 && <Trophy className="size-4 text-[color-mix(in_oklab,var(--warning)_60%,var(--foreground))]" aria-label="ยอดเยี่ยม" />}
           </div>

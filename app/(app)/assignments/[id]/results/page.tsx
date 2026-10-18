@@ -8,6 +8,7 @@ import { officialSubmissionsByStudent, rescaleToDisplayMax } from '@/lib/scoring
 import { classifySubmissionTimingsByStudent, type AssignmentLateBand } from '@/lib/late-submission'
 import { AssignmentWorkspaceSidebar } from '../_components/assignment-workspace-sidebar'
 import type { AssignmentSidebarSummary } from '../_components/assignment-context-sidebar'
+import { loadVoidedQuestionIds, withVoidedScoreMetadata } from '@/lib/voided-score-metadata.server'
 import {
   ResultsClient,
   type SubmittedRow,
@@ -79,7 +80,7 @@ export default async function ResultsPage({
   // per the assignment's score_strategy, same as the assignment detail and
   // classroom scores pages.
   const rescaledSubmissions = rescaleToDisplayMax(
-    (submissions ?? []) as unknown as { total_score: number | null; max_score: number }[],
+    await withVoidedScoreMetadata(admin, (submissions ?? [])),
     () => assignment.display_max_score
   ) as any[]
   const officialByStudent = officialSubmissionsByStudent(rescaledSubmissions, assignment.score_strategy)
@@ -197,6 +198,7 @@ export default async function ResultsPage({
         pendingFinalizationCount={pendingFinalizationCount}
         initialPendingOnly={pending === '1'}
         adjustmentBatches={adjustmentBatches}
+        voidedQuestionIds={[...await loadVoidedQuestionIds(admin, id)]}
       />
     </>
   )

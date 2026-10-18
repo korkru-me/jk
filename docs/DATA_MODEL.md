@@ -1,5 +1,13 @@
 # Data model และ invariants
 
+## Grading corrections — local migration 20261018005611
+
+ยังไม่ apply ภายนอก: `submission_answers.grading_config` เก็บชนิด/ความคลาดเคลื่อน/ส่วนคำตอบ/extra_data สำหรับตรวจตาม revision ตอนสร้างรอบ Backfill กติกาปัจจุบันให้แถวเก่าโดยไม่เปลี่ยนคะแนนหรือ correct_answer เดิม กู้กติกาในอดีตที่ไม่เคยบันทึกไม่ได้ `is_void` และ `void_original_max_score` เก็บการตัดคะแนนและน้ำหนักเดิม `submissions.voided_max_score` รวมคะแนนเต็มที่ตัด ให้ display_max_score ลดตามสเกลเดิมแม้สุ่มได้คนละข้อ
+
+`assignment_void_questions` มี PK (assignment_id,question_id), reason, created_by, created_at และกำกับรอบใหม่ `question_grading_change_batches`/`question_grading_change_items` เก็บผู้แก้ เหตุผล ก่อน/หลัง เฉลยและแถวคำตอบ ทุกตารางเปิด RLS และไม่ให้ browser อ่าน/เขียนโดยตรง ไม่ลบคำตอบเมื่อโมฆะ
+
+RPC `apply_question_grading_change` ใช้ service role หลังตรวจสิทธิ์ ล็อกโจทย์/งาน/รอบ/คำตอบ ตรวจชุดเป้าหมายกับ expected snapshot ก่อนเขียนเฉลย/คะแนน/ค่ารวม/audit ใน transaction เดียว Trigger ตรวจ revision ตอนสร้างคำตอบ `p_requires_unused_question` ป้องกัน structural change หากมีคำตอบแทรกหลังวางแผน `discard_empty_grading_attempt` ล็อกรอบของนักเรียนและลบได้เฉพาะ in_progress ที่ไม่มีคำตอบ ใช้กู้ explicit SQL revision conflict ไม่ลบรอบจาก transport error ที่อาจบันทึกแล้ว
+
 สถานะ 15 ตุลาคม 2026: งานคลังฝึก/ชุดฝึกส่วนตัว/ปักทบทวน รูปโปรไฟล์ รับทราบประกาศ และปิดรอบเมื่อหมดเวลาเผยแพร่ Production แล้วตาม `docs/PRODUCTION_SYNC_20261015.md`; ข้อความ local-only/prepared ในบันทึกเฟสก่อนหน้าบอกสถานะขณะพัฒนา ส่วน native SEB ที่ยังพักไว้ไม่ได้เปิดเพิ่ม
 
 การปิดรอบ (`20261014072745`, apply ทั้ง Staging และ Production แล้ว 15 ตุลาคม 2026): `submissions.closed_at` หยุดคำตอบ/วิธีทำ, `close_reason` เป็น `manual|time_limit|close_time`, `answer_revision` ตรวจข้อมูลที่เปลี่ยนระหว่างยืนยันส่ง และ `missing_work_evidence` แจ้งหลักฐานที่ไม่ครบ รอบที่ปิดอาจยังเป็น `in_progress` ขณะรอตรวจโดยไม่เผยแพร่คะแนนชั่วคราว Commit คะแนนตั้ง `submitted_at = closed_at` กับ `status = submitted` ใน transaction เดียว การเรียกซ้ำไม่ทับผลที่เสร็จหรือครูแก้แล้ว ใช้สเกลคะแนนและช่วงสีเดิม

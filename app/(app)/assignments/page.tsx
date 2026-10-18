@@ -9,6 +9,7 @@ import { filterAssignmentsForStudent } from '@/lib/classroom-groups-server'
 import { ExamDashboard } from './_components/exam-dashboard'
 import { completionAttemptLimit, findPassingCompletion } from '@/lib/assignment-completion'
 import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
+import { withVoidedScoreMetadata } from '@/lib/voided-score-metadata.server'
 
 export const metadata = { title: 'ชุดข้อสอบ — KorKru' }
 
@@ -64,6 +65,7 @@ export default async function AssignmentsPage() {
   if (isTeacher) redirect('/classrooms')
 
   // Student view
+  const submissionRows = await withVoidedScoreMetadata(admin, submissionsRes.data ?? [])
   const memberships = membershipsRes.data
   const cids = (memberships ?? []).map((m: any) => m.classroom_id)
 
@@ -85,7 +87,7 @@ export default async function AssignmentsPage() {
     user.id,
     cids,
     (published ?? []) as any[],
-    new Set((submissionsRes.data ?? []).map((s: any) => s.assignment_id as string)),
+    new Set(submissionRows.map((s: any) => s.assignment_id as string)),
   )
 
   const pList: AssignmentRow[] = reached.map((row: any) => ({
@@ -100,7 +102,7 @@ export default async function AssignmentsPage() {
     end_at: row.end_at,
     show_results: row.show_results,
     max_attempts: completionAttemptLimit(row),
-    completion_reached: findPassingCompletion(row, (submissionsRes.data ?? []).filter(s => s.assignment_id === row.id)) != null,
+    completion_reached: findPassingCompletion(row, submissionRows.filter(s => s.assignment_id === row.id)) != null,
     retry_scope: row.retry_scope ?? 'all',
     score_strategy: row.score_strategy,
     display_max_score: row.display_max_score,
@@ -109,7 +111,7 @@ export default async function AssignmentsPage() {
     classrooms: Array.isArray(row.classrooms) ? row.classrooms[0] ?? null : row.classrooms,
   }))
   const publishedIds = new Set(pList.map(a => a.id))
-  const rawMySubs = (submissionsRes.data ?? []).filter((s: any) => publishedIds.has(s.assignment_id))
+  const rawMySubs = submissionRows.filter((s: any) => publishedIds.has(s.assignment_id))
 
   const displayMaxByAssignment = new Map(pList.map(a => [a.id, a.display_max_score]))
   const mySubs = rescaleToDisplayMax(
