@@ -1038,7 +1038,7 @@ export interface AssignmentExtension {
   created_at: string
 }
 
-export type NotificationType = 'assignment_reminder' | 'co_teacher_invite' | 'extension_granted' | 'classroom_post' | 'homeroom_weekly_digest'
+export type NotificationType = 'assignment_reminder' | 'co_teacher_invite' | 'extension_granted' | 'classroom_post' | 'homeroom_weekly_digest' | 'grade_published'
 
 export interface Notification {
   id: string

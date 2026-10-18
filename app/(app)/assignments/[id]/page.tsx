@@ -9,6 +9,7 @@ import type { Assignment, Question } from '@/lib/types'
 import { officialSubmissionsByStudent, rescaleToDisplayMax } from '@/lib/scoring'
 import { AssignmentDetailClient } from './_components/assignment-detail-client'
 import { loadAssignmentQuestionsByProvenance } from '@/lib/assignment-question-access.server'
+import { withVoidedScoreMetadata } from '@/lib/voided-score-metadata.server'
 
 export const metadata = { title: 'ชุดข้อสอบ — KorKru' }
 
@@ -123,7 +124,7 @@ export default async function AssignmentDetailPage({
   // A student may have multiple submissions (retries) — reduce to the
   // "official" attempt per the assignment's own score_strategy.
   const rescaledSubmissions = rescaleToDisplayMax(
-    (submissions ?? []) as unknown as SubmissionRow[],
+    (await withVoidedScoreMetadata(admin, submissions ?? [])) as unknown as SubmissionRow[],
     () => a.display_max_score
   )
   const normalizedSubmissions = rescaledSubmissions.map(s => ({ ...s, attempt_number: s.attempt_number ?? 1 }))

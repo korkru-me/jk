@@ -13,7 +13,8 @@ import { GeneralInfoSection } from './general-info-section'
 import { QuestionImageUpload } from './question-image-upload'
 import { SolutionSection } from './solution-section'
 import { QuestionPreview } from './question-preview'
-import { createQuestion, updateQuestion } from '@/lib/actions/questions'
+import { createQuestion } from '@/lib/actions/questions'
+import { useQuestionUpdate } from '@/components/questions/question-update-confirmation'
 import type { QuestionDraftHandoff } from '@/lib/question-draft-handoff'
 import { readDuplicateSeed } from '@/lib/question-duplicate'
 import type { Difficulty, Visibility, Question } from '@/lib/types'
@@ -46,6 +47,7 @@ export function EssayForm({ allTags, mode = 'create', question, isOwner = true, 
   // Back to exactly the bank view the teacher edited from — search, filters, page and tab.
   const returnTo = questionsReturnTo(useSearchParams())
   const [saving, setSaving] = useState(false)
+  const updateQuestion = useQuestionUpdate()
   const editorRef = useRef<RichTextEditorHandle>(null)
 
   const [title, setTitle] = useState(question?.title ?? '')
@@ -136,6 +138,11 @@ export function EssayForm({ allTags, mode = 'create', question, isOwner = true, 
     const result = mode === 'edit' && question
       ? await updateQuestion(question.id, payload)
       : await createQuestion(payload)
+
+    if (result && 'cancelled' in result && result.cancelled) {
+      setSaving(false)
+      return
+    }
 
     if (result?.error) {
       toast.error(result.error)

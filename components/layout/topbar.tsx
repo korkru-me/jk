@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { NotificationsBell } from '@/components/layout/notifications-bell'
 import type { ShellUser } from './shell-client'
+import { confirmPageExit } from './confirm-page-exit'
 
 interface TopbarProps {
   user: ShellUser
@@ -109,7 +110,7 @@ export function Topbar({ user, initialUnreadCount, onMenuToggle, sidebarCollapse
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem>
-              <form action={logout} className="w-full">
+              <form action={async () => { if (await confirmPageExit()) await logout() }} className="w-full">
                 <button type="submit" className="w-full text-left text-destructive text-sm">
                   ออกจากระบบ
                 </button>

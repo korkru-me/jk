@@ -25,6 +25,7 @@ import { attemptItemHasSolution } from '@/lib/attempt-solutions'
 import { loadAttemptSolutionItems, loadSolutionRelease } from '@/lib/attempt-solutions-server'
 import { type SolutionRelease } from '@/lib/solution-release'
 import { completionAttemptLimit, findPassingCompletion } from '@/lib/assignment-completion'
+import { withVoidedScoreMetadata } from '@/lib/voided-score-metadata.server'
 import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
 import {
   AttemptSolutionShortcut, AttemptSolutionsButton, AttemptSolutionsProvider,
@@ -185,7 +186,7 @@ export default async function SubmissionResultPage({
 
   const assignment = (submission as any).assignments
   const [{ total_score: displayScore, max_score: displayMax }] = rescaleToDisplayMax(
-    [submission as { total_score: number | null; score_adjustment?: number; max_score: number }],
+    await withVoidedScoreMetadata(isTeacherViewer ? admin : await createClient(), [submission]),
     () => assignment.display_max_score
   )
   const pct = displayMax > 0 ? Math.round(((displayScore ?? 0) / displayMax) * 100) : 0
@@ -217,7 +218,7 @@ export default async function SubmissionResultPage({
         .order('attempt_number').range(from, to)).then(({ rows, error }) => ({ data: rows, error }))
     : { data: [], error: null }
   const attemptsUsed = (ownAttempts ?? []).reduce((highest, attempt) => Math.max(highest, attempt.attempt_number), 0)
-  const attemptsRemaining = !attemptsError && !findPassingCompletion(assignment, ownAttempts ?? [])
+  const attemptsRemaining = !attemptsError && !findPassingCompletion(assignment, await withVoidedScoreMetadata(admin, ownAttempts ?? []))
     && (attemptLimit == null || attemptsUsed < attemptLimit)
 
   // A wrong-only retry only has something to reopen while a question is still
@@ -316,7 +317,7 @@ export default async function SubmissionResultPage({
       <SubmissionScoreSummary
         visible={canShowScore} score={displayScore} maxScore={displayMax} percentage={pct}
         passed={passed} threshold={passed !== null ? passingThreshold : null}
-        counts={canShowAnswers ? { correct: answers.filter(a => a.is_correct === true).length, wrong: answers.filter(a => a.is_correct === false).length, pending: pendingManualCount } : null}
+        counts={canShowAnswers ? { correct: answers.filter(a => a.max_score !== 0 && a.is_correct === true).length, wrong: answers.filter(a => a.max_score !== 0 && a.is_correct === false).length, pending: pendingManualCount } : null}
         submittedAt={submission.submitted_at ? thaiDateTime.format(new Date(submission.submitted_at)) : null}
         strategy={assignment.max_attempts !== 1 ? `การเก็บคะแนน: ${SCORE_STRATEGY_LABELS[assignment.score_strategy as 'best' | 'average' | 'latest']} (จากทั้งหมด ${submission.attempt_number} ครั้งที่ทำ)` : null}
       >
@@ -455,7 +456,7 @@ async function SubmissionAnswerDetails({
         </h2>
         {sortedAnswers.map((a: any, i: number) => {
           const q = a.questions
-          const isCorrect = a.is_correct
+          const isCorrect = a.max_score === 0 ? null : a.is_correct
           const isPendingManual = isPendingTeacherReview(a)
 
           return (
@@ -482,7 +483,7 @@ async function SubmissionAnswerDetails({
                       ? 'bg-destructive/10 text-destructive'
                       : 'bg-muted text-muted-foreground'
                   }`}>
-                    {isPendingManual ? '⏳' : isCorrect === true
+                    {a.max_score === 0 ? '—' : isPendingManual ? '⏳' : isCorrect === true
                       ? <CheckCircle2 size={16} />
                       : isCorrect === false
                       ? <XCircle size={16} />
@@ -504,7 +505,7 @@ async function SubmissionAnswerDetails({
                         </Badge>
                       )}
                       <div className="ml-auto shrink-0">
-                        {isTeacherViewer ? (
+                        {a.max_score === 0 ? <Badge variant="secondary">โมฆะ · ไม่นับคะแนน</Badge> : isTeacherViewer ? (
                           <ScoreEditor submissionAnswerId={a.id} score={a.score} maxScore={a.max_score} />
                         ) : (
                           <Badge variant="outline" className={`text-xs ${
@@ -533,7 +534,7 @@ async function SubmissionAnswerDetails({
                 )}
 
                 <div className="pl-11">
-                  <SubmissionAnswerReview
+                  {a.max_score === 0 ? <p className="text-sm text-muted-foreground">ข้อนี้เป็นโมฆะ ตัดคะแนนและคะแนนเต็มออกจากผลรวมแล้ว คำตอบเดิมยังเก็บไว้</p> : <SubmissionAnswerReview
                     studentAnswer={a.student_answer}
                     correctAnswer={a.correct_answer}
                     isCorrect={isCorrect}
@@ -550,7 +551,7 @@ async function SubmissionAnswerDetails({
                         : reorderOptions(q.mcq_options, a.option_order)
                     }
                     workImages={a.work_images ?? null}
-                  />
+                  />}
                   <SubmittedWorkArtifacts
                     artifacts={(a.student_work_artifacts ?? []).map((artifact: any) => ({
                       id: artifact.id as string,

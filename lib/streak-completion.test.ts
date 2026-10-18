@@ -27,10 +27,7 @@ describe('streakEligibleCount', () => {
     expect(streakEligibleCount(['mcq', 'essay', 'mcq'])).toBe(2)
   })
 
-  // Regression guard for the reason this is not just isInstantCheckable:
-  // gradeAnswer gives a ส่งไฟล์งาน full marks for any attached file, which in
-  // this mode would advance the streak for a blank photo, repeatedly.
-  it('leaves out ข้อส่งไฟล์, where attaching anything earns full marks', () => {
+  it('leaves out ข้อส่งไฟล์, which require a teacher to grade the content', () => {
     expect(streakEligibleCount(['mcq', 'file_upload'])).toBe(1)
   })
 

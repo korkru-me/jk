@@ -14,6 +14,7 @@ import { getQuestionCardData } from '@/lib/actions/question-card-data'
 import type { QuestionCardRow } from '@/components/questions/question-card'
 import { sortClassroomsByRecentViews } from '@/lib/classroom-recency'
 import { loadStudentPracticeLibraries } from '../practice/_lib/student-landing-data'
+import { withVoidedScoreMetadata } from '@/lib/voided-score-metadata.server'
 import { isPracticeLibraryEnabled } from '@/lib/practice-question'
 
 export async function generateMetadata() {
@@ -177,7 +178,7 @@ export default async function DashboardPage({ searchParams }: {
   const data = buildStudentLearningData({
     classrooms, groupOf,
     assignments: (assignmentsRes.data ?? []) as unknown as LearningAssignment[],
-    submissions: (submissionsRes.data ?? []) as unknown as LearningSubmission[],
+    submissions: (await withVoidedScoreMetadata(admin, submissionsRes.data ?? [])) as unknown as LearningSubmission[],
     practiceLibraries: practiceLibraries.items,
     practiceError: practiceLibraries.error,
   })

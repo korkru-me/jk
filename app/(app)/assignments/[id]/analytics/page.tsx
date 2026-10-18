@@ -3,6 +3,7 @@ import { getAuthUser } from '@/lib/auth/server'
 import { notFound, redirect } from 'next/navigation'
 import type { Assignment, Question } from '@/lib/types'
 import { officialSubmissionsByStudent, rescaleToDisplayMax } from '@/lib/scoring'
+import { withVoidedScoreMetadata } from '@/lib/voided-score-metadata.server'
 import { AnalyticsClient } from './_components/analytics-client'
 
 export const metadata = { title: 'วิเคราะห์และประเมินผล — KorKru' }
@@ -76,7 +77,10 @@ export default async function AnalyticsPage({
 
   // A student may have multiple attempts — reduce to the "official" score
   // per the assignment's score_strategy, so retries don't skew the stats.
-  const rescaledSubmissions = rescaleToDisplayMax((submissions ?? []) as any[], () => a.display_max_score)
+  const rescaledSubmissions = rescaleToDisplayMax(
+    await withVoidedScoreMetadata(supabase, (submissions ?? []) as any[]),
+    () => a.display_max_score,
+  )
   const officialByStudent = officialSubmissionsByStudent(rescaledSubmissions, a.score_strategy)
   const dedupedSubmissions = Array.from(officialByStudent.values())
     .map(official => ({

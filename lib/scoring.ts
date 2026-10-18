@@ -3,6 +3,8 @@ import type { ScoreStrategy } from '@/lib/types'
 interface ScoredRow {
   total_score: number | null
   max_score: number
+  /** Raw ceiling removed by void decisions, retained to preserve custom scaling. */
+  voided_max_score?: number | null
   /** Display points set by a teacher after automatic scoring. */
   score_adjustment?: number | null
 }
@@ -23,8 +25,9 @@ export function rescaleToDisplayMax<T extends ScoredRow>(
 ): T[] {
   return rows.map(row => {
     const displayMax = resolveDisplayMax(row)
-    const visibleMax = displayMax ?? row.max_score
-    const scale = displayMax == null || row.max_score <= 0 ? 1 : displayMax / row.max_score
+    const originalMax = row.max_score + Math.max(0, Number(row.voided_max_score ?? 0))
+    const scale = displayMax == null || originalMax <= 0 ? 1 : displayMax / originalMax
+    const visibleMax = displayMax == null ? row.max_score : Math.round(row.max_score * scale * 100) / 100
     const scaled = row.total_score == null ? null : Math.round(row.total_score * scale * 100) / 100
     const adjustment = Number(row.score_adjustment ?? 0)
     const adjusted = scaled == null

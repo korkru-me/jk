@@ -1,5 +1,27 @@
 # Security และ privacy guardrails
 
+## Classroom streaming — local, 18 October 2026
+
+The streamed classroom fallback is emitted after the existing verified actor and exact owner/co-teacher checks, never from a guessed URL or a client-provided classroom name. It exposes only id/name/description/type and the authorized navigation set. Roster, scores, invitation tokens and private student profiles stay out of this early DTO. Every deferred tab request repeats route authorization; view-only co-teachers cannot request score/manager data or invitations through a forged view parameter. Score reads are further restricted to the current classroom roster. Missing optional score metadata does not bypass authorization or suppress unrelated database failures.
+
+## Grading workspace boundaries — local, 18 October 2026
+
+Bulk-save UI reuses the existing action for each changed answer, with its first-edit expected revision. Client validation and navigation guards do not authorize a write or replace server numeric/membership checks. Untouched pending components are omitted; partial or ambiguous failures keep their drafts rather than claiming all answers saved. No batch RPC, schema, RLS or privileged-client changes were introduced, and score drafts remain in page memory only.
+
+Grading readers require a verified active teacher/admin (or trusted super admin) with management access to the exact assignment before service-role learner reads. Summary DTOs omit student response bodies, frozen keys, random values, emails and private profile fields; detail reads bind to authorized official submission IDs and the selected question/student window. Question content still passes assignment provenance checks. URL filter state never supplies resource authority or trusted score bounds.
+
+Private work preview signing validates the complete `students/<student>/<submission>/<answer>/<upload>/preview.webp|png` namespace before issuing 300-second URLs; it never signs scene JSON or unrelated paths. Public attachment rendering allows only the configured project's known buckets; PDF rendering fetches with omitted credentials, validates MIME/signature and a streamed 10 MiB cap, then uses a typed PDF Blob in the browser's native viewer. The viewer receives neither the stored public URL nor HTML; iframe sandbox blocks Chrome's PDF viewer and is deliberately omitted after byte validation. Signing failure shows unavailable evidence, never fabricated content.
+
+The new policy/audit data has RLS with browser grants revoked. Service-only invoker RPCs repeat active actor, role, assignment and submission membership checks, lock rows, enforce numeric component bounds and reject stale revisions before any mutation. A work-only review cannot silently claim ownership of an automatic answer. Missing migration disables new writes without bypassing to direct updates. The synthetic grading lab disables external mutations/polling and is unavailable in production, including its local asset route.
+
+## Grading corrections — local implementation, 18 October 2026
+
+Bank changes require verified active actor and exact bank-edit authority before service reads. Link enumeration reads assignment IDs; learner data is read only after canManageAssignment. Void checks management of the selected assignment. HMAC acknowledgement binds actor/question/edit/revision/scope, expires and is checked against fresh data; browser scores and target lists are not trusted. Manual overrides and unmanageable assignments are preserved.
+
+Service-only SECURITY INVOKER RPC uses fixed search_path, repeats actor/owner/team checks, whitelists question fields, validates complete snapshots/numeric bounds and commits key/score/audit together. Private audit/void tables have RLS and revoked browser grants. Completed-answer fence remains; grading bypass requires service role plus transaction-local context and cannot change inputs/random values/order. Insert revision fence and locked empty-attempt cleanup prevent mixed-rubric answers and deletion of committed attempts.
+
+Validation uses synthetic browser state, server mocks and throwaway PGlite, not deployed RLS tests. Migration is pending and linked history differs. No remote repair, database mutation, push or deployment performed.
+
 ## Signup/email safeguards — 17 October 2026 (prepared)
 
 Public auth-email actions validate inputs and reserve bounded shared email/IP counters before sending. The server-only fixed RPC is an explicitly permitted anonymous reservation operation: it accepts only keyed HMACs, performs no user/profile/tenant reads, takes no client-selected SQL/table/function, and exposes no browser grants. RLS remains enabled with no anon/authenticated policies; service_role has only this intended application path, while normal account mutations still require verified identity and exact-resource authorization. Failures/configuration gaps reject sending. The limiter cannot protect direct public Supabase Auth calls; hosted rate limits and current-password enforcement must be configured/tested. CAPTCHA is not wired in this phase.

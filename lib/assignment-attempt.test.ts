@@ -339,13 +339,13 @@ describe('gradeAnswer — fill in the blank', () => {
 })
 
 describe('gradeAnswer — file upload', () => {
-  it('credits an attached file and nothing else', () => {
+  it('leaves attached, empty and malformed file answers pending for a teacher', () => {
     const upload = (student: string | null) => gradeAnswer(answer({
       correct: '', student, questionType: 'file_upload', maxScore: 5,
     }))
-    expect(upload(JSON.stringify([{ url: 'x', name: 'a.pdf', type: 'application/pdf' }]))).toMatchObject({ is_correct: true, score: 5 })
-    expect(upload(JSON.stringify([]))).toMatchObject({ is_correct: false, score: 0 })
-    expect(upload(null)).toMatchObject({ is_correct: false, score: 0 })
+    for (const student of [JSON.stringify([{ url: 'x', name: 'a.pdf', type: 'application/pdf' }]), '[]', null, 'malformed']) {
+      expect(upload(student)).toMatchObject({ is_correct: null, score: 0 })
+    }
   })
 })
 
@@ -657,6 +657,22 @@ describe('buildRetryAttempt — what a wrong-only retry re-asks', () => {
     const total = [...retried, ...carried].reduce((sum, row) => sum + row.max_score, 0)
 
     expect(total).toBe(rows.reduce((sum, row) => sum + row.max_score, 0))
+  })
+
+  it('carries pending work with its component scores and review ownership intact', () => {
+    const prior = previous({ question_id: 'q1', score: 1, max_score: 2,
+      answer_score: 1, answer_max_score: 1, work_score: null, work_max_score: 1,
+      answer_reviewed_at: null, work_reviewed_at: null })
+    const result = buildRetryAttempt(assignment, pool, [prior])
+    expect(result.retried).toHaveLength(0)
+    expect(result.carried[0]).toMatchObject({ ...prior, carried_over: true })
+  })
+
+  it('re-asks a shortfall once both answer and work have been reviewed', () => {
+    const result = buildRetryAttempt(assignment, pool, [previous({ question_id: 'q1', score: 1.5,
+      answer_score: 1, answer_max_score: 1, work_score: 0.5, work_max_score: 1,
+      answer_reviewed_at: null, work_reviewed_at: '2026-10-18T05:00:00Z' })])
+    expect(result.retried.map(row => row.question_id)).toEqual(['q1'])
   })
 
   it('preserves the previous attempt\'s question numbering', () => {
