@@ -2,7 +2,7 @@
 
 import { useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { ArrowDownUp, ArrowUpRight, CheckCircle2, ChevronLeft, ChevronRight, Clock, Eye, UserRoundCheck } from 'lucide-react'
+import { ArrowDownWideNarrow, ArrowUpNarrowWide, ArrowUpRight, CheckCircle2, ChevronLeft, ChevronRight, Clock, Eye, UserRoundCheck } from 'lucide-react'
 import { GradingWorkspaceHeader } from '@/components/assignments/grading-workspace-header'
 import { QuestionPreviewContent } from '@/components/questions/question-preview'
 import { Badge } from '@/components/ui/badge'
@@ -148,6 +148,10 @@ export function GradingOverview({ data, initialQuery, tools }: Props) {
     setPreview(question)
   }
 
+  const descending = direction === 'desc'
+  const directionLabel = descending ? 'มากไปน้อย' : 'น้อยไปมาก'
+  const toggleLabel = `เรียงจาก${directionLabel} · กดเพื่อเรียงจาก${descending ? 'น้อยไปมาก' : 'มากไปน้อย'}`
+
   return <div className="flex min-w-0 flex-col gap-3" data-grading-overview>
     <GradingWorkspaceHeader data={data} />
     <Tabs value={view} onValueChange={value => setView(value === 'students' ? 'students' : 'questions')} className="gap-3">
@@ -157,22 +161,22 @@ export function GradingOverview({ data, initialQuery, tools }: Props) {
           <TabsTrigger value="students" className="px-3 pointer-coarse:min-h-11">รายคน</TabsTrigger>
         </TabsList>
         {view === 'questions' ? <p className="text-xs text-muted-foreground">{formatCount(data.questions.length)} ข้อ · {formatCount(submittedIds.size)} คนส่งแล้ว</p> : (
-          <FieldGroup className="w-auto flex-row flex-wrap items-center gap-2">
-            <Field orientation="horizontal" className="w-auto gap-1.5">
-              <FieldLabel htmlFor={`${controlId}-classroom`}>ชั้น/ห้อง</FieldLabel>
-              <NativeSelect id={`${controlId}-classroom`} value={classroom} className="w-auto max-w-48 pointer-coarse:min-h-11" onChange={event => { setClassroom(event.target.value); setStudentPage(1) }}>
+          <FieldGroup className="min-w-0 max-w-full flex-1 basis-[32rem] flex-row flex-wrap items-center justify-end gap-2">
+            <Field orientation="horizontal" className="w-auto max-w-full shrink-0 gap-1.5">
+              <FieldLabel htmlFor={`${controlId}-classroom`} className="whitespace-nowrap text-xs text-foreground/80">ชั้น/ห้อง</FieldLabel>
+              <NativeSelect id={`${controlId}-classroom`} value={classroom} className="h-7 w-auto max-w-48 bg-card font-medium text-foreground pointer-coarse:min-h-11" onChange={event => { setClassroom(event.target.value); setStudentPage(1) }}>
                 <option value="all">ทุกห้อง</option>
                 {classroomOptions.map(label => <option key={label} value={label}>{label}</option>)}
               </NativeSelect>
             </Field>
-            <Field orientation="horizontal" className="w-auto gap-1.5">
-              <FieldLabel htmlFor={`${controlId}-sort`}>เรียงตาม</FieldLabel>
-              <NativeSelect id={`${controlId}-sort`} value={sort} className="w-auto pointer-coarse:min-h-11" onChange={event => { setSort(event.target.value as StudentOrder); setStudentPage(1) }}>
+            <Field orientation="horizontal" className="w-auto max-w-full shrink-0 gap-1.5">
+              <FieldLabel htmlFor={`${controlId}-sort`} className="whitespace-nowrap text-xs text-foreground/80">เรียงตาม</FieldLabel>
+              <NativeSelect id={`${controlId}-sort`} value={sort} className="h-7 w-auto bg-card font-medium text-foreground pointer-coarse:min-h-11" onChange={event => { setSort(event.target.value as StudentOrder); setStudentPage(1) }}>
                 <option value="classroom">ชั้น/ห้อง</option><option value="number">เลขที่</option><option value="code">รหัสนักเรียน</option><option value="name">ชื่อ–สกุล</option>
               </NativeSelect>
             </Field>
-            <Button type="button" size="sm" variant="outline" className="pointer-coarse:min-h-11" onClick={() => { setDirection(value => value === 'asc' ? 'desc' : 'asc'); setStudentPage(1) }}>
-              <ArrowDownUp data-icon="inline-start" />{direction === 'asc' ? 'น้อย→มาก' : 'มาก→น้อย'}
+            <Button type="button" size="sm" variant="outline" className="pointer-coarse:min-h-11" aria-label={toggleLabel} title={toggleLabel} onClick={() => { setDirection(value => value === 'asc' ? 'desc' : 'asc'); setStudentPage(1) }}>
+              {descending ? <ArrowDownWideNarrow data-icon="inline-start" aria-hidden="true" /> : <ArrowUpNarrowWide data-icon="inline-start" aria-hidden="true" />}{directionLabel}
             </Button>
           </FieldGroup>
         )}
