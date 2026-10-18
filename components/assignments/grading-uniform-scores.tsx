@@ -45,7 +45,7 @@ export function GradingUniformScores({ data, question }: { data: GradingWorkspac
 
   return <Collapsible ref={root} open={open} onOpenChange={setOpen} className="contents">
     <CollapsibleTrigger render={<Button type="button" size="sm" variant="outline" className="pointer-coarse:min-h-11" />}>
-      <Users data-icon="inline-start" aria-hidden="true" />ให้คะแนนเท่ากันทั้งข้อ<ChevronDown data-icon="inline-end" aria-hidden="true" />
+      <Users data-icon="inline-start" aria-hidden="true" />ให้คะแนนเท่ากันทุกคน<ChevronDown data-icon="inline-end" aria-hidden="true" />
     </CollapsibleTrigger>
     <CollapsibleContent className="order-last w-full min-w-0 basis-full">
       <div className="flex min-w-0 flex-col gap-2 pt-2">
