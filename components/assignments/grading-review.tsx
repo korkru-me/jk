@@ -169,9 +169,11 @@ function scopeSources(data: GradingWorkspaceData, include: (answer: GradingAnswe
 function ReviewDraftToolbar({ data }: { data: GradingWorkspaceData }) {
   const { savedDrafts, dirtyCount } = useGradingBatch()
   const savedCount = Object.keys(savedDrafts).length
-  return <>
-    <div className="flex min-w-0 flex-wrap items-center gap-2"><GradingQuickScoreSettings /><GradingBatchSaveButton removeOnly />{savedCount > 0 && <Badge variant="secondary">ร่างที่บันทึกแล้ว {savedCount} คำตอบ · ยังไม่ส่งคะแนนนักเรียน</Badge>}{dirtyCount > 0 && <Badge variant="statusWarning">ยังไม่บันทึก {dirtyCount} คำตอบ</Badge>}</div>
-  </>
+  return <GradingQuickScoreSettings actions={<>
+    <GradingBatchSaveButton removeOnly />
+    {savedCount > 0 && <Badge variant="secondary" className="h-auto min-h-5 max-w-full whitespace-normal">ร่างที่บันทึกแล้ว {savedCount} คำตอบ · ยังไม่ส่งคะแนนนักเรียน</Badge>}
+    {dirtyCount > 0 && <Badge variant="statusWarning" className="h-auto min-h-5 max-w-full whitespace-normal">ยังไม่บันทึก {dirtyCount} คำตอบ</Badge>}
+  </>} />
 }
 
 export function QuestionGradingReview(props: CommonProps & { questionId: string }) {
