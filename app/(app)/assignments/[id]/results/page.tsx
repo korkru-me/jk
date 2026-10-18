@@ -6,6 +6,8 @@ import { notFound, redirect } from 'next/navigation'
 import type { Question } from '@/lib/types'
 import { officialSubmissionsByStudent, rescaleToDisplayMax } from '@/lib/scoring'
 import { classifySubmissionTimingsByStudent, type AssignmentLateBand } from '@/lib/late-submission'
+import { AssignmentWorkspaceSidebar } from '../_components/assignment-workspace-sidebar'
+import type { AssignmentSidebarSummary } from '../_components/assignment-context-sidebar'
 import {
   ResultsClient,
   type SubmittedRow,
@@ -33,7 +35,7 @@ export default async function ResultsPage({
   // assignments_co_teacher_all) already scopes this to owner or co-teacher.
   const assignmentQuery = supabase
     .from('assignments')
-    .select('title, org_id, question_ids, score_strategy, display_max_score, passing_type, passing_value, completion_rule, streak_target, due_at, late_bands, end_at, classrooms(name)')
+    .select('id, title, org_id, classroom_id, status, type, mode, question_ids, random_question_count, score_strategy, display_max_score, passing_type, passing_value, completion_rule, streak_target, due_at, late_bands, end_at, classrooms(name, description)')
     .eq('id', id)
     .maybeSingle()
 
@@ -164,24 +166,38 @@ export default async function ResultsPage({
 
   const inProgressCount = (submissions ?? []).filter((s: any) => s.status === 'in_progress' && !s.closed_at).length
   const pendingFinalizationCount = (submissions ?? []).filter((s: any) => s.status === 'in_progress' && s.closed_at).length
+  const pendingCount = new Set(
+    (answerRows ?? []).filter(answer => answer.is_correct === null).map(answer => answer.submission_id)
+  ).size
+  const uniqueQuestionCount = new Set(assignment.question_ids).size
 
   return (
-    <ResultsClient
-      assignmentId={id}
-      assignmentTitle={assignment.title}
-      classroomName={(assignment as any).classrooms?.name ?? null}
-      passingType={assignment.passing_type}
-      passingValue={assignment.passing_value}
-      completionRule={assignment.completion_rule === 'streak' ? 'streak' : 'fixed'}
-      streakTarget={assignment.streak_target ?? null}
-      questions={orderedQuestions}
-      submitted={submittedWithTiming}
-      answers={(answerRows ?? []) as AnswerRow[]}
-      profiles={profiles}
-      inProgressCount={inProgressCount}
-      pendingFinalizationCount={pendingFinalizationCount}
-      initialPendingOnly={pending === '1'}
-      adjustmentBatches={adjustmentBatches}
-    />
+    <>
+      <AssignmentWorkspaceSidebar
+        assignment={assignment as unknown as AssignmentSidebarSummary}
+        currentSection="results"
+        pendingCount={pendingCount}
+        availableQuestionCount={qMap.size}
+        missingQuestionCount={Math.max(0, uniqueQuestionCount - qMap.size)}
+        duplicateQuestionCount={Math.max(0, assignment.question_ids.length - uniqueQuestionCount)}
+      />
+      <ResultsClient
+        assignmentId={id}
+        assignmentTitle={assignment.title}
+        classroomName={(assignment as any).classrooms?.name ?? null}
+        passingType={assignment.passing_type}
+        passingValue={assignment.passing_value}
+        completionRule={assignment.completion_rule === 'streak' ? 'streak' : 'fixed'}
+        streakTarget={assignment.streak_target ?? null}
+        questions={orderedQuestions}
+        submitted={submittedWithTiming}
+        answers={(answerRows ?? []) as AnswerRow[]}
+        profiles={profiles}
+        inProgressCount={inProgressCount}
+        pendingFinalizationCount={pendingFinalizationCount}
+        initialPendingOnly={pending === '1'}
+        adjustmentBatches={adjustmentBatches}
+      />
+    </>
   )
 }

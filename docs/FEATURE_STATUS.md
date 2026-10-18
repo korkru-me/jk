@@ -1,5 +1,11 @@
 # Feature status
 
+## เมนูด้านข้างหน้าตรวจให้คะแนน — 18 ตุลาคม 2026 (local only)
+
+- หน้าผลคะแนนใช้เมนูบริบทงานเหมือนหน้าภาพรวม/ตั้งค่า มีกรอบชื่องาน ป้ายสถานะ/ประเภท และคำสั่งเดิม พร้อมไฮไลต์ “ตรวจให้คะแนน” ด้วย aria-current จำนวนชิ้นรอตรวจใช้คำตอบของรอบที่หน้าผลคะแนนโหลดอยู่ ไม่เพิ่ม query งานส่ง และไม่แก้การคิดคะแนนหรือสิทธิ์
+- แยก controller เดิมของหน้าตั้งค่าเป็น AssignmentWorkspaceSidebar เพื่อใช้ร่วมกัน ตรวจ fixture ชั่วคราวที่ใช้ shell/controller/results จริงและข้อมูลจำลอง: แบบฝึกหัดมีชิ้นรอตรวจ, ข้อสอบไม่มีชิ้นรอตรวจ/หน้าตั้งค่า, เมนูเต็ม/ย่อ, มือถือเปิด/ปิดด้วย Escape และโหมดมืด ที่ 320/390/1440px ไม่ล้นแนวนอน ปุ่มเมนูสูง 44px ตาราง desktop สูง 117.79px และอยู่ตำแหน่งเดิมทั้งก่อน/หลัง
+- TypeScript, lint:tokens, isolated webpack production build และ Next compilation/runtime ผ่าน React มี sidebar controller/navigation/results อย่างละ instance; scoped axe บน aside ในโหมดมืดไม่พบ violation/incomplete ลบ fixture ชั่วคราวหลังตรวจ ไม่ได้ทดสอบบัญชีจริงหรือ query/mutation กับบริการภายนอก ไม่รัน unit suite ซ้ำเพราะเปลี่ยนเฉพาะการประกอบ UI ไม่มี migration งานคอมมิตเฉพาะในเครื่อง ไม่ push/deploy ตามคำขอเจ้าของ
+
 ## Production synchronization completed — 15 October 2026
 
 Current-local UI is preserved in pushed `0bb51b3`; the release branch merges it with Production compatibility and the completed attempt-expiry work. Fixed stable keys on the slotted student classroom components without changing layout. TypeScript/token lint, 275 files / 3,400 tests and final isolated Webpack build pass; fresh Next runtime reports no errors. Staging personal-exercise/pin/order integration and isolation checks passed using 8 synthetic accounts / 1,000 questions, with cleanup verified. Production is READY at `master` `e1ccfc0` through PR #56; all seven scoped migrations and worker configuration are applied. Public home/icon and desktop/mobile checks pass, and the active localhost source is synchronized. No real-account submissions or physical-device tests were performed. Exact rollout, intentional SEB exclusions, preserved local files and recovery points are tracked in `docs/PRODUCTION_SYNC_20261015.md`.
