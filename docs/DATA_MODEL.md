@@ -1,5 +1,13 @@
 # Data model และ invariants
 
+## Resend quota delivery ledger — prepared migration 20261018154826
+
+Production ยังไม่ apply; Staging ผ่านแล้ว: ledger แยกจาก Auth/ข้อมูลผู้เรียน เก็บ scope (`local/staging/production`), period (`daily/monthly`), window key, threshold (`80/90/95`), delivery UUID, payload SHA-256 และ timestamps ของ claim/acceptance ไม่เก็บผู้รับ เนื้อหาอีเมล reset link หรือ snapshot usage รายคน รายวันใช้วันแจ้งเตือน UTC; รายเดือนใช้ canonical `monthly.resets_at` จาก provider จึงคงสถานะข้ามวันได้
+
+RPC แบบ atomic ตรวจ payload เดิมและ high-water ต่อ scope/period/window ก่อน claim เพื่อกัน concurrent events หรือระดับต่ำกว่าหลังระดับสูงเริ่มแล้ว UUID เดิมเป็นส่วนของ Resend idempotency key สำหรับ retry ภายใน 24 ชั่วโมง; claim ที่ยังยืนยัน acceptance ไม่ได้และเก่าเกิน 23 ชั่วโมงต้อง reconcile ไม่สร้าง delivery ใหม่หรือส่งซ้ำอัตโนมัติหลัง idempotency expiry Signed own-email event อาจยืนยัน acceptance แต่ไม่ปิดการประเมินโควตาอีกช่วง
+
+เปิด RLS และถอน PUBLIC/anon/authenticated grants; RPC เป็น SECURITY INVOKER พร้อม fixed search_path เปิดเฉพาะ service role หลัง route ตรวจ Svix แล้ว ไม่เป็น browser table/API ไม่เพิ่ม cron และ missing schema ต้องหยุดส่ง Production history ต้องตรวจใหม่ก่อน apply เฉพาะ migration นี้ ไม่ใช้ broad db push/reset/replay งาน SEB และโครงสร้างอื่นคงเดิม รายละเอียด `RESEND_SETUP.md` และ `RESEND_PRODUCTION_RELEASE_20261020.md`
+
 ## Private grading drafts — local migration 20261018133739
 
 ยังไม่ apply: `grading_score_drafts` keyed ด้วย `(actor_id, assignment_id, answer_id)` เก็บคะแนนส่วนที่แตะ, `base_score_edited_at` และ `updated_at` แบบ compare-and-set ร่างไม่เปลี่ยนคะแนนจริง/ยอดรวม/สถานะรอบ และไม่มี student reader หรือ browser grant อ่านได้ `read_grading_drafts` ตรวจ actor active และสิทธิ์ exact assignment ซ้ำ ตัวโหลดครูส่งเฉพาะร่างของตนใน official scope
