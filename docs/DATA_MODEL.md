@@ -1,5 +1,13 @@
 # Data model และ invariants
 
+## Resend quota delivery ledger — prepared migration 20261018154826
+
+ยังไม่ apply: ledger แยกจาก Auth/ข้อมูลผู้เรียน เก็บ scope (`local/staging/production`), period (`daily/monthly`), window key, threshold (`80/90/95`), delivery UUID, payload SHA-256 และ timestamps ของ claim/acceptance ไม่เก็บผู้รับ เนื้อหาอีเมล reset link หรือ snapshot usage รายคน รายวันใช้วันแจ้งเตือน UTC; รายเดือนใช้ canonical `monthly.resets_at` จาก provider จึงคงสถานะข้ามวันได้
+
+RPC แบบ atomic ตรวจ payload เดิมและ high-water ต่อ scope/period/window ก่อน claim เพื่อกัน concurrent events หรือระดับต่ำกว่าหลังระดับสูงเริ่มแล้ว UUID เดิมเป็นส่วนของ Resend idempotency key สำหรับ retry ภายใน 24 ชั่วโมง; claim ที่ยังยืนยัน acceptance ไม่ได้และเก่าเกิน 23 ชั่วโมงต้อง reconcile ไม่สร้าง delivery ใหม่หรือส่งซ้ำอัตโนมัติหลัง idempotency expiry Signed own-email event อาจยืนยัน acceptance แต่ไม่ปิดการประเมินโควตาอีกช่วง
+
+เปิด RLS และถอน PUBLIC/anon/authenticated grants; RPC เป็น SECURITY INVOKER พร้อม fixed search_path เปิดเฉพาะ service role หลัง route ตรวจ Svix แล้ว ไม่เป็น browser table/API ไม่เพิ่ม cron และ missing schema ต้องหยุดส่ง ตรวจ live Staging history ผ่าน MCP เทียบไฟล์พบ local-only `20261015132234` และ ledger ใหม่ `20261018154826`; remote-only `20261009142610` ส่วน CLI `migration list --linked` ติด `LegacyProjectNotLinkedError` จึงยังไม่ apply หรือใช้ db push/reset/repair ข้ามความต่าง งาน SEB ยังพัก คู่มือ `RESEND_SETUP.md` แยกการตรวจจำลองกับการตรวจ Staging จริง
+
 ## Private grading drafts — local migration 20261018133739
 
 ยังไม่ apply: `grading_score_drafts` keyed ด้วย `(actor_id, assignment_id, answer_id)` เก็บคะแนนส่วนที่แตะ, `base_score_edited_at` และ `updated_at` แบบ compare-and-set ร่างไม่เปลี่ยนคะแนนจริง/ยอดรวม/สถานะรอบ และไม่มี student reader หรือ browser grant อ่านได้ `read_grading_drafts` ตรวจ actor active และสิทธิ์ exact assignment ซ้ำ ตัวโหลดครูส่งเฉพาะร่างของตนใน official scope
@@ -24,9 +32,9 @@ Trigger แปลงคะแนนอัตโนมัติเต็มดิ
 
 RPC `apply_question_grading_change` ใช้ service role หลังตรวจสิทธิ์ ล็อกโจทย์/งาน/รอบ/คำตอบ ตรวจชุดเป้าหมายกับ expected snapshot ก่อนเขียนเฉลย/คะแนน/ค่ารวม/audit ใน transaction เดียว Trigger ตรวจ revision ตอนสร้างคำตอบ `p_requires_unused_question` ป้องกัน structural change หากมีคำตอบแทรกหลังวางแผน `discard_empty_grading_attempt` ล็อกรอบของนักเรียนและลบได้เฉพาะ in_progress ที่ไม่มีคำตอบ ใช้กู้ explicit SQL revision conflict ไม่ลบรอบจาก transport error ที่อาจบันทึกแล้ว
 
-## Prepared auth-email counters — 17 October 2026
+## Auth-email counters — rollout 17 October 2026
 
-Migration `20261017111034_auth_email_request_limits.sql` adds operational `auth_email_request_limits`, keyed only by domain-separated HMAC email/IP bucket strings. It contains request counts, window starts and expiry, no raw email/IP/user/tenant records. RLS is enabled; PUBLIC/anon/authenticated grants are revoked. Only service_role can reserve through the fixed invoker RPC or purge expired rows. Network buckets are locked/checked before recipient allocation, all bucket locks follow one order, and hosted pg_cron schedules hourly expiry cleanup. This schema has not been applied; Staging already had local-only `20261015132234`, so remote writes stopped for parity review. Auth policy version/date remains editable user metadata and introduces no legal audit or role-authority table.
+Migration `20261017111034_auth_email_request_limits.sql` adds operational `auth_email_request_limits`, keyed only by domain-separated HMAC email/IP bucket strings. It contains request counts, window starts and expiry, no raw email/IP/user/tenant records. RLS is enabled; PUBLIC/anon/authenticated grants are revoked. Only service_role can reserve through the fixed invoker RPC or purge expired rows. Network buckets are locked/checked before recipient allocation, all bucket locks follow one order, and hosted pg_cron schedules hourly expiry cleanup. The authorized auth rollout applied/recorded this migration in both environments as documented in `AUTH_SIGNUP_ROLLOUT.md`; a read of Staging migration history on 18 October confirms its entry. The quota delivery ledger above is a separate, still-unapplied migration. Auth policy version/date remains editable user metadata and introduces no legal audit or role-authority table.
 
 สถานะ 15 ตุลาคม 2026: งานคลังฝึก/ชุดฝึกส่วนตัว/ปักทบทวน รูปโปรไฟล์ รับทราบประกาศ และปิดรอบเมื่อหมดเวลาเผยแพร่ Production แล้วตาม `docs/PRODUCTION_SYNC_20261015.md`; ข้อความ local-only/prepared ในบันทึกเฟสก่อนหน้าบอกสถานะขณะพัฒนา ส่วน native SEB ที่ยังพักไว้ไม่ได้เปิดเพิ่ม
 

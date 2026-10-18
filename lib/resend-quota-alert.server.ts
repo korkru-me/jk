@@ -1,8 +1,10 @@
 import 'server-only'
+import { createHash } from 'node:crypto'
 import { Webhook } from 'svix'
 import { z } from 'zod'
+import { resendQuotaStore, type QuotaAlertStore, type QuotaLevel, type QuotaPeriod } from './resend-quota-store.server'
 
-export const RESEND_QUOTA_LEVELS = [80, 90, 97] as const
+export const RESEND_QUOTA_LEVELS = [80, 90, 95] as const
 const ALERT_KIND = 'korkru_quota_alert'
 const API_ORIGIN = 'https://api.resend.com'
 const MAX_BODY_BYTES = 32 * 1024
@@ -64,6 +66,7 @@ export async function handleResendQuotaWebhook(
   request: Request,
   environment: NodeJS.ProcessEnv,
   fetcher: typeof fetch = fetch,
+  store: QuotaAlertStore = resendQuotaStore,
 ) {
   if (environment.RESEND_QUOTA_ALERTS_ENABLED !== 'true') {
     return json({ error: 'not_configured' }, 503)
@@ -101,20 +104,19 @@ export async function handleResendQuotaWebhook(
     return json({ error: 'invalid_webhook' }, 400)
   }
 
-  const now = new Date()
-  // UTC is intentional: Resend's quota day resets at 00:00 UTC (07:00 Bangkok).
-  const quotaDay = now.toISOString().slice(0, 10)
-  const isOwnAlert = event.data.tags?.kind === ALERT_KIND
-  const ownLevel = Number(event.data.tags?.quota_level)
-  if (!['email.sent', 'email.received'].includes(event.type)
-    // Legacy unlevelled alerts and the final level cannot advance another
-    // threshold. Lower-level alerts may themselves consume the next threshold.
-    || (isOwnAlert && (!RESEND_QUOTA_LEVELS.some(level => level === ownLevel) || ownLevel === 97))
-    || event.created_at.slice(0, 10) !== quotaDay) {
-    return json({ status: 'ignored' })
-  }
+  if (!['email.sent', 'email.received'].includes(event.type)) return json({ status: 'ignored' })
 
   const authorization = `Bearer ${config.apiKey}`
+  // A signed delivery event can settle a timeout/failed finalization without
+  // resending. Even a 95% self-event must check the OTHER period afterwards.
+  const tags = event.data.tags
+  if (event.type === 'email.sent' && tags?.kind === ALERT_KIND
+    && tags.quota_scope === config.scope && z.uuid().safeParse(tags.delivery_key).success) {
+    try { await store.complete(tags.delivery_key) } catch {
+      return json({ error: 'ledger_unavailable' }, 503)
+    }
+  }
+
   try {
     const usageResponse = await fetcher(`${API_ORIGIN}/usage`, {
       headers: { Authorization: authorization },
@@ -125,62 +127,98 @@ export async function handleResendQuotaWebhook(
     if (!usageResponse.ok) return json({ error: 'usage_unavailable' }, 503)
     const usage = usageSchema.safeParse(await usageResponse.json())
     if (!usage.success) return json({ error: 'usage_unavailable' }, 503)
-    const { daily, monthly } = usage.data.emails
-    const dailyLimit = daily.limit
-    const level = dailyLimit === null ? undefined : [...RESEND_QUOTA_LEVELS].reverse()
-      .find(percent => daily.used >= Math.ceil(dailyLimit * percent / 100))
-    if (level === undefined || daily.limit === null) {
-      return json({ status: 'below_threshold' })
+    const now = new Date()
+    const quotaDay = now.toISOString().slice(0, 10)
+    const candidates: { period: QuotaPeriod; windowKey: string; level: QuotaLevel; limit: number }[] = []
+    for (const period of ['daily', 'monthly'] as const) {
+      const quota = usage.data.emails[period]
+      // Upgrading removes only the daily cap; monthly monitoring remains active.
+      if (quota.limit === null) continue
+      const reset = Date.parse(quota.resets_at)
+      const maximumWindow = period === 'daily' ? 25 * 3600000 : 35 * 86400000
+      if (reset <= now.getTime() || reset > now.getTime() + maximumWindow) {
+        return json({ error: 'usage_window_mismatch' }, 503)
+      }
+      const level = [...RESEND_QUOTA_LEVELS].reverse()
+        .find(percent => quota.used >= Math.ceil(quota.limit! * percent / 100))
+      if (level !== undefined) candidates.push({
+        period, level, limit: quota.limit,
+        // Daily is our notification cadence, not a claim that Resend's usage
+        // counter resets at midnight. Monthly uses the provider's actual window.
+        windowKey: period === 'daily' ? quotaDay : new Date(reset).toISOString(),
+      })
     }
-    // A self-event can advance to a higher level, never repeat its own or a
-    // lower level. This handles an alert at 89 consuming the 90th email.
-    if (isOwnAlert && level <= ownLevel) return json({ status: 'ignored' })
-    const nextReset = new Date(`${quotaDay}T00:00:00.000Z`).getTime() + 86400000
-    // Never alert using a stale counter from the previous quota window.
-    if (Date.parse(daily.resets_at) !== nextReset || new Date().toISOString().slice(0, 10) !== quotaDay) {
-      return json({ error: 'usage_window_mismatch' }, 503)
-    }
+    if (!candidates.length) return json({ status: 'below_threshold' })
 
-    // Keep each level's entire payload stable as usage changes within its band.
-    // Resend rejects retries with a reused idempotency key and different body.
-    const resetThai = new Date(nextReset).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
-    const alert = {
-      from: `KorKru <${config.from}>`,
-      to: [config.to],
-      subject: `[KorKru ${config.scope}] Resend ใช้โควตาถึง ${level}% แล้ว · ${quotaDay} UTC`,
-      text: [
-        `Resend ของ KorKru (${config.scope}) ใช้โควตารายวันถึงอย่างน้อย ${level}% (${Math.ceil(daily.limit * level / 100)} จาก ${daily.limit} ฉบับ) แล้ว`,
-        'ยอดรวมทั้งอีเมลส่งและรับของ Resend team ไม่ได้จำกัดเฉพาะอีเมลรีเซ็ตรหัสผ่าน',
-        `โควตาปัจจุบัน ${daily.limit} ฉบับ/วัน และ ${monthly.limit ?? 'ไม่จำกัด'} ฉบับ/เดือน อีเมลเตือนนี้นับอีก 1 ฉบับด้วย`,
-        `รอบโควตาถัดไปเริ่ม ${resetThai} (เวลาไทย) หากโควตารายเดือนยังเหลือ`,
-        'ตรวจยอดล่าสุด: https://resend.com/settings/usage',
-        'หากต้องการเพิ่มโควตา ให้ตรวจแพ็กเกจและอัปเกรดด้วยตนเอง: https://resend.com/settings/billing',
-        'ระบบนี้ไม่อัปเกรดแพ็กเกจอัตโนมัติ และเตือนที่ 80%, 90%, 97% ระดับละครั้งต่อวัน UTC ถ้ายอดข้ามหลายระดับจะเตือนระดับสูงสุดที่ตรวจพบ',
-      ].join('\n\n'),
-      tags: [{ name: 'kind', value: ALERT_KIND }, { name: 'quota_level', value: String(level) }],
+    const results = await Promise.allSettled(candidates.map(async candidate => {
+      const { period, level, windowKey, limit } = candidate
+      const label = period === 'daily' ? 'รายวัน' : 'รายเดือน'
+      const windowLabel = period === 'daily' ? `${windowKey} UTC`
+        : `รอบสิ้นสุด ${new Date(windowKey).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })} (เวลาไทย)`
+      // Immutable per-period payload: actual used count/other-period values
+      // must never change the body of an existing provider idempotency key.
+      const alert = {
+        from: `KorKru <${config.from}>`, to: [config.to],
+        subject: `[KorKru ${config.scope}] Resend โควตา${label}ถึง ${level}% แล้ว · ${windowLabel}`,
+        text: [
+          `Resend ของ KorKru (${config.scope}) ใช้โควตา${label}ถึงอย่างน้อย ${level}% (${Math.ceil(limit * level / 100)} จาก ${limit} ฉบับ) แล้ว`,
+          `รอบแจ้งเตือน: ${windowLabel}`,
+          'ยอดรวมอีเมลส่งและรับทั้ง Resend team อีเมลเตือนนี้นับใช้โควตาอีก 1 ฉบับด้วย',
+          period === 'daily'
+            ? 'ตรวจยอดรายวันล่าสุดจาก Resend แจ้งระดับละครั้งต่อวัน UTC (07:00–07:00 น. เวลาไทย) เวลานี้เป็นรอบแจ้งเตือน ไม่ใช่การรับรองเวลาคืนโควตาของ Resend'
+            : 'แจ้งระดับละครั้งต่อรอบรายเดือนที่ Resend รายงาน แยกจากการเตือนรายวัน',
+          'ตรวจยอดและเวลาคืนโควตาล่าสุด: https://resend.com/settings/usage',
+          'หากต้องการเพิ่มโควตา ตรวจแพ็กเกจและอัปเกรดด้วยตนเอง: https://resend.com/settings/billing',
+          'ระบบนี้ไม่อัปเกรดแพ็กเกจอัตโนมัติ เตือนที่ 80%, 90%, 95% ถ้ายอดข้ามหลายระดับจะเตือนระดับสูงสุดที่ตรวจพบ',
+        ].join('\n\n'),
+        tags: [
+          { name: 'kind', value: ALERT_KIND }, { name: 'quota_period', value: period },
+          { name: 'quota_level', value: String(level) }, { name: 'quota_scope', value: config.scope },
+        ],
+      }
+      let claimed
+      try {
+        claimed = await store.claim({
+          scope: config.scope, period, windowKey, level,
+          payloadHash: createHash('sha256').update(JSON.stringify(alert)).digest('hex'),
+        })
+      } catch { throw new Error('ledger_unavailable') }
+      if (claimed.status === 'already_sent' || claimed.status === 'ignored_higher') return false
+      if (claimed.status !== 'ready') throw new Error(claimed.status)
+      if (!claimed.deliveryKey) throw new Error('ledger_unavailable')
+
+      // Prevent using an old notification key after the UTC date/provider
+      // window expires during a slow request.
+      if ((period === 'daily' && new Date().toISOString().slice(0, 10) !== windowKey)
+        || (period === 'monthly' && Date.now() >= Date.parse(windowKey))) {
+        throw new Error('usage_window_mismatch')
+      }
+      const sent = await fetcher(`${API_ORIGIN}/emails`, {
+        method: 'POST', headers: {
+          Authorization: authorization, 'Content-Type': 'application/json',
+          'Idempotency-Key': `korkru-quota-v3/${claimed.deliveryKey}`,
+        },
+        body: JSON.stringify({ ...alert, tags: [...alert.tags, { name: 'delivery_key', value: claimed.deliveryKey }] }),
+        signal: AbortSignal.timeout(8000), redirect: 'error',
+      })
+      if (!sent.ok) {
+        console.error('[resend-quota] Alert not accepted', { period, status: sent.status })
+        throw new Error('alert_unavailable')
+      }
+      if (!z.object({ id: z.string().min(1) }).safeParse(await sent.json()).success) {
+        throw new Error('alert_unavailable')
+      }
+      try { await store.complete(claimed.deliveryKey) } catch { throw new Error('ledger_unavailable') }
+      return true
+    }))
+    const failure = results.find(result => result.status === 'rejected')
+    if (failure?.status === 'rejected') {
+      const safeErrors = ['ledger_unavailable', 'delivery_uncertain', 'payload_mismatch', 'usage_window_mismatch']
+      const message = failure.reason instanceof Error ? failure.reason.message : ''
+      return json({ error: safeErrors.includes(message) ? message : 'alert_unavailable' }, 503)
     }
-    const sent = await fetcher(`${API_ORIGIN}/emails`, {
-      method: 'POST',
-      headers: {
-        Authorization: authorization,
-        'Content-Type': 'application/json',
-        'Idempotency-Key': `korkru-quota-v2/${config.scope}/${quotaDay}/${level}`,
-      },
-      body: JSON.stringify(alert),
-      signal: AbortSignal.timeout(8000),
-      redirect: 'error',
-    })
-    if (!sent.ok) {
-      // A retry after quota exhaustion may still succeed via the same
-      // idempotency key if Resend already accepted the alert before a timeout.
-      const exhausted = daily.used >= daily.limit
-        || (monthly.limit !== null && monthly.used >= monthly.limit)
-      console.error('[resend-quota] Alert not accepted', { status: sent.status, exhausted })
-      return json({ error: exhausted ? 'quota_exhausted' : 'alert_unavailable' }, 503)
-    }
-    const result = z.object({ id: z.string().min(1) }).safeParse(await sent.json())
-    if (!result.success) return json({ error: 'alert_unavailable' }, 503)
-    return json({ status: 'alert_accepted' })
+    return json({ status: results.some(result => result.status === 'fulfilled' && result.value)
+      ? 'alert_accepted' : 'already_alerted' })
   } catch {
     // A non-2xx response asks Resend to retry delivery. Do not ACK failed work.
     return json({ error: 'provider_unavailable' }, 503)
