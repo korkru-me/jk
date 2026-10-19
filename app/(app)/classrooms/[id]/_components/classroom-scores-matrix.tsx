@@ -2,6 +2,7 @@
 
 import {
   useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useTransition,
+  type ReactNode,
 } from 'react'
 import Link from 'next/link'
 import {
@@ -42,6 +43,7 @@ import {
 } from '@/lib/classroom-score-sort'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { AssignmentTypeFilter, type AssignmentTypeFilterValue } from '@/components/assignments/assignment-type-filter'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { groupPreset } from '@/app/(app)/classrooms/_components/group-colors'
@@ -92,6 +94,8 @@ interface Props {
   /** The students each กลุ่มย่อย-only งาน was handed to, keyed by assignment id. */
   audienceByAssignment?: Map<string, Set<string>>
   groupNameById?: Map<string, string>
+  /** Official submitted scores with answer/work parts still awaiting teacher review. */
+  pendingReviewByStudent?: Record<string, Record<string, true>>
 }
 
 const assignmentDndId = (id: string) => `assignment:${id}`
@@ -102,11 +106,41 @@ const rawDndId = (id: string) => id.slice(id.indexOf(':') + 1)
 const MATRIX_HEADER_CELL = 'border-b-2 border-primary/20 bg-[color-mix(in_oklab,var(--primary)_9%,var(--card))]'
 const MATRIX_HEADER_TEXT = 'text-[color-mix(in_oklab,var(--primary)_50%,var(--foreground))]'
 const MATRIX_ROW_CELL = 'border-b border-border/60 bg-card transition-colors group-even/row:bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))] group-hover/row:bg-[color-mix(in_oklab,var(--primary)_5%,var(--card))] motion-reduce:transition-none'
+const PENDING_REVIEW_COLOR = 'border-warning/35 bg-warning/10 text-[color-mix(in_oklab,var(--warning)_50%,var(--foreground))] hover:bg-warning/20 focus-visible:border-warning/50 focus-visible:ring-warning/25'
+
+function PendingReviewLink({ assignmentId, label, description, appearance = 'badge', className, children }: {
+  assignmentId: string
+  label: string
+  description: string
+  appearance?: 'badge' | 'score'
+  className?: string
+  children: ReactNode
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={<Button render={<Link href={`/assignments/${assignmentId}/results`} />} variant="outline" size="xs" />}
+        aria-label={label}
+        className={cn(
+          'rounded-full pointer-coarse:min-h-11',
+          appearance === 'badge'
+            ? PENDING_REVIEW_COLOR
+            : 'h-auto min-h-11 gap-1.5 rounded-lg border-transparent bg-transparent px-0 text-[color-mix(in_oklab,var(--warning)_50%,var(--foreground))] hover:bg-warning/5 focus-visible:border-warning/50 focus-visible:ring-warning/25',
+          className,
+        )}
+      >
+        {children}
+      </TooltipTrigger>
+      <TooltipContent>{description}</TooltipContent>
+    </Tooltip>
+  )
+}
 
 interface SortableAssignmentHeaderProps {
   assignment: ClassroomAssignmentRow
   disabled: boolean
   hasNonSubmitter: boolean
+  pendingReviewCount: number
   reminding: boolean
   groupNameById: Map<string, string>
   onRemind: () => void
@@ -178,7 +212,7 @@ function RosterSortHeader({ label, sortKey, sort, className, onSort }: RosterSor
 
 function SortableAssignmentHeader({
   assignment, disabled, hasNonSubmitter, reminding, groupNameById, onRemind, sort, onSort,
-  onColumnMotion,
+  onColumnMotion, pendingReviewCount,
 }: SortableAssignmentHeaderProps) {
   const sortValue = sortAria(sort, { type: 'assignment', assignmentId: assignment.id })
   const {
@@ -207,6 +241,7 @@ function SortableAssignmentHeader({
       className={cn(
         'min-w-32 border-l border-primary/10 px-2 py-3 text-center align-top',
         MATRIX_HEADER_CELL,
+        pendingReviewCount > 0 && 'min-w-40 bg-[color-mix(in_oklab,var(--warning)_7%,var(--card))]',
         isOver && !isDragging && 'bg-[color-mix(in_oklab,var(--primary)_15%,var(--card))]',
         isDragging && 'relative z-30 opacity-60 shadow-lg ring-1 ring-primary/30',
       )}
@@ -251,29 +286,42 @@ function SortableAssignmentHeader({
           เฉพาะ {describeGroupTarget(assignment.group_ids, groupNameById)}
         </p>
       )}
-      <Button
-        type="button"
-        variant="ghost"
-        size="xs"
-        onClick={onRemind}
-        disabled={!hasNonSubmitter || reminding}
-        className={cn(
-          'mt-2 mx-auto flex h-auto items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium',
-          hasNonSubmitter
-            ? 'border-warning/20 bg-warning/10 text-[color-mix(in_oklab,var(--warning)_50%,var(--foreground))] hover:bg-warning/15'
-            : 'border-border bg-muted text-muted-foreground cursor-default',
+      <div className="mt-1.5 flex flex-col items-center gap-1">
+        {pendingReviewCount > 0 && (
+          <PendingReviewLink
+            assignmentId={assignment.id}
+            label={`ตรวจให้คะแนน ${assignment.title} · รอตรวจ ${pendingReviewCount} คน`}
+            description={`มีนักเรียน ${pendingReviewCount} คนที่ยังรอผู้สอนตรวจให้คะแนน กดเพื่อเปิดหน้าตรวจของงานนี้`}
+            className="text-[10px]"
+          >
+            <Clock data-icon="inline-start" aria-hidden="true" />
+            รอตรวจ {pendingReviewCount} คน
+          </PendingReviewLink>
         )}
-      >
-        <Bell className="w-2.5 h-2.5" />
-        {reminding ? 'กำลังเตือน...' : 'เตือน'}
-      </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="xs"
+          onClick={onRemind}
+          disabled={!hasNonSubmitter || reminding}
+          className={cn(
+            'h-auto items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium',
+            hasNonSubmitter
+              ? 'border-warning/20 bg-warning/10 text-[color-mix(in_oklab,var(--warning)_50%,var(--foreground))] hover:bg-warning/15'
+              : 'border-border bg-muted text-muted-foreground cursor-default',
+          )}
+        >
+          <Bell className="w-2.5 h-2.5" />
+          {reminding ? 'กำลังเตือน...' : 'เตือน'}
+        </Button>
+      </div>
     </th>
   )
 }
 
 export function ClassroomScoresMatrix({
   classroomId, classroomName, students, assignments, submissions, extensions,
-  categories, audienceByAssignment, groupNameById = new Map(),
+  categories, audienceByAssignment, groupNameById = new Map(), pendingReviewByStudent = {},
 }: Props) {
   const [reminding, setReminding] = useState<string | null>(null)
   const [dialogTarget, setDialogTarget] = useState<{ assignmentId: string; studentId: string } | null>(null)
@@ -445,6 +493,13 @@ export function ClassroomScoresMatrix({
   function notGiven(assignmentId: string, studentId: string) {
     const audience = audienceByAssignment?.get(assignmentId)
     return audience !== undefined && !audience.has(studentId) && !bestSubmission.has(subKey(assignmentId, studentId))
+  }
+
+  function awaitsReview(assignmentId: string, studentId: string) {
+    const sub = bestSubmission.get(subKey(assignmentId, studentId))
+    return (sub?.status === 'submitted' || sub?.status === 'graded')
+      && !notGiven(assignmentId, studentId)
+      && pendingReviewByStudent[assignmentId]?.[studentId] === true
   }
 
   function cellText(assignmentId: string, studentId: string) {
@@ -668,6 +723,7 @@ export function ClassroomScoresMatrix({
                     assignment={a}
                     disabled={isAssignmentOrderPending}
                     hasNonSubmitter={hasNonSubmitter}
+                    pendingReviewCount={orderedStudents.filter(student => awaitsReview(a.id, student.id)).length}
                     reminding={reminding === a.id}
                     groupNameById={groupNameById}
                     onRemind={() => handleRemind(a.id)}
@@ -706,6 +762,7 @@ export function ClassroomScoresMatrix({
                   const extension = extensionMap.get(subKey(a.id, student.id))
                   const submitted = sub?.status === 'submitted' || sub?.status === 'graded'
                   const inProgress = sub?.status === 'in_progress'
+                  const pendingReview = awaitsReview(a.id, student.id)
                   const passed = submitted
                     ? computePassed(sub!.total_score, sub!.max_score, a.passing_type, a.passing_value)
                     : null
@@ -728,7 +785,21 @@ export function ClassroomScoresMatrix({
                       MATRIX_ROW_CELL,
                       draggingAssignmentId === a.id && 'bg-primary/5 opacity-40',
                     )}>
-                      {submitted ? (
+                      {pendingReview ? (
+                        <PendingReviewLink
+                          assignmentId={a.id}
+                          label={`ตรวจให้คะแนน ${a.title} · ${student.full_name} · รอตรวจ · คะแนนชั่วคราว ${sub!.total_score ?? '—'}/${sub!.max_score}`}
+                          description="คะแนนชั่วคราว · รอผู้สอนตรวจให้ครบ กดเพื่อเปิดหน้าตรวจของงานนี้"
+                          appearance="score"
+                          className="mx-auto tabular-nums"
+                        >
+                          <span className={cn('inline-flex min-w-20 items-center justify-center gap-1 rounded-full border px-2 py-1 text-xs font-semibold', PENDING_REVIEW_COLOR)}>
+                            <Clock aria-hidden="true" />
+                            {sub!.total_score ?? '—'}/{sub!.max_score}
+                          </span>
+                          <span className="text-[10px] leading-tight">รอตรวจ</span>
+                        </PendingReviewLink>
+                      ) : submitted ? (
                         <Link
                           href={`/submissions/${sub!.id}`}
                           className={cn(
@@ -794,6 +865,7 @@ export function ClassroomScoresMatrix({
                   const sub = bestSubmission.get(subKey(assignment.id, student.id))
                   const submitted = sub?.status === 'submitted' || sub?.status === 'graded'
                   const inProgress = sub?.status === 'in_progress'
+                  const pendingReview = awaitsReview(assignment.id, student.id)
                   const passed = submitted
                     ? computePassed(sub!.total_score, sub!.max_score, assignment.passing_type, assignment.passing_value)
                     : null
@@ -805,6 +877,14 @@ export function ClassroomScoresMatrix({
                     >
                       {notGiven(assignment.id, student.id) ? (
                         <span className="text-[11px] text-muted-foreground/60">ไม่ได้มอบหมาย</span>
+                      ) : pendingReview ? (
+                        <span className={cn('flex flex-col items-center gap-0.5 text-xs font-semibold', PENDING_REVIEW_COLOR)}>
+                          <span className="flex items-center gap-1">
+                            <Clock className="size-3.5" aria-hidden="true" />
+                            {sub!.total_score ?? '—'}/{sub!.max_score}
+                          </span>
+                          <span className="text-[10px] font-medium">รอตรวจ</span>
+                        </span>
                       ) : submitted ? (
                         <span className={cn(
                           'flex items-center gap-1 text-xs font-semibold',

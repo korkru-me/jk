@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { prepareVoidQuestion, voidAssignmentQuestion } from '@/lib/actions/question-regrading'
 
 interface Impact { submissionCount: number; activeCount: number }
@@ -17,12 +18,13 @@ interface Props {
   assignmentId: string
   questionId: string
   isVoid: boolean
+  size?: 'xs' | 'sm'
   prepare?: typeof prepareVoidQuestion
   apply?: typeof voidAssignmentQuestion
   onComplete?: () => void
 }
 
-export function VoidQuestionButton({ assignmentId, questionId, isVoid, prepare = prepareVoidQuestion, apply = voidAssignmentQuestion, onComplete }: Props) {
+export function VoidQuestionButton({ assignmentId, questionId, isVoid, size = 'sm', prepare = prepareVoidQuestion, apply = voidAssignmentQuestion, onComplete }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -76,9 +78,12 @@ export function VoidQuestionButton({ assignmentId, questionId, isVoid, prepare =
   if (isVoid) return <Badge variant="secondary">โมฆะ · ไม่นับคะแนน</Badge>
 
   return <>
-    <Button ref={trigger} type="button" size="sm" variant="destructive" className="pointer-coarse:min-h-11" disabled={busy} onClick={prepareChange}>
-      <Ban data-icon="inline-start" /> ทำข้อเป็นโมฆะ
-    </Button>
+    <Tooltip>
+      <TooltipTrigger render={<Button ref={trigger} type="button" size={size} variant="destructive" className="pointer-coarse:min-h-11" disabled={busy} onClick={prepareChange}>
+        <Ban data-icon="inline-start" /> ทำข้อเป็นโมฆะ
+      </Button>} />
+      <TooltipContent>ไม่นับทั้งคะแนนที่ได้และคะแนนเต็มของข้อนี้ในการคำนวณคะแนนรวมของงานนี้</TooltipContent>
+    </Tooltip>
     <Dialog open={open} onOpenChange={(next, details) => {
       if (!next && (busy || details.reason === 'outside-press' || details.reason === 'escape-key')) {
         details.cancel()

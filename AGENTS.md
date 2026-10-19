@@ -10,6 +10,7 @@
 - Read `docs/WORD_IMPORT.md` before adding a question type, changing an existing one, or touching `lib/docx-import/` — it holds the per-type Word format spec, the decisions behind the import, and what a `.docx` provably cannot carry.
 - For matching files, also follow `.cursor/rules/typescript-react.mdc`, `.cursor/rules/supabase-security.mdc`, `.cursor/rules/product-ui.mdc`, and `.cursor/rules/overlay-dismissal.mdc`.
 - Before any test that touches a deployed site or external service, follow `.cursor/rules/staging-testing.mdc`.
+- For every Production release, follow `.cursor/rules/production-local-parity.mdc` and `docs/RELEASE_WORKFLOW.md`; this standing rule applies to every chat and agent in this project.
 - For SEB configuration, exam entry, submission, or exit work, follow `.cursor/rules/seb-entry-exit.mdc`.
 - If documentation conflicts with working code, treat code as current behavior, report the mismatch, and update the documentation with the same change.
 
@@ -45,6 +46,7 @@
 - Run `npm test` for changes to `lib/` — vitest covers the evaluator, scoring and shared text helpers. Add a case alongside any change to how a question is sampled or graded.
 - Coverage stops at the pure modules: nothing exercises Supabase, server actions or the browser, so state what was and was not verified.
 - Update `docs/FEATURE_STATUS.md` and any affected domain/architecture document when behavior or scope changes.
+- A successful Production deployment is not a finished release until its changes and dependencies are synced to the actual primary `localhost:3000` checkout and the affected pages/behavior are verified there. Preserve unrelated local work and report any sync or verification gap explicitly.
 
 ## Working across two agents and two machines
 
