@@ -3,11 +3,31 @@ import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 const migration = readFileSync(new URL('../supabase/migrations/20261019154815_extend_assignment_deadline.sql', import.meta.url), 'utf8')
+const conflictMigration = readFileSync(new URL('../supabase/migrations/20261019162413_assignment_deadline_conflict_response.sql', import.meta.url), 'utf8')
 const gradingMigration = readFileSync(new URL('../supabase/migrations/20261018005611_assignment_regrading_and_void.sql', import.meta.url), 'utf8')
 const authorizationHelper = gradingMigration.slice(
   gradingMigration.indexOf('CREATE FUNCTION public.actor_can_manage_grading_assignment('),
   gradingMigration.indexOf('-- Capture legacy rules'),
 )
+const tenancyMigration = readFileSync(new URL('../supabase/migrations/012_multi_tenancy.sql', import.meta.url), 'utf8')
+const classroomMigration = readFileSync(new URL('../supabase/migrations/20260713103000_assignment_classrooms.sql', import.meta.url), 'utf8')
+const organizationHelper = tenancyMigration.slice(
+  tenancyMigration.indexOf('CREATE OR REPLACE FUNCTION public.get_user_org_ids()'),
+  tenancyMigration.indexOf('-- 2b.'),
+)
+const superAdminHelper = tenancyMigration.slice(
+  tenancyMigration.indexOf('CREATE OR REPLACE FUNCTION public.is_super_admin()'),
+  tenancyMigration.indexOf('-- 2d.'),
+)
+const coTeacherHelper = classroomMigration.slice(
+  classroomMigration.indexOf('CREATE OR REPLACE FUNCTION public.get_my_co_teaching_assignment_ids()'),
+  classroomMigration.indexOf('CREATE OR REPLACE FUNCTION public.get_my_visible_assignment_ids()'),
+)
+const assignmentPolicies = [
+  tenancyMigration.match(/CREATE POLICY "assignments_org_teacher_all"[\s\S]*?;/)![0],
+  tenancyMigration.match(/CREATE POLICY "assignments_super_admin_all"[\s\S]*?;/)![0],
+  classroomMigration.match(/CREATE POLICY "assignments_co_teacher_all"[\s\S]*?;/)![0],
+].join('\n')
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
 const OWNER = id(1), OTHER = id(2), MANAGER = id(3), VIEWER = id(4), STUDENT = id(5), SUPER = id(6)
 const ASSIGNMENT = id(10), OTHER_ASSIGNMENT = id(11), ROOM = id(20), SECOND_ROOM = id(21)
@@ -29,6 +49,7 @@ beforeEach(async () => {
     $$;
     CREATE TABLE public.users (id uuid PRIMARY KEY, role text DEFAULT 'teacher', status text DEFAULT 'active');
     CREATE TABLE public.super_admins (user_id uuid PRIMARY KEY REFERENCES public.users(id));
+    CREATE TABLE public.organization_members (org_id uuid, user_id uuid REFERENCES public.users(id), PRIMARY KEY(org_id,user_id));
     CREATE TABLE public.assignment_classrooms (assignment_id uuid, classroom_id uuid);
     CREATE TABLE public.classroom_co_teachers (classroom_id uuid, user_id uuid, permission text);
     CREATE TABLE public.assignments (
@@ -60,6 +81,7 @@ beforeEach(async () => {
     INSERT INTO public.users(id) VALUES ('${OWNER}'),('${OTHER}'),('${MANAGER}'),('${VIEWER}'),('${SUPER}');
     INSERT INTO public.users(id,role) VALUES ('${STUDENT}','student');
     INSERT INTO public.super_admins VALUES ('${SUPER}');
+    INSERT INTO public.organization_members VALUES ('${id(90)}','${OWNER}'),('${id(91)}','${OTHER}');
     INSERT INTO public.assignments(id,created_by,org_id) VALUES
       ('${ASSIGNMENT}','${OWNER}','${id(90)}'),('${OTHER_ASSIGNMENT}','${OTHER}','${id(91)}');
     INSERT INTO public.assignment_classrooms VALUES
@@ -79,8 +101,7 @@ beforeEach(async () => {
     ALTER TABLE public.assignments ENABLE ROW LEVEL SECURITY;
     ALTER TABLE public.assignment_extensions ENABLE ROW LEVEL SECURITY;
     ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
-    CREATE POLICY assignments_owner ON public.assignments TO authenticated
-      USING (created_by=auth.uid()) WITH CHECK (created_by=auth.uid());
+    ALTER TABLE public.organization_members ENABLE ROW LEVEL SECURITY;
     CREATE POLICY extensions_owner ON public.assignment_extensions TO authenticated
       USING (EXISTS(SELECT 1 FROM public.assignments a WHERE a.id=assignment_id AND a.created_by=auth.uid()))
       WITH CHECK (EXISTS(SELECT 1 FROM public.assignments a WHERE a.id=assignment_id AND a.created_by=auth.uid()));
@@ -89,8 +110,13 @@ beforeEach(async () => {
     GRANT SELECT, INSERT, UPDATE ON public.assignment_extensions TO authenticated;
     GRANT SELECT ON public.users TO authenticated;
   `)
+  await db.exec(organizationHelper)
+  await db.exec(superAdminHelper)
+  await db.exec(coTeacherHelper)
+  await db.exec(assignmentPolicies)
   await db.exec(authorizationHelper)
   await db.exec(migration)
+  await db.exec(conflictMigration)
 })
 afterEach(async () => { await db?.close() })
 
@@ -149,7 +175,32 @@ describe('whole-assignment deadline extension transaction', () => {
   })
 
   it.each([MANAGER, SUPER])('allows exact management through another linked room or super-admin authority (%s)', async actor => {
+    expect((await db.query('SELECT org_id FROM public.organization_members WHERE user_id=$1', [actor])).rows).toEqual([])
+    expect((await asRole('authenticated', actor, tx => tx.query('SELECT id FROM public.assignments WHERE id=$1', [ASSIGNMENT]))).rows)
+      .toEqual([{ id: ASSIGNMENT }])
     expect((await extend({ actor })).id).toBe(ASSIGNMENT)
+  })
+  it.each(['departed', 'different organization'])('denies a still-active owner without membership in this organization (%s)', async membership => {
+    await db.query('DELETE FROM public.organization_members WHERE user_id=$1', [OWNER])
+    if (membership === 'different organization') {
+      await db.query('INSERT INTO public.organization_members VALUES($1,$2)', [id(91), OWNER])
+    }
+    // Ownership still passes the existing service-only grading helper. This
+    // isolates the additional assignment-edit policy enforced by the new RPC.
+    expect((await db.query<{ allowed: boolean }>('SELECT public.actor_can_manage_grading_assignment($1,$2) AS allowed', [OWNER, ASSIGNMENT])).rows)
+      .toEqual([{ allowed: true }])
+    const before = await assignment(), beforeExtensions = await extensions()
+    expect((await asRole('authenticated', OWNER, tx => tx.query('SELECT id FROM public.assignments WHERE id=$1', [ASSIGNMENT]))).rows).toEqual([])
+    expect((await asRole('authenticated', OWNER, tx => tx.query('UPDATE public.assignments SET end_at=$1 WHERE id=$2 RETURNING id', [NEW_END, ASSIGNMENT]))).rows).toEqual([])
+    await expect(extend()).rejects.toMatchObject({ code: '42501' })
+    expect(await assignment()).toEqual(before)
+    expect(await extensions()).toEqual(beforeExtensions)
+  })
+  it('allows an owner again only after current organization membership is restored', async () => {
+    await db.query('DELETE FROM public.organization_members WHERE user_id=$1', [OWNER])
+    await expect(extend()).rejects.toMatchObject({ code: '42501' })
+    await db.query('INSERT INTO public.organization_members VALUES($1,$2)', [id(90), OWNER])
+    expect((await extend()).id).toBe(ASSIGNMENT)
   })
   it('allows an admin co-teacher but denies organization peers and view-only co-teachers', async () => {
     for (const actor of [OTHER, VIEWER]) await expect(extend({ actor })).rejects.toMatchObject({ code: '42501' })
@@ -182,18 +233,50 @@ describe('whole-assignment deadline extension transaction', () => {
     expect(definitions.prosecdef).toBe(true)
     expect(definitions.proconfig).toContain('search_path=""')
   })
+  it('upgrades an installed serialization code to HTTP409 while preserving function authority and other functions', async () => {
+    const originalDefinition = (await db.query<{ definition: string }>(
+      "SELECT pg_get_functiondef('public.extend_assignment_deadline(uuid,timestamptz,timestamptz,timestamptz)'::regprocedure) AS definition",
+    )).rows[0].definition
+    await db.exec(originalDefinition.replace("ERRCODE = 'PT409', MESSAGE = 'assignment deadline changed", "ERRCODE = '40001', MESSAGE = 'assignment deadline changed"))
+    const metadataQuery = "SELECT oid,proowner,proacl,prosecdef,proconfig FROM pg_proc WHERE oid='public.extend_assignment_deadline(uuid,timestamptz,timestamptz,timestamptz)'::regprocedure"
+    const beforeAuthority = (await db.query(metadataQuery)).rows
+    const helperQuery = "SELECT pg_get_functiondef('public.actor_can_manage_grading_assignment(uuid,uuid)'::regprocedure) AS definition"
+    const beforeHelper = (await db.query(helperQuery)).rows
+    await expect(extend({ expectedUpdatedAt: null })).rejects.toMatchObject({ code: '40001' })
+    await db.exec(conflictMigration)
+    await expect(extend({ expectedUpdatedAt: null })).rejects.toMatchObject({ code: 'PT409' })
+    expect((await db.query(metadataQuery)).rows).toEqual(beforeAuthority)
+    expect((await db.query(helperQuery)).rows).toEqual(beforeHelper)
+  })
+  it('refuses to patch a missing deadline RPC', async () => {
+    await db.exec('DROP FUNCTION public.extend_assignment_deadline(uuid,timestamptz,timestamptz,timestamptz)')
+    await expect(db.exec(conflictMigration)).rejects.toMatchObject({ code: '55000' })
+  })
+  it('refuses an already-patched or unexpectedly changed deadline RPC without further writes', async () => {
+    const beforeAssignment = await assignment(), beforeExtensions = await extensions()
+    await expect(db.exec(conflictMigration)).rejects.toMatchObject({ code: '55000' })
+    const definition = (await db.query<{ definition: string }>(
+      "SELECT pg_get_functiondef('public.extend_assignment_deadline(uuid,timestamptz,timestamptz,timestamptz)'::regprocedure) AS definition",
+    )).rows[0].definition
+    await db.exec(definition
+      .replace("ERRCODE = 'PT409', MESSAGE = 'assignment deadline changed", "ERRCODE = '40001', MESSAGE = 'assignment deadline changed")
+      .replace('OR v_assignment.updated_at IS DISTINCT FROM p_expected_updated_at', 'AND v_assignment.updated_at IS DISTINCT FROM p_expected_updated_at'))
+    await expect(db.exec(conflictMigration)).rejects.toMatchObject({ code: '55000' })
+    expect(await assignment()).toEqual(beforeAssignment)
+    expect(await extensions()).toEqual(beforeExtensions)
+  })
   it.each([
     { expectedEndAt: '2090-01-03T10:00:00Z' }, { expectedEndAt: null },
     { expectedUpdatedAt: '2026-09-30T00:00:00Z' }, { expectedUpdatedAt: null },
   ])('rejects stale or missing optimistic snapshots without any write (%j)', async options => {
     const before = await assignment(), beforeExtensions = await extensions()
-    await expect(extend(options)).rejects.toMatchObject({ code: '40001' })
+    await expect(extend(options)).rejects.toMatchObject({ code: 'PT409' })
     expect(await assignment()).toEqual(before)
     expect(await extensions()).toEqual(beforeExtensions)
   })
   it('rejects a repeated stale save after another manager has extended the assignment', async () => {
     await extend()
-    await expect(extend({ endAt: '2090-01-07T10:00:00Z' })).rejects.toMatchObject({ code: '40001' })
+    await expect(extend({ endAt: '2090-01-07T10:00:00Z' })).rejects.toMatchObject({ code: 'PT409' })
   })
   it.each([
     ['draft', 'online', 'exercise'], ['closed', 'online', 'exercise'],
