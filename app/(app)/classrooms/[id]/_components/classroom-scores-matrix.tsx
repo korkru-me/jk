@@ -264,25 +264,37 @@ function SortableAssignmentHeader({
         >
           <GripVertical />
         </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="xs"
+        <Link
+          href={`/assignments/${assignment.id}`}
+          prefetch={false}
           onPointerDown={event => event.stopPropagation()}
-          onClick={event => {
-            event.stopPropagation()
-            onSort()
-          }}
+          onClick={event => event.stopPropagation()}
           className={cn(
-            'h-auto min-w-0 flex-1 whitespace-normal px-1 py-0.5 text-xs font-semibold hover:bg-primary/10 pointer-coarse:min-h-[44px]',
+            'flex min-w-0 flex-1 items-center justify-center rounded-sm px-1 py-0.5 text-xs font-semibold outline-none hover:text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:min-h-[44px]',
             MATRIX_HEADER_TEXT,
-            sortValue !== 'none' && 'bg-primary/10 ring-1 ring-primary/20',
           )}
-          title={`เรียงนักเรียนตาม ${assignment.title}`}
+          title={`เปิดหน้างาน ${assignment.title}`}
         >
           <span className="line-clamp-2">{assignment.title}</span>
-          <SortIndicator value={sortValue} />
-        </Button>
+        </Link>
+        <Tooltip>
+          <TooltipTrigger
+            render={<Button type="button" variant="ghost" size="icon-2xs" />}
+            onPointerDown={event => event.stopPropagation()}
+            onClick={event => { event.stopPropagation(); onSort() }}
+            aria-label={`เรียงนักเรียนตามคะแนน ${assignment.title} ${sortValue === 'descending' ? 'จากน้อยไปมาก' : 'จากมากไปน้อย'}`}
+            className={cn(
+              'mt-0.5 shrink-0 hover:bg-primary/10 pointer-coarse:min-h-[44px] pointer-coarse:min-w-[44px]',
+              MATRIX_HEADER_TEXT,
+              sortValue !== 'none' && 'bg-primary/10 ring-1 ring-primary/20',
+            )}
+          >
+            <SortIndicator value={sortValue} />
+          </TooltipTrigger>
+          <TooltipContent>
+            เรียงนักเรียนตามคะแนน {sortValue === 'descending' ? 'จากน้อยไปมาก' : 'จากมากไปน้อย'}
+          </TooltipContent>
+        </Tooltip>
       </div>
       {assignment.group_ids && (
         <p className="mt-0.5 line-clamp-1 text-[10px] font-medium text-tint-1" title={describeGroupTarget(assignment.group_ids, groupNameById)}>
@@ -660,7 +672,7 @@ export function ClassroomScoresMatrix({
 
       <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <GripVertical className="w-3.5 h-3.5 shrink-0" />
-        กดหัวตารางเพื่อเรียงนักเรียน หรือกดค้างแล้วลากหัวงานซ้าย–ขวาเพื่อจัดลำดับคอลัมน์
+        กดชื่องานเพื่อเปิดงาน กดลูกศรเพื่อเรียงนักเรียน หรือลากจุดข้างชื่อเพื่อสลับคอลัมน์
         {isAssignmentOrderPending && <span className="font-medium text-primary">กำลังบันทึก...</span>}
       </p>
 
