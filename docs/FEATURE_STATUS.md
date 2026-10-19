@@ -1,5 +1,9 @@
 # Feature status
 
+## เผยแพร่งานตรวจคะแนนและโหมดสอนรอบถัดมา — 19 ตุลาคม 2026 (Production · PR #65)
+
+งานที่เหลือแปดคอมมิตจากป้ายตรวจคะแนนถึงโหมดสอนทีละข้อเผยแพร่ผ่าน PR #65 / application merge `afb74c0` แล้ว หลัง Staging `b07e2ac` ผ่าน integration gate และ browser ด้วยข้อมูลสังเคราะห์ ชุด release ผ่าน 311 files / 4,155 tests, TypeScript, token lint และ isolated production build ตรวจเว็บจริงแบบอ่านอย่างเดียวและยืนยัน application scope ตรงกับ checkout หลักที่ localhost:3000 แล้ว ไม่มี migration ใหม่ ไม่แก้ Auth/รหัสผ่าน/สมัครสมาชิก/อีเมลหรือทับงานอื่น รายการ local-only ด้านล่างเป็นประวัติก่อนเผยแพร่ ดูขอบเขต หลักฐาน และข้อจำกัดใน [GRADING_TEACHING_RELEASE_20261019.md](GRADING_TEACHING_RELEASE_20261019.md)
+
 ## โหมดสอนทีละหนึ่งข้อ — 19 ตุลาคม 2026 (local only)
 
 - TeachingModeClient แสดง active question พร้อมกระดานของข้อนั้นเพียงหนึ่งแถวเสมอ ทั้งข้อสอบ/แบบฝึกหัดใช้ route/component เดียวกัน ถอด questionsPerPage prop/state/options/selector และ inactive-board placeholder ออก ไม่อ่าน assignments.questions_per_page เพื่อแบ่งหน้าสอน และไม่แก้การแบ่งหน้าฝั่งนักเรียน
