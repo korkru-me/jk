@@ -34,7 +34,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { ExtensionDialog } from './extension-dialog'
+import { ExtensionDialog, type ExtensionDialogActions } from './extension-dialog'
 import type { ClassroomAssignmentRow } from './classroom-assignments-tab'
 import { compareAssignmentsForDisplay } from '@/lib/student-ability'
 import {
@@ -96,6 +96,8 @@ interface Props {
   groupNameById?: Map<string, string>
   /** Official submitted scores with answer/work parts still awaiting teacher review. */
   pendingReviewByStudent?: Record<string, Record<string, true>>
+  /** Isolated UI fixtures supply actions that never write to a real database. */
+  extensionActions?: ExtensionDialogActions
 }
 
 const assignmentDndId = (id: string) => `assignment:${id}`
@@ -144,6 +146,7 @@ interface SortableAssignmentHeaderProps {
   reminding: boolean
   groupNameById: Map<string, string>
   onRemind: () => void
+  onExtend: (trigger: HTMLButtonElement) => void
   sort: ScoreMatrixSort | null
   onSort: () => void
   onColumnMotion: (
@@ -212,7 +215,7 @@ function RosterSortHeader({ label, sortKey, sort, className, onSort }: RosterSor
 
 function SortableAssignmentHeader({
   assignment, disabled, hasNonSubmitter, reminding, groupNameById, onRemind, sort, onSort,
-  onColumnMotion, pendingReviewCount,
+  onColumnMotion, pendingReviewCount, onExtend,
 }: SortableAssignmentHeaderProps) {
   const sortValue = sortAria(sort, { type: 'assignment', assignmentId: assignment.id })
   const {
@@ -298,22 +301,40 @@ function SortableAssignmentHeader({
             รอตรวจ {pendingReviewCount} คน
           </PendingReviewLink>
         )}
-        <Button
-          type="button"
-          variant="ghost"
-          size="xs"
-          onClick={onRemind}
-          disabled={!hasNonSubmitter || reminding}
-          className={cn(
-            'h-auto items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium pointer-coarse:min-h-[44px]',
-            hasNonSubmitter
-              ? 'border-warning/20 bg-warning/10 text-[color-mix(in_oklab,var(--warning)_50%,var(--foreground))] hover:bg-warning/15'
-              : 'border-border bg-muted text-muted-foreground cursor-default',
+        <div className="flex flex-wrap items-center justify-center gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            onPointerDown={event => event.stopPropagation()}
+            onClick={event => { event.stopPropagation(); onRemind() }}
+            disabled={!hasNonSubmitter || reminding}
+            className={cn(
+              'h-auto items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium pointer-coarse:min-h-[44px]',
+              hasNonSubmitter
+                ? 'border-warning/20 bg-warning/10 text-[color-mix(in_oklab,var(--warning)_50%,var(--foreground))] hover:bg-warning/15'
+                : 'border-border bg-muted text-muted-foreground cursor-default',
+            )}
+          >
+            <Bell className="w-2.5 h-2.5" />
+            {reminding ? 'กำลังเตือน...' : 'เตือน'}
+          </Button>
+          {assignment.mode === 'online' && (assignment.type === 'exercise' || assignment.type === 'exam') && assignment.status === 'published' && (
+            <Tooltip>
+              <TooltipTrigger
+                render={<Button type="button" variant="outline" size="xs" />}
+                aria-label={`ขยายเวลา ${assignment.title} สำหรับทุกคน`}
+                onPointerDown={event => event.stopPropagation()}
+                onClick={event => { event.stopPropagation(); onExtend(event.currentTarget) }}
+                className="h-auto gap-1 rounded-full border-primary/20 bg-primary/5 px-2 py-0.5 text-[10px] text-primary hover:bg-primary/10 pointer-coarse:min-h-[44px]"
+              >
+                <Clock className="size-2.5" aria-hidden="true" />
+                ขยายเวลา
+              </TooltipTrigger>
+              <TooltipContent>เลื่อนเวลาปิดรับของงานนี้สำหรับนักเรียนทุกคน</TooltipContent>
+            </Tooltip>
           )}
-        >
-          <Bell className="w-2.5 h-2.5" />
-          {reminding ? 'กำลังเตือน...' : 'เตือน'}
-        </Button>
+        </div>
       </div>
     </th>
   )
@@ -321,10 +342,11 @@ function SortableAssignmentHeader({
 
 export function ClassroomScoresMatrix({
   classroomId, classroomName, students, assignments, submissions, extensions,
-  categories, audienceByAssignment, groupNameById = new Map(), pendingReviewByStudent = {},
+  categories, audienceByAssignment, groupNameById = new Map(), pendingReviewByStudent = {}, extensionActions,
 }: Props) {
   const [reminding, setReminding] = useState<string | null>(null)
-  const [dialogTarget, setDialogTarget] = useState<{ assignmentId: string; studentId: string } | null>(null)
+  const [dialogTarget, setDialogTarget] = useState<string | null>(null)
+  const extensionTrigger = useRef<HTMLButtonElement | null>(null)
   const [isPending, startTransition] = useTransition()
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
@@ -742,6 +764,10 @@ export function ClassroomScoresMatrix({
                     reminding={reminding === a.id}
                     groupNameById={groupNameById}
                     onRemind={() => handleRemind(a.id)}
+                    onExtend={trigger => {
+                      extensionTrigger.current = trigger
+                      setDialogTarget(a.id)
+                    }}
                     sort={studentSort}
                     onSort={() => toggleStudentSort({ type: 'assignment', assignmentId: a.id })}
                     onColumnMotion={moveAssignmentCells}
@@ -779,7 +805,6 @@ export function ClassroomScoresMatrix({
                 </td>
                 {visibleAssignments.map(a => {
                   const sub = bestSubmission.get(subKey(a.id, student.id))
-                  const extension = extensionMap.get(subKey(a.id, student.id))
                   const submitted = sub?.status === 'submitted' || sub?.status === 'graded'
                   const inProgress = sub?.status === 'in_progress'
                   const pendingReview = awaitsReview(a.id, student.id)
@@ -844,18 +869,6 @@ export function ClassroomScoresMatrix({
                           <MinusCircle className="w-3.5 h-3.5" />
                           <span className="text-xs">ยังไม่ทำ</span>
                         </div>
-                      )}
-
-                      {!submitted && (
-                        <button
-                          onClick={() => setDialogTarget({ assignmentId: a.id, studentId: student.id })}
-                          className={cn('mx-auto mt-0.5 flex items-center gap-0.5 rounded-sm text-[10px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:min-h-[44px] pointer-coarse:opacity-100',
-                            extension ? 'text-tint-1 font-medium' : 'text-muted-foreground/40 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 hover:text-tint-1',
-                          )}
-                        >
-                          <Clock className="w-2.5 h-2.5" />
-                          {extension ? 'ขยายเวลาแล้ว' : 'ขยายเวลา'}
-                        </button>
                       )}
                     </td>
                   )
@@ -934,17 +947,15 @@ export function ClassroomScoresMatrix({
       )}
 
       {dialogTarget && (() => {
-        const assignment = assignments.find(a => a.id === dialogTarget.assignmentId)
-        const student = students.find(s => s.id === dialogTarget.studentId)
-        const existing = extensionMap.get(subKey(dialogTarget.assignmentId, dialogTarget.studentId))
-        if (!assignment || !student) return null
+        const assignment = assignments.find(a => a.id === dialogTarget)
+        if (!assignment) return null
         return (
           <ExtensionDialog
+            key={assignment.id}
             assignmentId={assignment.id}
             assignmentTitle={assignment.title}
-            studentId={student.id}
-            studentName={student.full_name}
-            currentExtension={existing ? { extended_end_at: existing.extended_end_at, note: existing.note } : undefined}
+            actions={extensionActions}
+            finalFocus={extensionTrigger}
             onClose={() => setDialogTarget(null)}
           />
         )

@@ -1,5 +1,11 @@
 # Brand, language และ UI rules
 
+## Assignment-wide extension dialog — 19 October 2026
+
+Assignment headers place Remind and Extend in the same action row below the title/review badge. Extend uses Clock, outline primary styling and an explanatory tooltip. No repeated extension controls appear in student cells. Coarse-pointer targets stay at least 44px; pointer/click events on actions do not start sorting or dragging.
+
+Use shared Dialog/Card/Input/Button at `sm:max-w-md`, with title “ขยายเวลาทั้งงาน”, full assignment title and scope across linked classrooms. Show the old close read-only, then a Thai-time datetime input and concise due/duration context. Loading/retry/error states must not imply success; invalid input or pending save disables submission. Backdrop/Escape always confirm dismissal; direct cancellation confirms when dirty. Returning preserves draft/focus, closing restores the exact header trigger. Save acknowledgement shows success, closes and refreshes.
+
 ## ความกระชับของตารางคะแนนห้องเรียน — 19 ตุลาคม 2026
 
 ตารางใช้ fixed layout กับ colgroup กำหนดความกว้างข้อมูลประจำตัว คอลัมน์นักเรียนกว้าง 36 spacing units บน desktop และ 32 บนจอแคบ แทน 40 บน desktop คอลัมน์งานรับพื้นที่ส่วนเกิน จึงไม่ยืดชื่อหรือดันชั้นออกไปเมื่อเหลืองานน้อย Sticky offsets คำนวณจากความกว้างชื่อเดียวกัน และคงพื้นทึบบังข้อมูลที่เลื่อนด้านใต้ จอแคบตรึงเฉพาะลำดับ/ชื่อเพื่อเหลือพื้นที่อ่านข้อมูลที่เลื่อน
