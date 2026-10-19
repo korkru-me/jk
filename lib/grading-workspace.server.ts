@@ -11,6 +11,7 @@ import { loadAssignmentQuestionsByProvenance } from '@/lib/assignment-question-a
 import { naturalMaxScore, type GradingConfig } from '@/lib/assignment-attempt'
 import { scoreParts, sortGradingStudents, type GradingAnswer, type GradingPartsPolicy, type GradingStudent, type GradingStudentSortKey, type GradingWorkspaceData } from '@/lib/grading-workspace'
 import { officialSubmissionsByStudent, rescaleToDisplayMax } from '@/lib/scoring'
+import { preferPendingAverageReviewAttempts } from '@/lib/grading-review-attempt'
 import { classifySubmissionTimingsByStudent, type LateBandColorId } from '@/lib/late-submission'
 import { loadAssignmentGradingState, withVoidedScoreMetadata } from '@/lib/voided-score-metadata.server'
 import { isCurrentAnswerAttachmentPath, isLegacyStudentAttachmentPath, storagePathFromPublicUrl } from '@/lib/exam-attachment'
@@ -216,6 +217,7 @@ export async function loadGradingWorkspace(assignmentId: string, scope: GradingW
   }))
   const bySubmission = new Map<string, GradingAnswer[]>()
   for (const answer of summaryAnswers) { const list = bySubmission.get(answer.submissionId) ?? []; list.push(answer); bySubmission.set(answer.submissionId, list) }
+  const pendingSubmissionIds = new Set<string>()
   const projected = (await withVoidedScoreMetadata(reader, finished)).map(row => {
     const answers = bySubmission.get(row.id)
     if (!answers?.length) return row
@@ -224,13 +226,17 @@ export async function loadGradingWorkspace(assignmentId: string, scope: GradingW
     for (const answer of answers) {
       const question = questionById.get(answer.questionId)
       const parts = question ? scoreParts(answer, question) : null
+      if (parts?.pending) pendingSubmissionIds.add(row.id)
       total += parts?.total ?? answer.score
       max += parts?.maxScore ?? answer.maxScore
     }
     return { ...row, total_score: Math.round(total * 100) / 100, max_score: Math.round(max * 100) / 100 }
   })
   const scaled = rescaleToDisplayMax(projected, () => assignment.display_max_score)
-  const official = officialSubmissionsByStudent(scaled, assignment.score_strategy)
+  const officialScores = officialSubmissionsByStudent(scaled, assignment.score_strategy)
+  const official = assignment.score_strategy === 'average'
+    ? preferPendingAverageReviewAttempts(officialScores, scaled, pendingSubmissionIds)
+    : officialScores
   const studentIds = [...official.keys()]
   const [profiles, extensions, batches] = await Promise.all([
     fetchRowsInChunks(studentIds, ids => reader.from('student_profiles').select('student_id, grade_level, section_number, class_number, student_code').in('student_id', ids).returns<ProfileRecord[]>(), CHUNK_SIZE),

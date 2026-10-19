@@ -10,9 +10,9 @@ const id = (kind: number, value: number) =>
   `00000000-0000-4000-8${kind}00-${String(value).padStart(12, '0')}`
 
 const students = [
-  { id: id(1, 1), full_name: 'ก่อกุศล มาแสน', email: 'sunji.teen@gmail.com', grade_level: 'ม.3', section_number: 5, class_number: 3, student_code: '57290' },
-  { id: id(1, 2), full_name: 'เด็กหญิงเด่น ดัก', email: 'sanglao.nil2@gmail.com', grade_level: null, section_number: null, class_number: null, student_code: null },
-  { id: id(1, 3), full_name: 'เด็กชายก่อกุศล มาแสน', email: 'sunji.teen1@gmail.com', grade_level: 'ม.4', section_number: 8, class_number: 5, student_code: 'กดเกด' },
+  { id: id(1, 1), full_name: 'นักเรียนตัวอย่าง 1', email: 'student1@example.invalid', grade_level: 'ม.3', section_number: 5, class_number: 3, student_code: '57290' },
+  { id: id(1, 2), full_name: 'นักเรียนตัวอย่าง 2', email: 'student2@example.invalid', grade_level: null, section_number: null, class_number: null, student_code: null },
+  { id: id(1, 3), full_name: 'นักเรียนตัวอย่าง 3', email: 'student3@example.invalid', grade_level: 'ม.4', section_number: 8, class_number: 5, student_code: '53001' },
 ]
 
 const assignments: ClassroomAssignmentRow[] = Array.from({ length: 7 }, (_, index) => ({
@@ -42,6 +42,9 @@ const submissions = [
   { id: id(3, 2), assignment_id: assignments[1].id, student_id: students[1].id, status: 'submitted', total_score: 10, max_score: 11, submitted_at: '2026-09-30T01:00:00.000Z', attempt_number: 1 },
   { id: id(3, 3), assignment_id: assignments[3].id, student_id: students[0].id, status: 'submitted', total_score: 4, max_score: 9, submitted_at: '2026-09-30T01:00:00.000Z', attempt_number: 1 },
   { id: id(3, 4), assignment_id: assignments[4].id, student_id: students[1].id, status: 'submitted', total_score: 9, max_score: 11, submitted_at: '2026-09-30T01:00:00.000Z', attempt_number: 1 },
+  { id: id(3, 5), assignment_id: assignments[3].id, student_id: students[1].id, status: 'submitted', total_score: 0, max_score: 9, submitted_at: '2026-09-30T01:00:00.000Z', attempt_number: 1 },
+  { id: id(3, 6), assignment_id: assignments[3].id, student_id: students[2].id, status: 'in_progress', total_score: null, max_score: 9, submitted_at: null, attempt_number: 1 },
+  { id: id(3, 7), assignment_id: assignments[1].id, student_id: students[2].id, status: 'graded', total_score: 0, max_score: 11, submitted_at: '2026-09-30T01:00:00.000Z', attempt_number: 1 },
 ]
 
 const studentAssignments: StudentAssignmentRow[] = assignments.map(assignment => ({
@@ -56,6 +59,7 @@ const studentAssignments: StudentAssignmentRow[] = assignments.map(assignment =>
 
 export function ScoresMatrixLabClient() {
   const [studentView, setStudentView] = useState(false)
+  const [reviewed, setReviewed] = useState(false)
   return (
     <main className="min-h-dvh bg-background p-6">
       <div className="mx-auto max-w-[1800px] space-y-4">
@@ -65,6 +69,9 @@ export function ScoresMatrixLabClient() {
           <Button variant="outline" size="sm" onClick={() => setStudentView(value => !value)}>
             {studentView ? 'กลับตารางคะแนนจำลอง' : 'ดูงานในมุมนักเรียนจำลอง'}
           </Button>
+          {!studentView && <Button variant="outline" size="sm" onClick={() => setReviewed(value => !value)}>
+            {reviewed ? 'จำลองรอตรวจอีกครั้ง' : 'จำลองตรวจครบ'}
+          </Button>}
         </div>
         {studentView ? (
           <AssignmentList assignments={studentAssignments} categories={[]} />
@@ -77,6 +84,7 @@ export function ScoresMatrixLabClient() {
             categories={[]}
             submissions={submissions}
             extensions={[]}
+            pendingReviewByStudent={reviewed ? {} : { [assignments[3].id]: { [students[0].id]: true, [students[1].id]: true } }}
           />
         )}
       </div>

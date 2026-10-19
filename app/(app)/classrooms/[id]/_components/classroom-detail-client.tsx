@@ -99,6 +99,8 @@ interface Props {
   posts: ClassroomPost[]
   /** The same waiting hand-ins split per งาน, keyed by assignment id. */
   pendingReviewByAssignment: Record<string, number>
+  /** Pending official score contributions, keyed by assignment then current roster student. */
+  pendingReviewByStudent?: Record<string, Record<string, true>>
   /** Student ids that have seen each announcement, keyed by post id. */
   seenByPost: Record<string, string[]>
   /** Live classrooms the same announcement can be cross-posted to. */
@@ -119,7 +121,7 @@ export function ClassroomDetailClient({
   classroom, switchableClassrooms, students, assignmentCount, isOwner, canManage, coTeachers, invites,
   classroomAssignments, practiceLibraries, recentWork, assignmentCategories, classroomSubmissions, classroomExtensions,
   homeroomAssignments, homeroomSubmissions, studentNotes, studentProfiles, ownerName, posts,
-  pendingReviewByAssignment, seenByPost, crossPostTargets,
+  pendingReviewByAssignment, pendingReviewByStudent = {}, seenByPost, crossPostTargets,
   groups, groupMembers, initialNavigationItem, loadedNavigationItem, initialPeopleView, backHref, navigationPathname,
 }: Props) {
   const router = useRouter()
@@ -410,6 +412,7 @@ export function ClassroomDetailClient({
             extensions={classroomExtensions}
             audienceByAssignment={audienceByAssignment}
             groupNameById={groupNameById}
+            pendingReviewByStudent={pendingReviewByStudent}
           />
         )}
         {activeTab === 'ability' && canManage && (
