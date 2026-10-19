@@ -12,13 +12,11 @@ import { naturalMaxScore, type GradingConfig } from '@/lib/assignment-attempt'
 import { scoreParts, sortGradingStudents, type GradingAnswer, type GradingPartsPolicy, type GradingStudent, type GradingStudentSortKey, type GradingWorkspaceData } from '@/lib/grading-workspace'
 import { officialSubmissionsByStudent, rescaleToDisplayMax } from '@/lib/scoring'
 import { preferPendingAverageReviewAttempts } from '@/lib/grading-review-attempt'
-import { classifySubmissionTimingsByStudent, type LateBandColorId } from '@/lib/late-submission'
 import { loadAssignmentGradingState, withVoidedScoreMetadata } from '@/lib/voided-score-metadata.server'
 import { isCurrentAnswerAttachmentPath, isLegacyStudentAttachmentPath, storagePathFromPublicUrl } from '@/lib/exam-attachment'
 import { MATH_WORK_BUCKET } from '@/lib/math-work'
 import type { Assignment, MathInputMode, Question } from '@/lib/types'
 import type { AssignmentSidebarSummary } from '@/app/(app)/assignments/[id]/_components/assignment-context-sidebar'
-import type { ScoreAdjustmentBatchRow } from '@/app/(app)/assignments/[id]/results/_components/results-client'
 
 export interface GradingWorkspaceScope {
   kind: 'overview' | 'question' | 'student'
@@ -33,18 +31,17 @@ export interface GradingWorkspaceLoadResult {
   availableQuestionCount: number
   missingQuestionCount: number
   duplicateQuestionCount: number
-  adjustmentBatches: ScoreAdjustmentBatchRow[]
 }
 
 type AssignmentRecord = Pick<Assignment,
   'id' | 'created_by' | 'org_id' | 'classroom_id' | 'title' | 'status' | 'type' | 'mode' | 'question_ids'
   | 'random_question_count' | 'completion_rule' | 'streak_target' | 'score_strategy' | 'display_max_score'
-  | 'question_points' | 'require_work_image' | 'due_at' | 'end_at' | 'late_bands'
+  | 'question_points' | 'require_work_image'
 > & { classrooms: { name: string; description?: string | null } | null }
 interface SubmissionRecord {
   id: string; assignment_id: string; student_id: string; status: 'in_progress' | 'submitted' | 'graded'
   closed_at: string | null; total_score: number | null; score_adjustment: number | null; max_score: number
-  submitted_at: string | null; started_at: string; attempt_number: number; best_streak?: number; streak_reached?: boolean
+  attempt_number: number; streak_reached?: boolean
   users: { full_name: string | null } | { full_name: string | null }[] | null
   voided_max_score?: number
 }
@@ -60,7 +57,6 @@ interface AnswerRecord {
 interface ProfileRecord { student_id: string; grade_level: string | null; section_number: number | null; class_number: number | null; student_code: string | null }
 interface PolicyRecord { question_id: string; work_share: number; updated_at: string | null }
 interface ArtifactRecord { id: string; submission_answer_id: string; student_id: string; part_key: string; source_type: string; preview_path: string }
-type BatchRecord = Omit<ScoreAdjustmentBatchRow, 'changed_by_name'>
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const CHUNK_SIZE = 100
@@ -175,7 +171,7 @@ export async function loadGradingWorkspace(assignmentId: string, scope: GradingW
   if (!await canManageAssignment(assignmentId, user.id)) return null
 
   const assignmentResult = await session.from('assignments')
-    .select('id, created_by, org_id, classroom_id, title, status, type, mode, question_ids, random_question_count, completion_rule, streak_target, score_strategy, display_max_score, question_points, require_work_image, due_at, end_at, late_bands, classrooms(name, description)')
+    .select('id, created_by, org_id, classroom_id, title, status, type, mode, question_ids, random_question_count, completion_rule, streak_target, score_strategy, display_max_score, question_points, require_work_image, classrooms(name, description)')
     .eq('id', assignmentId).maybeSingle()
   if (assignmentResult.error) throw new Error('โหลดงานที่มอบหมายไม่สำเร็จ')
   if (!assignmentResult.data) return null
@@ -191,7 +187,7 @@ export async function loadGradingWorkspace(assignmentId: string, scope: GradingW
   const reader = createAdminClient()
   const [allSubmissions, gradingState, policyResult] = await Promise.all([
     fetchAllRows((from, to) => reader.from('submissions')
-      .select('id, assignment_id, student_id, status, closed_at, total_score, score_adjustment, max_score, submitted_at, started_at, attempt_number, best_streak, streak_reached, users!submissions_student_id_fkey(full_name)')
+      .select('id, assignment_id, student_id, status, closed_at, total_score, score_adjustment, max_score, attempt_number, streak_reached, users!submissions_student_id_fkey(full_name)')
       .eq('assignment_id', assignmentId).order('id').range(from, to).returns<SubmissionRecord[]>()),
     loadAssignmentGradingState(reader, assignmentId),
     fetchAllRows((from, to) => reader.from('assignment_question_grading_parts').select('question_id, work_share, updated_at')
@@ -238,16 +234,10 @@ export async function loadGradingWorkspace(assignmentId: string, scope: GradingW
     ? preferPendingAverageReviewAttempts(officialScores, scaled, pendingSubmissionIds)
     : officialScores
   const studentIds = [...official.keys()]
-  const [profiles, extensions, batches] = await Promise.all([
-    fetchRowsInChunks(studentIds, ids => reader.from('student_profiles').select('student_id, grade_level, section_number, class_number, student_code').in('student_id', ids).returns<ProfileRecord[]>(), CHUNK_SIZE),
-    fetchRowsInChunks(studentIds, ids => reader.from('assignment_extensions').select('student_id, extended_due_at, extended_end_at').eq('assignment_id', assignmentId).in('student_id', ids), CHUNK_SIZE),
-    reader.from('assignment_score_adjustment_batches').select('id, color, adjustment, reason, affected_count, changed_by, created_at').eq('assignment_id', assignmentId).order('created_at', { ascending: false }).limit(5).returns<BatchRecord[]>(),
-  ])
-  if (profiles.error || extensions.error || batches.error) throw new Error('โหลดข้อมูลสรุปการตรวจไม่สำเร็จ')
+  const profiles = await fetchRowsInChunks(studentIds, ids => reader.from('student_profiles')
+    .select('student_id, grade_level, section_number, class_number, student_code').in('student_id', ids).returns<ProfileRecord[]>(), CHUNK_SIZE)
+  if (profiles.error) throw new Error('โหลดข้อมูลสรุปการตรวจไม่สำเร็จ')
   const profileById = new Map(profiles.rows.filter(row => studentIds.includes(row.student_id)).map(row => [row.student_id, row]))
-  const timings = classifySubmissionTimingsByStudent({ dueAt: assignment.due_at, endAt: assignment.end_at, bands: assignment.late_bands,
-    submissions, extensions: extensions.rows,
-  })
   const students: GradingStudent[] = [...official].map(([studentId, result]) => {
     const row = result.representative
     const profileRow = profileById.get(studentId)
@@ -256,8 +246,7 @@ export async function loadGradingWorkspace(assignmentId: string, scope: GradingW
       sectionNumber: profileRow?.section_number ?? null, classNumber: profileRow?.class_number ?? null, studentCode: profileRow?.student_code ?? null,
       classroom: profileRow?.grade_level ? `${profileRow.grade_level}${profileRow.section_number == null ? '' : `/${profileRow.section_number}`}` : null,
       submissionId: row.id, attemptNumber: row.attempt_number, status: row.status === 'graded' ? 'graded' : 'submitted',
-      score: result.total_score, maxScore: result.max_score, timing: timings.get(studentId) ?? { status: 'not_submitted' },
-      streakReached: row.streak_reached, bestStreak: row.best_streak,
+      score: result.total_score, maxScore: result.max_score, streakReached: row.streak_reached,
     }
   })
   const officialIds = new Set(students.map(student => student.submissionId!))
@@ -291,14 +280,6 @@ export async function loadGradingWorkspace(assignmentId: string, scope: GradingW
     for (let index = 0; index < officialAnswers.length; index++) officialAnswers[index] = fullById.get(officialAnswers[index].id) ?? officialAnswers[index]
   }
 
-  const actorIds = [...new Set((batches.data ?? []).map(batch => batch.changed_by))]
-  const actors = await fetchRowsInChunks(actorIds, ids => reader.from('users').select('id, full_name').in('id', ids).returns<{ id: string; full_name: string | null }[]>(), CHUNK_SIZE)
-  if (actors.error) throw new Error('โหลดประวัติผู้ปรับคะแนนไม่สำเร็จ')
-  const names = new Map(actors.rows.map(actor => [actor.id, actor.full_name]))
-  const adjustmentBatches: ScoreAdjustmentBatchRow[] = (batches.data ?? []).map(batch => ({
-    id: batch.id, color: batch.color as LateBandColorId, adjustment: batch.adjustment, reason: batch.reason,
-    affected_count: batch.affected_count, changed_by: batch.changed_by, created_at: batch.created_at, changed_by_name: names.get(batch.changed_by) || 'ผู้สอน',
-  }))
   const questionMaxScores = Object.fromEntries(questions.map(question => [question.id,
     assignment.question_points?.[question.id] ?? naturalMaxScore(question.question_type, question.extra_data, question.answer_parts, question.question_type === 'matching' ? question.mcq_options?.length ?? 0 : 0),
   ]))
@@ -318,6 +299,5 @@ export async function loadGradingWorkspace(assignmentId: string, scope: GradingW
     sidebarAssignment: { id: assignment.id, classroom_id: assignment.classroom_id, status: assignment.status, title: assignment.title, type: assignment.type, mode: assignment.mode,
       question_ids: assignment.question_ids, random_question_count: assignment.random_question_count, completion_rule: assignment.completion_rule, streak_target: assignment.streak_target, classrooms: assignment.classrooms },
     pendingCount, availableQuestionCount: questions.length, missingQuestionCount: loadedQuestions.missingQuestionIds.length, duplicateQuestionCount: loadedQuestions.duplicateQuestionCount,
-    adjustmentBatches,
   }
 }

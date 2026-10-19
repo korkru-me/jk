@@ -4,7 +4,11 @@
 
 หน้าตรวจให้คะแนน `/assignments/[id]/results` ไม่มีกรอบ “เครื่องมือและประวัติคะแนน” ท้ายตารางอีกต่อไป ทั้งมุมมองรายข้อและรายคน ลบคอมโพเนนต์ `GradingTools` ที่ใช้เฉพาะกรอบนี้และช่อง `tools` ของ `GradingOverview` คงการเปิดตรวจคำตอบ บันทึกร่าง ส่งคะแนน และข้อมูล/ประวัติคะแนนเดิม ไม่มีการลบข้อมูลหรือ migration และไม่แก้ Auth/รหัสผ่าน/สมัครสมาชิก/อีเมล
 
-ตรวจแล้ว: TypeScript, token lint, diff check และ Next.js compilation/runtime errors ผ่าน Browser บน localhost:3000 ยืนยันทั้งแท็บรายข้อ/รายคนไม่มีกรอบนี้ และเปิดหน้าตรวจรายคนได้แบบอ่านอย่างเดียว ไม่มีการปรับ/บันทึก/ส่งคะแนนระหว่างทดสอบ ไม่เพิ่ม unit test หรือรัน full suite/production build สำหรับการถอด UI เฉพาะส่วนนี้ ยังไม่ได้ deploy Production
+ตรวจเก็บโค้ดตกค้างรอบถัดมา: ถอด query ประวัติและชื่อผู้ปรับคะแนน, mapping/type/import และ `adjustmentBatches` จาก reader/DTO ของหน้าตรวจทั้ง overview/question/student รวมการจำแนกกลุ่มส่งช้า, query ขยายเวลา, คอลัมน์กำหนดส่ง/ช่วงสี และ `timing`/`bestStreak` ที่ไม่มี consumer หลังลบกรอบแล้ว คงการคำนวณ `score_adjustment` และสถานะผ่าน streak เดิม ส่วน action/type/ประวัติใน `ResultsClient` ยังใช้โดย lab ส่งช้า และ audit/migration ที่ใช้จริงไม่ถูกลบ
+
+การตรวจรอบถอด UI: TypeScript, token lint, diff check และ Next.js compilation/runtime errors ผ่าน Browser บน localhost:3000 ยืนยันทั้งแท็บรายข้อ/รายคนไม่มีกรอบนี้ และเปิดหน้าตรวจรายคนได้แบบอ่านอย่างเดียว ไม่มีการปรับ/บันทึก/ส่งคะแนนระหว่างทดสอบ รอบแรกยังไม่ได้เพิ่ม unit test หรือรัน full suite/production build
+
+การตรวจรอบเก็บโค้ด: เพิ่ม regression 3 กรณี overview/question/student ซึ่งล้มกับโค้ดก่อนเก็บและผ่านหลังถอด dependency ประวัติ โดยจำลอง service ประวัติใช้งานไม่ได้ ยืนยันว่าไม่ query ประวัติ/ผู้ปรับ/ขยายเวลา ไม่ส่ง DTO ที่เลิกใช้ และค่าปรับคะแนน -0.25 ยังได้ 0.75/1 โดยคะแนนคำตอบดิบคง 1 ผ่าน TypeScript, token lint, diff check, Vitest 303 ไฟล์ / 3,934 เคส และ Webpack production build ของ tracked candidate ในสำเนาชั่วคราวแยกด้วยค่าเชื่อมต่อจำลอง ไม่แตะ live .next/tsconfig ของ checkout หลัก Browser localhost ยืนยัน overview ทั้งสองแท็บและหน้าตรวจรายข้อ ไม่มี compilation/runtime error และไม่มีการแก้คะแนน/ข้อมูลจริง ยังไม่ได้ deploy Production หรือทดสอบการเขียนคะแนน/อุปกรณ์มือถือจริงในรอบเก็บโค้ดนี้
 
 ## ป้ายรอตรวจในตารางคะแนนห้องเรียน — 19 ตุลาคม 2026
 
