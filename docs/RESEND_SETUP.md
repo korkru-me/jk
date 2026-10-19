@@ -107,6 +107,14 @@ RESEND_QUOTA_ALERT_TO=korkru.me@gmail.com
 
 ## วิธีทดสอบโดยไม่ใช้โควตาหลายร้อยฉบับ
 
+### ตัวอย่างอีเมลจริง 1 ฉบับ — เจ้าของอนุญาต 19 ตุลาคม 2026
+
+เจ้าของขอส่งตัวอย่างไป `korkru.me@gmail.com` เพียง 1 ฉบับ และยืนยันว่าเก็บ key ไว้ส่วนตัว เตรียม local helper `/private/tmp/korkru-quota-sample-local.mjs` ที่ `http://127.0.0.1:3069/` ให้เจ้าของกรอก Full access monitor key ในช่อง password เอง Key ใน Vercel/Supabase อ่านกลับมาใช้ไม่ได้ จึงไม่ขอ key ผ่านแชทหรือแก้ credentials เดิม
+
+ข้อความระบุ “ทดสอบ KorKru Staging” และจำลองรายวัน 80% ชัดเจน ใช้ผู้ส่งเดิมกับผู้รับตายตัวเพียงรายเดียว เป็นการทดสอบรูปแบบ/ส่งถึงกล่องเมล ไม่ใช่หลักฐานว่าถึง threshold จริง Helper ตรวจ webhook ของบัญชีและ Usage ทั้งสองช่วงก่อนส่ง ไม่เปลี่ยน quota threshold/env/ฐานข้อมูล/Production และใช้ test tag แยกจาก receipt ของ alert จริง
+
+Helper รับเฉพาะ loopback พร้อม Host/Origin/CSRF guards และมี manifest ที่ไม่มี credentials `/private/tmp/korkru-quota-sample-20261019-state.json` เขียนแบบ exclusive ก่อน POST พร้อม payload/hash และ idempotency key คงที่ ทุกสถานะหลังเริ่มส่งล็อกการส่งซ้ำ หากผลไม่แน่นอนให้ตรวจ Resend ก่อน ห้ามล้าง manifest เพื่อบังคับส่งใหม่ หลังเสร็จต้องปิด helper; ผล accepted/delivered และ Inbox/Spam ต้องตรวจต่อแยกกัน ขณะเตรียมผ่าน syntax/review และ local rejection checks โดยไม่ใช้ valid key/ไม่เรียก provider/ไม่ส่งอีเมล ยังรอเจ้าของกรอก key และส่งจากหน้าทดสอบ
+
 แยกผลจำลองในเครื่องจากการต่อบริการจริง ไม่ลด threshold บนเว็บจริงและไม่ส่งจนโควตาเต็มเพื่อทดสอบ รันชุดทดสอบเฉพาะโควตาซ้ำได้จากโฟลเดอร์โปรเจกต์:
 
 ```bash
