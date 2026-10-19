@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 const migration = readFileSync(new URL('../supabase/migrations/20261019154815_extend_assignment_deadline.sql', import.meta.url), 'utf8')
+const conflictMigration = readFileSync(new URL('../supabase/migrations/20261019162413_assignment_deadline_conflict_response.sql', import.meta.url), 'utf8')
 const gradingMigration = readFileSync(new URL('../supabase/migrations/20261018005611_assignment_regrading_and_void.sql', import.meta.url), 'utf8')
 const authorizationHelper = gradingMigration.slice(
   gradingMigration.indexOf('CREATE FUNCTION public.actor_can_manage_grading_assignment('),
@@ -115,6 +116,7 @@ beforeEach(async () => {
   await db.exec(assignmentPolicies)
   await db.exec(authorizationHelper)
   await db.exec(migration)
+  await db.exec(conflictMigration)
 })
 afterEach(async () => { await db?.close() })
 
@@ -231,18 +233,50 @@ describe('whole-assignment deadline extension transaction', () => {
     expect(definitions.prosecdef).toBe(true)
     expect(definitions.proconfig).toContain('search_path=""')
   })
+  it('upgrades an installed serialization code to HTTP409 while preserving function authority and other functions', async () => {
+    const originalDefinition = (await db.query<{ definition: string }>(
+      "SELECT pg_get_functiondef('public.extend_assignment_deadline(uuid,timestamptz,timestamptz,timestamptz)'::regprocedure) AS definition",
+    )).rows[0].definition
+    await db.exec(originalDefinition.replace("ERRCODE = 'PT409', MESSAGE = 'assignment deadline changed", "ERRCODE = '40001', MESSAGE = 'assignment deadline changed"))
+    const metadataQuery = "SELECT oid,proowner,proacl,prosecdef,proconfig FROM pg_proc WHERE oid='public.extend_assignment_deadline(uuid,timestamptz,timestamptz,timestamptz)'::regprocedure"
+    const beforeAuthority = (await db.query(metadataQuery)).rows
+    const helperQuery = "SELECT pg_get_functiondef('public.actor_can_manage_grading_assignment(uuid,uuid)'::regprocedure) AS definition"
+    const beforeHelper = (await db.query(helperQuery)).rows
+    await expect(extend({ expectedUpdatedAt: null })).rejects.toMatchObject({ code: '40001' })
+    await db.exec(conflictMigration)
+    await expect(extend({ expectedUpdatedAt: null })).rejects.toMatchObject({ code: 'PT409' })
+    expect((await db.query(metadataQuery)).rows).toEqual(beforeAuthority)
+    expect((await db.query(helperQuery)).rows).toEqual(beforeHelper)
+  })
+  it('refuses to patch a missing deadline RPC', async () => {
+    await db.exec('DROP FUNCTION public.extend_assignment_deadline(uuid,timestamptz,timestamptz,timestamptz)')
+    await expect(db.exec(conflictMigration)).rejects.toMatchObject({ code: '55000' })
+  })
+  it('refuses an already-patched or unexpectedly changed deadline RPC without further writes', async () => {
+    const beforeAssignment = await assignment(), beforeExtensions = await extensions()
+    await expect(db.exec(conflictMigration)).rejects.toMatchObject({ code: '55000' })
+    const definition = (await db.query<{ definition: string }>(
+      "SELECT pg_get_functiondef('public.extend_assignment_deadline(uuid,timestamptz,timestamptz,timestamptz)'::regprocedure) AS definition",
+    )).rows[0].definition
+    await db.exec(definition
+      .replace("ERRCODE = 'PT409', MESSAGE = 'assignment deadline changed", "ERRCODE = '40001', MESSAGE = 'assignment deadline changed")
+      .replace('OR v_assignment.updated_at IS DISTINCT FROM p_expected_updated_at', 'AND v_assignment.updated_at IS DISTINCT FROM p_expected_updated_at'))
+    await expect(db.exec(conflictMigration)).rejects.toMatchObject({ code: '55000' })
+    expect(await assignment()).toEqual(beforeAssignment)
+    expect(await extensions()).toEqual(beforeExtensions)
+  })
   it.each([
     { expectedEndAt: '2090-01-03T10:00:00Z' }, { expectedEndAt: null },
     { expectedUpdatedAt: '2026-09-30T00:00:00Z' }, { expectedUpdatedAt: null },
   ])('rejects stale or missing optimistic snapshots without any write (%j)', async options => {
     const before = await assignment(), beforeExtensions = await extensions()
-    await expect(extend(options)).rejects.toMatchObject({ code: '40001' })
+    await expect(extend(options)).rejects.toMatchObject({ code: 'PT409' })
     expect(await assignment()).toEqual(before)
     expect(await extensions()).toEqual(beforeExtensions)
   })
   it('rejects a repeated stale save after another manager has extended the assignment', async () => {
     await extend()
-    await expect(extend({ endAt: '2090-01-07T10:00:00Z' })).rejects.toMatchObject({ code: '40001' })
+    await expect(extend({ endAt: '2090-01-07T10:00:00Z' })).rejects.toMatchObject({ code: 'PT409' })
   })
   it.each([
     ['draft', 'online', 'exercise'], ['closed', 'online', 'exercise'],

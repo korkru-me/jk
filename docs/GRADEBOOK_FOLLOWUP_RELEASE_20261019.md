@@ -14,4 +14,12 @@ For each environment, a private temporary CLI project fetches that environment's
 
 Staging application/SQL tests, deployment identifiers, Production confirmation and primary port-3000 parity are recorded below as each phase completes. Production verification is read-only; all write testing uses owned synthetic Staging accounts and rows.
 
-Status: candidate prepared; hosted activation and validation pending.
+## Validation and Staging findings
+
+The composed application passed all 317 Vitest files / 4,284 tests, TypeScript, token lint, diff checks and an isolated Webpack production build. An independent read-only review found no release-blocking application issue. Staging application deployment `dpl_FLgphgzgAuNsxM3aekjESrjaiyVN` is READY at `0bfd4f1217cc5f763a124f79184b043dc7efb978`, with `staging.korkru.com` assigned to it.
+
+The first migration is applied on Staging. The synthetic gate confirmed the assignment-wide save, both classroom links, safe student table denial, legacy deadlines and unchanged scores/timers. It also exposed a hosted stale-CAS hang: PostgREST 14 retries custom SQLSTATE `40001`. The additive CLI-created `20261019162413_assignment_deadline_conflict_response.sql` changes only that function's application conflict to `PT409`, preserving its owner, grants, security-definer status and empty search path. The already-applied base migration stays immutable. This follows the [Supabase troubleshooting guidance](https://supabase.com/docs/guides/troubleshooting/high-cpu-and-infinite-transaction-retries-when-using-custom-error-codes-in-rpc-functions-77326b). Every unsuccessful synthetic run was cleaned through its exact private manifest; no real data was used.
+
+The Stage-only harness has bounded requests, no POST retries, strict project/origin/migration fences and safe request tracing. Its 40 safety tests pass. It requires both migration versions before write testing.
+
+Status: additive conflict fix and full hosted validation in progress; Production remains unchanged.
