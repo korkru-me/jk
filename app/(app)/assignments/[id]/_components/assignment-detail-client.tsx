@@ -29,10 +29,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Progress, ProgressLabel } from '@/components/ui/progress'
 import { useContextualSidebar } from '@/components/layout/sidebar-context'
 import { assignmentSizeLabel } from '@/lib/assignment-size-label'
+import { sortAssignmentRoster, type AssignmentRosterSort } from '@/lib/assignment-roster-sort'
 import { cn } from '@/lib/utils'
 import { ClassroomWorkHeader } from '@/components/assignments/classroom-work-header'
 import { AssignmentQuestionCards } from '@/components/assignments/assignment-question-cards'
@@ -222,13 +222,14 @@ export function AssignmentDetailClient({
         gradeHref={gradeHref}
       />
 
+      <StudentsTab submissions={submissions} pendingIdSet={pendingIdSet} />
+
       <AssignmentQuestionCards
         questions={questions}
         sections={parseSections(a.sections)}
         showSections={a.show_sections !== false}
       />
 
-      <StudentsTab submissions={submissions} pendingIdSet={pendingIdSet} />
       {confirmDialog}
     </div>
   )
@@ -379,13 +380,16 @@ function OverviewTab({ a, questions, totalSubs, pendingCount, pendingReviewCappe
 
 function StudentsTab({ submissions, pendingIdSet }: { submissions: SubmissionRow[]; pendingIdSet: Set<string> }) {
   const [open, setOpen] = useState(true)
-  const [sort, setSort] = useState<'name' | 'score' | 'time'>('time')
+  const [sort, setSort] = useState<AssignmentRosterSort>('time')
 
-  const sorted = [...submissions].sort((a, b) => {
-    if (sort === 'score') return (b.total_score ?? -1) - (a.total_score ?? -1)
-    if (sort === 'name') return (a.users?.full_name ?? '').localeCompare(b.users?.full_name ?? '', 'th')
-    return new Date(b.submitted_at ?? b.started_at).getTime() - new Date(a.submitted_at ?? a.started_at).getTime()
-  })
+  const sorted = sortAssignmentRoster(submissions, sort)
+  const sortOptions: { value: AssignmentRosterSort; label: string }[] = [
+    { value: 'time', label: 'ล่าสุด' },
+    { value: 'score', label: 'คะแนนมากไปน้อย' },
+    { value: 'name', label: 'ชื่อ ก–ฮ' },
+    { value: 'submitted', label: 'ส่งแล้วก่อน' },
+    { value: 'unsubmitted', label: 'ยังไม่ส่งก่อน' },
+  ]
   const submittedCount = submissions.filter(s => s.status === 'submitted' || s.status === 'graded').length
 
   return (
@@ -415,21 +419,21 @@ function StudentsTab({ submissions, pendingIdSet }: { submissions: SubmissionRow
           <Separator />
           <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
             <p className="text-xs text-muted-foreground">เรียงรายชื่อนักเรียนตาม</p>
-            <ToggleGroup
-              value={[sort]}
-              onValueChange={values => {
-                const next = values.at(-1)
-                if (next === 'time' || next === 'score' || next === 'name') setSort(next)
-              }}
+            <div
+              role="group"
               aria-label="เรียงรายชื่อนักเรียน"
-              size="sm"
-              spacing={1}
-              className="rounded-lg bg-muted p-1"
+              className="flex max-w-full flex-wrap items-center gap-1"
             >
-              <ToggleGroupItem value="time">ล่าสุด</ToggleGroupItem>
-              <ToggleGroupItem value="score">คะแนน</ToggleGroupItem>
-              <ToggleGroupItem value="name">ชื่อ</ToggleGroupItem>
-            </ToggleGroup>
+              {sortOptions.map(option => <Button
+                key={option.value}
+                type="button"
+                size="sm"
+                variant={sort === option.value ? 'navigation' : 'outline'}
+                className={cn('pointer-coarse:min-h-11', sort === option.value && 'border-primary/30')}
+                aria-pressed={sort === option.value}
+                onClick={() => setSort(option.value)}
+              >{option.label}</Button>)}
+            </div>
           </div>
 
           <Table className="min-w-[720px]">
