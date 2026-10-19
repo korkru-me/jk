@@ -211,7 +211,7 @@ export function GradingOverview({ data, initialQuery, tools }: Props) {
                       {summary.pendingWork > 0 && <Badge variant="statusWarning"><Clock aria-hidden="true" />รอตรวจวิธีทำ {formatCount(summary.pendingWork)} รายการ</Badge>}
                       {summary.automatic + summary.teacher + summary.pendingAnswer + summary.pendingWork === 0 && <Badge variant="secondary">ไม่นับคะแนน</Badge>}
                     </>}
-                    {draftQuestions.has(question.id) && <Badge variant="secondary">มีร่าง · ยังไม่ส่งคะแนนนักเรียน</Badge>}
+                    {draftQuestions.has(question.id) && <Badge variant="secondary">ร่างคะแนน · ยังไม่ส่งคะแนนนักเรียน</Badge>}
                   </div></TableCell>
                   <TableCell className="px-3"><Button size="sm" variant={pending ? 'attentionOutline' : 'outline'} className="pointer-coarse:min-h-11" render={<Link href={detailHref('questions', question.id)} prefetch={false} />}>ตรวจ/ดูคำตอบ<ArrowUpRight data-icon="inline-end" /></Button></TableCell>
                 </TableRow>
@@ -234,7 +234,7 @@ export function GradingOverview({ data, initialQuery, tools }: Props) {
                 return <TableRow key={student.id}>
                   <TableCell className="px-3 text-muted-foreground">{studentOffset + index + 1}</TableCell>
                   <TableCell className="px-3">{classroomLabel(student)}</TableCell><TableCell className="px-3">{student.classNumber ?? '—'}</TableCell><TableCell className="px-3">{student.studentCode || '—'}</TableCell><TableCell className="px-3 font-medium">{student.name}</TableCell>
-                  <TableCell className="px-3">{!submitted ? <Badge variant="secondary">{student.status === 'in_progress' ? 'กำลังทำ' : 'ยังไม่ส่ง'}</Badge> : <Badge variant={pending ? 'statusWarning' : 'statusSuccess'}>{pending ? 'มีข้อรอตรวจ' : 'ตรวจครบแล้ว'}</Badge>}{draftStudents.has(student.id) && <Badge variant="secondary" className="ml-1">มีร่าง · ยังไม่ส่งคะแนนนักเรียน</Badge>}</TableCell>
+                  <TableCell className="px-3">{!submitted ? <Badge variant="secondary">{student.status === 'in_progress' ? 'กำลังทำ' : 'ยังไม่ส่ง'}</Badge> : <Badge variant={pending ? 'statusWarning' : 'statusSuccess'}>{pending ? 'มีข้อรอตรวจ' : 'ตรวจครบแล้ว'}</Badge>}{draftStudents.has(student.id) && <Badge variant="secondary" className="ml-1">ร่างคะแนน · ยังไม่ส่งคะแนนนักเรียน</Badge>}</TableCell>
                   <TableCell className="px-3">{submitted ? <Button size="sm" variant={pending ? 'attentionOutline' : 'outline'} className="pointer-coarse:min-h-11" render={<Link href={detailHref('students', student.id)} prefetch={false} />}>ตรวจ/ดูคำตอบ<ArrowUpRight data-icon="inline-end" /></Button> : <span className="text-muted-foreground">—</span>}</TableCell>
                 </TableRow>
               })}
