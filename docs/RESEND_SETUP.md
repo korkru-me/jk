@@ -115,6 +115,8 @@ RESEND_QUOTA_ALERT_TO=korkru.me@gmail.com
 
 Helper รับเฉพาะ loopback พร้อม Host/Origin/CSRF guards และมี manifest ที่ไม่มี credentials `/private/tmp/korkru-quota-sample-20261019-state.json` เขียนแบบ exclusive ก่อน POST พร้อม payload/hash และ idempotency key คงที่ ทุกสถานะหลังเริ่มส่งล็อกการส่งซ้ำ หากผลไม่แน่นอนให้ตรวจ Resend ก่อน ห้ามล้าง manifest เพื่อบังคับส่งใหม่ หลังเสร็จต้องปิด helper; ผล accepted/delivered และ Inbox/Spam ต้องตรวจต่อแยกกัน ขณะเตรียมผ่าน syntax/review และ local rejection checks โดยไม่ใช้ valid key/ไม่เรียก provider/ไม่ส่งอีเมล ยังรอเจ้าของกรอก key และส่งจากหน้าทดสอบ
 
+แก้ปัญหา local form ตอบ403 หลังเจ้าของกดส่ง: Chrome native form ภายใต้ `Referrer-Policy: no-referrer` ส่ง `Origin: null` ทำให้ strict Origin guard ปฏิเสธ ยืนยันด้วยฟอร์มเปล่าบน Chrome จริงก่อนแก้ แล้วเปลี่ยนเฉพาะ header เป็น `same-origin` และเพิ่มคำอธิบายเมื่อ Origin ถูกปฏิเสธ คง Host/loopback/Origin/CSRF/CSP และ one-send lock เดิม เปิดเอกสาร GET ใหม่ให้เจ้าของใช้ต่อ Native form ด้วย dummy key เข้าถึง validation400 ได้; HTTP checks อีก8กรณีผ่าน โดย null/missing/wrong Origin, cross-site, wrong Host/CSRF ยัง403 และ extra field400 ตรวจ manifest ยังไม่มี จึงไม่มี provider call หรืออีเมลจากการแก้รอบนี้ ไม่แก้ app/ฐานข้อมูล/env/deploy
+
 แยกผลจำลองในเครื่องจากการต่อบริการจริง ไม่ลด threshold บนเว็บจริงและไม่ส่งจนโควตาเต็มเพื่อทดสอบ รันชุดทดสอบเฉพาะโควตาซ้ำได้จากโฟลเดอร์โปรเจกต์:
 
 ```bash
