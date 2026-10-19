@@ -8,6 +8,25 @@ const authorizationHelper = gradingMigration.slice(
   gradingMigration.indexOf('CREATE FUNCTION public.actor_can_manage_grading_assignment('),
   gradingMigration.indexOf('-- Capture legacy rules'),
 )
+const tenancyMigration = readFileSync(new URL('../supabase/migrations/012_multi_tenancy.sql', import.meta.url), 'utf8')
+const classroomMigration = readFileSync(new URL('../supabase/migrations/20260713103000_assignment_classrooms.sql', import.meta.url), 'utf8')
+const organizationHelper = tenancyMigration.slice(
+  tenancyMigration.indexOf('CREATE OR REPLACE FUNCTION public.get_user_org_ids()'),
+  tenancyMigration.indexOf('-- 2b.'),
+)
+const superAdminHelper = tenancyMigration.slice(
+  tenancyMigration.indexOf('CREATE OR REPLACE FUNCTION public.is_super_admin()'),
+  tenancyMigration.indexOf('-- 2d.'),
+)
+const coTeacherHelper = classroomMigration.slice(
+  classroomMigration.indexOf('CREATE OR REPLACE FUNCTION public.get_my_co_teaching_assignment_ids()'),
+  classroomMigration.indexOf('CREATE OR REPLACE FUNCTION public.get_my_visible_assignment_ids()'),
+)
+const assignmentPolicies = [
+  tenancyMigration.match(/CREATE POLICY "assignments_org_teacher_all"[\s\S]*?;/)![0],
+  tenancyMigration.match(/CREATE POLICY "assignments_super_admin_all"[\s\S]*?;/)![0],
+  classroomMigration.match(/CREATE POLICY "assignments_co_teacher_all"[\s\S]*?;/)![0],
+].join('\n')
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
 const OWNER = id(1), OTHER = id(2), MANAGER = id(3), VIEWER = id(4), STUDENT = id(5), SUPER = id(6)
 const ASSIGNMENT = id(10), OTHER_ASSIGNMENT = id(11), ROOM = id(20), SECOND_ROOM = id(21)
@@ -29,6 +48,7 @@ beforeEach(async () => {
     $$;
     CREATE TABLE public.users (id uuid PRIMARY KEY, role text DEFAULT 'teacher', status text DEFAULT 'active');
     CREATE TABLE public.super_admins (user_id uuid PRIMARY KEY REFERENCES public.users(id));
+    CREATE TABLE public.organization_members (org_id uuid, user_id uuid REFERENCES public.users(id), PRIMARY KEY(org_id,user_id));
     CREATE TABLE public.assignment_classrooms (assignment_id uuid, classroom_id uuid);
     CREATE TABLE public.classroom_co_teachers (classroom_id uuid, user_id uuid, permission text);
     CREATE TABLE public.assignments (
@@ -60,6 +80,7 @@ beforeEach(async () => {
     INSERT INTO public.users(id) VALUES ('${OWNER}'),('${OTHER}'),('${MANAGER}'),('${VIEWER}'),('${SUPER}');
     INSERT INTO public.users(id,role) VALUES ('${STUDENT}','student');
     INSERT INTO public.super_admins VALUES ('${SUPER}');
+    INSERT INTO public.organization_members VALUES ('${id(90)}','${OWNER}'),('${id(91)}','${OTHER}');
     INSERT INTO public.assignments(id,created_by,org_id) VALUES
       ('${ASSIGNMENT}','${OWNER}','${id(90)}'),('${OTHER_ASSIGNMENT}','${OTHER}','${id(91)}');
     INSERT INTO public.assignment_classrooms VALUES
@@ -79,8 +100,7 @@ beforeEach(async () => {
     ALTER TABLE public.assignments ENABLE ROW LEVEL SECURITY;
     ALTER TABLE public.assignment_extensions ENABLE ROW LEVEL SECURITY;
     ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
-    CREATE POLICY assignments_owner ON public.assignments TO authenticated
-      USING (created_by=auth.uid()) WITH CHECK (created_by=auth.uid());
+    ALTER TABLE public.organization_members ENABLE ROW LEVEL SECURITY;
     CREATE POLICY extensions_owner ON public.assignment_extensions TO authenticated
       USING (EXISTS(SELECT 1 FROM public.assignments a WHERE a.id=assignment_id AND a.created_by=auth.uid()))
       WITH CHECK (EXISTS(SELECT 1 FROM public.assignments a WHERE a.id=assignment_id AND a.created_by=auth.uid()));
@@ -89,6 +109,10 @@ beforeEach(async () => {
     GRANT SELECT, INSERT, UPDATE ON public.assignment_extensions TO authenticated;
     GRANT SELECT ON public.users TO authenticated;
   `)
+  await db.exec(organizationHelper)
+  await db.exec(superAdminHelper)
+  await db.exec(coTeacherHelper)
+  await db.exec(assignmentPolicies)
   await db.exec(authorizationHelper)
   await db.exec(migration)
 })
@@ -149,7 +173,32 @@ describe('whole-assignment deadline extension transaction', () => {
   })
 
   it.each([MANAGER, SUPER])('allows exact management through another linked room or super-admin authority (%s)', async actor => {
+    expect((await db.query('SELECT org_id FROM public.organization_members WHERE user_id=$1', [actor])).rows).toEqual([])
+    expect((await asRole('authenticated', actor, tx => tx.query('SELECT id FROM public.assignments WHERE id=$1', [ASSIGNMENT]))).rows)
+      .toEqual([{ id: ASSIGNMENT }])
     expect((await extend({ actor })).id).toBe(ASSIGNMENT)
+  })
+  it.each(['departed', 'different organization'])('denies a still-active owner without membership in this organization (%s)', async membership => {
+    await db.query('DELETE FROM public.organization_members WHERE user_id=$1', [OWNER])
+    if (membership === 'different organization') {
+      await db.query('INSERT INTO public.organization_members VALUES($1,$2)', [id(91), OWNER])
+    }
+    // Ownership still passes the existing service-only grading helper. This
+    // isolates the additional assignment-edit policy enforced by the new RPC.
+    expect((await db.query<{ allowed: boolean }>('SELECT public.actor_can_manage_grading_assignment($1,$2) AS allowed', [OWNER, ASSIGNMENT])).rows)
+      .toEqual([{ allowed: true }])
+    const before = await assignment(), beforeExtensions = await extensions()
+    expect((await asRole('authenticated', OWNER, tx => tx.query('SELECT id FROM public.assignments WHERE id=$1', [ASSIGNMENT]))).rows).toEqual([])
+    expect((await asRole('authenticated', OWNER, tx => tx.query('UPDATE public.assignments SET end_at=$1 WHERE id=$2 RETURNING id', [NEW_END, ASSIGNMENT]))).rows).toEqual([])
+    await expect(extend()).rejects.toMatchObject({ code: '42501' })
+    expect(await assignment()).toEqual(before)
+    expect(await extensions()).toEqual(beforeExtensions)
+  })
+  it('allows an owner again only after current organization membership is restored', async () => {
+    await db.query('DELETE FROM public.organization_members WHERE user_id=$1', [OWNER])
+    await expect(extend()).rejects.toMatchObject({ code: '42501' })
+    await db.query('INSERT INTO public.organization_members VALUES($1,$2)', [id(90), OWNER])
+    expect((await extend()).id).toBe(ASSIGNMENT)
   })
   it('allows an admin co-teacher but denies organization peers and view-only co-teachers', async () => {
     for (const actor of [OTHER, VIEWER]) await expect(extend({ actor })).rejects.toMatchObject({ code: '42501' })

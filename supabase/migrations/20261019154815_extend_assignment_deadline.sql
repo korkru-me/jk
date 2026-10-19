@@ -48,6 +48,28 @@ BEGIN
   IF NOT FOUND OR NOT public.actor_can_manage_grading_assignment(v_actor_id, p_assignment_id) THEN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'assignment management permission required';
   END IF;
+  -- This authenticated SECURITY DEFINER entry point must also retain the
+  -- assignment UPDATE policies. The shared grading helper allows ownership
+  -- without org membership; that service-only rule must not let a departed
+  -- organization member bypass the session-bound assignment edit boundary.
+  IF NOT (
+    EXISTS (SELECT 1 FROM public.super_admins sa WHERE sa.user_id = v_actor_id)
+    OR (
+      v_assignment.created_by = v_actor_id
+      AND EXISTS (
+        SELECT 1 FROM public.organization_members member
+        WHERE member.user_id = v_actor_id AND member.org_id = v_assignment.org_id
+      )
+    )
+    OR EXISTS (
+      SELECT 1 FROM public.assignment_classrooms ac
+      JOIN public.classroom_co_teachers co ON co.classroom_id = ac.classroom_id
+      WHERE ac.assignment_id = v_assignment.id AND co.user_id = v_actor_id
+        AND co.permission IN ('admin', 'manage')
+    )
+  ) THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'assignment edit permission required';
+  END IF;
   IF v_assignment.end_at IS DISTINCT FROM p_expected_end_at
     OR v_assignment.updated_at IS DISTINCT FROM p_expected_updated_at THEN
     RAISE EXCEPTION USING ERRCODE = '40001', MESSAGE = 'assignment deadline changed; refresh before extending';

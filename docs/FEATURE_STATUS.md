@@ -1,5 +1,9 @@
 # Feature status
 
+## Gradebook follow-up release candidate — 19 October 2026
+
+The owner renewed authorization to publish all remaining chat work after the earlier database-history stop. Five scoped commits are composed on fresh master. The deadline RPC additionally enforces the assignment UPDATE-policy organization predicate, with 38 real-SQL regression cases. Both databases have the required schema; unrelated older pending migrations remain excluded. Target-only CLI activation, Staging integration and release parity are tracked in [GRADEBOOK_FOLLOWUP_RELEASE_20261019.md](GRADEBOOK_FOLLOWUP_RELEASE_20261019.md). Earlier local-only labels below remain historical until that record confirms activation.
+
 ## Gradebook assignment links and separate sort controls — 19 October 2026 (local)
 
 Assignment names in score-matrix headers are native links to `/assignments/[id]`, matching the existing teacher assignment cards. Only the adjacent arrow button sorts students by that assignment's score, retaining the existing descending/ascending toggle, `aria-sort` on the header, direction icon and selected styling. Link and sort remain separate keyboard targets; the link retains normal modified-click behavior. Dragging is still limited to the grip. Updated helper text distinguishes all three actions. No database, scoring or migration change; the prior deadline-extension migration activation remains pending.
