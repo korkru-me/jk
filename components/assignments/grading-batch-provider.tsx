@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, useTransition, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { FilePenLine, LoaderCircle, Save, Trash2 } from 'lucide-react'
+import { FilePenLine, LoaderCircle, Save } from 'lucide-react'
 import { toast } from 'sonner'
 import { saveGradingDrafts, publishGradingDrafts } from '@/lib/actions/grading-drafts'
 import type { SaveGradingReviewInput } from '@/lib/actions/grading-review'
@@ -15,7 +15,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/utils'
 
 interface SavedScore { input: SaveGradingReviewInput; revision: string | null }
-interface PendingRequest { mode: 'draft' | 'publish' | 'remove'; input: SaveGradingDraftsInput; edits: GradingScoreDrafts }
+interface PendingRequest { mode: 'draft' | 'publish'; input: SaveGradingDraftsInput; edits: GradingScoreDrafts }
 interface GradingBatchContextValue {
   dirtyCount: number
   unpublishedCount: number
@@ -31,7 +31,6 @@ interface GradingBatchContextValue {
   refreshScores: () => void
   saveDraft: () => Promise<boolean>
   saveAll: () => Promise<boolean>
-  removeSavedDrafts: () => Promise<boolean>
   retryWrite: () => Promise<boolean>
   discardChanges: () => void
   drafts: GradingScoreDrafts
@@ -169,7 +168,7 @@ export function GradingBatchProvider({ assignmentId, sources: suppliedSources, s
         }
         updateAwaiting(nextAwaiting)
         toast.success(`บันทึกคะแนนแล้ว ${result.published.length} คำตอบ · แจ้งนักเรียน ${result.notificationCount} คน`)
-      } else toast.success(pending.mode === 'remove' ? 'ลบร่างคะแนนแล้ว คะแนนที่ส่งให้นักเรียนคงเดิม' : 'บันทึกร่างแล้ว · ยังไม่ส่งคะแนนให้นักเรียน')
+      } else toast.success('บันทึกร่างแล้ว · ยังไม่ส่งคะแนนให้นักเรียน')
       request.current = null; uncertainRef.current = false; setUncertain(false)
       // Only an acknowledged publication finishes this review. Draft saves,
       // failed/uncertain requests and any newer edits must stay on this page.
@@ -188,11 +187,10 @@ export function GradingBatchProvider({ assignmentId, sources: suppliedSources, s
     const merged = combinedGradingDrafts(editsRef.current, savedRef.current, sources.current)
     const selected = mode === 'draft' ? Object.fromEntries(Object.entries(merged).filter(([id]) => !!editsRef.current[id])) : merged
     const prepared = prepareGradingScoreDrafts(assignmentId, selected, sources.current)
-    if (mode !== 'remove' && Object.keys(prepared.errors).length) {
+    if (Object.keys(prepared.errors).length) {
       setRowErrors(prepared.errors); setError('กรุณาตรวจคะแนนที่ระบุ ก่อนบันทึกคะแนนทั้งหมด'); return false
     }
-    const items = mode === 'remove' ? Object.values(savedRef.current).map(draft => ({ answerId: draft.answerId, expectedScoreEditedAt: draft.expectedScoreEditedAt, expectedDraftUpdatedAt: draft.updatedAt, remove: true as const }))
-      : prepared.inputs.map(({ assignmentId: _, ...item }) => ({ ...item, expectedDraftUpdatedAt: savedRef.current[item.answerId]?.updatedAt ?? null }))
+    const items = prepared.inputs.map(({ assignmentId: _, ...item }) => ({ ...item, expectedDraftUpdatedAt: savedRef.current[item.answerId]?.updatedAt ?? null }))
     if (!items.length) return true
     const pending = { mode, input: { assignmentId, requestId: crypto.randomUUID(), items }, edits: editsRef.current }
     request.current = pending
@@ -203,34 +201,34 @@ export function GradingBatchProvider({ assignmentId, sources: suppliedSources, s
     return perform(request.current)
   }
   const displayedError = awaitingRefresh ? [error, 'บันทึกคะแนนแล้ว แต่ยังโหลดคะแนนล่าสุดไม่ได้ กรุณากดโหลดคะแนนล่าสุดอีกครั้ง'].filter(Boolean).join(' · ') : error
-  return <GradingBatchContext.Provider value={{ dirtyCount, unpublishedCount, savedDrafts, busy, workflowDisabled: disabled, canSave: !disabled && !busy && unpublishedCount > 0, error: displayedError, hasUnsavedChanges, awaitingRefresh, uncertain, writing, refreshScores, saveDraft: () => write('draft'), saveAll: () => write('publish'), removeSavedDrafts: () => write('remove'), retryWrite, discardChanges, drafts, unsavedDrafts: edits, rowErrors, awaiting, registerSource, edit }}>{children}</GradingBatchContext.Provider>
+  return <GradingBatchContext.Provider value={{ dirtyCount, unpublishedCount, savedDrafts, busy, workflowDisabled: disabled, canSave: !disabled && !busy && unpublishedCount > 0, error: displayedError, hasUnsavedChanges, awaitingRefresh, uncertain, writing, refreshScores, saveDraft: () => write('draft'), saveAll: () => write('publish'), retryWrite, discardChanges, drafts, unsavedDrafts: edits, rowErrors, awaiting, registerSource, edit }}>{children}</GradingBatchContext.Provider>
 }
 
 /** Private persistence and student publication are distinct explicit actions. */
-export function GradingBatchSaveButton({ className, removeOnly = false }: { className?: string; removeOnly?: boolean }) {
+export function GradingBatchSaveButton({ className }: { className?: string }) {
   const batch = useGradingBatch()
-  const [confirm, setConfirm] = useState<'publish' | 'remove' | null>(null)
+  const [confirm, setConfirm] = useState(false)
   const [confirmClose, setConfirmClose] = useState(false)
   const focus = useRef<HTMLElement | null>(null)
   const trigger = useRef<HTMLButtonElement | null>(null)
   return <div className={cn('flex flex-wrap items-center justify-end gap-1.5', className)}>
-    {removeOnly ? (Object.keys(batch.savedDrafts).length > 0 && <Button type="button" size="sm" variant="outline" className="pointer-coarse:min-h-11" disabled={batch.workflowDisabled || batch.busy || batch.dirtyCount > 0} onClick={event => { trigger.current = event.currentTarget; setConfirm('remove') }}><Trash2 data-icon="inline-start" aria-hidden="true" />ลบร่างคะแนน</Button>) : batch.awaitingRefresh ? <Button size="sm" variant="outline" className="pointer-coarse:min-h-11" onClick={batch.refreshScores}>โหลดคะแนนล่าสุดอีกครั้ง</Button> : batch.uncertain ? <Button size="sm" className="pointer-coarse:min-h-11" disabled={batch.writing} onClick={() => void batch.retryWrite()}>ลองคำสั่งเดิมอีกครั้ง</Button> : <>
+    {batch.awaitingRefresh ? <Button size="sm" variant="outline" className="pointer-coarse:min-h-11" onClick={batch.refreshScores}>โหลดคะแนนล่าสุดอีกครั้ง</Button> : batch.uncertain ? <Button size="sm" className="pointer-coarse:min-h-11" disabled={batch.writing} onClick={() => void batch.retryWrite()}>ลองคำสั่งเดิมอีกครั้ง</Button> : <>
       <Button type="button" size="sm" variant="outline" className="pointer-coarse:min-h-11" disabled={batch.workflowDisabled || batch.busy || !batch.dirtyCount} aria-label="บันทึกร่างคะแนน" title="บันทึกร่างคะแนน โดยยังไม่ส่งให้นักเรียน" onClick={() => void batch.saveDraft()}><FilePenLine data-icon="inline-start" />บันทึกร่าง</Button>
-      <Button type="button" size="sm" className="pointer-coarse:min-h-11" aria-label="บันทึกและแจ้งนักเรียน" title="บันทึกและแจ้งคะแนนนักเรียน" disabled={!batch.canSave} onClick={event => { trigger.current = event.currentTarget; setConfirm('publish') }}>{batch.busy ? <LoaderCircle data-icon="inline-start" className="motion-safe:animate-spin" /> : <Save data-icon="inline-start" />}ส่งคะแนน{batch.unpublishedCount > 0 ? ` (${batch.unpublishedCount})` : ''}</Button>
+      <Button type="button" size="sm" className="pointer-coarse:min-h-11" aria-label="บันทึกและแจ้งนักเรียน" title="บันทึกและแจ้งคะแนนนักเรียน" disabled={!batch.canSave} onClick={event => { trigger.current = event.currentTarget; setConfirm(true) }}>{batch.busy ? <LoaderCircle data-icon="inline-start" className="motion-safe:animate-spin" /> : <Save data-icon="inline-start" />}ส่งคะแนน{batch.unpublishedCount > 0 ? ` (${batch.unpublishedCount})` : ''}</Button>
     </>}
-    <Dialog open={confirm !== null} onOpenChangeComplete={open => {
+    <Dialog open={confirm} onOpenChangeComplete={open => {
       if (!open) requestAnimationFrame(() => {
         if (trigger.current?.isConnected && !trigger.current.disabled) trigger.current.focus({ preventScroll: true })
       })
     }} onOpenChange={(next, details) => {
       if (!next && (details.reason === 'outside-press' || details.reason === 'escape-key')) { details.cancel(); focus.current = document.activeElement as HTMLElement; setConfirmClose(true); return }
-      if (!batch.busy && !next) setConfirm(null)
+      if (!batch.busy && !next) setConfirm(false)
     }}>
       <DialogContent showCloseButton={false} finalFocus={trigger} className="gap-3 sm:max-w-md">
-        <DialogHeader><DialogTitle>{confirm === 'remove' ? 'ลบร่างคะแนนที่เก็บไว้?' : 'บันทึกและแจ้งคะแนนนักเรียน?'}</DialogTitle><DialogDescription>{confirm === 'remove' ? 'ลบเฉพาะร่างคะแนนของคุณในหน้านี้ คะแนนที่ส่งให้นักเรียนแล้วจะไม่เปลี่ยนแปลง' : `กำลังบันทึก ${batch.unpublishedCount} คำตอบเป็นคะแนนจริง นักเรียนจะได้รับแจ้งว่าครูตรวจคะแนนแล้ว และเห็นคะแนนตามการตั้งค่าการแสดงผลของงาน หากยังตรวจไม่เสร็จ ให้กลับไปบันทึกร่างคะแนนก่อน`}</DialogDescription></DialogHeader>
-        <DialogFooter className="flex-row flex-wrap gap-2 py-3"><Button variant="outline" className="pointer-coarse:min-h-11" disabled={batch.busy} onClick={() => setConfirm(null)}>กลับไปตรวจต่อ</Button><Button variant={confirm === 'remove' ? 'destructive' : 'default'} className="pointer-coarse:min-h-11" disabled={batch.busy} onClick={() => { const mode = confirm; setConfirm(null); void (mode === 'remove' ? batch.removeSavedDrafts() : batch.saveAll()) }}>{confirm === 'remove' ? 'ยืนยันลบร่างคะแนน' : 'ยืนยันบันทึกและแจ้งนักเรียน'}</Button></DialogFooter>
+        <DialogHeader><DialogTitle>บันทึกและแจ้งคะแนนนักเรียน?</DialogTitle><DialogDescription>กำลังบันทึก {batch.unpublishedCount} คำตอบเป็นคะแนนจริง นักเรียนจะได้รับแจ้งว่าครูตรวจคะแนนแล้ว และเห็นคะแนนตามการตั้งค่าการแสดงผลของงาน หากยังตรวจไม่เสร็จ ให้กลับไปบันทึกร่างคะแนนก่อน</DialogDescription></DialogHeader>
+        <DialogFooter className="flex-row flex-wrap gap-2 py-3"><Button variant="outline" className="pointer-coarse:min-h-11" disabled={batch.busy} onClick={() => setConfirm(false)}>กลับไปตรวจต่อ</Button><Button className="pointer-coarse:min-h-11" disabled={batch.busy} onClick={() => { setConfirm(false); void batch.saveAll() }}>ยืนยันบันทึกและแจ้งนักเรียน</Button></DialogFooter>
       </DialogContent>
-      <ConfirmDialog open={confirmClose} onOpenChange={setConfirmClose} title="ปิดหน้าต่างยืนยัน?" description="ยังไม่มีการส่งคะแนนให้นักเรียน ร่างคะแนนในหน้าตรวจยังอยู่" cancelLabel="กลับไปดำเนินการต่อ" confirmLabel="ยืนยันปิด" finalFocus={() => confirm === null ? trigger.current : focus.current} onConfirm={() => { setConfirmClose(false); setConfirm(null) }} />
+      <ConfirmDialog open={confirmClose} onOpenChange={setConfirmClose} title="ปิดหน้าต่างยืนยัน?" description="ยังไม่มีการส่งคะแนนให้นักเรียน ร่างคะแนนในหน้าตรวจยังอยู่" cancelLabel="กลับไปดำเนินการต่อ" confirmLabel="ยืนยันปิด" finalFocus={() => !confirm ? trigger.current : focus.current} onConfirm={() => { setConfirmClose(false); setConfirm(false) }} />
     </Dialog>
   </div>
 }

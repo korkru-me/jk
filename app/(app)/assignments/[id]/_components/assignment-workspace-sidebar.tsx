@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { AssignmentContextNavigation, type AssignmentSidebarSummary } from './assignment-context-sidebar'
 import { useContextualSidebar } from '@/components/layout/sidebar-context'
@@ -28,6 +28,12 @@ export function AssignmentWorkspaceSidebar({
   const [isPending, startTransition] = useTransition()
   const [confirm, confirmDialog] = useConfirm()
   const router = useRouter()
+  const pathname = usePathname()
+  const sectionPathname = `/assignments/${a.id}/${currentSection}`
+  // Keep review detail routes in this workspace without carrying it to another assignment.
+  const sidebarPathname = pathname === sectionPathname || pathname.startsWith(`${sectionPathname}/`)
+    ? pathname
+    : sectionPathname
   const assignmentTypeLabel = a.type === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'
 
   const publish = useCallback(() => {
@@ -82,7 +88,7 @@ export function AssignmentWorkspaceSidebar({
     />
   ), [a, availableQuestionCount, close, currentSection, duplicateQuestionCount, handleDelete, isPending, missingQuestionCount, pendingCount, publish])
 
-  useContextualSidebar(`/assignments/${a.id}/${currentSection}`, renderContextualSidebar)
+  useContextualSidebar(sidebarPathname, renderContextualSidebar)
 
   return confirmDialog
 }
