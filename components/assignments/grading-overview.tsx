@@ -1,6 +1,6 @@
 'use client'
 
-import { useId, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useId, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { ArrowDownWideNarrow, ArrowUpNarrowWide, ArrowUpRight, CheckCircle2, ChevronLeft, ChevronRight, Clock, Eye } from 'lucide-react'
 import { GradingWorkspaceHeader } from '@/components/assignments/grading-workspace-header'
@@ -36,8 +36,6 @@ export interface GradingOverviewQuery {
 interface Props {
   data: GradingWorkspaceData
   initialQuery?: GradingOverviewQuery
-  /** Late adjustments and streak tools stay in a compact disclosure. */
-  tools?: ReactNode
 }
 
 function classroomLabel(student: GradingStudent) {
@@ -66,7 +64,7 @@ function WorkspacePagination({ page, total, label, onChange }: {
   </div>
 }
 
-export function GradingOverview({ data, initialQuery, tools }: Props) {
+export function GradingOverview({ data, initialQuery }: Props) {
   const [view, setView] = useState<'questions' | 'students'>(initialQuery?.view ?? 'questions')
   const [classroom, setClassroom] = useState(initialQuery?.classroom ?? 'all')
   const [sort, setSort] = useState<StudentOrder>(initialQuery?.sort ?? 'classroom')
@@ -246,7 +244,6 @@ export function GradingOverview({ data, initialQuery, tools }: Props) {
       </TabsContent>
     </Tabs>
 
-    {tools}
     <Dialog open={preview !== null} onOpenChange={(open, details) => {
       if (open) return
       if (details.reason === 'outside-press' || details.reason === 'escape-key') {
