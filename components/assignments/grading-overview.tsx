@@ -191,6 +191,7 @@ export function GradingOverview({ data, initialQuery, tools }: Props) {
                 const position = questionOffset + index + 1
                 const summary = reviewSummary.questions.get(question.id)
                 const isVoid = data.voidedQuestionIds.includes(question.id)
+                const pending = !isVoid && ((summary?.pendingAnswer ?? 0) > 0 || (summary?.pendingWork ?? 0) > 0)
                 return <TableRow key={question.id}>
                   <TableCell className="px-3 text-muted-foreground">{position}</TableCell>
                   <TableCell className="px-3">
@@ -212,7 +213,7 @@ export function GradingOverview({ data, initialQuery, tools }: Props) {
                     </>}
                     {draftQuestions.has(question.id) && <Badge variant="secondary">มีร่าง · ยังไม่ส่งคะแนนนักเรียน</Badge>}
                   </div></TableCell>
-                  <TableCell className="px-3"><Button size="sm" variant="outline" className="pointer-coarse:min-h-11" render={<Link href={detailHref('questions', question.id)} prefetch={false} />}>ตรวจ/ดูคำตอบ<ArrowUpRight data-icon="inline-end" /></Button></TableCell>
+                  <TableCell className="px-3"><Button size="sm" variant={pending ? 'attentionOutline' : 'outline'} className="pointer-coarse:min-h-11" render={<Link href={detailHref('questions', question.id)} prefetch={false} />}>ตรวจ/ดูคำตอบ<ArrowUpRight data-icon="inline-end" /></Button></TableCell>
                 </TableRow>
               })}
               {data.questions.length === 0 && <TableRow><TableCell colSpan={5}><Empty className="gap-2 p-4"><EmptyHeader><EmptyTitle>ยังไม่มีโจทย์ในงานนี้</EmptyTitle></EmptyHeader></Empty></TableCell></TableRow>}
@@ -234,7 +235,7 @@ export function GradingOverview({ data, initialQuery, tools }: Props) {
                   <TableCell className="px-3 text-muted-foreground">{studentOffset + index + 1}</TableCell>
                   <TableCell className="px-3">{classroomLabel(student)}</TableCell><TableCell className="px-3">{student.classNumber ?? '—'}</TableCell><TableCell className="px-3">{student.studentCode || '—'}</TableCell><TableCell className="px-3 font-medium">{student.name}</TableCell>
                   <TableCell className="px-3">{!submitted ? <Badge variant="secondary">{student.status === 'in_progress' ? 'กำลังทำ' : 'ยังไม่ส่ง'}</Badge> : <Badge variant={pending ? 'statusWarning' : 'statusSuccess'}>{pending ? 'มีข้อรอตรวจ' : 'ตรวจครบแล้ว'}</Badge>}{draftStudents.has(student.id) && <Badge variant="secondary" className="ml-1">มีร่าง · ยังไม่ส่งคะแนนนักเรียน</Badge>}</TableCell>
-                  <TableCell className="px-3">{submitted ? <Button size="sm" variant="outline" className="pointer-coarse:min-h-11" render={<Link href={detailHref('students', student.id)} prefetch={false} />}>ตรวจ/ดูคำตอบ<ArrowUpRight data-icon="inline-end" /></Button> : <span className="text-muted-foreground">—</span>}</TableCell>
+                  <TableCell className="px-3">{submitted ? <Button size="sm" variant={pending ? 'attentionOutline' : 'outline'} className="pointer-coarse:min-h-11" render={<Link href={detailHref('students', student.id)} prefetch={false} />}>ตรวจ/ดูคำตอบ<ArrowUpRight data-icon="inline-end" /></Button> : <span className="text-muted-foreground">—</span>}</TableCell>
                 </TableRow>
               })}
               {sortedStudents.length === 0 && <TableRow><TableCell colSpan={7}><Empty className="gap-2 p-4"><EmptyHeader><EmptyTitle>{data.students.length ? 'ไม่พบนักเรียนในชั้น/ห้องที่เลือก' : 'ยังไม่มีนักเรียนในงานนี้'}</EmptyTitle></EmptyHeader></Empty></TableCell></TableRow>}
