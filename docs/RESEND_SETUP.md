@@ -2,15 +2,24 @@
 
 เจ้าของเลือก Resend Free และผู้รับแจ้งเตือน `korkru.me@gmail.com` เมื่อ 17 ตุลาคม 2026 และวันที่ 18 ตุลาคมเปลี่ยนระดับสุดท้ายจาก 97% เป็น **95%** พร้อมขอให้ตรวจ **ทั้งรายวันและรายเดือน** ระดับปัจจุบันจึงเป็น **80%, 90%, 95%** แยกต่อช่วง สำหรับ Free 100 ฉบับ/วัน คือ 80, 90, 95 ฉบับ และ 3,000 ฉบับ/เดือน คือ 2,400, 2,700, 2,850 ฉบับ ([Pricing](https://resend.com/pricing), [Usage API](https://resend.com/docs/api-reference/usage/retrieve-usage)) ไม่มีการอัปเกรดแพ็กเกจหรือเปิดค่าใช้จ่ายส่วนเกินอัตโนมัติ
 
-**สถานะล่าสุด 18 ตุลาคม 2026: ต่อ custom SMTP บน Staging แล้ว; เจ้าของทดสอบ signup และ recovery core flow ผ่าน; quota alerts ยังปิด** โค้ดระบบบัญชีและ webhook ขึ้น Production ในรอบก่อนแล้ว รอบนี้เจ้าของกลับมาทำ Resend ต่อและพักงาน SEB โดยยังไม่เปิด Production SMTP หรือ Google
+**สถานะล่าสุด 19 ตุลาคม 2026: Staging SMTP และ recovery core flow ผ่าน; apply ledger ใหม่บน Staging แล้ว; เปิด quota flag เฉพาะ Staging เพื่อทดสอบ; กำลัง deploy รุ่นใหม่และรอ signed provider delivery** โค้ดตรวจรายวันและรายเดือนเตรียมแล้ว แต่ยังไม่อ้างว่าอ่าน Usage API หรือรับ signed webhook จาก Resend จริงผ่าน งาน SEB ยังพัก และยังไม่เปิด Production SMTP หรือ Google
 
 - บัญชี Resend สร้างแล้ว; `mail.korkru.com` ขึ้น Verified ใน region Tokyo ตรวจ public DNS พบ TXT `resend._domainkey.mail`, CNAME `rsend.mail` → `rsend-apne1.forge.rmta.net` และ `send.mail` → `send.forge.rmta.net` โดย CNAME เป็น DNS only
 - เจ้าของสร้าง Sending access key และกรอก custom SMTP เอง ไม่ส่ง key มาในแชท การอ่าน configuration ยืนยัน Staging ใช้ `smtp.resend.com:465`, username `resend`, sender `auth@mail.korkru.com`, ชื่อ `KorKru Staging` และมี SMTP password โดยไม่อ่าน/บันทึกค่าลับ
 - Staging Site URL เป็น `https://staging.korkru.com`, email autoconfirm ปิด, Require current password เปิด และ signup/recovery templates ยังคง `{{ .ConfirmationURL }}` ตามเดิม
 - **เจ้าของรายงานว่าได้รับอีเมลสมัคร กดยืนยัน และเข้า Staging สำเร็จแล้ว** และวันที่ 18 ตุลาคมทดสอบ recovery ด้วยอีเมลใหม่ผ่าน: ได้รับอีเมล → เปิด reset form → ลองรหัสเดิมมีคำเตือนใต้ช่อง → ส่งรหัสอื่น → หน้า login มี banner “เปลี่ยนรหัสผ่านแล้ว” ตามภาพเวลา 22:10:54 → เข้าได้ด้วยรหัสใหม่ที่กรอกไว้ ต่อมายืนยันว่ารหัสก่อน reset รอบล่าสุดถูกปฏิเสธด้วย “อีเมลหรือรหัสผ่านไม่ถูกต้อง” ตามภาพเวลา 22:17:18 และรหัสใหม่ยังเข้าได้ตามปกติ เป็น manual/owner-reported proof พร้อมภาพ แยกจาก independent hosted E2E ส่วนลิงก์ใช้แล้วซ้ำ/หมดอายุยังไม่ได้รายงาน; quota-alert delivery ยังต้องตรวจต่อ
-- `RESEND_QUOTA_ALERTS_ENABLED=false`; ยังไม่มี Full access monitor key/webhook signing secret ที่ตั้งค่าในรอบนี้ จึงยังไม่ส่งเตือน 80/90/95% จริงทั้งสองช่วง
+- เจ้าของตั้ง `RESEND_QUOTA_API_KEY`, `RESEND_QUOTA_WEBHOOK_SECRET`, `RESEND_QUOTA_ALERT_FROM`, `RESEND_QUOTA_ALERT_TO` แล้ว ทั้งสี่รายการคงไว้เฉพาะ **Vercel Preview → gitBranch `staging`** และนำสำเนาที่ผูก Preview กว้างออก และเปลี่ยน flag เฉพาะ Staging เป็น `RESEND_QUOTA_ALERTS_ENABLED=true` สำหรับ integration test (ต้อง deploy จึงมีผล) ไม่อ่าน/บันทึกค่าลับลงเอกสาร การตั้งค่านี้ยังไม่พิสูจน์ว่า deployment ใช้ค่าใหม่หรือ provider เชื่อมสำเร็จ
+- Apply เฉพาะ **`20261018154826_resend_quota_alert_delivery_ledger.sql`** บน Staging แล้ว ตรวจ history รวม 162 รายการ พร้อม RLS และสิทธิ์ RPC แบบ service-only ผ่าน ไม่ apply/replay migration SEB หรือเปลี่ยน schema งานนั้น public webhook URL พร้อมแล้วตามด้านล่าง กำลัง deploy ให้รับ configuration ใหม่ก่อนทดสอบ signed delivery จริง
 
 รอบ release ก่อนมี migration จำกัดคำขอส่งอีเมลและ `AUTH_FLOW_SECRET` พร้อมแล้ว อ่าน `docs/AUTH_SIGNUP_ROLLOUT.md` ประกอบ; SMTP เพียงอย่างเดียวไม่ทดแทน dependency ของ email actions
+
+## URL รับ webhook สำหรับ Staging — 19 ตุลาคม 2026
+
+ใช้ `https://jk-resend-staging-korkru-mes-projects.vercel.app/api/webhooks/resend` แทน URL เว็บ Staging เดิมที่ติด Vercel sign-in โดยแก้ endpoint เดิมใน Resend และคง events `email.sent`, `email.received` พร้อม signing secret เดิม โดเมนนี้ verified และผูก project `jk` กับ gitBranch `staging` จึงตาม Staging release ถัดไป ไม่ต้องตั้ง DNS เพิ่ม
+
+ก่อนเปิดข้อยกเว้น ได้สร้างและเปิด WAF rule เฉพาะ hostname นี้: ปฏิเสธทุก path ที่ไม่ใช่ `/api/webhooks/resend` หรือ method ที่ไม่ใช่ POST จากนั้นเปิด alias-scoped `alias-protection-override` เฉพาะ alias นี้ ไม่แก้ project automation bypass หรือปิด protection ของทั้งเว็บ Probe ก่อน deploy รุ่นใหม่: GET หน้าแรก/login/webhook ได้403; unsigned POST ถึงแอปได้503 `not_configured` ของรุ่นที่ยังปิด flag; URL `staging.korkru.com` เดิมยังได้401 จึงยังไม่ถือว่า signed delivery ผ่าน
+
+WAF config `waf_0G4wivLDsFkX` version1, rule `rule_korkru_staging_resend_webhook_alias_only_MC7lhU` เป็น rule เดียวที่เพิ่ม เริ่มต้นไม่มี active/draft custom config หากยกเลิกให้ revoke alias protection override ก่อนแก้/ลบ guard และไม่เปิด route อื่นบน alias นี้ Production deployment, credentials และฐานข้อมูลไม่เปลี่ยนจากงานนี้
 
 ## สมัครและยืนยันโดเมน
 
@@ -50,28 +59,28 @@ Recovery contract: `forgotPassword` หรือขอตั้งรหัส�
 
 ## เตรียมแจ้งเตือน 80%, 90%, 95% ทั้งสองช่วง
 
-**สถานะ: โค้ดรุ่นใหม่และ migration ตรวจในเครื่องผ่านแล้ว ยังไม่ apply ฐานข้อมูลหรือเปิด webhook จริง** รุ่นเดิมตรวจรายวันเท่านั้น รุ่นใหม่นี้ต้องมี durable delivery ledger ก่อนเปิด flag มิฉะนั้นหยุดส่งแทนการเสี่ยงส่งซ้ำ ไม่เพิ่ม cron หรือซื้อบริการตั้งเวลา Webhook เป็นตัวกระตุ้นให้อ่านยอดจริงจาก Usage API จึงไม่มีการตรวจเป็นช่วงเวลาขณะที่ไม่มี event
+**สถานะ 19 ตุลาคม: ledger apply เฉพาะ Staging และตรวจ RLS/service-only RPC แล้ว; โค้ดรวม Staging build ผ่าน; flag ยังปิด** รุ่นเดิมตรวจรายวันเท่านั้น รุ่นใหม่นี้ต้องมี durable delivery ledger ก่อนเปิด flag มิฉะนั้นหยุดส่งแทนการเสี่ยงส่งซ้ำ ไม่เพิ่ม cron หรือซื้อบริการตั้งเวลา Webhook เป็นตัวกระตุ้นให้อ่านยอดจริงจาก Usage API จึงไม่มีการตรวจเป็นช่วงเวลาขณะที่ไม่มี event Deployment/public endpoint และ provider integration ยังอยู่ระหว่างเตรียม
 
 ทำทีละขั้นบน Staging ก่อน โดยไม่ส่ง key/secret มาในแชท:
 
-1. **ขั้นแรกสำหรับเจ้าของ:** Resend → API Keys → Create API Key ตั้งชื่อ **`korkru-staging-quota-monitor`** เลือก **Full access** แล้วเก็บ key ใน secret manager ให้เรียบร้อย `GET /usage` ใช้ Sending access ไม่ได้ จึงต้องแยกจาก SMTP key ที่จำกัดโดเมน เมื่อสร้างแล้วตอบเพียงว่า “สร้าง monitor key แล้ว” เพื่อไปขั้น Vercel ไม่ต้องส่งค่า key
-2. ฝั่งทีมตรวจ migration history ของ Staging ก่อน rollout migration **`20261018154826_resend_quota_alert_delivery_ledger.sql`** ที่สร้างผ่าน CLI รอบนี้ `supabase migration list --linked` ติด `LegacyProjectNotLinkedError`; เทียบไฟล์กับ live `list_migrations` ผ่าน MCP แบบอ่านอย่างเดียวพบ local-only `20261015132234` และไฟล์ ledger ใหม่นี้ ส่วน remote-only คือ `20261009142610` จึง **ยังไม่ apply** และไม่ใช้ `supabase db push`, reset หรือ repair เพื่อข้ามความต่าง ต้องตรวจและเตรียมวิธีปล่อยเฉพาะ migration นี้พร้อมบันทึกให้ตรวจสอบได้ก่อนเปิด flag งาน SEB ยังพักไว้
-3. Vercel project **`jk`** → Settings → Environment Variables เพิ่มเฉพาะ Staging โดยยังปิด flag และเก็บทุกค่าต่อไปนี้เป็น server-only:
+1. **เสร็จแล้ว:** เจ้าของสร้าง **`korkru-staging-quota-monitor`** แบบ **Full access** และเก็บค่าใน Vercel เอง `GET /usage` ใช้ Sending access ไม่ได้ จึงแยกจาก SMTP key ที่จำกัดโดเมน ไม่ต้องสร้างซ้ำหรือส่งค่า key ในแชท
+2. **เสร็จแล้วเฉพาะ Staging:** ปล่อย migration CLI **`20261018154826_resend_quota_alert_delivery_ledger.sql`** เพียงไฟล์เดียว ตรวจ history รวม **162 รายการ**, ledger เปิด RLS, browser ไม่มี direct grants และ RPC เปิดเฉพาะ service role ผ่านแล้ว ก่อนหน้านี้ CLI `migration list --linked` ติด `LegacyProjectNotLinkedError` และ live history เทียบไฟล์มีความต่าง จึงไม่ได้ใช้ db push/reset/replay เพื่อข้ามความต่างหรือปล่อย migration SEB ที่พักไว้ หลักฐาน apply รอบนี้ไม่ครอบคลุม Production
+3. **ตั้งแล้ว:** Vercel project **`jk`** → Settings → Environment Variables มี API key/signing secret/from/to **เฉพาะ Preview ของ gitBranch `staging`** แล้ว ไม่เพิ่มสำเนา Preview แบบทุก branch อีก รักษา flag เดิม `false` จน ledger, deployment และ public endpoint พร้อมก่อนเปิดทดสอบจริง ทุกค่าเป็น server-only:
 
 ```dotenv
 KORKRU_DEPLOYMENT_ENV=staging
 RESEND_QUOTA_ALERTS_ENABLED=false
 RESEND_QUOTA_API_KEY=key_full_access_ที่เก็บเป็น_secret
-RESEND_QUOTA_WEBHOOK_SECRET=signing_secret_ของ_endpoint_เมื่อสร้างแล้ว
+RESEND_QUOTA_WEBHOOK_SECRET=signing_secret_ของ_endpoint_ที่ตั้งไว้
 RESEND_QUOTA_ALERT_FROM=auth@mail.korkru.com
 RESEND_QUOTA_ALERT_TO=korkru.me@gmail.com
 ```
 
    ใช้ `SUPABASE_SERVICE_ROLE_KEY` ของ Staging ที่มีอยู่เพื่อเรียก ledger ห้ามคัดลอกจาก Production หรือใส่ `NEXT_PUBLIC_*` Runtime ของ route เป็น Node.js และตั้ง `maxDuration=60`; โปรเจกต์นี้ใช้ Node.js 24
-4. ตรวจ **readiness แบบอ่านอย่างเดียว** ด้วย monitor key: `GET https://api.resend.com/usage` ต้องได้ daily/monthly `used`, `limit`, `resets_at` ที่สมเหตุสมผล ตรวจการเข้าถึง ledger ใน Staging ด้วย ไม่มี key/Authorization header ใน output/log ตรวจรอบเดือนจากค่าจริงที่ API ให้ ไม่เดาวันตัดรอบจากวันสมัคร ถ้ายังตรวจไม่ได้ให้คง flag ปิด
-5. Deploy รุ่นที่มี route และ ledger dependency แล้ว Resend → Webhooks → Add Webhook เลือก **`email.sent` และ `email.received`** URL **`https://staging.korkru.com/api/webhooks/resend`**
-6. ตรวจว่า Resend POST ถึง endpoint ได้จริงโดยไม่ติดหน้า Vercel sign-in/Cloudflare challenge Staging ปัจจุบันมี Deployment Protection จึงเป็น dependency ที่ต้องแก้ด้วยข้อยกเว้นที่เจาะจง endpoint/วิธีที่บริการรองรับ **อย่าปิด protection ของทั้งเว็บหรือเผย bypass secret ในแชท/URL/log** Route ตรวจ Svix อยู่แล้ว แต่ไม่สามารถข้ามหน้าป้องกันของ Vercel ด้วย session ของผู้ทดสอบได้เอง หากยังไม่มีวิธีให้ provider ถึง route ให้คงปิด flag
-7. เก็บ Signing secret (`whsec_...`) ของ endpoint นั้นใน `RESEND_QUOTA_WEBHOOK_SECRET` ตรวจ prerequisites ข้างต้นครบแล้วจึงเปลี่ยน flag เป็น `true` และ redeploy การเปลี่ยน env ต้อง redeploy จึงมีผล ตรวจ delivery ตามหัวข้อถัดไปก่อนอ้างว่าเปิดใช้งานแล้ว
+4. ตรวจ ledger/RPC และ env scope ของ Staging ให้ตรงก่อนเปิดทดสอบ Usage API ที่ `GET https://api.resend.com/usage` ต้องได้ daily/monthly `used`, `limit`, `resets_at` สมเหตุสมผลโดยไม่มี key/Authorization header ใน output/log ตรวจรอบเดือนจากค่าจริง ไม่เดาจากวันสมัคร การตรวจ provider นี้ยังรอทำผ่าน signed event หลังเปิด flag ในขั้น 7; ตอน flag `false` route ตอบ `503 not_configured` จึงยังตรวจ Usage ไม่ได้
+5. Deploy โค้ดรวม Staging รุ่นที่มี route และ ledger dependency โดย flag ยังปิด จากนั้นกำหนด **public URL ของ Staging endpoint `/api/webhooks/resend` ที่ตรวจ reachability แล้ว** และให้ Resend webhook เลือก **`email.sent` และ `email.received`** ชื่อ hostname/alias สุดท้ายยังรอยืนยัน อย่าใช้ลิงก์ที่ยังติดหน้า Vercel sign-in เป็น endpoint ทดสอบ
+6. ตรวจว่า provider POST ถึง public endpoint นั้นได้โดยไม่ติด Vercel sign-in/Cloudflare challenge ระหว่างนี้กำลังเตรียมวิธีให้เข้าถึงเฉพาะ endpoint ที่จำเป็น **อย่าปิด protection ของทั้งเว็บหรือเผย bypass secret ในแชท/URL/log** Route ตรวจ Svix อยู่แล้ว แต่ session ของผู้ทดสอบไม่ได้ทำให้ provider ข้าม Deployment Protection ได้เอง หาก public URL/กติกาป้องกันยังไม่ตรวจผ่านให้คงปิด flag
+7. เมื่อ ledger/key/signing secret/deployment และ public endpoint พร้อมแล้ว เปลี่ยน flag ของ **Staging** เป็น `true` และ redeploy เพื่อทดสอบ signed event จริง ตรวจ Usage API/route response ตามหัวข้อถัดไป การเปลี่ยน env ต้อง redeploy จึงมีผล ไม่ต้องรอ signed success ก่อนเปิด flag เพราะ flag ปิดจะปฏิเสธทุก event; หาก readiness หรือ signed delivery ไม่ผ่านให้ปิด flag กลับและแก้สาเหตุ ก่อนเปิด Production ต้องมีผลทดสอบ Staging นี้ผ่านแล้ว
 8. หลัง Staging ผ่านจึงเตรียม Production: monitor/SMTP key และ webhook signing secret คนละค่ากับ Staging, ledger migration ที่ตรวจ history แล้ว และ `KORKRU_DEPLOYMENT_ENV=production` Free มี webhook endpoint **1 แห่ง** จึงใช้ endpoint เดิมทดสอบ Staging ก่อน แล้วค่อยย้ายไป **`https://www.korkru.com/api/webhooks/resend`** พร้อมหยุด Staging monitor อย่าสร้างหลายบัญชีเพื่อหลบโควตา การเปลี่ยน environment เป็น scope ใหม่จึงต้องตรวจประวัติแจ้งเตือนที่ส่งจริงก่อนย้าย เพื่อจัดการระดับที่อาจแจ้งซ้ำในรอบเดือนนั้น
 
 โควตาเป็นยอดของ **Resend team รวมทั้งส่งและรับ** การแยก SMTP/monitor key หรือ environment ไม่ได้แยกโควตาให้ใหม่ ([Usage API](https://resend.com/docs/api-reference/usage/retrieve-usage), [Pricing](https://resend.com/pricing)) Production SMTP, Google และ SEB ไม่ได้เปิดเพิ่มจากงานนี้
@@ -100,7 +109,7 @@ npm test -- lib/resend-quota-alert.test.ts lib/resend-quota-store.test.ts lib/re
 
 1. **Local mock tests:** daily 79/80/89/90/94/95/100 และ monthly 2,399/2,400/2,699/2,700/2,849/2,850; ยอดต่ำกว่าเงียบและยอดแตะเกณฑ์เตือนช่วงถูกต้อง ตรวจทั้งสองช่วงถึงเกณฑ์พร้อมกัน, daily ไม่จำกัดแต่ monthly ถึงเกณฑ์, ยอดกระโดดให้ระดับสูงสุด, retry/concurrency, วันใหม่แต่รอบเดือนเดิม, รอบเดือนใหม่ และ signed self-event ของระดับ 95 ที่ข้ามอีกช่วง
 2. **Local failure/ledger tests:** ลายเซ็นปลอม/หาย/เก่า, raw body เกินขนาด, Usage malformed/timeout/redirect, monthly window ไม่สมเหตุสมผล, payload hash เปลี่ยน, provider รับแล้ว response หาย, mark accepted ล้มเหลว และ pending เกิน 23 ชั่วโมงต้องไม่ส่งซ้ำ ทุกกรณีใช้ provider/ฐานข้อมูลจำลอง ไม่ส่งอีเมลจริง
-3. **Staging readiness:** ยืนยัน migration/config และอ่าน Usage API จริงได้ด้วย key Full access พร้อมบันทึกเฉพาะยอด/เพดาน/รอบที่ไม่ใช่ secret ตรวจ webhook URL จากภายนอกว่าไม่เป็น sign-in page และตรวจ Svix rejection โดยไม่เรียก Usage/ส่งอีเมล
+3. **Staging readiness:** ยืนยัน migration/config และ public webhook URL จากภายนอกว่าไม่เป็น sign-in page ก่อนเปิด flag ทดสอบ จากนั้นตรวจ Svix rejection โดยไม่เรียก Usage/ส่งอีเมล และใช้ signed event ตรวจว่าอ่าน Usage API จริงได้ด้วย key Full access บันทึกเฉพาะยอด/เพดาน/รอบที่ไม่ใช่ secret เมื่อ flag ยังปิดจะได้ `503 not_configured` แทน
 4. **Staging signed delivery:** ใช้ event ของอีเมลทดสอบที่เจ้าของส่งให้ตนเองตาม flow ปกติ หรือ Resend replay ของ event ที่เหมาะสม ตรวจ webhook ได้ 200, เหตุผล below-threshold เมื่อทั้งสองช่วงยังต่ำ และไม่มี alert เพิ่ม ใช้บัญชีสังเคราะห์ตามกติกา Staging ตรวจทั้ง Resend delivery log และ route response ไม่ถือว่าแค่เปิดหน้าเว็บได้คือ webhook ผ่าน
 5. **ทดสอบตัวอีเมลเตือน:** ข้อความ/ผู้รับ/threshold และการทำงานระดับ 80/90/95 ยืนยันใน local mocks ก่อน หากต้องการส่งตัวอย่างจริงให้ส่งเพียงฉบับที่ตกลงไว้ผ่านขั้นตอนทดสอบแยก ไม่ปลอม signed production event/ลดเกณฑ์/ล้าง ledger เพื่อบังคับส่ง ตัวอย่างถึง Gmail ไม่ทดแทนหลักฐานว่าการข้าม threshold ของ provider เกิดจริง
 6. หลัง Staging ผ่านจึงย้าย endpoint และตั้ง Production ตาม release workflow; การตรวจ Production ต้องได้รับอนุมัติและเป็น read-only เว้นแต่ได้รับอนุญาตการเปลี่ยนแปลงเฉพาะนั้นแล้ว
@@ -113,7 +122,9 @@ Core recovery บน Staging ที่เจ้าของทดสอบผ่
 
 Signed Next HTTP fixture ผ่าน **9 กรณี** รวมขอบเขต threshold ทั้งหก, unsigned rejection, partial retry และ self-event ระดับ 95 ที่ข้ามอีกช่วง ใช้ Supabase/Resend จำลอง ไม่มีอีเมลภายนอก Next MCP compilation/config/session errors ว่าง และหน้า login เดิม render/React tree ถูกต้อง ไม่มี UI เปลี่ยนจึงไม่รัน token lint รอบนี้ Build ครั้งแรกติด sandbox Google Fonts DNS และผ่านเมื่ออนุญาต network สำหรับ build ไม่ใช่ application failure
 
-ผลข้างต้นไม่ใช่ hosted provider integration: **ยังไม่ apply migration, ตั้ง Full access key/signing secret, อ่าน Usage API จริงด้วย key ใหม่, ตรวจ signed webhook delivery จริง หรือส่งอีเมลเตือนจริง** Flag ยังปิด Production SMTP/Google ยังรอ และ SEB ยังพักไว้
+**รอบรวม Staging วันที่ 19 ตุลาคม 2026:** Node.js 24 production Webpack build ผ่านพร้อม TypeScript Full suite รอบแรกผ่าน **315 ไฟล์ / 4,296 เคส** แต่มี 7 เคสไม่ผ่านใน 3 ไฟล์ SEB ที่ quota patch ไม่ได้แก้ (PGlite timeout 5 วินาที 6 เคส และ helper probe ได้ null 1 เคส) หลัง build จบรัน 3 ไฟล์นี้แยกผ่าน **3 ไฟล์ / 17 เคส** โดยไม่แก้ application code จึงบันทึก full-run failure และผล rerun แยกกัน ไม่อ้างว่า full run รอบแรกผ่านทั้งหมด ผลโควตาเฉพาะ 132 เคสข้างต้นยังเป็นหลักฐานของแพตช์เดิมที่ผ่านแล้ว
+
+Hosted Staging รอบนี้ apply/ตรวจ **ledger ใหม่เพียงไฟล์ `20261018154826`** แล้ว: history 162 รายการ, RLS เปิด และ service-only RPC ผ่าน พร้อมเก็บ API key/signing secret/from/to เฉพาะ Preview branch `staging` และลบสำเนา scope กว้างแล้ว **ยังไม่ยืนยัน Usage API จริงด้วย monitor key, signed webhook delivery หรืออีเมลเตือนถึง Gmail** Public endpoint ตรวจถึงแอปแล้วและเปิด flag เฉพาะ Staging เป็น `true` สำหรับ deployment/integration test ไม่มี Production SMTP/Google หรือ SEB rollout เพิ่ม
 
 หลักฐานย้อนหลังของ **รุ่น daily-only 80/90/97**: TypeScript, Vitest 276 ไฟล์ / 3,447 เคส (monitor 47 เคส), Webpack build และ Next HTTP กับ provider จำลองผ่าน จึงเป็นหลักฐานเฉพาะรุ่นเดิม แพตช์ recovery/branding ถัดมามีผลตรวจแยกใน `docs/AUTH_SIGNUP_ROLLOUT.md` และไม่ยืนยัน quota-alert delivery หรือ Production SMTP
 

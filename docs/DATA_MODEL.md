@@ -1,12 +1,12 @@
 # Data model และ invariants
 
-## Resend quota delivery ledger — prepared migration 20261018154826
+## Resend quota delivery ledger — Staging migration 20261018154826
 
-ยังไม่ apply: ledger แยกจาก Auth/ข้อมูลผู้เรียน เก็บ scope (`local/staging/production`), period (`daily/monthly`), window key, threshold (`80/90/95`), delivery UUID, payload SHA-256 และ timestamps ของ claim/acceptance ไม่เก็บผู้รับ เนื้อหาอีเมล reset link หรือ snapshot usage รายคน รายวันใช้วันแจ้งเตือน UTC; รายเดือนใช้ canonical `monthly.resets_at` จาก provider จึงคงสถานะข้ามวันได้
+Apply เฉพาะ Staging เมื่อ 19 ตุลาคม 2026: ledger แยกจาก Auth/ข้อมูลผู้เรียน เก็บ scope (`local/staging/production`), period (`daily/monthly`), window key, threshold (`80/90/95`), delivery UUID, payload SHA-256 และ timestamps ของ claim/acceptance ไม่เก็บผู้รับ เนื้อหาอีเมล reset link หรือ snapshot usage รายคน รายวันใช้วันแจ้งเตือน UTC; รายเดือนใช้ canonical `monthly.resets_at` จาก provider จึงคงสถานะข้ามวันได้
 
 RPC แบบ atomic ตรวจ payload เดิมและ high-water ต่อ scope/period/window ก่อน claim เพื่อกัน concurrent events หรือระดับต่ำกว่าหลังระดับสูงเริ่มแล้ว UUID เดิมเป็นส่วนของ Resend idempotency key สำหรับ retry ภายใน 24 ชั่วโมง; claim ที่ยังยืนยัน acceptance ไม่ได้และเก่าเกิน 23 ชั่วโมงต้อง reconcile ไม่สร้าง delivery ใหม่หรือส่งซ้ำอัตโนมัติหลัง idempotency expiry Signed own-email event อาจยืนยัน acceptance แต่ไม่ปิดการประเมินโควตาอีกช่วง
 
-เปิด RLS และถอน PUBLIC/anon/authenticated grants; RPC เป็น SECURITY INVOKER พร้อม fixed search_path เปิดเฉพาะ service role หลัง route ตรวจ Svix แล้ว ไม่เป็น browser table/API ไม่เพิ่ม cron และ missing schema ต้องหยุดส่ง ตรวจ live Staging history ผ่าน MCP เทียบไฟล์พบ local-only `20261015132234` และ ledger ใหม่ `20261018154826`; remote-only `20261009142610` ส่วน CLI `migration list --linked` ติด `LegacyProjectNotLinkedError` จึงยังไม่ apply หรือใช้ db push/reset/repair ข้ามความต่าง งาน SEB ยังพัก คู่มือ `RESEND_SETUP.md` แยกการตรวจจำลองกับการตรวจ Staging จริง
+เปิด RLS และถอน PUBLIC/anon/authenticated grants; RPC เป็น SECURITY INVOKER พร้อม fixed search_path เปิดเฉพาะ service role หลัง route ตรวจ Svix แล้ว ไม่เป็น browser table/API ไม่เพิ่ม cron และ missing schema ต้องหยุดส่ง รอบนี้ fetch ประวัติ Staging ทั้ง 161 รายการเข้าที่ทำงานชั่วคราว ตรวจ parity และ dry-run ก่อน apply เฉพาะ ledger ใหม่เป็นรายการที่ 162 ผ่าน CLI ที่ระบุ project-ref ชัดเจน ไม่ repair/replay migration เก่า `20261015132234` เป็น retention ที่ยังพักใน Staging จึงไม่นำมาปล่อย ส่วน atomic SEB `20261009142610` มีอยู่แล้ว Fingerprint ฟังก์ชัน SEB/retention ทั้งสี่ตัวตรงก่อน apply สิทธิ์ตาราง/RPC ตรวจบน hosted catalog ผ่าน และ smoke ภายใต้ service_role ผ่าน 18 assertions ใน transaction ที่ ROLLBACK ทั้งหมด เหลือ ledger 0 แถว ไม่ส่งอีเมลจริง คู่มือ `RESEND_SETUP.md` แยกผลนี้จาก signed provider integration
 
 ## Private grading drafts — local migration 20261018133739
 
