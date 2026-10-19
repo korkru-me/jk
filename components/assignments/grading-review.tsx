@@ -106,7 +106,7 @@ function AnswerStatus({ answer, question }: { answer: GradingAnswer; question: Q
   return <div className="flex flex-wrap items-center gap-1.5">
     {parts.answer.pending && <Badge variant="statusWarning"><Clock3 aria-hidden="true" />รอตรวจคำตอบ</Badge>}
     {pendingWorkForReview(parts) && <Badge variant="statusWarning"><Clock3 aria-hidden="true" />รอตรวจวิธีทำ</Badge>}
-    {!parts.pending && <Badge variant={answer.scoreEditedBy ? 'secondary' : 'statusSuccess'}>{answer.scoreEditedBy ? <PencilLine aria-hidden="true" /> : <CheckCircle2 aria-hidden="true" />}{answer.scoreEditedBy ? 'ครูปรับคะแนนแล้ว' : parts.answer.source === 'automatic' && !parts.hasWork ? 'ตรวจแล้วโดยระบบ' : 'ครูตรวจแล้ว'}</Badge>}
+    {!parts.pending && <Badge variant="statusSuccess"><CheckCircle2 aria-hidden="true" />{!answer.scoreEditedBy && parts.answer.source === 'automatic' && !parts.hasWork ? 'ตรวจแล้วโดยระบบ' : 'ตรวจแล้วโดยผู้สอน'}</Badge>}
   </div>
 }
 
