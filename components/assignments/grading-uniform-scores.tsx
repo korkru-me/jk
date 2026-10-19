@@ -1,12 +1,14 @@
 'use client'
 
-import { useId, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import { ChevronDown, Users } from 'lucide-react'
+import { toast } from 'sonner'
 import { scoreParts, type GradingWorkspaceData } from '@/lib/grading-workspace'
 import type { GradingScoreDraftSource, GradingScoreKind } from '@/lib/grading-score-drafts'
 import { prepareUniformGradingScore, uniformGradingScope } from '@/lib/grading-uniform-scores'
 import type { Question } from '@/lib/types'
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
@@ -34,21 +36,26 @@ export function GradingUniformScores({ data, question }: { data: GradingWorkspac
   const selectedIds = new Set(scope.targets.map(source => source.answerId))
   const people = new Set(answers.filter(answer => selectedIds.has(answer.id)).map(answer => answer.studentId)).size
   const blocked = batch.busy || batch.workflowDisabled
+  useEffect(() => {
+    if (!open || batch.busy) setNotice('')
+  }, [open, batch.busy])
 
   function fill() {
     if (blocked) return
     const plan = prepareUniformGradingScore(sources, kind, value)
     if (!plan.ok) { setError(plan.error); setNotice(''); return }
     for (const source of plan.targets) batch.edit(source, kind, String(plan.score))
-    setError(''); setNotice(`ใส่ร่าง ${plan.targets.length} คำตอบแล้ว กดบันทึกร่าง หรือบันทึกและแจ้งนักเรียน`)
+    const message = `ร่างคะแนนสำเร็จ ${plan.targets.length} คำตอบ`
+    setError(''); setNotice(`${message} · ยังไม่ได้บันทึกหรือส่งคะแนนให้นักเรียน`)
+    toast.success(message, { description: 'ยังไม่ได้บันทึกร่างหรือส่งคะแนนให้นักเรียน กดบันทึกร่างหรือส่งคะแนนเมื่อพร้อม' })
   }
 
   return <Collapsible ref={root} open={open} onOpenChange={setOpen} className="contents">
     <CollapsibleTrigger render={<Button type="button" size="sm" variant="outline" className="pointer-coarse:min-h-11" />}>
       <Users data-icon="inline-start" aria-hidden="true" />ให้คะแนนเท่ากันทุกคน<ChevronDown data-icon="inline-end" aria-hidden="true" />
     </CollapsibleTrigger>
-    <CollapsibleContent className="order-last w-full min-w-0 basis-full">
-      <div className="flex min-w-0 flex-col gap-2 pt-2">
+    <CollapsibleContent className="order-last w-full min-w-0 basis-full pt-2">
+      <Card radius="md" padding="sm" className="flex w-full min-w-0 max-w-[42rem] flex-col gap-2">
         <p className="text-xs text-muted-foreground">ทุกห้องและทุกหน้า · {people} คน · {scope.targets.length} คำตอบของข้อนี้</p>
         {scope.excludedCount > 0 && <p className="text-xs text-muted-foreground">ไม่รวม {scope.excludedCount} คำตอบที่ไม่มีส่วนคะแนนนี้หรือแก้คะแนนไม่ได้</p>}
         <FieldGroup className="flex-row flex-wrap items-end gap-2">
@@ -64,11 +71,11 @@ export function GradingUniformScores({ data, question }: { data: GradingWorkspac
               onChange={event => { setValue(event.target.value); setError(''); setNotice('') }} disabled={blocked || !scope.targets.length}
               aria-invalid={!!error} aria-describedby={error ? `${id}-error` : undefined} className="w-28 tabular-nums pointer-coarse:min-h-11" />
           </Field>
-          <Button type="button" size="sm" variant="outline" className="pointer-coarse:min-h-11" disabled={blocked || !scope.targets.length} onClick={fill}>ใส่ร่างให้ทุกคน</Button>
+          <Button type="button" size="sm" variant="outline" className="pointer-coarse:min-h-11" disabled={blocked || !scope.targets.length} onClick={fill}>ร่างคะแนนให้ทุกคน</Button>
         </FieldGroup>
         {error && <Alert id={`${id}-error`} variant="destructive" className="py-1.5"><AlertDescription>{error}</AlertDescription></Alert>}
         {notice && <p role="status" className="text-xs text-muted-foreground">{notice}</p>}
-      </div>
+      </Card>
     </CollapsibleContent>
   </Collapsible>
 }

@@ -1,11 +1,13 @@
 'use client'
 
-import { createContext, useCallback, useContext, useEffect, useId, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ChevronDown, SlidersHorizontal } from 'lucide-react'
+import { toast } from 'sonner'
 import { DEFAULT_GRADING_QUICK_SCORES, GRADING_QUICK_SCORE_COUNT, gradingQuickScore, gradingQuickScoresStorageKey, isGradingQuickScores, readGradingQuickScores, writeGradingQuickScores } from '@/lib/grading-quick-scores'
 import { useGradingDisclosure } from './use-grading-disclosure'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
@@ -13,7 +15,7 @@ import { Input } from '@/components/ui/input'
 interface GradingQuickScoresContextValue {
   percentages: readonly number[]
   ready: boolean
-  update: (percentages: number[]) => void
+  update: (percentages: number[]) => boolean
 }
 const GradingQuickScoresContext = createContext<GradingQuickScoresContextValue | null>(null)
 
@@ -32,10 +34,11 @@ export function GradingQuickScoresProvider({ assignmentId, viewerId, children }:
     setStored({ key, percentages })
   }, [key])
   const update = useCallback((percentages: number[]) => {
-    if (!isGradingQuickScores(percentages)) return
+    if (!isGradingQuickScores(percentages)) return false
     const next = [...percentages]
     setStored({ key, percentages: next })
-    try { writeGradingQuickScores(window.localStorage, key, next) } catch { /* The current page can still use its in-memory preferences. */ }
+    try { return writeGradingQuickScores(window.localStorage, key, next) }
+    catch { return false /* The current page can still use its in-memory preferences. */ }
   }, [key])
   const ready = stored?.key === key
   const percentages = ready ? stored.percentages : DEFAULT_GRADING_QUICK_SCORES
@@ -47,6 +50,7 @@ export function GradingQuickScoreSettings() {
   const context = useContext(GradingQuickScoresContext)
   const { open, setOpen, root } = useGradingDisclosure()
   const [fields, setFields] = useState(() => DEFAULT_GRADING_QUICK_SCORES.map(String))
+  const trigger = useRef<HTMLButtonElement | null>(null)
   const id = useId()
   const percentages = context?.percentages ?? DEFAULT_GRADING_QUICK_SCORES
   useEffect(() => { setFields(percentages.map(String)) }, [percentages])
@@ -55,16 +59,16 @@ export function GradingQuickScoreSettings() {
   const valid = isGradingQuickScores(values)
   const invalidMessage = `กรอกเปอร์เซ็นต์ 0–100 ให้ครบทั้ง ${GRADING_QUICK_SCORE_COUNT} ปุ่ม`
   return <Collapsible ref={root} open={open} onOpenChange={setOpen} className="contents">
-    <CollapsibleTrigger render={<Button type="button" size="sm" variant="outline" className="shrink-0 pointer-coarse:min-h-11" />}>
+    <CollapsibleTrigger render={<Button ref={trigger} type="button" size="sm" variant="outline" className="shrink-0 pointer-coarse:min-h-11" />}>
       <SlidersHorizontal data-icon="inline-start" aria-hidden="true" />ตั้งค่าปุ่มให้คะแนนเร็ว<ChevronDown data-icon="inline-end" aria-hidden="true" />
     </CollapsibleTrigger>
-    <CollapsibleContent className="@container/quick-settings order-last w-full min-w-0 basis-full">
-      <div className="flex min-w-0 flex-col gap-2 pt-2">
+    <CollapsibleContent className="order-last w-full min-w-0 basis-full pt-2">
+      <Card radius="md" padding="sm" className="flex w-full min-w-0 max-w-[42rem] flex-col gap-2">
         <p className="text-xs text-muted-foreground">กำหนดเปอร์เซ็นต์ที่ใช้กับทุกช่องคะแนนในงานนี้</p>
-        <FieldGroup className="grid grid-cols-2 gap-2 @min-[24rem]/quick-settings:grid-cols-3 @min-[40rem]/quick-settings:grid-cols-6">
+        <FieldGroup className="min-w-0 flex-row flex-wrap gap-2">
           {fields.map((value, index) => {
             const invalid = !Number.isFinite(values[index]) || values[index] < 0 || values[index] > 100
-            return <Field key={index} className="min-w-0 gap-1" data-invalid={invalid} data-disabled={!context.ready}>
+            return <Field key={index} className="w-20 min-w-0 gap-1" data-invalid={invalid} data-disabled={!context.ready}>
               <FieldLabel htmlFor={`${id}-${index}`} className="whitespace-nowrap text-xs text-muted-foreground">ปุ่ม {index + 1} · %</FieldLabel>
               <Input id={`${id}-${index}`} type="number" min={0} max={100} step="any" inputMode="decimal" value={value}
                 disabled={!context.ready} aria-invalid={invalid} aria-describedby={invalid ? `${id}-error` : undefined}
@@ -78,10 +82,19 @@ export function GradingQuickScoreSettings() {
         </FieldGroup>
         {!valid && <Alert id={`${id}-error`} variant="destructive" className="py-1.5"><AlertDescription>{invalidMessage}</AlertDescription></Alert>}
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" size="sm" disabled={!context.ready || !valid} className="pointer-coarse:min-h-11" onClick={() => context.update(values)}>ใช้ค่าชุดนี้</Button>
+          <Button type="button" size="sm" disabled={!context.ready || !valid} className="pointer-coarse:min-h-11" onClick={() => {
+            if (!context.ready || !valid) return
+            if (!context.update(values)) {
+              toast.error('ยังบันทึกการตั้งค่าไม่ได้', { description: 'ค่าชุดนี้ใช้ได้ในหน้านี้ แต่ยังเก็บไว้ในเบราว์เซอร์ไม่ได้ กรุณาลองอีกครั้ง' })
+              return
+            }
+            toast.success('บันทึกการตั้งค่าปุ่มให้คะแนนเร็วแล้ว')
+            setOpen(false)
+            trigger.current?.focus({ preventScroll: true })
+          }}>บันทึก</Button>
           <Button type="button" size="sm" variant="ghost" disabled={!context.ready} className="pointer-coarse:min-h-11" onClick={() => context.update([...DEFAULT_GRADING_QUICK_SCORES])}>คืนค่าเริ่มต้น</Button>
         </div>
-      </div>
+      </Card>
     </CollapsibleContent>
   </Collapsible>
 }
