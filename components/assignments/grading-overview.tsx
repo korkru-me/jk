@@ -2,7 +2,7 @@
 
 import { useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { ArrowDownWideNarrow, ArrowUpNarrowWide, ArrowUpRight, CheckCircle2, ChevronLeft, ChevronRight, Clock, Eye, UserRoundCheck } from 'lucide-react'
+import { ArrowDownWideNarrow, ArrowUpNarrowWide, ArrowUpRight, CheckCircle2, ChevronLeft, ChevronRight, Clock, Eye } from 'lucide-react'
 import { GradingWorkspaceHeader } from '@/components/assignments/grading-workspace-header'
 import { QuestionPreviewContent } from '@/components/questions/question-preview'
 import { Badge } from '@/components/ui/badge'
@@ -205,7 +205,7 @@ export function GradingOverview({ data, initialQuery, tools }: Props) {
                   <TableCell className="px-3 whitespace-normal"><div className="flex min-w-80 flex-wrap gap-1.5">
                     {isVoid ? <Badge variant="secondary">โมฆะ · ไม่นับคะแนน</Badge> : !summary?.count ? <span className="text-xs text-muted-foreground">ยังไม่มีคำตอบที่ส่งแล้ว</span> : <>
                       {summary.automatic > 0 && <Badge variant="statusSuccess"><CheckCircle2 aria-hidden="true" />{summary.hasWork ? 'ระบบตรวจคำตอบแล้ว' : 'ตรวจแล้วโดยระบบ'} {formatCount(summary.automatic)} รายการ</Badge>}
-                      {summary.teacher > 0 && <Badge variant="secondary"><UserRoundCheck aria-hidden="true" />ครูตรวจแล้ว {formatCount(summary.teacher)} รายการ</Badge>}
+                      {summary.teacher > 0 && <Badge variant="statusSuccess"><CheckCircle2 aria-hidden="true" />ครูตรวจแล้ว {formatCount(summary.teacher)} รายการ</Badge>}
                       {summary.pendingAnswer > 0 && <Badge variant="statusWarning"><Clock aria-hidden="true" />รอตรวจคำตอบ {formatCount(summary.pendingAnswer)} รายการ</Badge>}
                       {summary.pendingWork > 0 && <Badge variant="statusWarning"><Clock aria-hidden="true" />รอตรวจวิธีทำ {formatCount(summary.pendingWork)} รายการ</Badge>}
                       {summary.automatic + summary.teacher + summary.pendingAnswer + summary.pendingWork === 0 && <Badge variant="secondary">ไม่นับคะแนน</Badge>}
