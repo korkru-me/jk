@@ -91,6 +91,15 @@ RESEND_QUOTA_ALERT_TO=korkru.me@gmail.com
 
 โควตาเป็นยอดของ **Resend team รวมทั้งส่งและรับ** การแยก SMTP/monitor key หรือ environment ไม่ได้แยกโควตาให้ใหม่ ([Usage API](https://resend.com/docs/api-reference/usage/retrieve-usage), [Pricing](https://resend.com/pricing)) Production SMTP, Google และ SEB ไม่ได้เปิดเพิ่มจากงานนี้
 
+### เริ่มเตรียม Production — เจ้าของอนุญาต 19 ตุลาคม 2026
+
+เจ้าของขอให้ตั้งแจ้งเตือน 80/90/95 ทั้งรายวันและรายเดือนบน Production แบบทีละขั้นตอนแล้ว ขอบเขตนี้เป็น quota monitor เท่านั้น ไม่เปิด Production SMTP/Google หรือปล่อย SEB เพิ่ม การตรวจรอบแรกเป็น read-only ยังไม่มีการสร้าง key, แก้ env/webhook, apply migration หรือ deploy Production ใหม่
+
+- Production deployment ปัจจุบัน Ready ที่ `9004e96` ตรง `origin/master` ยังเป็น daily-only 80/90/97 ไม่มี durable store เลือกเฉพาะ implementation commit `0352be1` เป็นขอบเขต candidate จาก master ไม่ merge Staging/auth release ทั้ง branch เพราะมีงานอื่น ขึ้น Production แล้วต้อง sync เฉพาะส่วนนี้และ dependency ที่จำเป็นสู่ primary `localhost:3000` ตาม release workflow โดยรักษางานคำถาม/deadlineที่ dirty อยู่
+- Production Supabase history จาก MCP มี149รายการ ล่าสุด `20261018133739`; ledger migration `20261018154826` และ quota table/RPC ยังไม่มี เทียบชื่อไฟล์กับ auth release พบ local-only13รายการ = quota1 + SEBที่พักไว้12 ไม่มี remote-only ต้องตรวจ CLI migration list ก่อนเขียนและใช้ isolated Production history baseline พร้อม quota migrationเดียว ห้าม db push checkout นี้หรือใช้ Staging baseline เพราะ Production มี retention/grading ที่ต่างกัน
+- Vercel metadata มี Production scope/flag/service-role key อยู่แล้ว แต่ยังไม่มี quota API key/signing secret/from/to ฝั่ง Production การอ่านรอบนี้เก็บเฉพาะชื่อ/target/type ค่าของ scope/flagยังยืนยันจาก metadataไม่ได้ จึงต้องตรวจว่า flagเป็นfalseก่อนบันทึกค่าใหม่หรือเปิดระบบ ไม่อ่าน/บันทึกค่าลับ
+- เปิด Resend Add API Key form และเตรียมชื่อ `korkru-production-quota-monitor`, Permission Full access, Domain All domains ไว้ให้เจ้าของกด Add และเก็บค่าตัวเต็มเอง **ยังรอเจ้าของสร้างและยืนยัน** ขั้นถัดไปคือบันทึกใน Vercel เฉพาะ Production โดยเริ่มflagปิด แล้วเตรียมโค้ด/ledger/deploymentและ cutover webhook ตามลำดับ ไม่ขอ key หรือ signing secret ผ่านแชท
+
 ## ระบบเตือนทำอะไรบ้าง
 
 - ทุก signed `email.sent`/`email.received` ที่ยอมรับจะอ่าน Usage API แล้วประเมิน **daily และ monthly แยกกัน** ใช้ยอดและเพดานจาก provider คำนวณ `ceil(limit × percentage / 100)` ถ้าข้ามหลายระดับ ส่งเฉพาะระดับสูงสุดที่ถึงของช่วงนั้น ไม่ไล่ส่งย้อนหลัง ระดับที่ต่ำกว่าหรือเท่าระดับสูงสุดที่รับงานไว้แล้วไม่ส่งใหม่ `daily.limit=null` ข้ามเฉพาะรายวัน ส่วนรายเดือนยังตรวจตามเดิม
