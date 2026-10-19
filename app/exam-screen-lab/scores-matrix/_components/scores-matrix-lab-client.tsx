@@ -15,6 +15,15 @@ const students = [
   { id: id(1, 3), full_name: 'นักเรียนตัวอย่าง 3', email: 'student3@example.invalid', grade_level: 'ม.4', section_number: 8, class_number: 5, student_code: '53001' },
 ]
 
+const manyStudents = [
+  { ...students[0], full_name: 'นักเรียนตัวอย่างชื่อยาวมาก สำหรับทดสอบการแสดงชื่อและนามสกุลให้ครบถ้วน' },
+  ...students.slice(1),
+  ...Array.from({ length: 33 }, (_, index) => ({
+    id: id(1, index + 4), full_name: `นักเรียนตัวอย่าง ${index + 4}`, email: `student${index + 4}@example.invalid`,
+    grade_level: 'ม.4', section_number: index % 5 + 1, class_number: index + 4, student_code: `53${String(index + 4).padStart(3, '0')}`,
+  })),
+]
+
 const assignments: ClassroomAssignmentRow[] = Array.from({ length: 7 }, (_, index) => ({
   id: id(2, index + 1),
   title: index === 0 ? 'ทดสอบ (สำเนา)' : `ทดสอบ ${index + 1}`,
@@ -60,6 +69,7 @@ const studentAssignments: StudentAssignmentRow[] = assignments.map(assignment =>
 export function ScoresMatrixLabClient() {
   const [studentView, setStudentView] = useState(false)
   const [reviewed, setReviewed] = useState(false)
+  const [showManyStudents, setShowManyStudents] = useState(false)
   return (
     <main className="min-h-dvh bg-background p-6">
       <div className="mx-auto max-w-[1800px] space-y-4">
@@ -72,6 +82,9 @@ export function ScoresMatrixLabClient() {
           {!studentView && <Button variant="outline" size="sm" onClick={() => setReviewed(value => !value)}>
             {reviewed ? 'จำลองรอตรวจอีกครั้ง' : 'จำลองตรวจครบ'}
           </Button>}
+          {!studentView && <Button variant="outline" size="sm" onClick={() => setShowManyStudents(value => !value)}>
+            {showManyStudents ? 'กลับรายชื่อ 3 คน' : 'จำลองชื่อยาวและรายชื่อ 36 คน'}
+          </Button>}
         </div>
         {studentView ? (
           <AssignmentList assignments={studentAssignments} categories={[]} />
@@ -79,7 +92,7 @@ export function ScoresMatrixLabClient() {
           <ClassroomScoresMatrix
             classroomId={id(4, 1)}
             classroomName="ห้องทดสอบ"
-            students={students}
+            students={showManyStudents ? manyStudents : students}
             assignments={assignments}
             categories={[]}
             submissions={submissions}
