@@ -43,7 +43,6 @@ export default async function DrawingBoardLabPage({ searchParams }: { searchPara
         currentUserId="22222222-2222-4222-8222-222222222222"
         canManage
         questions={[question]}
-        questionsPerPage={1}
         initialBoards={[]}
         contextualSidebarPath="/exam-screen-lab/drawing-board"
       />

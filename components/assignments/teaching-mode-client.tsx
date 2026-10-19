@@ -11,7 +11,6 @@ import {
   EyeOff,
   ImagePlus,
   Loader2,
-  PenLine,
   Plus,
   Presentation,
   Trash2,
@@ -50,7 +49,6 @@ import {
   type DrawingBoardSessionLibraryItem,
 } from '@/lib/drawing-board-session-library'
 import { TYPE_LABEL } from '@/lib/question-display'
-import { drawingBackgroundStyle } from '@/components/exam/drawing-board-utils'
 import {
   adoptSavedTeachingBoard,
   createTeachingBoardRecovery,
@@ -95,8 +93,6 @@ interface Props {
   currentUserId: string
   canManage: boolean
   questions: TeachingQuestionView[]
-  /** The งาน's own ข้อต่อหน้า, so a class sees the paging its students get. */
-  questionsPerPage: number
   initialBoards: TeachingBoardView[]
   initialBoardsError?: string
   /** Registers the teaching controls in the surrounding app shell. */
@@ -474,7 +470,7 @@ function TeachingBoardSlots({
  */
 function TeachingQuestionCard({
   question: initialQuestion, index, total, showSolution, showQuestion, showSavedBoards,
-  actions, slots, outlined, onActivate, onInsertImage,
+  actions, slots, onInsertImage,
 }: {
   question: TeachingQuestionView
   index: number
@@ -485,9 +481,6 @@ function TeachingQuestionCard({
   actions?: React.ReactNode
   /** This ข้อ's own saved boards, grouped with it. */
   slots?: React.ReactNode
-  outlined: boolean
-  /** Given when this ข้อ is not the one being taught; a click moves to it. */
-  onActivate?: () => void
   onInsertImage?: (url: string) => void
 }) {
   const [variant, setVariant] = useState<TeachingQuestionView | null>(null)
@@ -540,16 +533,7 @@ function TeachingQuestionCard({
       className={cn(
         'flex flex-col gap-4',
         !showQuestion && !showSavedBoards && 'hidden',
-        outlined && 'border-primary',
-        onActivate && 'cursor-pointer',
       )}
-      /* Clicking anywhere quiet in another ข้อ brings the board to it, so the
-         teacher does not have to go up to the bar to change ข้อ. Controls and
-         fields inside keep their own click. */
-      onClick={onActivate ? event => {
-        if (event.target instanceof HTMLElement && event.target.closest('button, a, input, select, textarea, label')) return
-        onActivate()
-      } : undefined}
     >
       {showQuestion && (
         <TeachingQuestion
@@ -725,7 +709,6 @@ export function TeachingModeClient({
   currentUserId,
   canManage,
   questions,
-  questionsPerPage,
   initialBoards,
   initialBoardsError,
   contextualSidebarPath,
@@ -735,16 +718,12 @@ export function TeachingModeClient({
   const initialSlot = firstAvailableSlot(initialBoards, currentUserId)
   const initialBoard = initialBoards.find(board => board.createdBy === currentUserId && board.slot === initialSlot) ?? null
   const [questionIndex, setQuestionIndex] = useState(0)
-  const [perPage, setPerPage] = useState(() => (
-    Math.min(Math.max(1, Math.round(questionsPerPage) || 1), questions.length)
-  ))
   const [boardsByQuestion, setBoardsByQuestion] = useState<Record<string, TeachingBoardView[]>>(
     () => ({ [questions[0].id]: initialBoards }),
   )
   const [selectedSlot, setSelectedSlot] = useState(initialSlot)
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(initialBoard?.id ?? null)
-  // Revealed per ข้อ: the button sits on each card, so pressing it there
-  // should show that ข้อ's เฉลย and leave the others on the page covered.
+  // Revealed per ข้อ, so changing questions keeps each one's reveal state.
   const [revealedQuestionIds, setRevealedQuestionIds] = useState<string[]>([])
   // These are page-wide presentation controls. In the authenticated route
   // they are exposed by the contextual sidebar and survive question changes.
@@ -819,18 +798,9 @@ export function TeachingModeClient({
   }, [])
 
   const question = questions[questionIndex]
+  const revealed = revealedQuestionIds.includes(question.id)
   const activeQuestionIdRef = useRef(question.id)
   activeQuestionIdRef.current = question.id
-  // Same paging arithmetic the exam page runs: the page is the block that
-  // holds the ข้อ whose board is open, so jumping to a ข้อ brings its page.
-  const pageStart = Math.floor(questionIndex / perPage) * perPage
-  const pageQuestions = questions.slice(pageStart, pageStart + perPage)
-  const pageNumber = Math.floor(pageStart / perPage) + 1
-  const pageCount = Math.ceil(questions.length / perPage)
-  const perPageOptions = useMemo(() => {
-    const values = new Set([1, 2, 3, 4, 5, Math.max(1, Math.round(questionsPerPage) || 1)])
-    return [...values].filter(value => value <= questions.length).sort((a, b) => a - b)
-  }, [questions.length, questionsPerPage])
   const draftRecords = useMemo(
     () => {
       // Reading the revision makes lifecycle changes observable without
@@ -1027,19 +997,14 @@ export function TeachingModeClient({
     return request
   }, [assignmentId])
 
-  // Every ข้อ on the page shows its own slots, so each one's boards are
-  // fetched once when it first appears. The ref keeps a second render from
-  // asking again while the first request is still out.
+  // Fetch the active question's saved slots on first reveal. The ref avoids
+  // asking again while its first request is still out.
   const requestedRef = useRef(new Set<string>([questions[0].id]))
-  const pageQuestionIds = pageQuestions.map(item => item.id).join('|')
   useEffect(() => {
-    if (!showBoards) return
-    for (const id of pageQuestionIds.split('|')) {
-      if (requestedRef.current.has(id)) continue
-      requestedRef.current.add(id)
-      void fetchBoards(id)
-    }
-  }, [fetchBoards, pageQuestionIds, showBoards])
+    if (!showBoards || requestedRef.current.has(question.id)) return
+    requestedRef.current.add(question.id)
+    void fetchBoards(question.id)
+  }, [fetchBoards, question.id, showBoards])
 
   const activeDraftFor = (questionId: string) => {
     const currentTarget = boardTargetsRef.current.get(questionId)
@@ -1612,168 +1577,120 @@ export function TeachingModeClient({
             ))}
           </NativeSelect>
 
-          <label className="flex shrink-0 items-center gap-1.5 text-[11px] text-muted-foreground">
-            ต่อหน้า
-            <NativeSelect
-              aria-label="จำนวนข้อต่อหน้า"
-              className="h-8 w-16 text-xs"
-              value={perPage}
-              onChange={event => setPerPage(Number(event.target.value))}
-            >
-              {perPageOptions.map(value => <option key={value} value={value}>{value}</option>)}
-            </NativeSelect>
-          </label>
-
           <div className="flex shrink-0 items-center gap-1">
-            <Button type="button" variant="outline" size="icon-sm" onClick={() => void changeQuestion(pageStart - perPage)} disabled={pageStart === 0} aria-label="หน้าก่อนหน้า">
+            <Button type="button" variant="outline" size="icon-sm" onClick={() => void changeQuestion(questionIndex - 1)} disabled={questionIndex === 0} aria-label="ข้อก่อนหน้า">
               <ChevronLeft />
             </Button>
             <span className="min-w-12 text-center text-xs font-semibold">
-              {perPage > 1 && 'หน้า '}{pageNumber} / {pageCount}
+              ข้อ {questionIndex + 1} / {questions.length}
             </span>
-            <Button type="button" variant="outline" size="icon-sm" onClick={() => void changeQuestion(pageStart + perPage)} disabled={pageStart + perPage >= questions.length} aria-label="หน้าถัดไป">
+            <Button type="button" variant="outline" size="icon-sm" onClick={() => void changeQuestion(questionIndex + 1)} disabled={questionIndex === questions.length - 1} aria-label="ข้อถัดไป">
               <ChevronRight />
             </Button>
           </div>
         </div>
       </Card>
 
-      {/* Each ข้อ is one row of its own: the question and saved answers on
-          the left, its board on the right. The question track is based on the
-          normal desktop viewport after subtracting the 64-unit sidebar,
-          12 units of page padding and the 3-unit gap. Collapsing the sidebar
-          therefore gives all reclaimed width to the board instead of making
-          the question wider, including with a custom density/spacing theme. */}
+      {/* Teaching always pairs one active question with its own board.
+          Student questions-per-page settings do not change this workspace. */}
       <div className="flex min-h-0 min-w-0 flex-1 gap-3">
-        <div className="min-w-0 flex-1 space-y-4">
-          {pageQuestions.map((pageQuestion, offset) => {
-            const index = pageStart + offset
-            const isBoardQuestion = index === questionIndex
-            const revealed = revealedQuestionIds.includes(pageQuestion.id)
-            return (
-              <div
-                key={pageQuestion.id}
-                className={cn(
-                  'grid min-w-0 gap-3',
-                  !showQuestion && !showBoards && !showBoard && 'hidden',
-                  (showQuestion || showBoards) && showBoard
-                    && 'lg:grid-cols-[clamp(17rem,calc(36vw-(var(--spacing)*28.44)),35rem)_minmax(30rem,1fr)]',
-                )}
-              >
-                <TeachingQuestionCard
-                  question={pageQuestion}
-                  index={index}
-                  total={questions.length}
-                  showSolution={revealed}
-                  showQuestion={showQuestion}
-                  showSavedBoards={showBoards}
-                  outlined={perPage > 1 && isBoardQuestion}
-                  onActivate={isBoardQuestion ? undefined : () => void changeQuestion(index)}
-                  onInsertImage={url => void insertQuestionImage(index, url)}
-                  actions={
-                    /* Correct-answer reveal remains per question; page-level
-                       visibility lives only in the sidebar. */
-                    <Button type="button" variant="outline" size="xs" onClick={() => toggleSolution(pageQuestion.id)} aria-pressed={revealed}>
-                      {revealed ? <EyeOff /> : <Eye />}{revealed ? 'ซ่อนเฉลย' : 'แสดงเฉลย'}
-                    </Button>
-                  }
-                  slots={
-                    <TeachingBoardSlots
-                      boards={boardsByQuestion[pageQuestion.id] ?? []}
-                      loading={loadingQuestionIds.includes(pageQuestion.id)}
-                      canManage={canManage}
-                      currentUserId={currentUserId}
-                      active={isBoardQuestion}
-                      selectedSlot={selectedSlot}
-                      selectedBoardId={selectedBoardId}
-                      separated={showQuestion}
-                      dirtySlots={draftRecords
-                        .filter(draft => draft.target.questionId === pageQuestion.id && draft.dirty)
-                        .map(draft => draft.target.slot)}
-                      onOpenSlot={slot => void openSlotOn(index, slot)}
-                      onOpenBoard={board => void openBoardOn(index, board)}
-                      onDelete={board => void deleteBoard(board, pageQuestion.id)}
-                      onRefresh={() => void fetchBoards(pageQuestion.id)}
-                    />
-                  }
+        <div className="min-w-0 flex-1">
+          <div
+            key={question.id}
+            data-teaching-question
+            className={cn(
+              'grid min-w-0 gap-3',
+              !showQuestion && !showBoards && !showBoard && 'hidden',
+              (showQuestion || showBoards) && showBoard
+                && 'lg:grid-cols-[clamp(17rem,calc(36vw-(var(--spacing)*28.44)),35rem)_minmax(30rem,1fr)]',
+            )}
+          >
+            <TeachingQuestionCard
+              question={question}
+              index={questionIndex}
+              total={questions.length}
+              showSolution={revealed}
+              showQuestion={showQuestion}
+              showSavedBoards={showBoards}
+              onInsertImage={url => void insertQuestionImage(questionIndex, url)}
+              actions={
+                /* Correct-answer reveal remains per question; page-level
+                   visibility lives only in the sidebar. */
+                <Button type="button" variant="outline" size="xs" onClick={() => toggleSolution(question.id)} aria-pressed={revealed}>
+                  {revealed ? <EyeOff /> : <Eye />}{revealed ? 'ซ่อนเฉลย' : 'แสดงเฉลย'}
+                </Button>
+              }
+              slots={
+                <TeachingBoardSlots
+                  boards={boardsByQuestion[question.id] ?? []}
+                  loading={loadingQuestionIds.includes(question.id)}
+                  canManage={canManage}
+                  currentUserId={currentUserId}
+                  active
+                  selectedSlot={selectedSlot}
+                  selectedBoardId={selectedBoardId}
+                  separated={showQuestion}
+                  dirtySlots={draftRecords
+                    .filter(draft => draft.target.questionId === question.id && draft.dirty)
+                    .map(draft => draft.target.slot)}
+                  onOpenSlot={slot => void openSlotOn(questionIndex, slot)}
+                  onOpenBoard={board => void openBoardOn(questionIndex, board)}
+                  onDelete={board => void deleteBoard(board, question.id)}
+                  onRefresh={() => void fetchBoards(question.id)}
                 />
+              }
+            />
 
-                {showBoard && (
-                  <div className="min-h-[560px] min-w-0 lg:min-h-0">
-                    {isBoardQuestion ? (
-                      <TeachingBoardEditor
-                        key={`${pageQuestion.id}:${editorMountRevision}`}
-                        assignmentId={assignmentId}
-                        questionId={pageQuestion.id}
-                        slot={selectedSlot}
-                        board={selectedBoard}
-                        canManage={canManage}
-                        operation={boardOperation}
-                        questionLabel={`ข้อ ${index + 1}/${questions.length}`}
-                        initialScene={activeDraft?.scene ?? null}
-                        initialDirty={activeDraft?.dirty ?? false}
-                        initialDraftState={activeDraft?.state}
-                        onSaved={handleSaved}
-                        onDraftStateChange={updateDraftState}
-                        onSceneChange={updateDraftScene}
-                        pendingBoard={pendingLoad?.questionId === pageQuestion.id ? pendingLoad.board : null}
-                        onLoadResolved={handleLoadResolved}
-                        onLoadFailed={handleLoadFailed}
-                        onResetRequested={requestBoardReset}
-                        questionImages={pageQuestion.image_urls ?? []}
-                        onResolveSaveSlot={() => resolveSaveSlot(pageQuestion.id, `ข้อ ${index + 1}/${questions.length}`)}
-                        insertImage={imageRequest?.questionId === pageQuestion.id ? imageRequest : null}
-                        onInsertImageHandled={nonce => setImageRequest(current => (
-                          current?.nonce === nonce ? null : current
-                        ))}
-                        onDuplicated={scene => detachDuplicatedBoard(pageQuestion.id, selectedSlot, scene)}
-                        fingerInputMode={fingerInputMode}
-                        onFingerInputModeChange={setFingerInputMode}
-                        presentationLocked={presentationLocked}
-                        onPresentationLockedChange={setPresentationLocked}
-                        gridEnabled={gridEnabled}
-                        onGridEnabledChange={setGridEnabled}
-                        snapEnabled={snapEnabled}
-                        onSnapEnabledChange={setSnapEnabled}
-                        sessionLibraryItems={sessionLibraryItems}
-                        onSessionLibraryItemAdd={item => {
-                          setSessionLibraryItems(current => [
-                            ...current.slice(-(MAX_DRAWING_SESSION_LIBRARY_ITEMS - 1)),
-                            item,
-                          ])
-                        }}
-                        onSessionLibraryItemRemove={itemId => {
-                          setSessionLibraryItems(current => current.filter(item => item.id !== itemId))
-                        }}
-                      />
-                    ) : (
-                      /* Only one board is live at a time: several Excalidraw
-                         canvases at once is more than a tablet should carry,
-                         and only one is being written on anyway. */
-                      <Card
-                        role="region"
-                        aria-label={`กระดานของข้อ ${index + 1}`}
-                        className="flex h-full min-h-[220px] cursor-pointer flex-col items-center justify-center gap-2 p-6 text-center"
-                        style={drawingBackgroundStyle('lined')}
-                        onClick={() => void changeQuestion(index)}
-                      >
-                        <PenLine className="size-5 text-primary" aria-hidden="true" />
-                        <p className="text-sm font-semibold">กระดานของข้อ {index + 1}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {draftRecords.some(draft => draft.target.questionId === pageQuestion.id && draft.dirty)
-                            ? 'มีงานเขียนค้างไว้ในข้อนี้'
-                            : 'ยังไม่ได้เขียนอะไรในข้อนี้'}
-                        </p>
-                        <Button type="button" variant="outline" size="xs" onClick={() => void changeQuestion(index)}>
-                          <PenLine /> เขียนกระดานข้อนี้
-                        </Button>
-                      </Card>
-                    )}
-                  </div>
-                )}
+            {showBoard && (
+              <div className="min-h-[560px] min-w-0 lg:min-h-0">
+                <TeachingBoardEditor
+                  key={`${question.id}:${editorMountRevision}`}
+                  assignmentId={assignmentId}
+                  questionId={question.id}
+                  slot={selectedSlot}
+                  board={selectedBoard}
+                  canManage={canManage}
+                  operation={boardOperation}
+                  questionLabel={`ข้อ ${questionIndex + 1}/${questions.length}`}
+                  initialScene={activeDraft?.scene ?? null}
+                  initialDirty={activeDraft?.dirty ?? false}
+                  initialDraftState={activeDraft?.state}
+                  onSaved={handleSaved}
+                  onDraftStateChange={updateDraftState}
+                  onSceneChange={updateDraftScene}
+                  pendingBoard={pendingLoad?.questionId === question.id ? pendingLoad.board : null}
+                  onLoadResolved={handleLoadResolved}
+                  onLoadFailed={handleLoadFailed}
+                  onResetRequested={requestBoardReset}
+                  questionImages={question.image_urls ?? []}
+                  onResolveSaveSlot={() => resolveSaveSlot(question.id, `ข้อ ${questionIndex + 1}/${questions.length}`)}
+                  insertImage={imageRequest?.questionId === question.id ? imageRequest : null}
+                  onInsertImageHandled={nonce => setImageRequest(current => (
+                    current?.nonce === nonce ? null : current
+                  ))}
+                  onDuplicated={scene => detachDuplicatedBoard(question.id, selectedSlot, scene)}
+                  fingerInputMode={fingerInputMode}
+                  onFingerInputModeChange={setFingerInputMode}
+                  presentationLocked={presentationLocked}
+                  onPresentationLockedChange={setPresentationLocked}
+                  gridEnabled={gridEnabled}
+                  onGridEnabledChange={setGridEnabled}
+                  snapEnabled={snapEnabled}
+                  onSnapEnabledChange={setSnapEnabled}
+                  sessionLibraryItems={sessionLibraryItems}
+                  onSessionLibraryItemAdd={item => {
+                    setSessionLibraryItems(current => [
+                      ...current.slice(-(MAX_DRAWING_SESSION_LIBRARY_ITEMS - 1)),
+                      item,
+                    ])
+                  }}
+                  onSessionLibraryItemRemove={itemId => {
+                    setSessionLibraryItems(current => current.filter(item => item.id !== itemId))
+                  }}
+                />
               </div>
-            )
-          })}
+            )}
+          </div>
         </div>
       </div>
       <Dialog open={slotChoice !== null} onOpenChange={open => { if (!open) slotChoice?.resolve(null) }}>

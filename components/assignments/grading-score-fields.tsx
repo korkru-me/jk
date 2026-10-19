@@ -43,23 +43,24 @@ export function GradingScoreFields({ answer, question, disabled = false, student
     const label = kind === 'work' ? 'คะแนนวิธีทำ' : parts.hasWork || parts.needsAllocation ? 'คะแนนคำตอบ' : 'คะแนน'
     const savedValue = kind === 'answer' ? saved?.answerScore : saved?.workScore
     const value = draft?.fields[kind] ?? String(savedValue ?? part.score)
+    const unsaved = batch.unsavedDrafts[answer.id]?.fields[kind] !== undefined
     const unpublished = draft?.fields[kind] !== undefined
     const description = [error ? `${id}-error` : undefined, unpublished ? `${id}-${kind}-draft` : undefined].filter(Boolean).join(' ') || undefined
     return <Field key={kind} className="@container/score-part min-w-0 gap-1" data-invalid={!!error}>
       <FieldLabel htmlFor={`${id}-${kind}`} className="flex flex-wrap items-center gap-x-2 gap-y-0 text-xs text-muted-foreground">
         {label}{part.pending && savedValue === undefined && <span className="font-normal text-foreground/75">ยังไม่ตรวจ</span>}
       </FieldLabel>
-      <div className="flex items-center gap-1 text-sm">
+      <div className="flex min-w-0 items-center gap-1 text-sm">
         <Input id={`${id}-${kind}`} type="number" min={0} max={part.maxScore} step="any" inputMode="decimal" aria-label={`${label}${studentName ? `ของ ${studentName}` : ''} ข้อ ${question.title}${occurrence ? ` ครั้งที่ตอบ ${occurrence}` : ''}`} aria-invalid={!!error} aria-describedby={description} value={value}
           onInput={event => {
             // React's change event can omit replacing a displayed 0 with 0.
             // The native input event records that explicit pending review.
             if (part.pending && event.currentTarget.value === value) batch.edit(source, kind, event.currentTarget.value)
           }}
-          onChange={event => batch.edit(source, kind, event.target.value)} disabled={disabled || batch.workflowDisabled || batch.busy || parts.needsAllocation || !part.enabled} className={cn('h-8 w-16 px-2 text-center tabular-nums pointer-coarse:min-h-11', unpublished ? 'text-[color-mix(in_oklab,var(--warning)_60%,var(--foreground))]' : 'text-foreground')} />
-        <span className="text-xs tabular-nums text-muted-foreground">/ {part.maxScore.toLocaleString('th-TH', { maximumFractionDigits: 6 })}</span>
+          onChange={event => batch.edit(source, kind, event.target.value)} disabled={disabled || batch.workflowDisabled || batch.busy || parts.needsAllocation || !part.enabled} className={cn('h-8 w-16 shrink-0 px-2 text-center tabular-nums pointer-coarse:min-h-11', unpublished ? 'text-[color-mix(in_oklab,var(--warning)_60%,var(--foreground))]' : 'text-foreground')} />
+        <span className="shrink-0 whitespace-nowrap text-xs tabular-nums text-muted-foreground">/ {part.maxScore.toLocaleString('th-TH', { maximumFractionDigits: 6 })}</span>
+        {unpublished && <Badge id={`${id}-${kind}-draft`} variant="statusWarning" className="h-auto min-h-5 min-w-0 max-w-full shrink whitespace-normal">{unsaved ? 'ยังไม่บันทึกคะแนน' : 'ร่างคะแนน · ยังไม่ส่ง'}</Badge>}
       </div>
-      {unpublished && <span id={`${id}-${kind}-draft`} className="sr-only">คะแนนร่าง · ยังไม่ส่งให้นักเรียน</span>}
       <GradingQuickScoreButtons maxScore={part.maxScore} disabled={disabled || batch.workflowDisabled || batch.busy || parts.needsAllocation || !part.enabled} label={label}
         onPick={score => batch.edit(source, kind, String(score))} />
     </Field>
