@@ -122,10 +122,10 @@ function PendingReviewLink({ assignmentId, label, description, appearance = 'bad
         render={<Button render={<Link href={`/assignments/${assignmentId}/results`} />} variant="outline" size="xs" />}
         aria-label={label}
         className={cn(
-          'rounded-full pointer-coarse:min-h-11',
+          'rounded-full pointer-coarse:min-h-[44px]',
           appearance === 'badge'
             ? PENDING_REVIEW_COLOR
-            : 'h-auto min-h-11 gap-1.5 rounded-lg border-transparent bg-transparent px-0 text-[color-mix(in_oklab,var(--warning)_50%,var(--foreground))] hover:bg-warning/5 focus-visible:border-warning/50 focus-visible:ring-warning/25',
+            : 'h-auto min-h-8 gap-1.5 rounded-lg border-transparent bg-transparent px-0 text-[color-mix(in_oklab,var(--warning)_50%,var(--foreground))] hover:bg-warning/5 focus-visible:border-warning/50 focus-visible:ring-warning/25',
           className,
         )}
       >
@@ -181,7 +181,7 @@ function RosterSortHeader({ label, sortKey, sort, className, onSort }: RosterSor
     <th
       aria-sort={value}
       className={cn(
-        'sticky z-20 px-1 py-3 text-xs font-semibold',
+        'sticky z-20 border-r border-primary/20 px-1 py-2 text-xs font-semibold',
         MATRIX_HEADER_CELL,
         MATRIX_HEADER_TEXT,
         className,
@@ -197,7 +197,7 @@ function RosterSortHeader({ label, sortKey, sort, className, onSort }: RosterSor
           onSort(sortKey)
         }}
         className={cn(
-          'h-auto max-w-full gap-1 px-1 py-1 hover:bg-primary/10',
+          'h-auto max-w-full gap-1 px-1 py-1 hover:bg-primary/10 pointer-coarse:min-h-[44px]',
           MATRIX_HEADER_TEXT,
           value !== 'none' && 'bg-primary/10 ring-1 ring-primary/20',
         )}
@@ -239,14 +239,14 @@ function SortableAssignmentHeader({
       aria-sort={sortValue}
       style={{ transform: headerTransform, transition }}
       className={cn(
-        'min-w-32 border-l border-primary/10 px-2 py-3 text-center align-top',
+        'border-l border-primary/10 px-2 py-2 text-center align-top',
         MATRIX_HEADER_CELL,
-        pendingReviewCount > 0 && 'min-w-40 bg-[color-mix(in_oklab,var(--warning)_7%,var(--card))]',
+        pendingReviewCount > 0 && 'bg-[color-mix(in_oklab,var(--warning)_7%,var(--card))]',
         isOver && !isDragging && 'bg-[color-mix(in_oklab,var(--primary)_15%,var(--card))]',
         isDragging && 'relative z-30 opacity-60 shadow-lg ring-1 ring-primary/30',
       )}
     >
-      <div className="mx-auto flex min-h-9 max-w-[160px] items-start justify-center gap-0.5">
+      <div className="mx-auto flex min-h-7 max-w-[160px] items-start justify-center gap-0.5">
         <Button
           ref={setActivatorNodeRef}
           {...attributes}
@@ -257,7 +257,7 @@ function SortableAssignmentHeader({
           disabled={disabled}
           aria-label={`ย้ายคอลัมน์ ${assignment.title}`}
           title="ลากเพื่อสลับ"
-          className="mt-0.5 shrink-0 cursor-grab touch-manipulation rounded-full text-muted-foreground/70 hover:bg-primary/10 active:cursor-grabbing"
+          className="mt-0.5 shrink-0 cursor-grab touch-manipulation rounded-full text-muted-foreground/70 hover:bg-primary/10 active:cursor-grabbing pointer-coarse:min-h-[44px] pointer-coarse:min-w-[44px]"
         >
           <GripVertical />
         </Button>
@@ -271,7 +271,7 @@ function SortableAssignmentHeader({
             onSort()
           }}
           className={cn(
-            'h-auto min-w-0 flex-1 whitespace-normal px-1 py-0.5 text-xs font-semibold hover:bg-primary/10',
+            'h-auto min-w-0 flex-1 whitespace-normal px-1 py-0.5 text-xs font-semibold hover:bg-primary/10 pointer-coarse:min-h-[44px]',
             MATRIX_HEADER_TEXT,
             sortValue !== 'none' && 'bg-primary/10 ring-1 ring-primary/20',
           )}
@@ -286,7 +286,7 @@ function SortableAssignmentHeader({
           เฉพาะ {describeGroupTarget(assignment.group_ids, groupNameById)}
         </p>
       )}
-      <div className="mt-1.5 flex flex-col items-center gap-1">
+      <div className="mt-1 flex flex-col items-center gap-0.5">
         {pendingReviewCount > 0 && (
           <PendingReviewLink
             assignmentId={assignment.id}
@@ -305,7 +305,7 @@ function SortableAssignmentHeader({
           onClick={onRemind}
           disabled={!hasNonSubmitter || reminding}
           className={cn(
-            'h-auto items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium',
+            'h-auto items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium pointer-coarse:min-h-[44px]',
             hasNonSubmitter
               ? 'border-warning/20 bg-warning/10 text-[color-mix(in_oklab,var(--warning)_50%,var(--foreground))] hover:bg-warning/15'
               : 'border-border bg-muted text-muted-foreground cursor-default',
@@ -667,13 +667,28 @@ export function ClassroomScoresMatrix({
             cells doesn't reliably paint over a collapsed border seam, which
             let scrolled-under content show through the gap between the
             sticky ลำดับ/นักเรียน columns. */}
-        <table ref={tableRef} className="w-full text-sm border-separate border-spacing-0 [&_tbody_tr:last-child_td]:border-b-0">
+        <table
+          ref={tableRef}
+          className="w-full table-fixed border-separate border-spacing-0 text-sm [--matrix-name-width:calc(var(--spacing)*32)] sm:[--matrix-name-width:calc(var(--spacing)*36)] [&_tbody_tr:last-child_td]:border-b-0"
+          style={{ minWidth: `calc(var(--spacing) * ${66 + visibleAssignments.length * 36} + var(--matrix-name-width))` }}
+        >
+          {/* Fixed roster tracks keep their sticky offsets aligned. Unspecified
+              assignment tracks share any extra width without stretching names. */}
+          <colgroup>
+            <col className="w-10" />
+            <col className="w-[var(--matrix-name-width)]" />
+            <col className="w-14" />
+            <col className="w-12" />
+            <col className="w-12" />
+            <col className="w-18" />
+            {visibleAssignments.map(assignment => <col key={assignment.id} />)}
+          </colgroup>
           <thead data-classroom-table-header>
             {/* Row-divider borders live on the cells, not the <tr> — the
                 separated-borders table model (needed above) doesn't render
                 borders set directly on rows. */}
             <tr>
-              <th className={cn('sticky left-0 z-20 w-10 min-w-10 max-w-10 px-1 py-3 text-center text-xs font-semibold', MATRIX_HEADER_CELL, MATRIX_HEADER_TEXT)}>
+              <th className={cn('sticky left-0 z-20 border-r border-primary/20 px-1 py-2 text-center text-xs font-semibold', MATRIX_HEADER_CELL, MATRIX_HEADER_TEXT)}>
                 ลำดับ
               </th>
               <RosterSortHeader
@@ -681,35 +696,35 @@ export function ClassroomScoresMatrix({
                 sortKey={{ type: 'name' }}
                 sort={studentSort}
                 onSort={toggleStudentSort}
-                className="left-10 w-32 min-w-32 max-w-32 border-r border-primary/20 text-left sm:w-40 sm:min-w-40 sm:max-w-40 sm:border-r-0"
+                className="left-10 text-left"
               />
               <RosterSortHeader
                 label="ชั้น"
                 sortKey={{ type: 'grade' }}
                 sort={studentSort}
                 onSort={toggleStudentSort}
-                className="static left-[calc(var(--spacing)*50)] w-14 min-w-14 max-w-14 text-center sm:sticky"
+                className="static text-center sm:sticky sm:left-[calc(var(--spacing)*10+var(--matrix-name-width))]"
               />
               <RosterSortHeader
                 label="ห้อง"
                 sortKey={{ type: 'section' }}
                 sort={studentSort}
                 onSort={toggleStudentSort}
-                className="static left-64 w-12 min-w-12 max-w-12 text-center sm:sticky"
+                className="static text-center sm:sticky sm:left-[calc(var(--spacing)*24+var(--matrix-name-width))]"
               />
               <RosterSortHeader
                 label="เลขที่"
                 sortKey={{ type: 'number' }}
                 sort={studentSort}
                 onSort={toggleStudentSort}
-                className="static left-[calc(var(--spacing)*76)] w-12 min-w-12 max-w-12 text-center sm:sticky"
+                className="static text-center sm:sticky sm:left-[calc(var(--spacing)*36+var(--matrix-name-width))]"
               />
               <RosterSortHeader
                 label="รหัสนักเรียน"
                 sortKey={{ type: 'code' }}
                 sort={studentSort}
                 onSort={toggleStudentSort}
-                className="static left-[calc(var(--spacing)*88)] w-18 min-w-18 max-w-18 border-r border-primary/20 text-center sm:sticky"
+                className="static text-center sm:sticky sm:left-[calc(var(--spacing)*48+var(--matrix-name-width))]"
               />
               {visibleAssignments.map(a => {
                 const hasNonSubmitter = orderedStudents.some(s => {
@@ -738,23 +753,28 @@ export function ClassroomScoresMatrix({
           <tbody>
             {orderedStudents.map((student, index) => (
               <tr key={student.id} className="group/row">
-                <td className={cn('sticky left-0 z-10 w-10 min-w-10 max-w-10 px-1 py-2.5 text-center text-xs tabular-nums text-muted-foreground', MATRIX_ROW_CELL)}>
+                <td className={cn('sticky left-0 z-10 border-r border-border/70 px-1 py-1 text-center text-xs tabular-nums text-muted-foreground', MATRIX_ROW_CELL)}>
                   {index + 1}
                 </td>
-                <td className={cn('sticky left-10 z-10 w-32 min-w-32 max-w-32 border-r border-border/70 px-2.5 py-2.5 sm:w-40 sm:min-w-40 sm:max-w-40 sm:border-r-0', MATRIX_ROW_CELL)}>
-                  <p className="truncate text-sm font-semibold text-foreground" title={student.full_name}>{student.full_name}</p>
+                <td className={cn('sticky left-10 z-10 border-r border-border/70 px-2 py-1', MATRIX_ROW_CELL)}>
+                  <Tooltip>
+                    <TooltipTrigger render={<span />} tabIndex={0} className="block w-full cursor-help truncate rounded-sm text-sm font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      {student.full_name}
+                    </TooltipTrigger>
+                    <TooltipContent align="start" className="max-w-[min(24rem,calc(100vw-2rem))] break-words">{student.full_name}</TooltipContent>
+                  </Tooltip>
                   <p className="truncate text-xs text-muted-foreground" title={student.email}>{student.email}</p>
                 </td>
-                <td className={cn('left-[calc(var(--spacing)*50)] z-10 w-14 min-w-14 max-w-14 px-1 py-2.5 text-center text-xs text-muted-foreground sm:sticky', MATRIX_ROW_CELL)} title={student.grade_level ?? undefined}>
+                <td className={cn('z-10 border-r border-border/70 px-1 py-1 text-center text-xs text-muted-foreground sm:sticky sm:left-[calc(var(--spacing)*10+var(--matrix-name-width))]', MATRIX_ROW_CELL)} title={student.grade_level ?? undefined}>
                   <span className="block truncate">{student.grade_level || '—'}</span>
                 </td>
-                <td className={cn('left-64 z-10 w-12 min-w-12 max-w-12 px-1 py-2.5 text-center text-xs tabular-nums text-muted-foreground sm:sticky', MATRIX_ROW_CELL)}>
+                <td className={cn('z-10 border-r border-border/70 px-1 py-1 text-center text-xs tabular-nums text-muted-foreground sm:sticky sm:left-[calc(var(--spacing)*24+var(--matrix-name-width))]', MATRIX_ROW_CELL)}>
                   {student.section_number ?? '—'}
                 </td>
-                <td className={cn('left-[calc(var(--spacing)*76)] z-10 w-12 min-w-12 max-w-12 px-1 py-2.5 text-center text-xs tabular-nums text-muted-foreground sm:sticky', MATRIX_ROW_CELL)}>
+                <td className={cn('z-10 border-r border-border/70 px-1 py-1 text-center text-xs tabular-nums text-muted-foreground sm:sticky sm:left-[calc(var(--spacing)*36+var(--matrix-name-width))]', MATRIX_ROW_CELL)}>
                   {student.class_number ?? '—'}
                 </td>
-                <td className={cn('left-[calc(var(--spacing)*88)] z-10 w-18 min-w-18 max-w-18 border-r border-border/70 px-1 py-2.5 text-center text-xs tabular-nums text-muted-foreground shadow-[6px_0_10px_-8px_var(--border)] sm:sticky', MATRIX_ROW_CELL)} title={student.student_code ?? undefined}>
+                <td className={cn('z-10 border-r border-border/70 px-1 py-1 text-center text-xs tabular-nums text-muted-foreground shadow-[6px_0_10px_-8px_var(--border)] sm:sticky sm:left-[calc(var(--spacing)*48+var(--matrix-name-width))]', MATRIX_ROW_CELL)} title={student.student_code ?? undefined}>
                   <span className="block truncate">{student.student_code || '—'}</span>
                 </td>
                 {visibleAssignments.map(a => {
@@ -770,7 +790,7 @@ export function ClassroomScoresMatrix({
                   if (notGiven(a.id, student.id)) {
                     return (
                       <td key={a.id} data-assignment-column={a.id} className={cn(
-                        'border-l border-border/40 px-3 py-2.5 text-center',
+                        'border-l border-border/40 px-3 py-1 text-center',
                         MATRIX_ROW_CELL,
                         draggingAssignmentId === a.id && 'bg-primary/10 opacity-40',
                       )}>
@@ -781,7 +801,7 @@ export function ClassroomScoresMatrix({
 
                   return (
                     <td key={a.id} data-assignment-column={a.id} className={cn(
-                      'group relative border-l border-border/40 px-3 py-2.5 text-center',
+                      'group relative border-l border-border/40 px-3 py-1 text-center',
                       MATRIX_ROW_CELL,
                       draggingAssignmentId === a.id && 'bg-primary/5 opacity-40',
                     )}>
@@ -803,7 +823,7 @@ export function ClassroomScoresMatrix({
                         <Link
                           href={`/submissions/${sub!.id}`}
                           className={cn(
-                            'mx-auto inline-flex min-w-20 items-center justify-center gap-1 rounded-full px-2 py-1 tabular-nums hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                            'mx-auto inline-flex min-w-20 items-center justify-center gap-1 rounded-full px-2 py-1 tabular-nums hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:min-h-[44px]',
                             passed === false
                               ? 'bg-destructive/10 text-[color-mix(in_oklab,var(--destructive)_55%,var(--foreground))]'
                               : 'bg-success/10 text-[color-mix(in_oklab,var(--success)_55%,var(--foreground))]',
@@ -829,9 +849,9 @@ export function ClassroomScoresMatrix({
                       {!submitted && (
                         <button
                           onClick={() => setDialogTarget({ assignmentId: a.id, studentId: student.id })}
-                          className={`mt-0.5 flex items-center gap-0.5 mx-auto text-[10px] transition-colors ${
-                            extension ? 'text-tint-1 font-medium' : 'text-muted-foreground/40 opacity-0 group-hover:opacity-100 hover:text-tint-1'
-                          }`}
+                          className={cn('mx-auto mt-0.5 flex items-center gap-0.5 rounded-sm text-[10px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:min-h-[44px] pointer-coarse:opacity-100',
+                            extension ? 'text-tint-1 font-medium' : 'text-muted-foreground/40 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 hover:text-tint-1',
+                          )}
                         >
                           <Clock className="w-2.5 h-2.5" />
                           {extension ? 'ขยายเวลาแล้ว' : 'ขยายเวลา'}
@@ -854,7 +874,7 @@ export function ClassroomScoresMatrix({
             <Card
               edge="ring"
               aria-hidden="true"
-              className="w-32 cursor-grabbing overflow-hidden bg-card shadow-xl ring-2 ring-primary/30"
+              className="w-36 cursor-grabbing overflow-hidden bg-card shadow-xl ring-2 ring-primary/30"
             >
               <div className={cn('flex min-h-28 items-center justify-center gap-1 px-2 py-3 text-center', MATRIX_HEADER_CELL)}>
                 <GripVertical className="size-4 shrink-0 text-primary" />
@@ -873,7 +893,7 @@ export function ClassroomScoresMatrix({
                   return (
                     <div
                       key={student.id}
-                      className="flex min-h-14 items-center justify-center border-t border-border px-2 py-2 text-center"
+                      className="flex min-h-10 items-center justify-center border-t border-border px-2 py-1 text-center"
                     >
                       {notGiven(assignment.id, student.id) ? (
                         <span className="text-[11px] text-muted-foreground/60">ไม่ได้มอบหมาย</span>
