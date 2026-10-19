@@ -35,6 +35,7 @@ interface GradingBatchContextValue {
   retryWrite: () => Promise<boolean>
   discardChanges: () => void
   drafts: GradingScoreDrafts
+  unsavedDrafts: GradingScoreDrafts
   rowErrors: Record<string, string>
   awaiting: Record<string, SavedScore>
   registerSource: (source: GradingScoreDraftSource) => void
@@ -202,7 +203,7 @@ export function GradingBatchProvider({ assignmentId, sources: suppliedSources, s
     return perform(request.current)
   }
   const displayedError = awaitingRefresh ? [error, 'บันทึกคะแนนแล้ว แต่ยังโหลดคะแนนล่าสุดไม่ได้ กรุณากดโหลดคะแนนล่าสุดอีกครั้ง'].filter(Boolean).join(' · ') : error
-  return <GradingBatchContext.Provider value={{ dirtyCount, unpublishedCount, savedDrafts, busy, workflowDisabled: disabled, canSave: !disabled && !busy && unpublishedCount > 0, error: displayedError, hasUnsavedChanges, awaitingRefresh, uncertain, writing, refreshScores, saveDraft: () => write('draft'), saveAll: () => write('publish'), removeSavedDrafts: () => write('remove'), retryWrite, discardChanges, drafts, rowErrors, awaiting, registerSource, edit }}>{children}</GradingBatchContext.Provider>
+  return <GradingBatchContext.Provider value={{ dirtyCount, unpublishedCount, savedDrafts, busy, workflowDisabled: disabled, canSave: !disabled && !busy && unpublishedCount > 0, error: displayedError, hasUnsavedChanges, awaitingRefresh, uncertain, writing, refreshScores, saveDraft: () => write('draft'), saveAll: () => write('publish'), removeSavedDrafts: () => write('remove'), retryWrite, discardChanges, drafts, unsavedDrafts: edits, rowErrors, awaiting, registerSource, edit }}>{children}</GradingBatchContext.Provider>
 }
 
 /** Private persistence and student publication are distinct explicit actions. */

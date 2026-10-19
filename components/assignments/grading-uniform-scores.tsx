@@ -71,7 +71,7 @@ export function GradingUniformScores({ data, question }: { data: GradingWorkspac
           </Field>
           <Field className="w-auto gap-1" data-invalid={!!error} data-disabled={blocked || !scope.targets.length}>
             <FieldLabel htmlFor={`${id}-score`} className="text-xs text-muted-foreground">คะแนนเดียวกัน · 0–{scope.maxScore}</FieldLabel>
-            <Input id={`${id}-score`} type="number" inputMode="decimal" min={0} max={scope.maxScore} step="any" value={value}
+            <Input id={`${id}-score`} type="number" inputMode="decimal" min={0} max={scope.maxScore} step={0.1} value={value}
               onChange={event => { setValue(event.target.value); setError(''); setNotice('') }} disabled={blocked || !scope.targets.length}
               aria-invalid={!!error} aria-describedby={error ? `${id}-error` : undefined} className="w-28 tabular-nums pointer-coarse:min-h-11" />
           </Field>
