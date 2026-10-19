@@ -207,6 +207,7 @@ export function QuestionGradingReview(props: CommonProps & { questionId: string 
   return <GradingKeywordsProvider assignmentId={props.data.assignment.id} viewerId={props.data.viewerId}><GradingQuickScoresProvider assignmentId={props.data.assignment.id} viewerId={props.data.viewerId}>
     <GradingBatchProvider key={reviewDraftKey(props.data, `question:${props.questionId}`, props.query)} assignmentId={props.data.assignment.id}
       savedDrafts={props.data.savedDrafts} sources={sources} saveDrafts={props.saveDrafts} publish={props.publish}
+      publishSuccessHref={hrefFor(props.data.baseHref, props.query ?? {}, { view: 'questions', page: undefined })}
       disabled={props.data.reviewAvailable === false || props.data.draftsAvailable === false}>
       <QuestionReviewBody {...props} />
     </GradingBatchProvider>
@@ -242,6 +243,7 @@ export function StudentGradingReview(props: CommonProps & { studentId: string })
   return <GradingKeywordsProvider assignmentId={props.data.assignment.id} viewerId={props.data.viewerId}><GradingQuickScoresProvider assignmentId={props.data.assignment.id} viewerId={props.data.viewerId}>
     <GradingBatchProvider key={reviewDraftKey(props.data, `student:${props.studentId}`, props.query)} assignmentId={props.data.assignment.id}
       savedDrafts={props.data.savedDrafts} sources={sources} saveDrafts={props.saveDrafts} publish={props.publish}
+      publishSuccessHref={hrefFor(props.data.baseHref, props.query ?? {}, { view: 'students' })}
       disabled={props.data.reviewAvailable === false || props.data.draftsAvailable === false}>
       <StudentReviewBody {...props} />
     </GradingBatchProvider>

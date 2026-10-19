@@ -52,12 +52,13 @@ export interface GradingBatchProviderProps {
   savedDrafts?: GradingSavedDraft[]
   saveDrafts?: typeof saveGradingDrafts
   publish?: typeof publishGradingDrafts
+  publishSuccessHref?: string
   disabled?: boolean
   children: ReactNode
   onDirtyChange?: (dirty: boolean) => void
 }
 
-export function GradingBatchProvider({ assignmentId, sources: suppliedSources, savedDrafts: initialSaved = [], saveDrafts = saveGradingDrafts, publish = publishGradingDrafts, disabled = false, children, onDirtyChange }: GradingBatchProviderProps) {
+export function GradingBatchProvider({ assignmentId, sources: suppliedSources, savedDrafts: initialSaved = [], saveDrafts = saveGradingDrafts, publish = publishGradingDrafts, publishSuccessHref, disabled = false, children, onDirtyChange }: GradingBatchProviderProps) {
   const router = useRouter()
   const initialSources = suppliedSources ?? []
   const sources = useRef(new Map(initialSources.map(source => [source.answerId, source])))
@@ -141,6 +142,7 @@ export function GradingBatchProvider({ assignmentId, sources: suppliedSources, s
 
   async function perform(pending: PendingRequest): Promise<boolean> {
     writingRef.current = true; busyRef.current = true; setWriting(true); setError(''); setRowErrors({})
+    let returnHref: string | undefined
     try {
       const result = pending.mode === 'publish'
         ? await publish({ ...pending.input, confirmed: true })
@@ -156,7 +158,8 @@ export function GradingBatchProvider({ assignmentId, sources: suppliedSources, s
       for (const id of result.deletedDraftIds) delete nextSaved[id]
       if ('drafts' in result) for (const draft of result.drafts) nextSaved[draft.answerId] = draft
       updateSaved(nextSaved)
-      updateEdits(settleGradingScoreDrafts(editsRef.current, pending.edits, new Set(pending.input.items.map(item => item.answerId))))
+      const remainingEdits = settleGradingScoreDrafts(editsRef.current, pending.edits, new Set(pending.input.items.map(item => item.answerId)))
+      updateEdits(remainingEdits)
       if ('published' in result) {
         const nextAwaiting = { ...awaitingRef.current }
         for (const row of result.published) {
@@ -167,13 +170,17 @@ export function GradingBatchProvider({ assignmentId, sources: suppliedSources, s
         toast.success(`บันทึกคะแนนแล้ว ${result.published.length} คำตอบ · แจ้งนักเรียน ${result.notificationCount} คน`)
       } else toast.success(pending.mode === 'remove' ? 'ลบร่างคะแนนแล้ว คะแนนที่ส่งให้นักเรียนคงเดิม' : 'บันทึกร่างแล้ว · ยังไม่ส่งคะแนนให้นักเรียน')
       request.current = null; uncertainRef.current = false; setUncertain(false)
-      startRefresh(() => router.refresh())
-      return true
+      // Only an acknowledged publication finishes this review. Draft saves,
+      // failed/uncertain requests and any newer edits must stay on this page.
+      returnHref = 'published' in result && Object.keys(remainingEdits).length === 0 ? publishSuccessHref : undefined
     } catch {
       uncertainRef.current = true; setUncertain(true)
       setError('ยังยืนยันผลการบันทึกไม่ได้ กรุณาลองคำสั่งเดิมอีกครั้ง คะแนนที่กรอกยังอยู่')
       return false
     } finally { writingRef.current = false; setWriting(false) }
+    // Navigation errors must not turn a confirmed write into an uncertain RPC.
+    startRefresh(() => returnHref ? router.replace(returnHref) : router.refresh())
+    return true
   }
   async function write(mode: PendingRequest['mode']): Promise<boolean> {
     if (disabled || busyRef.current) return false
