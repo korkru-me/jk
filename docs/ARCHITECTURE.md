@@ -1,5 +1,11 @@
 # Architecture
 
+## Classroom score review markers — 19 October 2026
+
+The scores-tab server payload calls loadClassroomScoreReview only after the existing exact classroom management gate, using linked assignment IDs, the current roster and the same rescaled submission rows as the matrix. The read-only server helper batches and paginates question classification flags, void/policy references and selected answer review metadata; failures propagate instead of becoming completed scores. Its DTO is only assignmentId → studentId → true, with no response body, key, attachment or private draft. Existing legacy pending counts on other classroom tabs are unchanged.
+
+The pure classifier reuses scoreParts, frozen grading rules, published per-part review timestamps, allocation policies and void decisions. Best/latest use the matrix's official attempt; average includes every finished scored contributor and deduplicates the learner. In the grading workspace only, average keeps its aggregate total/max while choosing the most recent pending contributor as the review representative, allowing the existing question/student paths and atomic publish RPC to settle earlier pending attempts without a new URL or write protocol. Other strategies and generic scoring selection are unchanged. Existing publish invalidation covers the classroom layout; private draft saves do not settle the markers. No schema, RLS, Auth or settings change is required.
+
 สถานะงานตรวจคะแนน/เมนูงาน/การโหลดห้องเรียนด้านล่าง: เผยแพร่ Production แล้ว 18 ตุลาคม 2026 ผ่าน PR #61 / master `237f44e` และ apply ทั้งสาม migration บน Staging/Production ข้อความ local-only/no deployment change ในบันทึกเฟสก่อนหน้าบอกสถานะขณะพัฒนา ดู [GRADING_RELEASE_20261018.md](GRADING_RELEASE_20261018.md) ไม่แก้ architecture/config ของรหัสผ่าน สมัครสมาชิก หรืออีเมลใน release นี้
 
 ## Classroom entry streaming and tab-scoped data — local, 18 October 2026

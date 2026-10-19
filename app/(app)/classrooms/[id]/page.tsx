@@ -2,6 +2,7 @@ import { Suspense } from 'react'
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { loadClassroomScoreReview } from '@/lib/classroom-score-review.server'
 import { getAuthUser } from '@/lib/auth/server'
 import type { Classroom, User } from '@/lib/types'
 import { ClassroomDetailClient } from './_components/classroom-detail-client'
@@ -400,13 +401,13 @@ async function TeacherClassroomContent({
     const studentIds = membershipResult.rows.map(membership => membership.student_id)
     const rosterIds = new Set(studentIds)
     if (c.classroom_type !== 'subject' || !canManage || assignmentIds.length === 0 || isCoTeachers) {
-      return { assignments: [], submissions: [] as TeacherSubmissionRow[], extensions: [], pendingReviewByAssignment: {} }
+      return { assignments: [], submissions: [] as TeacherSubmissionRow[], extensions: [], pendingReviewByAssignment: {}, pendingReviewByStudent: {} }
     }
     // Preserve all attempts used by official-score/completion selection, while
     // restricting a shared assignment to this classroom's current roster.
     const [{ data: assignmentRows }, submissionResult, { data: extensionRows }, { data: pendingAnswerRows }] = await Promise.all([
       admin.from('assignments')
-        .select('id, title, type, mode, status, start_at, end_at, question_ids, random_question_count, completion_rule, streak_target, created_at, passing_type, passing_value, max_attempts, score_strategy, display_max_score')
+        .select('id, title, type, mode, status, start_at, end_at, question_ids, random_question_count, completion_rule, streak_target, created_at, passing_type, passing_value, max_attempts, score_strategy, display_max_score, require_work_image')
         .in('id', assignmentIds).order('created_at', { ascending: false }),
       needsProgress && studentIds.length > 0
         ? readWithVoidedScoreMetadata(async includeVoided => {
@@ -447,6 +448,11 @@ async function TeacherClassroomContent({
     }
     const linkByAssignment = new Map(links.map(link => [link.assignment_id, link]))
     const displayMaxByAssignment = new Map((assignmentRows ?? []).map(assignment => [assignment.id, assignment.display_max_score as number | null]))
+    const scoredSubmissions = rescaleToDisplayMax(submissionResult.data ?? [], row => displayMaxByAssignment.get(row.assignment_id) ?? null)
+    // Exact classroom management was verified before this roster-scoped service read.
+    const pendingReviewByStudent = isScores && studentIds.length > 0
+      ? await loadClassroomScoreReview(admin, assignmentRows ?? [], scoredSubmissions, studentIds)
+      : {}
     return {
       assignments: (assignmentRows ?? []).map(assignment => ({
         ...assignment,
@@ -454,9 +460,10 @@ async function TeacherClassroomContent({
         group_ids: linkByAssignment.get(assignment.id)?.group_ids ?? null,
         category_id: linkByAssignment.get(assignment.id)?.category_id ?? null,
       })),
-      submissions: rescaleToDisplayMax(submissionResult.data ?? [], row => displayMaxByAssignment.get(row.assignment_id) ?? null),
+      submissions: scoredSubmissions,
       extensions: extensionRows ?? [],
       pendingReviewByAssignment: Object.fromEntries(Array.from(pendingSubmissionIdsByAssignment, ([assignmentId, set]) => [assignmentId, set.size])),
+      pendingReviewByStudent,
     }
   })
 
@@ -573,6 +580,7 @@ async function TeacherClassroomContent({
         ownerName={ownerProfile?.full_name ?? 'ครูหลัก'}
         posts={announcementStatus.posts}
         pendingReviewByAssignment={work.pendingReviewByAssignment}
+        pendingReviewByStudent={work.pendingReviewByStudent}
         seenByPost={announcementStatus.seenByPost}
         crossPostTargets={crossPostTargets}
         groups={groupRows ?? []}

@@ -175,6 +175,56 @@ describe('authenticated grading workspace reader', () => {
     expect(result?.data.answers.map(row => row.id)).toEqual([uuid(31), uuid(32)])
     expect(result?.data.answers.every(row => row.studentAnswer === 'PRIVATE_RESPONSE')).toBe(true)
   })
+  it('opens an older pending average contributor with its own bodies and drafts without changing the aggregate score', async () => {
+    const latestSubmissionId = uuid(21), latestAnswerId = uuid(31)
+    const saved = { answerId, expectedScoreEditedAt: null, updatedAt: now, workScore: 0 }
+    sessionTables.assignments = [assignment({ score_strategy: 'average' })]
+    adminTables.submissions = [submission({ total_score: 0.5 }),
+      submission({ id: latestSubmissionId, attempt_number: 2, total_score: 1 })]
+    adminTables.assignment_question_grading_parts = [{ assignment_id: assignmentId, question_id: questionId, work_share: 0.5, updated_at: now }]
+    adminTables.submission_answers = [
+      answer({ score: 0.5, answer_score: 0.5, answer_max_score: 0.5, work_score: 0, work_max_score: 0.5,
+        student_answer: 'OLDER_PRIVATE_RESPONSE', correct_answer: 'OLDER_PRIVATE_KEY' }),
+      answer({ id: latestAnswerId, submission_id: latestSubmissionId,
+        answer_score: 0.5, answer_max_score: 0.5, work_score: 0.5, work_max_score: 0.5,
+        work_reviewed_at: now, score_edited_by: actorId, score_edited_at: now,
+        student_answer: 'LATEST_PRIVATE_RESPONSE', correct_answer: 'LATEST_PRIVATE_KEY' }),
+    ]
+    const { admin } = install({ draftRows: [saved, { ...saved, answerId: latestAnswerId }] })
+
+    const overview = await loadGradingWorkspace(assignmentId)
+    expect(overview?.data.students[0]).toMatchObject({ submissionId, attemptNumber: 1, score: 0.75, maxScore: 1 })
+    expect(overview?.pendingCount).toBe(1)
+    expect(overview?.data.answers.map(row => row.id)).toEqual([answerId])
+    expect(overview?.data.savedDrafts).toEqual([saved])
+    expect(JSON.stringify(overview)).not.toMatch(/OLDER_PRIVATE_RESPONSE|OLDER_PRIVATE_KEY|LATEST_PRIVATE_RESPONSE|LATEST_PRIVATE_KEY/)
+
+    for (const scope of [{ kind: 'student' as const, studentId }, { kind: 'question' as const, questionId }]) {
+      const detail = await loadGradingWorkspace(assignmentId, scope)
+      expect(detail?.data.students[0]).toMatchObject({ submissionId, attemptNumber: 1, score: 0.75, maxScore: 1 })
+      expect(detail?.data.answers).toHaveLength(1)
+      expect(detail?.data.answers[0]).toMatchObject({ id: answerId, submissionId,
+        studentAnswer: 'OLDER_PRIVATE_RESPONSE', correctAnswer: 'OLDER_PRIVATE_KEY' })
+      expect(detail?.data.savedDrafts).toEqual([saved])
+      expect(JSON.stringify(detail)).not.toMatch(/LATEST_PRIVATE_RESPONSE|LATEST_PRIVATE_KEY/)
+    }
+    const fullBodyReads = admin.queries.filter(query => query.table === 'submission_answers' && query.columns.includes('student_answer'))
+    expect(fullBodyReads).toHaveLength(2)
+    expect(fullBodyReads.every(query => query.in.some(([column, ids]) => column === 'submission_id'
+      && ids.length === 1 && ids[0] === submissionId))).toBe(true)
+
+    // A published explicit zero settles the missing work review while leaving
+    // both attempt totals, and therefore the official average, unchanged.
+    adminTables.submission_answers[0] = { ...adminTables.submission_answers[0],
+      work_reviewed_at: now, score_edited_by: actorId, score_edited_at: now }
+    install({ draftRows: [saved] })
+    const complete = await loadGradingWorkspace(assignmentId, { kind: 'student', studentId })
+    expect(complete?.data.students[0]).toMatchObject({ submissionId: latestSubmissionId, attemptNumber: 2, score: 0.75, maxScore: 1 })
+    expect(complete?.pendingCount).toBe(0)
+    expect(complete?.data.answers.map(row => row.id)).toEqual([latestAnswerId])
+    expect(complete?.data.answers[0]).toMatchObject({ studentAnswer: 'LATEST_PRIVATE_RESPONSE', correctAnswer: 'LATEST_PRIVATE_KEY' })
+    expect(complete?.data.savedDrafts).toEqual([])
+  })
   it('rejects students with only active or unrelated attempts before reading profiles and answer bodies', async () => {
     adminTables.submissions = [submission({ status: 'in_progress' }), submission({ id: uuid(21), assignment_id: uuid(999) })]
     const { admin } = install()
