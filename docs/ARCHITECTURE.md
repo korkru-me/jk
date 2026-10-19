@@ -1,5 +1,9 @@
 # Architecture
 
+## Removed grading tools history dependency — 19 October 2026 (local)
+
+After removing the tools/history panel, `loadGradingWorkspace` no longer queries `assignment_score_adjustment_batches` or hydrates adjustment actor names, and its result no longer carries `adjustmentBatches`. It also drops the panel-only timing classification, extension query, due/end/band and submission timestamp columns, and unused best-streak projection; `GradingStudent` and the grading lab fixture no longer expose the unused timing/bestStreak fields. Overview, question and student routes retain the same authorization, score adjustment calculation, streak completion and private-draft reads. Existing adjustment actions, audit schema/history and the separate late-submission lab still have consumers and are retained; this is application code cleanup only, with no data or schema deletion.
+
 ## Classroom score review markers — 19 October 2026
 
 The scores-tab server payload calls loadClassroomScoreReview only after the existing exact classroom management gate, using linked assignment IDs, the current roster and the same rescaled submission rows as the matrix. The read-only server helper batches and paginates question classification flags, void/policy references and selected answer review metadata; failures propagate instead of becoming completed scores. Its DTO is only assignmentId → studentId → true, with no response body, key, attachment or private draft. Existing legacy pending counts on other classroom tabs are unchanged.
