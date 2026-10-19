@@ -82,7 +82,7 @@ export function AssignmentDetailLabClient({ assignmentType = 'exercise' }: { ass
       }}
       questions={[]}
       submissions={submissions}
-      pendingSubmissionIds={[]}
+      pendingSubmissionIds={submissions.slice(0, 2).map(submission => submission.id!)}
       pendingReviewCapped={false}
     />
   )
