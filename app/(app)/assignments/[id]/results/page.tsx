@@ -1,6 +1,5 @@
 import { notFound, redirect } from 'next/navigation'
 import { GradingOverview } from '@/components/assignments/grading-overview'
-import { GradingTools } from '@/components/assignments/grading-tools'
 import { getAuthUser } from '@/lib/auth/server'
 import { loadGradingWorkspace } from '@/lib/grading-workspace.server'
 import { parseGradingWorkspaceQuery } from '@/lib/grading-workspace-query'
@@ -21,7 +20,6 @@ export default async function ResultsPage({ params, searchParams }: {
     <GradingOverview
       data={workspace.data}
       initialQuery={parseGradingWorkspaceQuery(search)}
-      tools={<GradingTools data={workspace.data} adjustmentBatches={workspace.adjustmentBatches} />}
     />
   </>
 }

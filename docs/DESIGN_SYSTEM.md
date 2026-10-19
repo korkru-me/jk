@@ -1,8 +1,26 @@
 # Brand, language และ UI rules
 
+## Assignment names navigate; arrows sort — 19 October 2026
+
+Score-matrix headers separate the drag grip, full-name link and adjacent sort icon button as sibling controls. Names link to assignment detail, use a two-line clamp with full native title, and have hover/focus affordances. The arrow alone toggles student score sorting and shows the next direction in a Thai label/tooltip; `aria-sort` stays on the column header. Active sort styling belongs to the arrow rather than the link. Preserve compact header spacing and 44px coarse-pointer targets for the grip, link and arrow.
+
+## Assignment-wide extension dialog — 19 October 2026
+
+Assignment headers place Remind and Extend in the same action row below the title/review badge. Extend uses Clock, outline primary styling and an explanatory tooltip. No repeated extension controls appear in student cells. Coarse-pointer targets stay at least 44px; pointer/click events on actions do not start sorting or dragging.
+
+Use shared Dialog/Card/Input/Button at `sm:max-w-md`, with title “ขยายเวลาทั้งงาน”, full assignment title and scope across linked classrooms. Show the old close read-only, then a Thai-time datetime input and concise due/duration context. Loading/retry/error states must not imply success; invalid input or pending save disables submission. Backdrop/Escape always confirm dismissal; direct cancellation confirms when dirty. Returning preserves draft/focus, closing restores the exact header trigger. Save acknowledgement shows success, closes and refreshes.
+
+## ความกระชับของตารางคะแนนห้องเรียน — 19 ตุลาคม 2026
+
+ตารางใช้ fixed layout กับ colgroup กำหนดความกว้างข้อมูลประจำตัว คอลัมน์นักเรียนกว้าง 36 spacing units บน desktop และ 32 บนจอแคบ แทน 40 บน desktop คอลัมน์งานรับพื้นที่ส่วนเกิน จึงไม่ยืดชื่อหรือดันชั้นออกไปเมื่อเหลืองานน้อย Sticky offsets คำนวณจากความกว้างชื่อเดียวกัน และคงพื้นทึบบังข้อมูลที่เลื่อนด้านใต้ จอแคบตรึงเฉพาะลำดับ/ชื่อเพื่อเหลือพื้นที่อ่านข้อมูลที่เลื่อน
+
+ใช้เส้น border semantic หลังลำดับ นักเรียน ชั้น ห้อง เลขที่ และรหัสนักเรียนทั้งหัว/เนื้อหา ชื่อกับอีเมลยังอยู่คนละบรรทัด ชื่อย่อด้วย ellipsis และแสดงชื่อเต็มใน Tooltip มาตรฐานเมื่อชี้หรือโฟกัสด้วยคีย์บอร์ด พร้อม focus ring และข้อความพับตาม viewport โดยไม่เปลี่ยนชื่อเต็มในการเรียง/CSV
+
+ลด padding แนวตั้งของข้อมูลจาก 2.5 เป็น 1 และหัวตารางจาก 3 เป็น 2 ลดพื้นที่ขั้นต่ำหัวชื่อและช่องว่างป้ายงาน คะแนนรอตรวจใช้ขั้นต่ำ 8 spacing units บน fine pointer โดยคงขั้นต่ำ 44px จริงสำหรับ coarse pointer เช่นเดียวกับปุ่มเรียง/ลาก/เตือน/คะแนน/ขยายเวลา จึงไม่ขึ้นกับ spacing ของธีม ขยายเวลาเผยเมื่อโฟกัสได้ด้วย และจอสัมผัสเห็นปุ่มโดยไม่ต้อง hover ไม่ลดขนาดตัวอักษรชื่อหรืออีเมล
+
 ## ป้ายรอตรวจบนตารางคะแนน — 19 ตุลาคม 2026
 
-หัวคอลัมน์งานที่มีนักเรียนรอตรวจใช้พื้น warning ผสม card บางและปุ่มนาฬิกา “รอตรวจ N คน” ขนาดกระชับเหนือปุ่มกระดิ่งเตือนผู้ยังไม่ส่ง แยกหน้าที่สองปุ่มชัดเจน คะแนนที่ยังไม่ครบแสดงนาฬิกา/ตัวเลขใน pill สี warning เข้มพร้อมคำว่า “รอตรวจ” ข้างกัน มี Tooltip เมื่อชี้หรือโฟกัส “คะแนนชั่วคราว · รอผู้สอนตรวจให้ครบ” และลิงก์ทั้งสองจุดไปหน้าตรวจของงานนั้น คงพื้นที่กดอย่างน้อย 44px และกรอบ focus ไม่ใช้สีอย่างเดียวบอกสถานะ ป้ายหายเมื่อส่งคะแนนตรวจครบ โดยคะแนนกลับใช้สถานะปกติของตาราง; กำลังทำ/ยังไม่ทำและศูนย์ที่ตรวจแล้วแยกตามเดิม พื้น/สีระหว่างลากคอลัมน์คงสถานะรอตรวจ
+หัวคอลัมน์งานที่มีนักเรียนรอตรวจใช้พื้น warning ผสม card บางและปุ่มนาฬิกา “รอตรวจ N คน” ขนาดกระชับเหนือปุ่มกระดิ่งเตือนผู้ยังไม่ส่ง แยกหน้าที่สองปุ่มชัดเจน คะแนนที่ยังไม่ครบแสดงนาฬิกา/ตัวเลขใน pill สี warning เข้มพร้อมคำว่า “รอตรวจ” ข้างกัน มี Tooltip เมื่อชี้หรือโฟกัส “คะแนนชั่วคราว · รอผู้สอนตรวจให้ครบ” และลิงก์ทั้งสองจุดไปหน้าตรวจของงานนั้น คงพื้นที่กดอย่างน้อย 44px บน coarse pointer และกรอบ focus ไม่ใช้สีอย่างเดียวบอกสถานะ ป้ายหายเมื่อส่งคะแนนตรวจครบ โดยคะแนนกลับใช้สถานะปกติของตาราง; กำลังทำ/ยังไม่ทำและศูนย์ที่ตรวจแล้วแยกตามเดิม พื้น/สีระหว่างลากคอลัมน์คงสถานะรอตรวจ
 
 ## หน่วยนับงานส่งที่รอตรวจ — 19 ตุลาคม 2026
 

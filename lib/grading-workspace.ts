@@ -1,7 +1,6 @@
 import type { GradingSavedDraft } from './grading-draft-types'
 import { getBlankType } from './fill-blank'
 import type { GradingConfig } from './assignment-attempt'
-import type { SubmissionTiming } from './late-submission'
 import type { MathInputMode, Question } from './types'
 
 export type GradingReviewStatus = 'void' | 'teacher' | 'pending' | 'automatic'
@@ -18,10 +17,8 @@ export interface GradingStudent {
   attemptNumber: number | null
   score: number | null
   maxScore: number
-  timing?: SubmissionTiming
   status?: 'not_submitted' | 'in_progress' | 'submitted' | 'graded'
   streakReached?: boolean
-  bestStreak?: number
 }
 export interface GradingWorkArtifact { id: string; partKey: string; previewUrl: string | null; sourceType?: string | null }
 export interface GradingAnswer {

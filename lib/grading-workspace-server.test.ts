@@ -31,7 +31,7 @@ function assignment(overrides: Row = {}): Row {
 }
 function submission(overrides: Row = {}): Row {
   return { id: submissionId, assignment_id: assignmentId, student_id: studentId, status: 'graded', closed_at: null, total_score: 1, score_adjustment: 0,
-    max_score: 1, voided_max_score: 0, submitted_at: now, started_at: now, attempt_number: 1, best_streak: 0, streak_reached: false,
+    max_score: 1, voided_max_score: 0, attempt_number: 1, streak_reached: false,
     users: { full_name: 'นักเรียน ก', email: 'private@example.test' }, ...overrides }
 }
 function answer(overrides: Row = {}): Row {
@@ -57,7 +57,6 @@ function client(tables: Record<string, Row[]>, options: FakeOptions = {}) {
         in(key: string, values: unknown[]) { log.in.push([key, values]); return q },
         order(key: string, value?: { ascending?: boolean }) { log.order = key; log.descending = value?.ascending === false; return q },
         range(from: number, to: number) { log.from = from; log.to = to; return q },
-        limit(count: number) { log.to = count - 1; return q },
         maybeSingle() { log.single = true; return q },
         returns() { return q },
         then(resolve: (value: { data: Row[] | Row | null; error: { code: string } | null }) => unknown, reject?: (reason: unknown) => unknown) {
@@ -90,7 +89,7 @@ beforeEach(() => {
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://project.test')
   sessionTables = { assignments: [assignment()] }
   adminTables = { submissions: [submission()], submission_answers: [answer()], student_profiles: [{ student_id: studentId, grade_level: 'ม.4', section_number: 1, class_number: 2, student_code: '00123', health_notes: 'PRIVATE_HEALTH' }],
-    assignment_question_grading_parts: [], assignment_void_questions: [], assignment_extensions: [], assignment_score_adjustment_batches: [], student_work_artifacts: [], users: [] }
+    assignment_question_grading_parts: [], assignment_void_questions: [], student_work_artifacts: [] }
   mocks.auth.mockResolvedValue({ id: actorId })
   mocks.manage.mockResolvedValue(true)
   mocks.questions.mockResolvedValue({ questions: [question()], missingQuestionIds: [], duplicateQuestionCount: 0 })
@@ -131,6 +130,22 @@ describe('authenticated grading workspace reader', () => {
     expect(result?.data).toMatchObject({ viewerId: actorId, draftsAvailable: true, savedDrafts: [saved] })
     expect(result?.data.answers[0].score).toBe(1)
     expect(result?.data.students[0].score).toBe(1)
+  })
+  it.each([
+    { kind: 'overview' as const },
+    { kind: 'question' as const, questionId },
+    { kind: 'student' as const, studentId },
+  ])('opens $kind without the removed history service and preserves existing score adjustments', async scope => {
+    adminTables.submissions = [submission({ score_adjustment: -0.25 })]
+    const { admin } = install({ failTable: 'assignment_score_adjustment_batches' })
+    const result = await loadGradingWorkspace(assignmentId, scope)
+    expect(result).not.toBeNull()
+    expect(result?.data.students[0]).toMatchObject({ score: 0.75, maxScore: 1 })
+    expect(result?.data.students[0]).not.toHaveProperty('timing')
+    expect(result?.data.students[0]).not.toHaveProperty('bestStreak')
+    expect(result?.data.answers[0].score).toBe(1)
+    expect(result).not.toHaveProperty('adjustmentBatches')
+    expect(admin.queries.some(query => ['assignment_score_adjustment_batches', 'assignment_extensions', 'users'].includes(query.table))).toBe(false)
   })
   it('keeps older schemas readable and clearly marks private-draft mutations unavailable', async () => {
     install({ missingDrafts: true })

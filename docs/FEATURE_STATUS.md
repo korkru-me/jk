@@ -1,5 +1,47 @@
 # Feature status
 
+## Gradebook follow-up release candidate — 19 October 2026
+
+The owner renewed authorization to publish all remaining chat work after the earlier database-history stop. Five scoped commits are composed on fresh master. The deadline RPC additionally enforces the assignment UPDATE-policy organization predicate, with 38 real-SQL regression cases. Both databases have the required schema; unrelated older pending migrations remain excluded. Target-only CLI activation, Staging integration and release parity are tracked in [GRADEBOOK_FOLLOWUP_RELEASE_20261019.md](GRADEBOOK_FOLLOWUP_RELEASE_20261019.md). Earlier local-only labels below remain historical until that record confirms activation.
+
+## Gradebook assignment links and separate sort controls — 19 October 2026 (local)
+
+Assignment names in score-matrix headers are native links to `/assignments/[id]`, matching the existing teacher assignment cards. Only the adjacent arrow button sorts students by that assignment's score, retaining the existing descending/ascending toggle, `aria-sort` on the header, direction icon and selected styling. Link and sort remain separate keyboard targets; the link retains normal modified-click behavior. Dragging is still limited to the grip. Updated helper text distinguishes all three actions. No database, scoring or migration change; the prior deadline-extension migration activation remains pending.
+
+Validation: TypeScript, token lint, diff check and isolated Webpack production build passed; Next.js compilation/runtime reports are empty. Local browser clicked a real assignment title and verified its detail heading, then exercised both sort directions without leaving the matrix. Synthetic unequal-score rows, mouse activation, link-to-arrow Tab order and 390px layout were checked; no page overflow or link/button overlap. Full unit suite was not repeated for this UI-only change, and modified-click/new-tab behavior, physical touch devices and dark theme were not separately exercised. No notifications, deadline/grade/order writes or Production deployment occurred.
+
+## Assignment-wide extension from score headers — 19 October 2026 (local candidate)
+
+The assignment header now holds Extend next to Remind; per-student extension controls are removed. The shared dialog shows the full assignment title, all linked classrooms, existing close and a new Asia/Bangkok close. There is no student selector or revoke flow. It preserves input on errors/cancelled dismissal, confirms backdrop/Escape dismissal, and closes/refreshes only after acknowledged success. Unlimited assignments explain that no extension is needed rather than introducing a new restriction.
+
+Only the hard close changes: due/late bands, duration, attempt limits, scores and submitted/closed attempts stay intact. The action rechecks active exact manager access and calls an atomic compare-and-set RPC. Historical personal overrides remain for existing readers/CSV; shorter closes are lifted atomically while their old on-time boundaries are preserved. No direct-update fallback can leave a partial extension.
+
+**Database activation is pending:** `supabase migration list --project-ref libsutfinswqkruihwdx` found 13 local-only and 1 remote-only versions. Per AGENTS.md, database changes stopped; no db push, repair, Staging or Production migration was run. CLI-created `20261019154815_extend_assignment_deadline.sql` is prepared for isolated SQL verification only. Missing RPC fails closed with a localized error. Reconcile migration history against the live schema before applying this reviewed candidate and testing a synthetic Staging transaction. Local UI success is not evidence of a successful live database write.
+
+The local `/exam-screen-lab/scores-matrix` uses injected prepare/save fixtures for finite/unlimited closes and success/error cases; it never writes real deadlines.
+
+Validation: TypeScript, token lint, diff checks, all 306 Vitest files / 4,024 tests (including 90 new action/helper/real-SQL regressions), and isolated Webpack production build passed. Next.js compilation/runtime reports are empty. Browser fixtures verified success/close/refocus, re-opened saved close, failure/draft retention, earlier-time rejection, Escape/backdrop/direct-cancel confirmation, and 390/320px dialogs without horizontal overflow. The actual local classroom shows 12 eligible header controls and zero cell controls; its real metadata read correctly explains an unlimited assignment. No real notification, deadline/grade write or Production deployment was performed. Separate-connection DB races, real touch devices and dark theme were not tested.
+
+History differences to audit before activation: local-only `20260922005743`, `20260923073215`, `20260923161000`, `20260923163333`, `20260923201848`, `20260924133500`, `20260924134000`, `20260924142500`, `20260924145500`, `20260927093000`, `20260927094000`, `20260927095000`, `20261009142610`; remote-only `20261017111034`. The new candidate is additionally local-only by design; do not blindly replay or repair these versions.
+
+## ตารางคะแนนห้องเรียนกระชับและดูชื่อเต็ม — 19 ตุลาคม 2026 (local)
+
+กำหนด colgroup/fixed layout ให้คอลัมน์ประจำตัวไม่ขยายตามพื้นที่ว่าง ลดคอลัมน์ชื่อ desktop 40 → 36 spacing units และปรับ sticky offsets ให้ตรงกัน ชั้นจึงเข้ามาใกล้ชื่อ เส้นแบ่งครบหกคอลัมน์ตั้งแต่ลำดับถึงรหัสนักเรียน ชื่อยาวใช้ ellipsis กับ Tooltip ชื่อเต็มเมื่อชี้/โฟกัส ชื่อ/อีเมลและข้อมูลเรียง/CSV คงเดิม ลด padding แถวและหัวตาราง คงเป้ากด 44px ขึ้นไปสำหรับ coarse pointer และให้ปุ่มขยายเวลาเห็นเมื่อโฟกัส/ใช้จอสัมผัสด้วย ป้ายรอตรวจ/คะแนนศูนย์/กำลังทำและการลากงานยังใช้กติกาเดิม ไม่มี server/data/Auth/email/schema change
+
+บน localhost:3000 ธีมปัจจุบันที่ viewport 1507×749 คอลัมน์ชื่อ 192 → 172.8px หัวตาราง 136 → 117.2px แถวข้อมูลห้องจริงสามแถว 77.8/77.8/60 → 49/54.9/45.6px (เฉลี่ยลดประมาณ 31%) เส้นขอบหัว/เนื้อหาตรงกันทั้งหกคอลัมน์เมื่อเลื่อนสุดแนวนอน ห้องทดลองเพิ่มข้อมูลสังเคราะห์ 36 คนพร้อมชื่อยาวเพื่อดู ellipsis/Tooltip และจำนวนแถวได้โดยไม่แก้รายชื่อนักเรียนจริง
+
+ตรวจแล้ว: TypeScript, token lint, diff check, sort/column-order unit tests เดิม 13 เคส และ Webpack production build ในสำเนาชั่วคราวแยก ใช้ค่าเชื่อมต่อจำลองและไม่แตะ live .next/tsconfig Browser ตรวจกรองเหลืองานเดียว (คอลัมน์ชื่อยังกว้างเท่าเดิม), เรียงชื่อ/ชั้น/ห้อง/เลขที่/รหัสทั้งสองทิศ, ยกเลิกการลากด้วยคีย์บอร์ด, Tooltip ชื่อเต็มผ่าน focus, ข้อมูลจำลอง 36 คน และ viewport 320/390px ไม่ล้นทั้งหน้า บนห้องจริงตรวจ layout/scroll แบบอ่านอย่างเดียว ไม่มีการส่งเตือน ขยายเวลา ปรับคะแนน หรือบันทึกลำดับงานจริง ไม่เพิ่ม tests ที่ทวน CSS และไม่รัน full suite ซ้ำ เพราะไม่เปลี่ยน logic/shared lib ไม่ได้ทดสอบ hover ด้วยเมาส์จริง อุปกรณ์ touch จริง หรือสีมืดในรอบนี้ ยังไม่ได้ deploy Production
+
+## ถอดกรอบเครื่องมือและประวัติคะแนน — 19 ตุลาคม 2026 (local)
+
+หน้าตรวจให้คะแนน `/assignments/[id]/results` ไม่มีกรอบ “เครื่องมือและประวัติคะแนน” ท้ายตารางอีกต่อไป ทั้งมุมมองรายข้อและรายคน ลบคอมโพเนนต์ `GradingTools` ที่ใช้เฉพาะกรอบนี้และช่อง `tools` ของ `GradingOverview` คงการเปิดตรวจคำตอบ บันทึกร่าง ส่งคะแนน และข้อมูล/ประวัติคะแนนเดิม ไม่มีการลบข้อมูลหรือ migration และไม่แก้ Auth/รหัสผ่าน/สมัครสมาชิก/อีเมล
+
+ตรวจเก็บโค้ดตกค้างรอบถัดมา: ถอด query ประวัติและชื่อผู้ปรับคะแนน, mapping/type/import และ `adjustmentBatches` จาก reader/DTO ของหน้าตรวจทั้ง overview/question/student รวมการจำแนกกลุ่มส่งช้า, query ขยายเวลา, คอลัมน์กำหนดส่ง/ช่วงสี และ `timing`/`bestStreak` ที่ไม่มี consumer หลังลบกรอบแล้ว คงการคำนวณ `score_adjustment` และสถานะผ่าน streak เดิม ส่วน action/type/ประวัติใน `ResultsClient` ยังใช้โดย lab ส่งช้า และ audit/migration ที่ใช้จริงไม่ถูกลบ
+
+การตรวจรอบถอด UI: TypeScript, token lint, diff check และ Next.js compilation/runtime errors ผ่าน Browser บน localhost:3000 ยืนยันทั้งแท็บรายข้อ/รายคนไม่มีกรอบนี้ และเปิดหน้าตรวจรายคนได้แบบอ่านอย่างเดียว ไม่มีการปรับ/บันทึก/ส่งคะแนนระหว่างทดสอบ รอบแรกยังไม่ได้เพิ่ม unit test หรือรัน full suite/production build
+
+การตรวจรอบเก็บโค้ด: เพิ่ม regression 3 กรณี overview/question/student ซึ่งล้มกับโค้ดก่อนเก็บและผ่านหลังถอด dependency ประวัติ โดยจำลอง service ประวัติใช้งานไม่ได้ ยืนยันว่าไม่ query ประวัติ/ผู้ปรับ/ขยายเวลา ไม่ส่ง DTO ที่เลิกใช้ และค่าปรับคะแนน -0.25 ยังได้ 0.75/1 โดยคะแนนคำตอบดิบคง 1 ผ่าน TypeScript, token lint, diff check, Vitest 303 ไฟล์ / 3,934 เคส และ Webpack production build ของ tracked candidate ในสำเนาชั่วคราวแยกด้วยค่าเชื่อมต่อจำลอง ไม่แตะ live .next/tsconfig ของ checkout หลัก Browser localhost ยืนยัน overview ทั้งสองแท็บและหน้าตรวจรายข้อ ไม่มี compilation/runtime error และไม่มีการแก้คะแนน/ข้อมูลจริง ยังไม่ได้ deploy Production หรือทดสอบการเขียนคะแนน/อุปกรณ์มือถือจริงในรอบเก็บโค้ดนี้
+
 ## ป้ายรอตรวจในตารางคะแนนห้องเรียน — 19 ตุลาคม 2026
 
 ตารางคะแนนและการส่งงานแสดงปุ่มนาฬิกาสี warning “รอตรวจ N คน” บนหัวงาน โดยนับนักเรียนในห้องไม่ซ้ำ เฉพาะรอบที่ส่งแล้วและมีส่วนคำตอบ/วิธีทำหรือสัดส่วนคะแนนที่ยังรอตรวจ คะแนนรายคนนั้นเป็นสี warning พร้อม “รอตรวจ” และคำอธิบายคะแนนชั่วคราว กดป้ายหัวงานหรือคะแนนรอตรวจแล้วเปิด /assignments/{id}/results ของงานตรงกัน ปุ่มเตือนผู้ยังไม่ส่ง การเรียง ลากคอลัมน์ และสถานะกำลังทำ/ยังไม่ทำคงเดิม เมื่อส่งคะแนนตรวจครบแล้วป้ายหาย; บันทึกร่างยังไม่ถือว่าตรวจเสร็จ
