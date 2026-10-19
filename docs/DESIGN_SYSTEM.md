@@ -168,6 +168,12 @@ The source picker includes exercise, exam and feature-enabled practice libraries
 
 “ทำใหม่” ล้างคำตอบ/ผลตรวจและขอค่าตัวเลขชุดใหม่สำหรับโจทย์สุ่มทุกช่องพร้อมกัน ไม่เพิ่มคำอธิบายหรือกรอบถาวร เมื่อ document reload ต้องเตรียมค่าใหม่ให้ใช้ status/error แถวสั้นและพักการโต้ตอบจนเสร็จ ไม่เพิ่มความสูงหน้าปกติ คำตอบและเฉลยของตัวอย่างต้องตามเลขชุดที่มองเห็น โหมดสอนใช้การล้างคำตอบเริ่มตัวเลขชุดใหม่เช่นกัน ป้ายตัวเลขชุดเดียวกับนักเรียนหายเมื่อเป็นชุดที่ครูสุ่มใหม่เอง
 
+## โหมดสอนทีละข้อ — 19 ตุลาคม 2026
+
+โหมดสอนแสดงโจทย์ครั้งละหนึ่งข้อคู่กับกระดานของข้อนั้นเสมอ ไม่ใช้จำนวนข้อต่อหน้าที่ครูตั้งให้ฝั่งนักเรียน และไม่มีตัวเลือก “ต่อหน้า” ใน header ตัวเลือก “ไปที่ข้อ” รวมทุกข้อในงานตามลำดับ ปุ่มก่อนหน้า/ถัดไปเปลี่ยนทีละข้อและปิดปุ่มเมื่อถึงข้อแรก/สุดท้าย พร้อมตัวนับ “ข้อ N / รวม” ในแถวเดียวกัน ไม่เพิ่มแถวหรือคำอธิบายซ้ำที่กินพื้นที่เขียน
+
+เปลี่ยนข้อแล้วแสดงเฉพาะโจทย์/กระดานปัจจุบัน การกลับข้อเดิมต้องคืนร่างกระดานและสถานะการเปิดเฉลยของข้อนั้น ไม่ย้ายรูปหรือร่างจากข้ออื่นมาปะปน การเปลี่ยนข้อไม่ใช่การบันทึก กระดานยังใช้ปุ่มบันทึกและคำเตือนก่อนออกเดิม พร้อมสถานะร่างและสิทธิ์อ่าน/เขียนตามเดิม
+
 ## Teacher assignment cards and compact recent work - 15 October 2026
 
 Teacher work uses individual rounded Card surfaces with an even neutral border on every side and no status stripe. Status remains in the labelled badge; its title carries the existing description. The removed stripe has no invisible hover/focus target. Each category has a separate tinted heading and a 1/2-column grid at container width 40rem (never three columns). The drag handle sits at the upper right with title clearance. All metadata, category selection, type/status badges and preview/grading/copy or practice actions remain visible. Actions align at the card bottom; there is no fixed aspect ratio or added minimum height.
