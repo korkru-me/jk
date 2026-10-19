@@ -93,6 +93,6 @@ export function recomputeLab<T extends GradingWorkspaceData>(data: T): T {
       currentStreak = parts.maxScore > 0 && parts.total >= parts.maxScore && !parts.pending ? currentStreak + 1 : 0
       bestStreak = Math.max(bestStreak, currentStreak)
     }
-    return { ...student, score: Math.round(score * 100) / 100, maxScore, bestStreak, streakReached: bestStreak >= (data.assignment.streakTarget ?? 3) }
+    return { ...student, score: Math.round(score * 100) / 100, maxScore, streakReached: bestStreak >= (data.assignment.streakTarget ?? 3) }
   }) }
 }

@@ -1,8 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { AssignmentList, type StudentAssignmentRow } from '@/app/(app)/classrooms/[id]/_components/assignment-list'
+import type { ExtensionDialogActions } from '@/app/(app)/classrooms/[id]/_components/extension-dialog'
+import { formatThaiDateTime } from '@/lib/thai-time'
 import { ClassroomScoresMatrix } from '@/app/(app)/classrooms/[id]/_components/classroom-scores-matrix'
 import type { ClassroomAssignmentRow } from '@/app/(app)/classrooms/[id]/_components/classroom-assignments-tab'
 
@@ -15,6 +17,15 @@ const students = [
   { id: id(1, 3), full_name: 'นักเรียนตัวอย่าง 3', email: 'student3@example.invalid', grade_level: 'ม.4', section_number: 8, class_number: 5, student_code: '53001' },
 ]
 
+const manyStudents = [
+  { ...students[0], full_name: 'นักเรียนตัวอย่างชื่อยาวมาก สำหรับทดสอบการแสดงชื่อและนามสกุลให้ครบถ้วน' },
+  ...students.slice(1),
+  ...Array.from({ length: 33 }, (_, index) => ({
+    id: id(1, index + 4), full_name: `นักเรียนตัวอย่าง ${index + 4}`, email: `student${index + 4}@example.invalid`,
+    grade_level: 'ม.4', section_number: index % 5 + 1, class_number: index + 4, student_code: `53${String(index + 4).padStart(3, '0')}`,
+  })),
+]
+
 const assignments: ClassroomAssignmentRow[] = Array.from({ length: 7 }, (_, index) => ({
   id: id(2, index + 1),
   title: index === 0 ? 'ทดสอบ (สำเนา)' : `ทดสอบ ${index + 1}`,
@@ -22,7 +33,7 @@ const assignments: ClassroomAssignmentRow[] = Array.from({ length: 7 }, (_, inde
   mode: 'online',
   status: 'published',
   start_at: null,
-  end_at: null,
+  end_at: index === 6 ? null : '2030-10-20T16:59:00.000Z',
   question_ids: [],
   random_question_count: null,
   completion_rule: null,
@@ -60,6 +71,29 @@ const studentAssignments: StudentAssignmentRow[] = assignments.map(assignment =>
 export function ScoresMatrixLabClient() {
   const [studentView, setStudentView] = useState(false)
   const [reviewed, setReviewed] = useState(false)
+  const [showManyStudents, setShowManyStudents] = useState(false)
+  const [labAssignments, setLabAssignments] = useState(assignments)
+  const [simulateFailure, setSimulateFailure] = useState(false)
+  const [lastSaved, setLastSaved] = useState<string | null>(null)
+  const extensionActions = useMemo<ExtensionDialogActions>(() => ({
+    prepare: async assignmentId => {
+      const assignment = labAssignments.find(row => row.id === assignmentId)
+      if (!assignment) return { error: 'ไม่พบงานจำลอง' }
+      if (!assignment.end_at) return { error: 'งานนี้ไม่ได้กำหนดเวลาปิดรับ นักเรียนจึงเข้าทำงานได้โดยไม่ต้องขยายเวลา' }
+      return { snapshot: {
+        id: assignment.id, title: assignment.title, endAt: assignment.end_at,
+        updatedAt: lastSaved ?? '2026-10-19T12:00:00.000Z', startAt: null, dueAt: '2030-10-19T16:59:00.000Z',
+        durationMinutes: assignment.type === 'exam' ? 60 : null, linkedClassroomCount: 2,
+      } }
+    },
+    save: async (assignmentId, input) => {
+      if (simulateFailure) return { error: 'บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง (ข้อมูลจำลอง)' }
+      const updatedAt = new Date().toISOString()
+      setLabAssignments(rows => rows.map(row => row.id === assignmentId ? { ...row, end_at: input.endAt } : row))
+      setLastSaved(updatedAt)
+      return { success: true, endAt: input.endAt, updatedAt }
+    },
+  }), [labAssignments, lastSaved, simulateFailure])
   return (
     <main className="min-h-dvh bg-background p-6">
       <div className="mx-auto max-w-[1800px] space-y-4">
@@ -72,18 +106,29 @@ export function ScoresMatrixLabClient() {
           {!studentView && <Button variant="outline" size="sm" onClick={() => setReviewed(value => !value)}>
             {reviewed ? 'จำลองรอตรวจอีกครั้ง' : 'จำลองตรวจครบ'}
           </Button>}
+          {!studentView && <Button variant="outline" size="sm" onClick={() => setShowManyStudents(value => !value)}>
+            {showManyStudents ? 'กลับรายชื่อ 3 คน' : 'จำลองชื่อยาวและรายชื่อ 36 คน'}
+          </Button>}
         </div>
+        {!studentView && <div className="flex flex-wrap items-center gap-2 text-sm">
+          <Button variant="outline" size="sm" onClick={() => setSimulateFailure(value => !value)}>
+            {simulateFailure ? 'กลับโหมดบันทึกสำเร็จ' : 'จำลองบันทึกไม่สำเร็จ'}
+          </Button>
+          <p className="text-muted-foreground">การขยายเวลาในหน้านี้ใช้ข้อมูลจำลองเท่านั้น ไม่เขียนฐานข้อมูล</p>
+          {lastSaved && <p role="status" className="text-success">บันทึกจำลองแล้ว · {formatThaiDateTime(lastSaved)}</p>}
+        </div>}
         {studentView ? (
           <AssignmentList assignments={studentAssignments} categories={[]} />
         ) : (
           <ClassroomScoresMatrix
             classroomId={id(4, 1)}
             classroomName="ห้องทดสอบ"
-            students={students}
-            assignments={assignments}
+            students={showManyStudents ? manyStudents : students}
+            assignments={labAssignments}
             categories={[]}
             submissions={submissions}
             extensions={[]}
+            extensionActions={extensionActions}
             pendingReviewByStudent={reviewed ? {} : { [assignments[3].id]: { [students[0].id]: true, [students[1].id]: true } }}
           />
         )}
