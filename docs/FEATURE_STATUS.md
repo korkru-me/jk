@@ -1,5 +1,13 @@
 # Feature status
 
+## โหมดสอนทีละหนึ่งข้อ — 19 ตุลาคม 2026 (local only)
+
+- TeachingModeClient แสดง active question พร้อมกระดานของข้อนั้นเพียงหนึ่งแถวเสมอ ทั้งข้อสอบ/แบบฝึกหัดใช้ route/component เดียวกัน ถอด questionsPerPage prop/state/options/selector และ inactive-board placeholder ออก ไม่อ่าน assignments.questions_per_page เพื่อแบ่งหน้าสอน และไม่แก้การแบ่งหน้าฝั่งนักเรียน
+- แถบหัวคงตัวเลือกกระโดดไปข้อใดก็ได้ ปุ่ม “ข้อก่อนหน้า”/“ข้อถัดไป” เปลี่ยนทีละหนึ่งข้อพร้อมปิดปุ่มที่ขอบเขต และแสดง “ข้อ N / รวม” คง keyed question/editor, changeQuestion, exact draft target, epoch guards, การเปิดเฉลยรายข้อและ guard ออกจากหน้าพร้อมร่างเดิม
+- Browser localhost:3000 ตรวจงานแบบฝึกหัดจริง 5 ข้อที่เดิมเลือกสอน 3 ข้อต่อหน้า: มีหนึ่ง question row และไม่มี select จำนวนข้อต่อหน้าเสมอ ทดสอบถัดไป 1→2→3 กระโดดไปข้อ 5/ปิดปุ่มถัดไป ย้อนกลับข้อ 4 และสถานะเฉลยของข้อ 1 คงอยู่โดยไม่เปิดของข้อ 2 กรณี fixture ข้อเดียวปิดปุ่มก่อน/ถัดไปทั้งคู่
+- วาดเส้นชั่วคราวในข้อ 1 เปลี่ยนข้อ 2 แล้วกลับมา เส้นและสถานะยังไม่บันทึกกลับมาถูกข้อ ออกจากหน้าขึ้นคำยืนยันระบุข้อ/ช่อง ยกเลิกแล้วร่างคงอยู่ จากนั้นยืนยันออกเพื่อล้างเฉพาะร่างทดสอบ เปิดโหมดสอนใหม่ผ่านเมนูแล้วเป็นกระดานสะอาด ไม่กดบันทึก/ลบเฉลย ไม่เปลี่ยนฐานข้อมูล/คะแนน
+- ผ่าน TypeScript, token lint, diff check, teaching-board lifecycle/draft-state เดิม 9 เคส, isolated Webpack production build โดยรักษา live .next และคืน tsconfig ส่วน build สร้าง, Next compilation/runtime และ browser console checks ไม่เพิ่ม tests ที่ทวน implementation หรือรัน full suite ซ้ำสำหรับ UI-only change นี้ ไม่ได้ตรวจ exam assignment แยกหรืออุปกรณ์มือถือจริง ไม่มี migration และไม่แก้ Auth/รหัสผ่าน/สมัครสมาชิก/อีเมล คอมมิตโลคอลใน codex/student-classroom-cards ไม่ push/deploy ตามคำขอเจ้าของ
+
 ## เมนูหน้าตรวจ กรอบโจทย์ และการเรียงนักเรียน — 19 ตุลาคม 2026 (local only)
 
 - กรอบโจทย์รายข้อใช้ sticky -top-6 ชดเชย shell p-6 ให้แนบใต้ topbar เมื่อเลื่อนรายการคำตอบ คงเพดานความสูง/ตัวเลื่อนเนื้อหาโจทย์และลำดับชั้นเดิม
