@@ -1,5 +1,13 @@
 # Architecture
 
+## Assignment-wide deadline extension — 19 October 2026 (pending database activation)
+
+The classroom score matrix opens one assignment-scoped dialog from its column header. It reads a fresh authorized snapshot, uses the shared Asia/Bangkok helpers, and submits only the new close plus expected close/version. `lib/actions/extensions.ts` replaces the retired per-student UI actions with active-manager checks and an authenticated atomic RPC. No service-role/direct-update fallback exists. Personal extension rows remain in the classroom payload for CSV exports.
+
+`extend_assignment_deadline` locks/rechecks the assignment, rejects stale, unlimited, unpublished, offline or non-increasing changes, and changes only its close. The same transaction lifts shorter personal closes while preserving `coalesce(extended_due_at, old extended_end_at)` as their on-time boundary. Longer overrides and historical metadata survive. An extension-write guard share-locks the parent to stop older clients restoring a shorter close. Completion, attempt duration, scores and late bands are untouched; closed/submitted attempts remain closed.
+
+The migration is a candidate only: Production history diverges (13 local-only, 1 remote-only), so the mandatory stop was respected. No remote migration, repair or schema mutation was run. Missing RPC fails closed. Reconcile recorded history with actual schema before applying this candidate and checking a synthetic Staging transaction. Local UI fixtures use injected actions and never write real data.
+
 ## Removed grading tools history dependency — 19 October 2026 (local)
 
 After removing the tools/history panel, `loadGradingWorkspace` no longer queries `assignment_score_adjustment_batches` or hydrates adjustment actor names, and its result no longer carries `adjustmentBatches`. It also drops the panel-only timing classification, extension query, due/end/band and submission timestamp columns, and unused best-streak projection; `GradingStudent` and the grading lab fixture no longer expose the unused timing/bestStreak fields. Overview, question and student routes retain the same authorization, score adjustment calculation, streak completion and private-draft reads. Existing adjustment actions, audit schema/history and the separate late-submission lab still have consumers and are retained; this is application code cleanup only, with no data or schema deletion.

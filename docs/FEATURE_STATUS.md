@@ -1,5 +1,19 @@
 # Feature status
 
+## Assignment-wide extension from score headers — 19 October 2026 (local candidate)
+
+The assignment header now holds Extend next to Remind; per-student extension controls are removed. The shared dialog shows the full assignment title, all linked classrooms, existing close and a new Asia/Bangkok close. There is no student selector or revoke flow. It preserves input on errors/cancelled dismissal, confirms backdrop/Escape dismissal, and closes/refreshes only after acknowledged success. Unlimited assignments explain that no extension is needed rather than introducing a new restriction.
+
+Only the hard close changes: due/late bands, duration, attempt limits, scores and submitted/closed attempts stay intact. The action rechecks active exact manager access and calls an atomic compare-and-set RPC. Historical personal overrides remain for existing readers/CSV; shorter closes are lifted atomically while their old on-time boundaries are preserved. No direct-update fallback can leave a partial extension.
+
+**Database activation is pending:** `supabase migration list --project-ref libsutfinswqkruihwdx` found 13 local-only and 1 remote-only versions. Per AGENTS.md, database changes stopped; no db push, repair, Staging or Production migration was run. CLI-created `20261019154815_extend_assignment_deadline.sql` is prepared for isolated SQL verification only. Missing RPC fails closed with a localized error. Reconcile migration history against the live schema before applying this reviewed candidate and testing a synthetic Staging transaction. Local UI success is not evidence of a successful live database write.
+
+The local `/exam-screen-lab/scores-matrix` uses injected prepare/save fixtures for finite/unlimited closes and success/error cases; it never writes real deadlines.
+
+Validation: TypeScript, token lint, diff checks, all 306 Vitest files / 4,024 tests (including 90 new action/helper/real-SQL regressions), and isolated Webpack production build passed. Next.js compilation/runtime reports are empty. Browser fixtures verified success/close/refocus, re-opened saved close, failure/draft retention, earlier-time rejection, Escape/backdrop/direct-cancel confirmation, and 390/320px dialogs without horizontal overflow. The actual local classroom shows 12 eligible header controls and zero cell controls; its real metadata read correctly explains an unlimited assignment. No real notification, deadline/grade write or Production deployment was performed. Separate-connection DB races, real touch devices and dark theme were not tested.
+
+History differences to audit before activation: local-only `20260922005743`, `20260923073215`, `20260923161000`, `20260923163333`, `20260923201848`, `20260924133500`, `20260924134000`, `20260924142500`, `20260924145500`, `20260927093000`, `20260927094000`, `20260927095000`, `20261009142610`; remote-only `20261017111034`. The new candidate is additionally local-only by design; do not blindly replay or repair these versions.
+
 ## ตารางคะแนนห้องเรียนกระชับและดูชื่อเต็ม — 19 ตุลาคม 2026 (local)
 
 กำหนด colgroup/fixed layout ให้คอลัมน์ประจำตัวไม่ขยายตามพื้นที่ว่าง ลดคอลัมน์ชื่อ desktop 40 → 36 spacing units และปรับ sticky offsets ให้ตรงกัน ชั้นจึงเข้ามาใกล้ชื่อ เส้นแบ่งครบหกคอลัมน์ตั้งแต่ลำดับถึงรหัสนักเรียน ชื่อยาวใช้ ellipsis กับ Tooltip ชื่อเต็มเมื่อชี้/โฟกัส ชื่อ/อีเมลและข้อมูลเรียง/CSV คงเดิม ลด padding แถวและหัวตาราง คงเป้ากด 44px ขึ้นไปสำหรับ coarse pointer และให้ปุ่มขยายเวลาเห็นเมื่อโฟกัส/ใช้จอสัมผัสด้วย ป้ายรอตรวจ/คะแนนศูนย์/กำลังทำและการลากงานยังใช้กติกาเดิม ไม่มี server/data/Auth/email/schema change
