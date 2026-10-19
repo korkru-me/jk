@@ -5,10 +5,12 @@ import { Plus, X } from 'lucide-react'
 import { MAX_GRADING_KEYWORDS, MAX_GRADING_KEYWORD_LENGTH, normalizeGradingKeywords, splitGradingKeywordMatches } from '@/lib/grading-keywords'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { IconButton } from '@/components/ui/icon-button'
 import { Input } from '@/components/ui/input'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useGradingDisclosure } from './use-grading-disclosure'
 
 const EMPTY_KEYWORDS: readonly string[] = []
@@ -67,9 +69,12 @@ export function GradingKeywordTools() {
   }
 
   return <Collapsible ref={root} open={open} onOpenChange={setOpen} className="contents">
-    <CollapsibleTrigger render={<Button ref={trigger} type="button" size="sm" variant="outline" disabled={!ready} className="pointer-coarse:min-h-11" />}>
-      <Plus data-icon="inline-start" aria-hidden="true" />ไฮไลต์คำ{keywords.length > 0 ? ` (${keywords.length}/${MAX_GRADING_KEYWORDS})` : ''}
-    </CollapsibleTrigger>
+    <Tooltip>
+      <TooltipTrigger render={<CollapsibleTrigger render={<Button ref={trigger} type="button" size="sm" variant="outline" disabled={!ready} className="pointer-coarse:min-h-11" />}>
+        <Plus data-icon="inline-start" aria-hidden="true" />ไฮไลต์คำ{keywords.length > 0 ? ` (${keywords.length}/${MAX_GRADING_KEYWORDS})` : ''}
+      </CollapsibleTrigger>} />
+      <TooltipContent className="max-w-[min(20rem,calc(100vw-1rem))]">ไฮไลต์คำสำคัญในคำตอบอัตนัย เพิ่มได้สูงสุด {MAX_GRADING_KEYWORDS} คำ เพื่อช่วยตรวจคำตอบ</TooltipContent>
+    </Tooltip>
     {keywords.length > 0 && <div className="flex min-w-0 max-w-full flex-wrap items-center gap-1" role="group" aria-label="คำที่ไฮไลต์ในคำตอบอัตนัย">
       {keywords.map((word, index) => <Badge key={word} variant="statusWarning" className="h-auto min-h-7 max-w-full gap-1 whitespace-normal">
         <span className="min-w-0 [overflow-wrap:anywhere]">{word}</span>
@@ -78,25 +83,27 @@ export function GradingKeywordTools() {
         }}><X aria-hidden="true" /></IconButton>
       </Badge>)}
     </div>}
-    <CollapsibleContent className="order-last w-full min-w-0 basis-full" onKeyDown={event => {
+    <CollapsibleContent className="order-last w-full min-w-0 basis-full pt-2" onKeyDown={event => {
       if (event.key === 'Escape') { setOpen(false); trigger.current?.focus({ preventScroll: true }) }
     }}>
-      <FieldGroup className="min-w-0 gap-1 pt-2">
-        <Field className="min-w-0 max-w-lg gap-1" data-invalid={!!error} data-disabled={!ready || full}>
-          <FieldLabel htmlFor={`${id}-keyword`} className="text-xs">คำที่ต้องการไฮไลต์</FieldLabel>
-          <div className="flex min-w-0 items-center gap-2">
-            <Input ref={input} id={`${id}-keyword`} value={value} maxLength={MAX_GRADING_KEYWORD_LENGTH} disabled={!ready || full} placeholder="พิมพ์คำ แล้วกด Enter หรือเพิ่มคำ" className="pointer-coarse:min-h-11"
-              aria-invalid={!!error} aria-describedby={`${id}-help${error ? ` ${id}-error` : ''}`} onChange={event => { setValue(event.target.value); setError('') }}
-              onKeyDown={event => {
-                if (event.key !== 'Enter' || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return
-                event.preventDefault(); add()
-              }} />
-            <Button type="button" size="sm" variant="outline" className="shrink-0 pointer-coarse:min-h-11" disabled={!ready || full || !value.trim()} onClick={add}><Plus data-icon="inline-start" aria-hidden="true" />เพิ่มคำ</Button>
-          </div>
-          <FieldDescription id={`${id}-help`} className="text-xs">เฉพาะคำตอบอัตนัย · {keywords.length}/{MAX_GRADING_KEYWORDS} คำ · ทุกคำใช้สีเดียวกัน</FieldDescription>
-          {error && <FieldError id={`${id}-error`}>{error}</FieldError>}
-        </Field>
-      </FieldGroup>
+      <Card radius="md" padding="sm" className="w-full min-w-0 max-w-[42rem]">
+        <FieldGroup className="min-w-0 gap-1">
+          <Field className="min-w-0 gap-1" data-invalid={!!error} data-disabled={!ready || full}>
+            <FieldLabel htmlFor={`${id}-keyword`} className="text-xs">คำที่ต้องการไฮไลต์</FieldLabel>
+            <div className="flex min-w-0 items-center gap-2">
+              <Input ref={input} id={`${id}-keyword`} value={value} maxLength={MAX_GRADING_KEYWORD_LENGTH} disabled={!ready || full} placeholder="พิมพ์คำ แล้วกด Enter หรือเพิ่มคำ" className="pointer-coarse:min-h-11"
+                aria-invalid={!!error} aria-describedby={`${id}-help${error ? ` ${id}-error` : ''}`} onChange={event => { setValue(event.target.value); setError('') }}
+                onKeyDown={event => {
+                  if (event.key !== 'Enter' || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return
+                  event.preventDefault(); add()
+                }} />
+              <Button type="button" size="sm" variant="outline" className="shrink-0 pointer-coarse:min-h-11" disabled={!ready || full || !value.trim()} onClick={add}><Plus data-icon="inline-start" aria-hidden="true" />เพิ่มคำ</Button>
+            </div>
+            <FieldDescription id={`${id}-help`} className="text-xs">เฉพาะคำตอบอัตนัย · {keywords.length}/{MAX_GRADING_KEYWORDS} คำ · ทุกคำใช้สีเดียวกัน</FieldDescription>
+            {error && <FieldError id={`${id}-error`}>{error}</FieldError>}
+          </Field>
+        </FieldGroup>
+      </Card>
     </CollapsibleContent>
   </Collapsible>
 }

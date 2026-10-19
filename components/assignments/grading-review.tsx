@@ -106,7 +106,7 @@ function AnswerStatus({ answer, question }: { answer: GradingAnswer; question: Q
   return <div className="flex flex-wrap items-center gap-1.5">
     {parts.answer.pending && <Badge variant="statusWarning"><Clock3 aria-hidden="true" />รอตรวจคำตอบ</Badge>}
     {pendingWorkForReview(parts) && <Badge variant="statusWarning"><Clock3 aria-hidden="true" />รอตรวจวิธีทำ</Badge>}
-    {!parts.pending && <Badge variant={answer.scoreEditedBy ? 'secondary' : 'statusSuccess'}>{answer.scoreEditedBy ? <PencilLine aria-hidden="true" /> : <CheckCircle2 aria-hidden="true" />}{answer.scoreEditedBy ? 'ครูปรับคะแนนแล้ว' : parts.answer.source === 'automatic' && !parts.hasWork ? 'ตรวจแล้วโดยระบบ' : 'ครูตรวจแล้ว'}</Badge>}
+    {!parts.pending && <Badge variant="statusSuccess"><CheckCircle2 aria-hidden="true" />{!answer.scoreEditedBy && parts.answer.source === 'automatic' && !parts.hasWork ? 'ตรวจแล้วโดยระบบ' : 'ตรวจแล้วโดยผู้สอน'}</Badge>}
   </div>
 }
 
@@ -134,8 +134,8 @@ function QuestionDisclosure({ data, question, number, configure, correctionActio
   const [open, setOpen] = useState(true)
   const { hasUnsavedChanges, unpublishedCount, busy } = useGradingBatch()
   return <>
-    {/* The shell scroller has p-6; -top-4 leaves a two-spacing gap below its topbar. */}
-    <Card radius="md" className="@container/grading-question sticky -top-4 z-10 shrink-0 overflow-hidden border-tint-2/40 bg-card shadow-sm" data-grading-question>
+    {/* Offset the shell scroller's p-6 so the pinned question meets the topbar. */}
+    <Card radius="md" className="@container/grading-question sticky -top-6 z-10 shrink-0 overflow-hidden border-tint-2/40 bg-card shadow-sm" data-grading-question>
       <Collapsible open={open} onOpenChange={setOpen} className="flex max-h-[calc(var(--app-height,100dvh)*0.4)] flex-col overflow-y-auto bg-tint-2/5">
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-tint-2/20 bg-tint-2/10 px-3 py-2">
           <div className="flex min-w-0 flex-1 basis-full items-center gap-2 @min-[40rem]/grading-question:basis-auto">
@@ -192,11 +192,10 @@ function ReviewWorkspaceHeader({ data, title }: { data: GradingWorkspaceData; ti
 }
 
 function ReviewDraftToolbar({ data, question, hasEssayAnswers = false }: { data: GradingWorkspaceData; question?: Question; hasEssayAnswers?: boolean }) {
-  const { savedDrafts, dirtyCount } = useGradingBatch()
+  const { dirtyCount } = useGradingBatch()
   return <div className="flex min-w-0 flex-wrap items-center gap-2">
     <GradingQuickScoreSettings />
     {question && <GradingUniformScores key={question.id} data={data} question={question} />}
-    {Object.keys(savedDrafts).length > 0 && <GradingBatchSaveButton removeOnly />}
     {(question?.question_type === 'essay' || hasEssayAnswers) && <GradingKeywordTools />}
     {dirtyCount > 0 && <Badge variant="statusWarning" className="h-auto min-h-5 max-w-full whitespace-normal">ยังไม่บันทึก {dirtyCount} คำตอบ</Badge>}
   </div>
@@ -207,6 +206,7 @@ export function QuestionGradingReview(props: CommonProps & { questionId: string 
   return <GradingKeywordsProvider assignmentId={props.data.assignment.id} viewerId={props.data.viewerId}><GradingQuickScoresProvider assignmentId={props.data.assignment.id} viewerId={props.data.viewerId}>
     <GradingBatchProvider key={reviewDraftKey(props.data, `question:${props.questionId}`, props.query)} assignmentId={props.data.assignment.id}
       savedDrafts={props.data.savedDrafts} sources={sources} saveDrafts={props.saveDrafts} publish={props.publish}
+      publishSuccessHref={hrefFor(props.data.baseHref, props.query ?? {}, { view: 'questions', page: undefined })}
       disabled={props.data.reviewAvailable === false || props.data.draftsAvailable === false}>
       <QuestionReviewBody {...props} />
     </GradingBatchProvider>
@@ -242,6 +242,7 @@ export function StudentGradingReview(props: CommonProps & { studentId: string })
   return <GradingKeywordsProvider assignmentId={props.data.assignment.id} viewerId={props.data.viewerId}><GradingQuickScoresProvider assignmentId={props.data.assignment.id} viewerId={props.data.viewerId}>
     <GradingBatchProvider key={reviewDraftKey(props.data, `student:${props.studentId}`, props.query)} assignmentId={props.data.assignment.id}
       savedDrafts={props.data.savedDrafts} sources={sources} saveDrafts={props.saveDrafts} publish={props.publish}
+      publishSuccessHref={hrefFor(props.data.baseHref, props.query ?? {}, { view: 'students' })}
       disabled={props.data.reviewAvailable === false || props.data.draftsAvailable === false}>
       <StudentReviewBody {...props} />
     </GradingBatchProvider>
