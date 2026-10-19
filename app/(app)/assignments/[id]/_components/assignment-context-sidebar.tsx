@@ -176,7 +176,7 @@ export function AssignmentContextNavigation({
         )}
         <SidebarButton
           label={pendingCount > 0
-            ? `ตรวจให้คะแนน ${pendingCount}${pendingReviewCapped ? '+' : ''} ชิ้น`
+            ? `รอตรวจงานส่ง ${pendingReviewCapped ? 'อย่างน้อย ' : ''}${pendingCount} รายการ`
             : 'ตรวจให้คะแนน / ดูคำตอบ'}
           size="sm"
           variant={currentSection === 'results' ? 'navigation' : 'ghost'}
