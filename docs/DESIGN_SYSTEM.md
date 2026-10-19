@@ -1,5 +1,9 @@
 # Brand, language และ UI rules
 
+## Assignment names navigate; arrows sort — 19 October 2026
+
+Score-matrix headers separate the drag grip, full-name link and adjacent sort icon button as sibling controls. Names link to assignment detail, use a two-line clamp with full native title, and have hover/focus affordances. The arrow alone toggles student score sorting and shows the next direction in a Thai label/tooltip; `aria-sort` stays on the column header. Active sort styling belongs to the arrow rather than the link. Preserve compact header spacing and 44px coarse-pointer targets for the grip, link and arrow.
+
 ## Assignment-wide extension dialog — 19 October 2026
 
 Assignment headers place Remind and Extend in the same action row below the title/review badge. Extend uses Clock, outline primary styling and an explanatory tooltip. No repeated extension controls appear in student cells. Coarse-pointer targets stay at least 44px; pointer/click events on actions do not start sorting or dragging.

@@ -1,5 +1,11 @@
 # Feature status
 
+## Gradebook assignment links and separate sort controls — 19 October 2026 (local)
+
+Assignment names in score-matrix headers are native links to `/assignments/[id]`, matching the existing teacher assignment cards. Only the adjacent arrow button sorts students by that assignment's score, retaining the existing descending/ascending toggle, `aria-sort` on the header, direction icon and selected styling. Link and sort remain separate keyboard targets; the link retains normal modified-click behavior. Dragging is still limited to the grip. Updated helper text distinguishes all three actions. No database, scoring or migration change; the prior deadline-extension migration activation remains pending.
+
+Validation: TypeScript, token lint, diff check and isolated Webpack production build passed; Next.js compilation/runtime reports are empty. Local browser clicked a real assignment title and verified its detail heading, then exercised both sort directions without leaving the matrix. Synthetic unequal-score rows, mouse activation, link-to-arrow Tab order and 390px layout were checked; no page overflow or link/button overlap. Full unit suite was not repeated for this UI-only change, and modified-click/new-tab behavior, physical touch devices and dark theme were not separately exercised. No notifications, deadline/grade/order writes or Production deployment occurred.
+
 ## Assignment-wide extension from score headers — 19 October 2026 (local candidate)
 
 The assignment header now holds Extend next to Remind; per-student extension controls are removed. The shared dialog shows the full assignment title, all linked classrooms, existing close and a new Asia/Bangkok close. There is no student selector or revoke flow. It preserves input on errors/cancelled dismissal, confirms backdrop/Escape dismissal, and closes/refreshes only after acknowledged success. Unlimited assignments explain that no extension is needed rather than introducing a new restriction.
