@@ -363,10 +363,10 @@ function OverviewTab({ a, questions, totalSubs, pendingCount, pendingReviewCappe
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-foreground">
-          มี {pendingCount}{pendingReviewCapped ? '+' : ''} ชิ้นที่ระบบตรวจให้ไม่ได้ รอครูกรอกคะแนนเอง
+          มีงานส่งของนักเรียน {pendingReviewCapped ? 'อย่างน้อย ' : ''}{pendingCount} รายการที่รอตรวจให้คะแนน
         </p>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          คะแนนรวมของนักเรียนจะยังไม่ครบจนกว่าจะกรอกคะแนนข้อเหล่านี้
+          แต่ละรายการคือการส่งงาน 1 ครั้ง และอาจมีหลายข้อที่ผู้สอนต้องตรวจ
         </p>
       </div>
       <span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-warning">
