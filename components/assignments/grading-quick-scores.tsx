@@ -11,6 +11,7 @@ import { Card } from '@/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 interface GradingQuickScoresContextValue {
   percentages: readonly number[]
@@ -59,9 +60,12 @@ export function GradingQuickScoreSettings() {
   const valid = isGradingQuickScores(values)
   const invalidMessage = `กรอกเปอร์เซ็นต์ 0–100 ให้ครบทั้ง ${GRADING_QUICK_SCORE_COUNT} ปุ่ม`
   return <Collapsible ref={root} open={open} onOpenChange={setOpen} className="contents">
-    <CollapsibleTrigger render={<Button ref={trigger} type="button" size="sm" variant="outline" className="shrink-0 pointer-coarse:min-h-11" />}>
-      <SlidersHorizontal data-icon="inline-start" aria-hidden="true" />ตั้งค่าปุ่มให้คะแนนเร็ว<ChevronDown data-icon="inline-end" aria-hidden="true" />
-    </CollapsibleTrigger>
+    <Tooltip>
+      <TooltipTrigger render={<CollapsibleTrigger render={<Button ref={trigger} type="button" size="sm" variant="outline" className="shrink-0 pointer-coarse:min-h-11" />}>
+        <SlidersHorizontal data-icon="inline-start" aria-hidden="true" />ตั้งค่าปุ่มให้คะแนนเร็ว<ChevronDown data-icon="inline-end" aria-hidden="true" />
+      </CollapsibleTrigger>} />
+      <TooltipContent className="max-w-[min(20rem,calc(100vw-1rem))]">กำหนดเปอร์เซ็นต์ของปุ่มให้คะแนนเร็ว ใช้กับทุกช่องคะแนนในงานนี้</TooltipContent>
+    </Tooltip>
     <CollapsibleContent className="order-last w-full min-w-0 basis-full pt-2">
       <Card radius="md" padding="sm" className="flex w-full min-w-0 max-w-[42rem] flex-col gap-2">
         <p className="text-xs text-muted-foreground">กำหนดเปอร์เซ็นต์ที่ใช้กับทุกช่องคะแนนในงานนี้</p>

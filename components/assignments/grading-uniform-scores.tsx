@@ -14,6 +14,7 @@ import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/native-select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useGradingDisclosure } from './use-grading-disclosure'
 import { useGradingBatch } from './grading-batch-provider'
 
@@ -51,9 +52,12 @@ export function GradingUniformScores({ data, question }: { data: GradingWorkspac
   }
 
   return <Collapsible ref={root} open={open} onOpenChange={setOpen} className="contents">
-    <CollapsibleTrigger render={<Button type="button" size="sm" variant="outline" className="pointer-coarse:min-h-11" />}>
-      <Users data-icon="inline-start" aria-hidden="true" />ให้คะแนนเท่ากันทุกคน<ChevronDown data-icon="inline-end" aria-hidden="true" />
-    </CollapsibleTrigger>
+    <Tooltip>
+      <TooltipTrigger render={<CollapsibleTrigger render={<Button type="button" size="sm" variant="outline" className="pointer-coarse:min-h-11" />}>
+        <Users data-icon="inline-start" aria-hidden="true" />ให้คะแนนเท่ากันทุกคน<ChevronDown data-icon="inline-end" aria-hidden="true" />
+      </CollapsibleTrigger>} />
+      <TooltipContent className="max-w-[min(20rem,calc(100vw-1rem))]">ร่างคะแนนเดียวกันให้ทุกคนในข้อนี้ รวมทุกห้องและทุกหน้า แล้วแก้รายคนก่อนบันทึกหรือส่งคะแนนได้</TooltipContent>
+    </Tooltip>
     <CollapsibleContent className="order-last w-full min-w-0 basis-full pt-2">
       <Card radius="md" padding="sm" className="flex w-full min-w-0 max-w-[42rem] flex-col gap-2">
         <p className="text-xs text-muted-foreground">ทุกห้องและทุกหน้า · {people} คน · {scope.targets.length} คำตอบของข้อนี้</p>
