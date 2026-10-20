@@ -2,7 +2,9 @@
 
 เจ้าของเลือก Resend Free และผู้รับแจ้งเตือน `korkru.me@gmail.com` เมื่อ 17 ตุลาคม 2026 และวันที่ 18 ตุลาคมเปลี่ยนระดับสุดท้ายจาก 97% เป็น **95%** พร้อมขอให้ตรวจ **ทั้งรายวันและรายเดือน** ระดับปัจจุบันจึงเป็น **80%, 90%, 95%** แยกต่อช่วง สำหรับ Free 100 ฉบับ/วัน คือ 80, 90, 95 ฉบับ และ 3,000 ฉบับ/เดือน คือ 2,400, 2,700, 2,850 ฉบับ ([Pricing](https://resend.com/pricing), [Usage API](https://resend.com/docs/api-reference/usage/retrieve-usage)) ไม่มีการอัปเกรดแพ็กเกจหรือเปิดค่าใช้จ่ายส่วนเกินอัตโนมัติ
 
-**สถานะ 20 ตุลาคม 2026: Production ledger พร้อมและ monitor/from/to บันทึกแล้ว แต่ flag ยังปิด/แอปยังไม่ deploy; Staging SMTP, recovery core flow และ signed webhook → Usage API ผ่านแล้ว** Staging รุ่น `8cd3919` ขึ้น Ready และเปิด quota monitor แล้ว ผลจริงตอบ `200 {"status":"below_threshold"}` เพราะทั้งรายวันและรายเดือนยังต่ำกว่า 80% ตัวอย่างอีเมล TEST จำลองรายวัน 80% ส่งจริงเพียง 1 ฉบับ Resend ขึ้น Delivered และเจ้าของยืนยันพบใน Inbox แล้ว ส่วนการส่งอีเมลเตือนจริงที่ระดับ 80/90/95 ยังไม่ได้บังคับให้เกิด งาน SEB ยังพัก และยังไม่เปิด Production SMTP หรือ Google
+**สถานะ 20 ตุลาคม 2026: เปิด Production quota monitor แล้ว** เตือน **80%, 90%, 95% ทั้งรายวันและรายเดือน** ไป `korkru.me@gmail.com` โค้ด **216d492** จาก PR75ขึ้น Ready เปิด Productionflagและย้าย webhookแล้ว Signed provider replayได้HTTP200/`below_threshold` โดยไม่ส่งอีเมลใหม่ Stageflagปิด และactualprimarylocalhost:3000 sync/runtimeผ่าน รายละเอียดrelease/หลักฐาน/ข้อจำกัดอยู่ใน `docs/RESEND_PRODUCTION_RELEASE_20261020.md`
+
+หลักฐาน Stagingวันที่19ตุลาคมยังคงเดิม: SMTP/recoverycoreflowและsignedwebhook→UsageAPIผ่าน อีเมล TESTจำลองรายวัน80%ส่งจริงเพียง1ฉบับ Deliveredและเจ้าของยืนยันInbox ไม่ได้บังคับยอดให้แตะทั้ง6threshold ProductionSMTP/GoogleและSEBไม่เปิดเพิ่มจากงานquotaนี้
 
 - บัญชี Resend สร้างแล้ว; `mail.korkru.com` ขึ้น Verified ใน region Tokyo ตรวจ public DNS พบ TXT `resend._domainkey.mail`, CNAME `rsend.mail` → `rsend-apne1.forge.rmta.net` และ `send.mail` → `send.forge.rmta.net` โดย CNAME เป็น DNS only
 - เจ้าของสร้าง Sending access key และกรอก custom SMTP เอง ไม่ส่ง key มาในแชท การอ่าน configuration ยืนยัน Staging ใช้ `smtp.resend.com:465`, username `resend`, sender `auth@mail.korkru.com`, ชื่อ `KorKru Staging` และมี SMTP password โดยไม่อ่าน/บันทึกค่าลับ
@@ -19,7 +21,7 @@
 
 ก่อนเปิดข้อยกเว้น ได้สร้างและเปิด WAF rule เฉพาะ hostname นี้: ปฏิเสธทุก path ที่ไม่ใช่ `/api/webhooks/resend` หรือ method ที่ไม่ใช่ POST จากนั้นเปิด alias-scoped `alias-protection-override` เฉพาะ alias นี้ ไม่แก้ project automation bypass หรือปิด protection ของทั้งเว็บ Probe ก่อน deploy รุ่นใหม่: GET หน้าแรก/login/webhook ได้403; unsigned POST ถึงแอปได้503 `not_configured` ของรุ่นที่ยังปิด flag; URL `staging.korkru.com` เดิมยังได้401 ผลช่วงเตรียมนี้ยังไม่ใช่ signed delivery proof
 
-**หลัง deploy:** commit `3e87c8458f80008dc5d4c3d69d6e7491c86745e2` บน branch `staging` ขึ้น READY (`dpl_5oakdtauo8qXb77UNpeyUfoZFdWy`) และรุ่นปัจจุบัน `8cd3919` ขึ้น Ready แล้ว หน้า login มีป้าย Staging และ source revision ตรงกัน Alias ย้ายตาม release อัตโนมัติและคงข้อยกเว้นไว้ ตรวจ unsigned POST ได้400 `invalid_webhook` แสดงว่า missing signature ถูกปฏิเสธ GET guard ยัง403 และเว็บ Staging เดิมยัง401 ผล signed integration ที่ตามมาบันทึกแยกด้านล่าง
+**หลัง deploy:** commit `3e87c8458f80008dc5d4c3d69d6e7491c86745e2` บน branch `staging` ขึ้น READY (`dpl_5oakdtauo8qXb77UNpeyUfoZFdWy`) และรุ่นที่ตรวจใน checkpoint นั้น `8cd3919` ขึ้น Ready แล้ว หน้า login มีป้าย Staging และ source revision ตรงกัน Alias ย้ายตาม release อัตโนมัติและคงข้อยกเว้นไว้ ตรวจ unsigned POST ได้400 `invalid_webhook` แสดงว่า missing signature ถูกปฏิเสธ GET guard ยัง403 และเว็บ Staging เดิมยัง401 ผล signed integration ที่ตามมาบันทึกแยกด้านล่าง
 
 **Signed integration ผ่าน:** วันที่ 19 ตุลาคมคำขอทดสอบ recovery ใหม่บน Staging ได้ 200 และ Auth audit action `user_recovery_requested` เวลา **15:05:06 UTC (22:05:06 น. ไทย)** Resend SMTP-associated `POST /emails` ได้ 200 เวลา 15:05 UTC และ `email.sent` ของอีเมลเดียวกันมี `created_at` **15:05:09.993Z** จากนั้น Resend แสดง webhook **Success, 1 attempt, HTTP 200** เวลา **15:08:06.344Z (22:08:06 น. ไทย)** พร้อม response **`{"status":"below_threshold"}`** ยืนยันเส้นทาง SMTP → signed Svix webhook → Usage API จริง โดยทั้งสองช่วงยังต่ำกว่าเกณฑ์ จึงไม่มีอีเมลเตือนเพิ่ม เจ้าของยืนยันได้รับอีเมลพร้อมภาพ และไม่ได้ trigger ฉบับอื่นเพิ่มจากการ debug นี้
 
@@ -27,13 +29,17 @@ Event รอบนี้มาหลังเวลา payload ประมา�
 
 WAF config `waf_0G4wivLDsFkX` version1, rule `rule_korkru_staging_resend_webhook_alias_only_MC7lhU` เป็น rule เดียวที่เพิ่ม เริ่มต้นไม่มี active/draft custom config หากยกเลิกให้ revoke alias protection override ก่อนแก้/ลบ guard และไม่เปิด route อื่นบน alias นี้ Production deployment, credentials และฐานข้อมูลไม่เปลี่ยนจากงานนี้
 
-## Production candidate — 20 ตุลาคม 2026
+## Production rollout complete — 20 ตุลาคม 2026
 
-Candidate `8478f884` ที่ทดสอบและ push แล้วแยกจาก Production base `7065d32` ใช้เฉพาะ quota implementation `0352be1` เจ้าของบันทึก monitor key แบบ sensitive และ FROM=`auth@mail.korkru.com`/TO=`korkru.me@gmail.com` บน Vercel Production แล้ว โดย root ยืนยันแถวใน UI ตรวจค่าที่ไม่ลับ `KORKRU_DEPLOYMENT_ENV=production` แล้ว Production flag ยัง `false` แอปยังไม่ deploy และ cutover/primary localhost parity ยังรอ
+[PR75](https://github.com/korkru-me/jk/pull/75) merge source **216d492469259a3e22945413e4ca798e71439a1f** แล้ว Deploymentปัจจุบัน **`dpl_EU5HJV6xvj4kgZSJ6NbRKjS2nbc4`** Readyเวลา **04:15:07.111UTC (11:15:07น. ไทย)** canonical aliases `www.korkru.com`/`korkru.com` ถูกต้อง Productionflagเป็น **true**, scope **production**, monitor/from/to/signing-secretเป็นsensitive/Production-only ตรวจmetadataโดยไม่อ่านค่าsecret
 
-เจ้าของยืนยันว่าเห็นกล่องยืนยันหลัง Rotate signing secret และกดยืนยันแล้ว เป็น owner-reported confirmation ไม่ใช่ผล provider logs ที่ตรวจอย่างอิสระ API Logs list ไม่มี rotate row และ dashboard ไม่คง success toast; การไม่มีแถวไม่ยืนยันว่าล้มเหลว ไม่อ่าน secret หรือกดหมุนซ้ำ เจ้าของคัดลอก current provider secret มาวางและ Save เองแล้ว Root ยืนยันแถว sensitive/Production-only `RESEND_QUOTA_WEBHOOK_SECRET` พร้อม success toast โดยไม่อ่านค่า secret ไม่ deploy/เปลี่ยน flag หรือ provider URL จากขั้นนี้ candidate รวม master `d3b864f` ตรวจผ่านแล้ว: full326ไฟล์/4,663เคส, TypeScript/token lint, Node24 Webpack build และ compiled Next HTTP9fixtures โดยใช้บริการจำลองและไม่ส่งอีเมลจริง ยังไม่ deploy
+Production ledger applyเฉพาะ `20261018154826_resend_quota_alert_delivery_ledger.sql` จาก isolatedCLIbaseline151ที่ตรงกัน หลังdry-run/applyไฟล์เดียวไม่เพิ่มroles/seeds ใช้ `--skip-vault` ได้history **152/152**, pending0 RLS/grants/service-onlyinvokerRPC/emptysearch_pathผ่าน Existingsecurity/function/policyfingerprintsคงเดิม NewWARN0และINFOservice-onlyRLS/no-policyที่คาดไว้ ไม่มีProductiontestdata
 
-Production apply เฉพาะ migration `20261018154826_resend_quota_alert_delivery_ledger.sql` แล้วจาก isolated CLI remote-history workspace: baseline151ตรงกัน, dry-run pendingไฟล์เดียว และ actualapplyไฟล์เดียวโดยไม่เพิ่มroles/seeds ใช้ `--skip-vault` หลัง apply history152/152 pending0 Catalogยืนยัน RLS, browserไม่มี table/RPC grants, service-only SECURITY INVOKER และ emptysearch_path Receipt0 fingerprintsของฟังก์ชัน/security/policiesเดิมคงเดิม NewWARN0 มีINFOservice-onlyRLS/no-policyที่คาดไว้ ไม่ replay/repair backlog หรือเปลี่ยน SEB รายละเอียด/hash/ผลตรวจอยู่ใน `docs/RESEND_PRODUCTION_RELEASE_20261020.md` การเตรียมนี้ยังไม่ยืนยันว่า Production ส่งแจ้งเตือนได้
+ปิด Stageflagและredeploysource `c77f4ec` Readyก่อนเปิดProduction ตรวจactualStagealiasPOST503และรอเกิน60วินาทีแล้ว EndpointResendเดิมบันทึกเป็น **`https://www.korkru.com/api/webhooks/resend`** คง Enabled/`email.sent`/`email.received` ไม่disable/delete UnsignedcanonicalPOSTถูกปฏิเสธ400 จากนั้น replay1genuineprovider`email.sent`ของTESTsampleเดิม ไม่ส่งเมลใหม่ ProductionexacthostPOSTได้ **200เวลา04:17:05.066UTC (11:17:05น. ไทย)** และResendหลังreloadเป็นSuccess/200/Attempts2/`below_threshold` รายการยังแสดงวันที่ต้นฉบับ19ตุลาคม จึงตรวจคู่กับcurrentVercelrequest/attempt ไม่ถือว่าoldtimestampเป็นเวลาทดสอบProductionใหม่
+
+ผลจริงยืนยันsignatureและUsageAPIบนProduction ทั้งสองledgerหลังreplayมีtotal0/pending0/completed0 ไม่มีอีเมลส่งระหว่างrollout ยังไม่ได้บังคับให้ยอดจริงแตะครบ6threshold และไม่มีเหตุให้เผาquotaหรือปรับthresholdเพื่อพิสูจน์เพิ่ม
+
+**Primary parityครบ:** actual `/Users/korkusonmasaen/Korkru/korkru` port3000/PID54741คงเดิม syncquota7ไฟล์ตรง216d492 พร้อมSvix2.8.0/lock, quota132/tsc/Node24isolatedsnapshotWebpackbuildผ่าน NextMCPcompile/runtime0 และlocalPOST503เพราะlocalflagปิด Protectedhash18รายการและงานร่วมคงเดิม ไม่คัดลอกenv/secret รายละเอียดพร้อมtechnicalnoteของnpmอยู่ใน `RESEND_PRODUCTION_RELEASE_20261020.md` ไม่มีreleasegateค้างสำหรับProductionquota monitor
 
 ## สมัครและยืนยันโดเมน
 
@@ -71,19 +77,19 @@ Recovery contract: `forgotPassword` หรือขอตั้งรหัส�
 
 อ้างอิง: [Resend + Supabase SMTP](https://resend.com/docs/send-with-supabase-smtp), [Supabase custom SMTP](https://supabase.com/docs/guides/auth/auth-smtp)
 
-## เตรียมแจ้งเตือน 80%, 90%, 95% ทั้งสองช่วง
+## บันทึกเตรียม Staging 19 ตุลาคม และการย้ายขึ้น Production 20 ตุลาคม
 
-**สถานะ 19 ตุลาคม: ledger/deployment/public endpoint และ signed provider integration ของ Staging ผ่านแล้ว; flag Staging เปิด** รุ่นเดิมตรวจรายวันเท่านั้น รุ่นใหม่นี้ต้องมี durable delivery ledger ก่อนเปิด flag มิฉะนั้นหยุดส่งแทนการเสี่ยงส่งซ้ำ ไม่เพิ่ม cron หรือซื้อบริการตั้งเวลา Webhook เป็นตัวกระตุ้นให้อ่านยอดจริงจาก Usage API จึงไม่มีการตรวจเป็นช่วงเวลาขณะที่ไม่มี event ยังไม่ได้บังคับยอดให้ถึงเกณฑ์เพื่อส่งอีเมลเตือนจริง และ Production ยังปิด
+**Checkpoint 19 ตุลาคม:** ledger/deployment/public endpoint และ signed provider integration ของ Staging ผ่านขณะเปิด flagทดสอบ **ปัจจุบัน Stageflagปิดและย้าย webhookไปProductionแล้ว** รุ่นเดิมตรวจรายวันเท่านั้น รุ่นใหม่นี้ต้องมี durable delivery ledger ก่อนเปิด flag มิฉะนั้นหยุดส่งแทนการเสี่ยงส่งซ้ำ ไม่เพิ่ม cron หรือซื้อบริการตั้งเวลา Webhook เป็นตัวกระตุ้นให้อ่านยอดจริงจาก Usage API จึงไม่มีการตรวจเป็นช่วงเวลาขณะที่ไม่มี event ยังไม่ได้บังคับยอดให้ถึงเกณฑ์เพื่อส่งอีเมลเตือนจริง ผล Productionที่เปิดในวันที่20ตุลาคมบันทึกไว้ด้านบน
 
 ทำทีละขั้นบน Staging ก่อน โดยไม่ส่ง key/secret มาในแชท:
 
 1. **เสร็จแล้ว:** เจ้าของสร้าง **`korkru-staging-quota-monitor`** แบบ **Full access** และเก็บค่าใน Vercel เอง `GET /usage` ใช้ Sending access ไม่ได้ จึงแยกจาก SMTP key ที่จำกัดโดเมน ไม่ต้องสร้างซ้ำหรือส่งค่า key ในแชท
-2. **เสร็จแล้วเฉพาะ Staging:** ปล่อย migration CLI **`20261018154826_resend_quota_alert_delivery_ledger.sql`** เพียงไฟล์เดียว ตรวจ history รวม **162 รายการ**, ledger เปิด RLS, browser ไม่มี direct grants และ RPC เปิดเฉพาะ service role ผ่านแล้ว ก่อนหน้านี้ CLI `migration list --linked` ติด `LegacyProjectNotLinkedError` และ live history เทียบไฟล์มีความต่าง จึงไม่ได้ใช้ db push/reset/replay เพื่อข้ามความต่างหรือปล่อย migration SEB ที่พักไว้ หลักฐาน apply รอบนี้ไม่ครอบคลุม Production
-3. **ตั้งแล้ว:** Vercel project **`jk`** → Settings → Environment Variables มี API key/signing secret/from/to **เฉพาะ Preview ของ gitBranch `staging`** แล้ว ไม่เพิ่มสำเนา Preview แบบทุก branch อีก เริ่มด้วย flag `false` ระหว่างเตรียม ก่อนเปลี่ยนเฉพาะ Staging เป็น `true` และ redeploy จนรับ signed event ผ่าน ค่าปัจจุบันของ Staging เป็น server-only:
+2. **Checkpoint Staging 19 ตุลาคม:** ปล่อย migration CLI **`20261018154826_resend_quota_alert_delivery_ledger.sql`** เพียงไฟล์เดียว ตรวจ history รวม **162 รายการ**, ledger เปิด RLS, browser ไม่มี direct grants และ RPC เปิดเฉพาะ service role ผ่านแล้ว ก่อนหน้านี้ CLI `migration list --linked` ติด `LegacyProjectNotLinkedError` และ live history เทียบไฟล์มีความต่าง จึงไม่ได้ใช้ db push/reset/replay เพื่อข้ามความต่างหรือปล่อย migration SEB ที่พักไว้ หลักฐานรอบStagingนี้แยกจาก Production applyวันที่20ตุลาคมตามrelease record
+3. **ตั้งแล้ว:** Vercel project **`jk`** → Settings → Environment Variables มี API key/signing secret/from/to **เฉพาะ Preview ของ gitBranch `staging`** แล้ว ไม่เพิ่มสำเนา Preview แบบทุก branch อีก เริ่มด้วย flag `false` ระหว่างเตรียม เคยเปลี่ยนเฉพาะ Stagingเป็น `true` และ redeployจน signed eventผ่าน วันที่20ตุลาคมปิดกลับก่อนcutover ค่าปัจจุบันของ Stagingเป็น server-onlyและปิด monitor:
 
 ```dotenv
 KORKRU_DEPLOYMENT_ENV=staging
-RESEND_QUOTA_ALERTS_ENABLED=true
+RESEND_QUOTA_ALERTS_ENABLED=false
 RESEND_QUOTA_API_KEY=key_full_access_ที่เก็บเป็น_secret
 RESEND_QUOTA_WEBHOOK_SECRET=signing_secret_ของ_endpoint_ที่ตั้งไว้
 RESEND_QUOTA_ALERT_FROM=auth@mail.korkru.com
@@ -95,20 +101,15 @@ RESEND_QUOTA_ALERT_TO=korkru.me@gmail.com
 5. **เสร็จแล้ว:** โค้ด Staging `8cd3919` ขึ้น Ready และเจ้าของบันทึก endpoint เดิมเป็น **`https://jk-resend-staging-korkru-mes-projects.vercel.app/api/webhooks/resend`** พร้อม events **`email.sent` และ `email.received`** แล้ว ไม่ใช้ URL เว็บ Staging เดิมที่ติด Vercel sign-in
 6. **ผ่านแล้ว:** provider POST ถึง public endpoint นี้ได้จริงผ่าน alias-scoped protection override และ WAF guard ที่เจาะจง POST/path ตามข้างต้น **ไม่ปิด protection ของทั้งเว็บหรือเผย bypass secret ในแชท/URL/log** Session ของผู้ทดสอบไม่ใช่หลักฐาน reachability; หลักฐานคือ signed delivery และ Preview log ที่ตรงกัน
 7. **ผ่านแล้วบน Staging:** เปิด flag และ redeploy จากนั้น signed event จริงได้ Success/HTTP 200/`below_threshold` หลังหน่วงประมาณ 177 วินาที ก่อนเปิด Production ต้องรักษาขอบเขตผลนี้: ยืนยันการรับ event/อ่าน Usage แล้ว แต่ยังไม่ใช่หลักฐานส่งอีเมลเตือนจริงเมื่อข้ามจุดเกณฑ์ทั้งหก การเปลี่ยน env ครั้งต่อไปยังต้อง redeploy; หาก readiness ล้มเหลวให้ปิด flag กลับและแก้สาเหตุ
-8. หลัง Staging ผ่านจึงเตรียม Production: monitor/SMTP key และ webhook signing secret คนละค่ากับ Staging, ledger migration ที่ตรวจ history แล้ว และ `KORKRU_DEPLOYMENT_ENV=production` Free มี webhook endpoint **1 แห่ง** จึงใช้ endpoint เดิมทดสอบ Staging ก่อน แล้วค่อยย้ายไป **`https://www.korkru.com/api/webhooks/resend`** พร้อมหยุด Staging monitor อย่าสร้างหลายบัญชีเพื่อหลบโควตา การเปลี่ยน environment เป็น scope ใหม่จึงต้องตรวจประวัติแจ้งเตือนที่ส่งจริงก่อนย้าย เพื่อจัดการระดับที่อาจแจ้งซ้ำในรอบเดือนนั้น
+8. **เสร็จแล้ว 20 ตุลาคม:** เตรียม monitor key/signing secretคนละค่ากับ Staging, apply ledgerเฉพาะไฟล์ที่ตรวจ historyแล้ว และ scopeproduction จากนั้นปิดStageและย้าย endpointเดิมไป **`https://www.korkru.com/api/webhooks/resend`** เพราะ Freeมี1endpoint ไม่สร้างหลายบัญชีเพื่อหลบโควตา ตรวจประวัติ/ledgerก่อนและหลังย้ายแล้วไม่พบalert receipts การแยกkeyไม่ได้แยกteamquota ProductionSMTPเป็นงานต่างหากที่ยังไม่เปิด
 
 โควตาเป็นยอดของ **Resend team รวมทั้งส่งและรับ** การแยก SMTP/monitor key หรือ environment ไม่ได้แยกโควตาให้ใหม่ ([Usage API](https://resend.com/docs/api-reference/usage/retrieve-usage), [Pricing](https://resend.com/pricing)) Production SMTP, Google และ SEB ไม่ได้เปิดเพิ่มจากงานนี้
 
-### เริ่มเตรียม Production — เจ้าของอนุญาต 19 ตุลาคม 2026
+### ประวัติเตรียม Production — 19–20 ตุลาคม 2026
 
-เจ้าของขอให้ตั้งแจ้งเตือน 80/90/95 ทั้งรายวันและรายเดือนบน Production แบบทีละขั้นตอนแล้ว ขอบเขตนี้เป็น quota monitor เท่านั้น ไม่เปิด Production SMTP/Google หรือปล่อย SEB เพิ่ม การตรวจรอบแรกเป็น read-only ยังไม่มีการสร้าง key, แก้ env/webhook, apply migration หรือ deploy Production ใหม่
+เจ้าของอนุญาต quota monitorแบบทีละขั้นตอนวันที่19ตุลาคม ไม่รวมเปิด ProductionSMTP/Google/SEB Snapshotแรกที่ `9004e96` ยังเป็น daily-only80/90/97 และ history149ก่อนreleaseอื่นเดินต่อ จึงเลือกเฉพาะ `0352be1` และไม่ใช้ broad db push จาก auth/Staging checkout
 
-- ผลตรวจครั้งแรก19ตุลาคม: Production Ready ที่ `9004e96` ตรง `origin/master` ยังเป็น daily-only 80/90/97 ไม่มี durable store เลือกเฉพาะ implementation commit `0352be1` เป็นขอบเขต candidate จาก master ไม่ merge Staging/auth release ทั้ง branch เพราะมีงานอื่น ขึ้น Production แล้วต้อง sync เฉพาะส่วนนี้และ dependency ที่จำเป็นสู่ primary `localhost:3000` ตาม release workflow โดยรักษางานคำถาม/deadlineที่ dirty อยู่
-- Production Supabase history จาก MCP มี149รายการ ล่าสุด `20261018133739`; ledger migration `20261018154826` และ quota table/RPC ยังไม่มี เทียบชื่อไฟล์กับ auth release พบ local-only13รายการ = quota1 + SEBที่พักไว้12 ไม่มี remote-only ต้องตรวจ CLI migration list ก่อนเขียนและใช้ isolated Production history baseline พร้อม quota migrationเดียว ห้าม db push checkout นี้หรือใช้ Staging baseline เพราะ Production มี retention/grading ที่ต่างกัน
-- Vercel metadata มี Production scope/flag/service-role key อยู่แล้ว แต่ยังไม่มี quota API key/signing secret/from/to ฝั่ง Production การอ่านรอบนี้เก็บเฉพาะชื่อ/target/type ค่าของ scope/flagยังยืนยันจาก metadataไม่ได้ จึงต้องตรวจว่า flagเป็นfalseก่อนบันทึกค่าใหม่หรือเปิดระบบ ไม่อ่าน/บันทึกค่าลับ
-- เปิด Resend Add API Key form และเตรียมชื่อ `korkru-production-quota-monitor`, Permission Full access, Domain All domains ไว้ให้เจ้าของกด Add และเก็บค่าตัวเต็มเอง **เจ้าของยืนยันวันที่20ตุลาคมว่าสร้างแล้ว** ไม่ขอ key หรือ signing secret ผ่านแชท
-
-**20ตุลาคม — คีย์ Vercel บันทึกแล้ว; from/to รอ Save:** เจ้าของยืนยันบันทึก `RESEND_QUOTA_API_KEY` แล้ว ตรวจ UIและAPI metadataพบ Type sensitive เฉพาะtarget Production/gitBranch null ขณะที่คีย์ Stagingยังเป็นPreview→stagingตามเดิม ไม่มีbroad Preview duplicates ไม่อ่านค่าคีย์ การตรวจ UIก่อนเพิ่มคีย์ยืนยัน `RESEND_QUOTA_ALERTS_ENABLED` แถว **Production เป็น `false`** โดยไม่แก้ค่า จากนั้นเตรียม Add Environment Variableสองรายการแบบ Secret/Productionเท่านั้น: `RESEND_QUOTA_ALERT_FROM=auth@mail.korkru.com` และ `RESEND_QUOTA_ALERT_TO=korkru.me@gmail.com` กรอกค่าให้ตรวจทานแล้ว **ยังรอเจ้าของกด Save** metadataก่อนเตรียมยังไม่มีfrom/toหรือwebhooksecretฝั่งProduction ยังไม่ redeploy คงขั้นถัดไปเป็น signing secret, scoped code/ledger/deployment และ webhook cutoverตามลำดับ readiness ตรวจ source/deploymentใหม่พบ Production/masterขยับเป็น **`949c44d` Ready** และ Staging`1916b46`; quota preimageยังตรง parentของ`0352be1` จึงคง candidateเฉพาะโควตาได้ ไม่มีpackagechangeจำเป็นบนProduction ต้องตรวจhistoryฐานข้อมูลใหม่ก่อน applyเพราะมีreleaseอื่นแทรก และรักษางานdirtyของprimarylocalhostไว้
+วันที่20ตุลาคมเจ้าของสร้าง Productionmonitor keyเองและบันทึกkey/from/to จากนั้นยืนยันกล่อง RotateและSave signing secretเอง ตรวจUI/metadataโดยไม่อ่านค่าลับ ตั้งscopeproduction เก็บflagfalseจน code/ledgerพร้อม แล้วทำquiescence/cutoverตามrelease recordด้านบน Stateระหว่างเตรียมที่ยังรอSaveถูกแทนด้วย **ผลปัจจุบันProductionเปิดแล้ว/Stageปิด** ไม่ต้องสร้างkey/หมุนsecret/ส่งTESTemailซ้ำเพื่อยืนยันงานที่ผ่านแล้ว
 
 ## ระบบเตือนทำอะไรบ้าง
 
