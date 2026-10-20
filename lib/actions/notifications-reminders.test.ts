@@ -4,10 +4,15 @@ const mocks = vi.hoisted(() => ({ createClient: vi.fn(), createAdminClient: vi.f
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: mocks.createAdminClient }))
 vi.mock('@/lib/auth/assignment-access', () => ({ canManageAssignment: mocks.canManageAssignment }))
-import { acknowledgeAssignmentReminder, getPendingAssignmentReminders, notifyNonSubmitters } from './notifications'
+vi.mock('server-only', () => ({}))
+import {
+  acknowledgeAssignmentNotice, acknowledgeAssignmentReminder, getPendingAssignmentNotices,
+  getPendingAssignmentReminders, notifyNonSubmitters,
+} from './notifications'
+import { notifyAssignmentPublished } from '@/lib/assignment-publication-notifications'
 
 type Row = Record<string, unknown>
-type Filter = { op: 'eq' | 'in' | 'gte'; field: string; value: unknown }
+type Filter = { op: 'eq' | 'in' | 'gte' | 'not-null'; field: string; value: unknown }
 type Query = {
   client: 'session' | 'admin'; table: string; operation: 'read' | 'insert' | 'update';
   columns: string; filters: Filter[]; orders: { field: string; ascending: boolean }[];
@@ -36,6 +41,7 @@ function client(kind: 'session' | 'admin') {
         if (fail?.(query)) return { data: null, error: { message: 'private database detail' } }
         const matches = (row: Row) => query.filters.every(filter => {
           const value = row[filter.field]
+          if (filter.op === 'not-null') return value !== null && value !== undefined
           return filter.op === 'eq' ? value === filter.value : filter.op === 'in'
             ? (filter.value as unknown[]).includes(value) : String(value) >= String(filter.value)
         })
@@ -64,6 +70,10 @@ function client(kind: 'session' | 'admin') {
         select: (columns: string) => { query.columns = columns; return builder },
         eq: (field: string, value: unknown) => { query.filters.push({ op: 'eq', field, value }); return builder },
         in: (field: string, value: unknown[]) => { query.filters.push({ op: 'in', field, value }); return builder },
+        not: (field: string, operator: string, value: unknown) => {
+          if (operator !== 'is' || value !== null) throw new Error('unsupported mock filter')
+          query.filters.push({ op: 'not-null', field, value }); return builder
+        },
         gte: (field: string, value: unknown) => { query.filters.push({ op: 'gte', field, value }); return builder },
         order: (field: string, options?: { ascending?: boolean }) => { query.orders.push({ field, ascending: options?.ascending ?? true }); return builder },
         range: (from: number, to: number) => { query.range = [from, to]; return builder },
@@ -291,7 +301,7 @@ describe('student reminder inbox', () => {
     expect(result.reminders[0].assignmentTitle).toBe('งานที่มอบหมาย')
     const assignmentRead = calls.findIndex(query => query.table === 'assignments')
     expect(assignmentRead).toBeGreaterThan(0)
-    expect(calls[assignmentRead]).toMatchObject({ client: 'admin', columns: 'id, title, end_at, created_by' })
+    expect(calls[assignmentRead]).toMatchObject({ client: 'admin', columns: 'id, title, end_at, due_at, start_at, created_by, type, mode' })
     expect(hasFilter(calls[assignmentRead], 'id', [ASSIGNMENT], 'in')).toBe(true)
     expect(hasFilter(calls[assignmentRead], 'status', 'published')).toBe(true)
     expect(hasFilter(calls[assignmentRead], 'mode', 'online')).toBe(true)
@@ -476,5 +486,246 @@ describe('reminder acknowledgement', () => {
     useStudent(); fail = query => query.operation === 'update'
     expect(await acknowledgeAssignmentReminder(NOTICE)).toHaveProperty('error')
     expect(tables.notifications[0].is_read).toBe(false)
+  })
+})
+
+describe('published-work notification fanout', () => {
+  function addRoom(room = OTHER_ROOM, teacher = TEACHER) {
+    tables.classrooms.push({ id: room, teacher_id: teacher, status: 'active', name: 'ห้องที่สอง' })
+    tables.assignment_classrooms.push({ assignment_id: ASSIGNMENT, classroom_id: room, group_ids: null })
+  }
+
+  it('binds the internal publisher actor to verified Auth rather than trusting the supplied actor ID', async () => {
+    expect(await notifyAssignmentPublished(ASSIGNMENT, OTHER_TEACHER)).toHaveProperty('error')
+    expect(mocks.canManageAssignment).not.toHaveBeenCalled()
+    expect(mocks.createAdminClient).not.toHaveBeenCalled()
+    expect(inserted()).toEqual([])
+  })
+
+  it.each(['invalid-id', 'missing', 'auth-error', 'inactive', 'student', 'guardian', 'no-assignment-authority'])('requires active exact teaching authority (%s)', async reason => {
+    if (reason === 'missing') actor = null
+    if (reason === 'auth-error') authError = new Error('expired')
+    if (reason === 'inactive') tables.users[0].status = 'suspended'
+    if (reason === 'student' || reason === 'guardian') tables.users[0].role = reason
+    if (reason === 'no-assignment-authority') mocks.canManageAssignment.mockResolvedValue(false)
+    expect(await notifyAssignmentPublished(reason === 'invalid-id' ? 'invalid' : ASSIGNMENT, TEACHER)).toHaveProperty('error')
+    expect(inserted()).toEqual([])
+    expect(mocks.createAdminClient).not.toHaveBeenCalled()
+  })
+
+  it.each([{ status: 'draft' }, { status: 'closed' }, { mode: 'print' }, { type: 'survey' }])('does not publish notices for ineligible canonical work (%j)', async change => {
+    Object.assign(tables.assignments[0], change)
+    expect(await notifyAssignmentPublished(ASSIGNMENT, TEACHER)).toHaveProperty('error')
+    expect(mocks.createAdminClient).not.toHaveBeenCalled()
+    expect(inserted()).toEqual([])
+  })
+
+  it.each(['foreign-owner', 'view-only', 'missing-session-room', 'archived'])('authorizes every canonical room before any learner read, including links hidden by session RLS (%s)', async reason => {
+    addRoom(OTHER_ROOM, OTHER_TEACHER)
+    if (reason === 'view-only') tables.classroom_co_teachers.push({ classroom_id: OTHER_ROOM, user_id: TEACHER, permission: 'view' })
+    if (reason === 'missing-session-room') tables.classrooms = tables.classrooms.filter(row => row.id !== OTHER_ROOM)
+    if (reason === 'archived') tables.classrooms[1].status = 'archived'
+    expect(await notifyAssignmentPublished(ASSIGNMENT, TEACHER)).toHaveProperty('error')
+    expect(calls.some(query => query.client === 'admin' && ['classroom_students', 'classroom_group_members', 'users', 'submissions', 'notifications'].includes(query.table))).toBe(false)
+    expect(inserted()).toEqual([])
+  })
+
+  it.each(['admin', 'manage'])('allows exact %s co-teacher authority across all linked rooms', async permission => {
+    addRoom(OTHER_ROOM, OTHER_TEACHER)
+    tables.classroom_co_teachers.push({ classroom_id: OTHER_ROOM, user_id: TEACHER, permission })
+    expect(await notifyAssignmentPublished(ASSIGNMENT, TEACHER)).toEqual({ success: true, notified: 3 })
+  })
+
+  it.each(['exercise', 'exam'])('creates durable assigned-work notices for %s with canonical org and student classroom href', async type => {
+    tables.assignments[0].type = type
+    expect(await notifyAssignmentPublished(ASSIGNMENT, TEACHER)).toEqual({ success: true, notified: 3 })
+    expect(inserted()).toEqual([STUDENT, STUDENT_B, STUDENT_C].map(recipient_id => ({
+      recipient_id, org_id: ORG, actor_id: TEACHER, type: 'classroom_post', related_assignment_id: ASSIGNMENT,
+      related_classroom_id: ROOM, title: `${type === 'exam' ? 'มีข้อสอบใหม่' : 'มีแบบฝึกหัดใหม่'}: งานที่มอบหมาย`,
+      body: 'ครูมอบหมายงานใหม่ให้คุณ กรุณาตรวจรายละเอียดและกำหนดส่งในห้องเรียน', link: `/classrooms/${ROOM}`,
+    })))
+    expect(inserted().every(row => !String(row.link).includes('/take'))).toBe(true)
+  })
+
+  it('sends once per recipient across overlapping room rosters and selects the first currently group-eligible room', async () => {
+    addRoom()
+    tables.classroom_students = [
+      { classroom_id: ROOM, student_id: STUDENT }, { classroom_id: ROOM, student_id: STUDENT_B },
+      { classroom_id: OTHER_ROOM, student_id: STUDENT }, { classroom_id: OTHER_ROOM, student_id: STUDENT_B },
+    ]
+    tables.assignment_classrooms[0].group_ids = [GROUP]
+    tables.classroom_group_members = [
+      { classroom_id: ROOM, student_id: STUDENT, group_id: GROUP },
+      { classroom_id: ROOM, student_id: STUDENT_B, group_id: OTHER_GROUP },
+    ]
+    expect(await notifyAssignmentPublished(ASSIGNMENT, TEACHER)).toEqual({ success: true, notified: 2 })
+    expect(inserted().map(row => [row.recipient_id, row.related_classroom_id])).toEqual([[STUDENT, ROOM], [STUDENT_B, OTHER_ROOM]])
+  })
+
+  it('targets only active current students and excludes any earlier completed attempt', async () => {
+    tables.users[2].status = 'suspended'
+    tables.submissions = [
+      { id: uuid(1, 8), assignment_id: ASSIGNMENT, student_id: STUDENT, status: 'submitted' },
+      { id: uuid(2, 8), assignment_id: ASSIGNMENT, student_id: STUDENT, status: 'in_progress' },
+    ]
+    expect(await notifyAssignmentPublished(ASSIGNMENT, TEACHER)).toEqual({ success: true, notified: 1 })
+    expect(inserted().map(row => row.recipient_id)).toEqual([STUDENT_C])
+  })
+
+  it('lifetime dedupe includes read rows in any room but not explicit reminders or ordinary classroom posts', async () => {
+    tables.notifications = [
+      notification({ type: 'classroom_post', is_read: true, related_classroom_id: OTHER_ROOM, created_at: '2025-10-20T12:00:00Z' }),
+      notification({ id: uuid(2, 7), recipient_id: STUDENT_B }),
+      notification({ id: uuid(3, 7), recipient_id: STUDENT_C, type: 'classroom_post', related_assignment_id: null }),
+    ]
+    expect(await notifyAssignmentPublished(ASSIGNMENT, TEACHER)).toEqual({ success: true, notified: 2 })
+    expect(inserted().map(row => row.recipient_id)).toEqual([STUDENT_B, STUDENT_C])
+    expect(await notifyAssignmentPublished(ASSIGNMENT, TEACHER)).toEqual({ success: true, notified: 0 })
+  })
+
+  it('later audience changes notify only newly reached recipients without reopening previous receipts', async () => {
+    tables.classroom_students = [{ classroom_id: ROOM, student_id: STUDENT }]
+    expect(await notifyAssignmentPublished(ASSIGNMENT, TEACHER)).toEqual({ success: true, notified: 1 })
+    tables.notifications[0].is_read = true
+    tables.classroom_students.push({ classroom_id: ROOM, student_id: STUDENT_B })
+    expect(await notifyAssignmentPublished(ASSIGNMENT, TEACHER)).toEqual({ success: true, notified: 1 })
+    expect(tables.notifications.map(row => row.recipient_id)).toEqual([STUDENT, STUDENT_B])
+  })
+
+  it.each(['assignments', 'assignment_classrooms', 'classrooms', 'classroom_co_teachers', 'classroom_students', 'users', 'notifications', 'submissions'])('fails closed on a %s read error without leaking diagnostics', async table => {
+    fail = query => query.table === table && query.operation === 'read'
+    const result = await notifyAssignmentPublished(ASSIGNMENT, TEACHER)
+    expect(result).toHaveProperty('error')
+    expect(JSON.stringify(result)).not.toContain('private database detail')
+    expect(inserted()).toEqual([])
+  })
+
+  it('reads all eligible rosters before inserting so a second-room read failure does not partly fan out', async () => {
+    addRoom()
+    fail = query => query.table === 'classroom_students' && hasFilter(query, 'classroom_id', OTHER_ROOM)
+    expect(await notifyAssignmentPublished(ASSIGNMENT, TEACHER)).toHaveProperty('error')
+    expect(inserted()).toEqual([])
+  })
+
+  it('fails closed on malformed group targets and membership read failures', async () => {
+    tables.assignment_classrooms[0].group_ids = ['invalid']
+    expect(await notifyAssignmentPublished(ASSIGNMENT, TEACHER)).toHaveProperty('error')
+    tables.assignment_classrooms[0].group_ids = [GROUP]
+    fail = query => query.table === 'classroom_group_members'
+    expect(await notifyAssignmentPublished(ASSIGNMENT, TEACHER)).toHaveProperty('error')
+    expect(inserted()).toEqual([])
+  })
+
+  it('paginates canonical room links, rosters, lifetime dedupe and attempts with bounded filters/inserts', async () => {
+    const ids = Array.from({ length: 1003 }, (_, i) => uuid(i + 1, 2))
+    tables.classroom_students = ids.map(student_id => ({ student_id, classroom_id: ROOM }))
+    tables.users.push(...ids.slice(3).map(id => ({ id, role: 'student', status: 'active' })))
+    tables.notifications = Array.from({ length: 1000 }, (_, i) => notification({ id: uuid(i + 1, 7), type: 'classroom_post' }))
+    tables.notifications.push(notification({ id: uuid(1001, 7), type: 'classroom_post', recipient_id: STUDENT_B }))
+    tables.submissions = Array.from({ length: 1000 }, (_, i) => ({ id: uuid(i + 1, 8), assignment_id: ASSIGNMENT, student_id: STUDENT_C, status: 'graded' }))
+    tables.submissions.push({ id: uuid(1001, 8), assignment_id: ASSIGNMENT, student_id: ids[3], status: 'submitted' })
+    expect(await notifyAssignmentPublished(ASSIGNMENT, TEACHER)).toEqual({ success: true, notified: 999 })
+    for (const table of ['classroom_students', 'notifications', 'submissions']) {
+      expect(calls).toContainEqual(expect.objectContaining({ table, range: [1000, 1999] }))
+    }
+    expect(calls.flatMap(query => query.filters.filter(filter => filter.op === 'in')).every(filter => (filter.value as unknown[]).length <= 200)).toBe(true)
+    expect(calls.filter(query => query.operation === 'insert').every(query => query.values.length <= 200)).toBe(true)
+  })
+
+  it('does not overlook an unauthorized linked room past the first 1,000 links', async () => {
+    tables.assignment_classrooms = Array.from({ length: 1001 }, (_, i) => ({ assignment_id: ASSIGNMENT, classroom_id: uuid(i + 1, 4), group_ids: null }))
+    tables.classrooms = Array.from({ length: 1000 }, (_, i) => ({ id: uuid(i + 1, 4), teacher_id: TEACHER, status: 'active' }))
+    expect(await notifyAssignmentPublished(ASSIGNMENT, TEACHER)).toHaveProperty('error')
+    expect(calls).toContainEqual(expect.objectContaining({ table: 'assignment_classrooms', range: [1000, 1999] }))
+    expect(calls.some(query => query.table === 'classroom_students')).toBe(false)
+    expect(inserted()).toEqual([])
+  })
+
+  it('reports a partial insert failure while retaining confirmed delivery counts', async () => {
+    const ids = Array.from({ length: 201 }, (_, i) => uuid(i + 1, 2))
+    tables.classroom_students = ids.map(student_id => ({ student_id, classroom_id: ROOM }))
+    tables.users.push(...ids.slice(3).map(id => ({ id, role: 'student', status: 'active' })))
+    let batch = 0
+    fail = query => query.operation === 'insert' && ++batch === 2
+    const result = await notifyAssignmentPublished(ASSIGNMENT, TEACHER)
+    expect(result).toEqual({ error: 'เผยแพร่งานแล้วและแจ้งนักเรียนสำเร็จ 200 คน แต่ยังแจ้งไม่ครบ กรุณาบันทึกการมอบหมายอีกครั้ง' })
+    expect(tables.notifications).toHaveLength(200)
+  })
+})
+
+describe('assigned-work student inbox', () => {
+  function useAssigned() { useStudent(); tables.notifications[0].type = 'classroom_post' }
+
+  it.each(['exercise', 'exam'])('loads canonical %s metadata with classroom destination and separate dates, never stored credentials/text/link', async type => {
+    useAssigned()
+    Object.assign(tables.assignments[0], { type, due_at: '2026-10-25T12:00:00Z', start_at: '2026-10-21T12:00:00Z', access_code: 'private access code' })
+    expect(await getPendingAssignmentNotices()).toEqual({ notices: [{
+      id: NOTICE, assignmentId: ASSIGNMENT, classroomId: ROOM, assignmentTitle: 'งานที่มอบหมาย', classroomName: 'ห้องฟิสิกส์',
+      teacherName: 'ครูเจ้าของงาน', createdAt: NOW, endAt: '2026-10-30T12:00:00Z', href: `/classrooms/${ROOM}`,
+      inProgress: false, kind: 'assigned', assignmentType: type, mode: 'online', dueAt: '2026-10-25T12:00:00Z', startAt: '2026-10-21T12:00:00Z',
+    }] })
+    expect(calls.some(query => query.client === 'session' && query.table === 'assignments')).toBe(false)
+    expect(calls.filter(query => query.table === 'assignments').every(query => !query.columns.includes('access_code') && query.columns !== '*')).toBe(true)
+    expect(await getPendingAssignmentReminders()).toEqual({ reminders: [] })
+  })
+
+  it('keeps assigned/reminder receipts independent and returns assigned work before an explicit reminder', async () => {
+    useAssigned()
+    tables.notifications.push(notification({ id: NEW_NOTICE, created_at: '2026-10-20T13:00:00Z' }))
+    expect((await getPendingAssignmentNotices()).notices.map(row => row.kind)).toEqual(['assigned', 'reminder'])
+    expect(await acknowledgeAssignmentNotice(NOTICE)).toEqual({ success: true })
+    expect((await getPendingAssignmentNotices()).notices.map(row => row.id)).toEqual([NEW_NOTICE])
+    expect(await acknowledgeAssignmentReminder(NEW_NOTICE)).toEqual({ success: true })
+    expect(await getPendingAssignmentNotices()).toEqual({ notices: [] })
+  })
+
+  it('acknowledges the exact own assigned-work row and never accepts an ordinary classroom post', async () => {
+    useAssigned()
+    expect(await acknowledgeAssignmentReminder(NOTICE)).toHaveProperty('error')
+    expect(await acknowledgeAssignmentNotice(NOTICE)).toEqual({ success: true })
+    const update = calls.filter(query => query.operation === 'update').at(-1)!
+    expect(hasFilter(update, 'recipient_id', STUDENT)).toBe(true)
+    expect(hasFilter(update, 'type', ['assignment_reminder', 'classroom_post'], 'in')).toBe(true)
+    expect(hasFilter(update, 'related_assignment_id', null, 'not-null')).toBe(true)
+    tables.notifications[0].is_read = false
+    tables.notifications[0].related_assignment_id = null
+    expect(await acknowledgeAssignmentNotice(NOTICE)).toHaveProperty('error')
+    expect(tables.notifications[0].is_read).toBe(false)
+    expect(await getPendingAssignmentNotices()).toEqual({ notices: [] })
+  })
+
+  it.each(['no-roster', 'unlinked', 'wrong-group', 'draft', 'already-submitted', 'other-recipient', 'ordinary-post'])('suppresses ineligible assigned notices (%s)', async reason => {
+    useAssigned()
+    if (reason === 'no-roster') tables.classroom_students = []
+    if (reason === 'unlinked') tables.assignment_classrooms = []
+    if (reason === 'wrong-group') tables.assignment_classrooms[0].group_ids = [GROUP]
+    if (reason === 'draft') tables.assignments[0].status = 'draft'
+    if (reason === 'already-submitted') tables.submissions = [{ id: uuid(1, 8), assignment_id: ASSIGNMENT, student_id: STUDENT, status: 'submitted' }]
+    if (reason === 'other-recipient') tables.notifications[0].recipient_id = STUDENT_B
+    if (reason === 'ordinary-post') tables.notifications[0].related_assignment_id = null
+    expect(await getPendingAssignmentNotices()).toEqual({ notices: [] })
+  })
+
+  it('ignores forged notification actor/title/link and refuses unrelated IDs before privilege', async () => {
+    useAssigned()
+    Object.assign(tables.notifications[0], { actor_id: OTHER_TEACHER, title: 'forged', link: '/assignments/private/take', related_assignment_id: OTHER_ASSIGNMENT })
+    expect(await getPendingAssignmentNotices()).toEqual({ notices: [] })
+    expect(mocks.createAdminClient).not.toHaveBeenCalled()
+  })
+
+  it('does not claim an empty completed inbox on canonical metadata or author read errors', async () => {
+    useAssigned()
+    fail = query => query.client === 'admin' && query.table === 'assignments'
+    expect(await getPendingAssignmentNotices()).toHaveProperty('error')
+    fail = query => query.client === 'admin' && query.table === 'users'
+    expect(await getPendingAssignmentNotices()).toHaveProperty('error')
+  })
+
+  it('reads old owned notice history past ordinary classroom-post rows on the first page', async () => {
+    useAssigned()
+    tables.notifications = Array.from({ length: 1000 }, (_, i) => notification({ id: uuid(i + 1, 7), type: 'classroom_post', related_assignment_id: null, created_at: '2026-10-21T12:00:00Z' }))
+    tables.notifications.push(notification({ id: uuid(1001, 7), type: 'classroom_post' }))
+    expect((await getPendingAssignmentNotices()).notices.map(row => row.id)).toEqual([uuid(1001, 7)])
+    expect(calls).toContainEqual(expect.objectContaining({ table: 'notifications', range: [1000, 1999] }))
   })
 })

@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { notifyAssignmentPublished } from '@/lib/assignment-publication-notifications'
+import { ASSIGNMENT_NOTIFICATION_WARNING } from '@/lib/assignment-publication-feedback'
 import {
   isValidResearchAccessCode,
   normalizeResearchAccessCode,
@@ -126,6 +128,19 @@ function friendlyCreateError(message: string): string {
   return 'สร้างโครงการไม่สำเร็จ ข้อมูลอาจมีการเปลี่ยนแปลง กรุณาตรวจสอบแล้วลองใหม่'
 }
 
+/** Notification delivery follows the committed research write. A delivery
+ * failure must not report that the already-created project or exam failed. */
+async function notifyPublishedResearchAssignments(assignmentIds: string[], actorId: string): Promise<string | undefined> {
+  let warning: string | undefined
+  for (const assignmentId of new Set(assignmentIds)) {
+    try {
+      const result = await notifyAssignmentPublished(assignmentId, actorId)
+      if ('error' in result) warning = ASSIGNMENT_NOTIFICATION_WARNING
+    } catch { warning = ASSIGNMENT_NOTIFICATION_WARNING }
+  }
+  return warning
+}
+
 export async function createEducationResearchProject(input: CreateEducationResearchProjectInput) {
   const parsed = createProjectSchema.safeParse(input)
   if (!parsed.success) return { error: firstValidationError(parsed.error) }
@@ -150,9 +165,29 @@ export async function createEducationResearchProject(input: CreateEducationResea
 
   if (error || !data) return { error: friendlyCreateError(error?.message ?? '') }
 
+  let notificationWarning: string | undefined
+  if ([pretest, posttest].some(measurement => measurement.source_type === 'korkru_exam' && measurement.publish_mode !== 'draft')) {
+    try {
+      // The RPC created and linked both measurements atomically. Read the
+      // actual persisted assignment IDs/statuses rather than trusting input.
+      const { data: measurements, error: measurementError } = await supabase
+        .from('education_research_measurements')
+        .select('assignment_id, assignments(status)')
+        .eq('project_id', data as string)
+      if (measurementError || !measurements?.length) notificationWarning = ASSIGNMENT_NOTIFICATION_WARNING
+      else {
+        const publishedIds = (measurements ?? []).flatMap(measurement => {
+          const assignment = Array.isArray(measurement.assignments) ? measurement.assignments[0] : measurement.assignments
+          return measurement.assignment_id && assignment?.status === 'published' ? [measurement.assignment_id] : []
+        })
+        notificationWarning = await notifyPublishedResearchAssignments(publishedIds, user.id)
+      }
+    } catch { notificationWarning = ASSIGNMENT_NOTIFICATION_WARNING }
+  }
+
   revalidatePath('/research')
   revalidatePath(`/classrooms/${parsed.data.classroom_id}`)
-  return { project_id: data as string }
+  return { project_id: data as string, notificationWarning }
 }
 
 export async function updateEducationResearchSchedule(input: z.input<typeof scheduleSchema>) {
@@ -185,7 +220,7 @@ export async function updateEducationResearchSchedule(input: z.input<typeof sche
     .from('assignments')
     .update({ status, start_at: startAt, end_at: endAt, access_code: accessCode })
     .eq('id', measurement.assignment_id)
-    .select('id')
+    .select('id, status')
     .maybeSingle()
 
   if (error || !updated) return { error: 'บันทึกกำหนดการไม่สำเร็จ กรุณาตรวจสิทธิ์และลองใหม่' }
@@ -220,7 +255,10 @@ export async function updateEducationResearchSchedule(input: z.input<typeof sche
   revalidatePath('/research')
   revalidatePath(`/research/${measurement.project_id}`)
   revalidatePath(`/assignments/${measurement.assignment_id}`)
-  return { success: true }
+  const notificationWarning = updated.status === 'published'
+    ? await notifyPublishedResearchAssignments([updated.id], user.id)
+    : undefined
+  return { success: true, notificationWarning }
 }
 
 export async function updateEducationResearchProjectDetails(input: z.input<typeof projectDetailsSchema>) {

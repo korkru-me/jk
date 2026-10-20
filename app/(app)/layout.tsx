@@ -83,7 +83,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       initialUnreadCount={initialUnreadCount}
       practiceLibraryEnabled={practiceLibraryEnabled}
     >
-      {profile.role === 'student' && <StudentAnnouncementInbox key={profile.id} initialPosts={announcementFeed.posts} initialError={announcementFeed.error} remindersEnabled />}
+      {profile.role === 'student' && <StudentAnnouncementInbox key={profile.id} initialPosts={announcementFeed.posts} initialError={announcementFeed.error} assignmentNoticesEnabled />}
       {children}
     </ShellClient>
   )

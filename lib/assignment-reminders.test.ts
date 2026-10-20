@@ -1,13 +1,45 @@
 import { describe, expect, it } from 'vitest'
 import {
-  isAssignmentReminderId, latestAssignmentReminderRecords, missingSubmissionStudentIds,
-  reminderAssignmentIsPublished, type AssignmentReminderRecord,
+  assignmentNoticeKind, isAssignmentReminderId, latestAssignmentNoticeRecords,
+  latestAssignmentReminderRecords, missingSubmissionStudentIds,
+  reminderAssignmentIsPublished, type AssignmentNoticeRecord, type AssignmentReminderRecord,
 } from './assignment-reminders'
 
 const id = (n: number) => `10000000-0000-4000-8000-${String(n).padStart(12, '0')}`
 const reminder = (n: number, change: Partial<AssignmentReminderRecord> = {}): AssignmentReminderRecord => ({
   id: id(n), related_assignment_id: id(100), related_classroom_id: id(200),
   is_read: false, created_at: '2026-10-20T02:00:00Z', ...change,
+})
+
+describe('new-work notice identity and receipts', () => {
+  const notice = (n: number, type = 'classroom_post', change: Partial<AssignmentNoticeRecord> = {}): AssignmentNoticeRecord => ({ ...reminder(n), type, ...change })
+
+  it('distinguishes assigned work from ordinary classroom posts and unrelated notification types', () => {
+    expect(assignmentNoticeKind(notice(1))).toBe('assigned')
+    expect(assignmentNoticeKind(notice(1, 'assignment_reminder'))).toBe('reminder')
+    expect(assignmentNoticeKind(notice(1, 'classroom_post', { related_assignment_id: null }))).toBeNull()
+    expect(assignmentNoticeKind(notice(1, 'grade_published'))).toBeNull()
+  })
+
+  it('acknowledging a new-work notice does not consume an explicit reminder for the same assignment', () => {
+    const explicit = notice(2, 'assignment_reminder')
+    expect(latestAssignmentNoticeRecords([notice(1, 'classroom_post', { is_read: true }), explicit])).toEqual([explicit])
+  })
+
+  it('acknowledging a reminder does not consume a new-work notice', () => {
+    const assigned = notice(1)
+    expect(latestAssignmentNoticeRecords([assigned, notice(2, 'assignment_reminder', { is_read: true })])).toEqual([assigned])
+  })
+
+  it('orders new work before explicit reminders while retaining independent newest-per-kind dedupe', () => {
+    const assigned = notice(2, 'classroom_post', { created_at: '2026-10-20T03:00:00Z' })
+    const explicit = notice(3, 'assignment_reminder', { created_at: '2026-10-20T04:00:00Z' })
+    expect(latestAssignmentNoticeRecords([notice(1), explicit, assigned])).toEqual([assigned, explicit])
+  })
+
+  it('never returns an ordinary post as a pending work popup', () => {
+    expect(latestAssignmentNoticeRecords([notice(1, 'classroom_post', { related_assignment_id: null })])).toEqual([])
+  })
 })
 
 describe('missing-hand-in reminder rules', () => {
