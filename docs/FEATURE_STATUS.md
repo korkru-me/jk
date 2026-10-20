@@ -1,5 +1,11 @@
 # Feature status
 
+## แท็บหลักในห้องเรียนครู — 20 ตุลาคม 2026 (local only; not released)
+
+ห้องเรียนรายวิชาของครูเพิ่มแท็บ “ภาพรวม / งานที่มอบหมาย” ใต้กรอบชื่อโดยอ้างอิง UI นักเรียน ภาพรวมคงประกาศและสรุปห้อง; แท็บงานเปิด ClassroomAssignmentsTab เดิมพร้อมตัวกรอง จัดกลุ่ม และมอบหมายงาน ใช้ `?view=` และ server navigation เดิม ไม่ใช้ `?tab=` ของนักเรียน ไม่เปลี่ยนเมนูด้านข้าง สิทธิ์ผู้ช่วย หรือโฮมรูม แก้การกดกลับไปแท็บเดิมระหว่างมี navigation ค้างให้คำขอล่าสุดเป็นผู้กำหนดหน้า
+
+TypeScript, token lint, diff check และ isolated Webpack production build ผ่าน ตรวจด้วย Next MCP ไม่มี compilation/runtime errors และใช้ route ข้อมูลจำลอง `/exam-screen-lab/classroom-entry` ที่ไม่อ่าน Auth/ฐานข้อมูล ทดสอบเลือกแท็บ/โหลด server payload, direct assignment URL, คง role/back query, Back/Forward, กดกลับขณะโหลด, คีย์บอร์ด/focus, dark mode, 390px/320px ไม่ล้น, ห้องว่าง, ผู้ช่วยดูอย่างเดียว และโฮมรูม ปุ่มแท็บสูง 44px ตรวจ React tree ว่าใช้คอมโพเนนต์ครูจริง ไม่ได้ทดสอบเขียนงาน/ประกาศ/ฐานข้อมูลหรือรัน unit suite เพราะไม่แก้ logic/lib ไม่มี migration; ยังไม่ push หรือ deploy Production ตามขอบเขตโลคอล
+
 ## กรอบห้องเรียนครูเห็นกวางชัดเจน — 20 ตุลาคม 2026 (local only; not released)
 
 ปรับเฉพาะหัว `TeacherViewClient`: ขอบ 2px พื้น primary จาง หัวข้อ/สถิติ/ไอคอน/ปุ่มมีสัดส่วนใหญ่ขึ้น และให้กวางจาก brand asset เดิมมีช่อง grid แยกจากปุ่มเลือก/สร้าง ห้องเรียนและการจัดการข้อมูลยังใช้พฤติกรรมเดิม เมื่อ container แคบกว่า 48rem ปุ่มอยู่แถวเต็มใต้หัวข้อกับกวาง; แถบเลือกยังแสดงจำนวนและเลือกทั้งหมดได้
