@@ -1,5 +1,16 @@
 # Feature status
 
+## Staging migration parity and real notification verification — 20 October 2026
+
+- ตามคำขอและการอนุมัติเฉพาะ Staging กู้ไฟล์ SEB ที่เคยรันจาก remote history โดยตรวจ SHA ตรงต้นฉบับ และใช้ migration เดิม `20261015132234` เพียงตัวเดียวพร้อมบันทึก applied ตรวจสดผ่าน **165 local / 165 remote** ไม่มี version ตกค้าง ข้อมูลหลักฐานเดิมไม่เปลี่ยน ไม่แตะ Production และไม่ replay migration SEB
+- Guarded runner สำหรับครู/นักเรียนสังเคราะห์อย่างละหนึ่งบัญชี ห้องและโจทย์หนึ่งชุดผ่าน Safety tests ใหม่ 59 เคส รวมกับ runner เดิม **103 เคสผ่าน** ใช้เฉพาะสอง Staging key ที่เจ้าของอนุมัติ ไม่ดึง Preview environment ทั้งชุด และไม่สร้างงาน/แจ้งเตือน/attempt แทนการกดในเว็บ
+- **Hosted E2E ผ่านจริงสองเส้นทาง:** หลังเจ้าของเข้าสู่ Vercel ตามปกติใน Chrome และตรวจ badge Staging ผู้ทดสอบเข้าสู่ระบบเป็นครูสังเคราะห์ สร้างและเผยแพร่แบบฝึกหัดไม่กำหนดส่งกับข้อสอบ ordinary-browser ที่มีวันส่ง/ปิดรับ แล้วเข้าสู่ระบบเป็นนักเรียนสังเคราะห์ เห็นชื่องาน ห้อง ผู้สอน ประเภท และกำหนดส่งตรงข้อมูลจริง กด “รับทราบ” แต่ละงานผ่าน UI และ reload แล้วไม่แสดงซ้ำ
+- Runner ยืนยัน notice ถาวรสองรายการเปลี่ยนจากยังไม่อ่านเป็นอ่านแล้วตามลำดับ และ scoped SQL ยืนยัน exam notice ID เดิมเปลี่ยน `is_read=false` เป็น `true`; **attempt เป็นศูนย์ตลอดการทดสอบ** การกรอกวันด้วย native control แสดงส่วนกำหนดเกณฑ์ส่งช้าและบันทึกเวลาตรง Asia/Bangkok ส่วน `Playwright.fill` รอบก่อนหน้าไม่เปลี่ยน React state จึงไม่ใช้เป็นหลักฐานว่าแอปมีบั๊ก
+- การทดสอบที่กลับมาทำต่อไม่เพิ่ม application code, RLS หรือ migration ใหม่ คงผล parity **165/165** จากการแก้เฉพาะ Staging ที่อนุมัติไว้ ไม่ครอบคลุม SEB, นักเรียนจริง, SMTP หรือการทดสอบ Production **ล้าง fixture ผ่านแล้ว:** runner ยืนยันลบ personal organizations และ scoped SQL แยกยืนยันบัญชีสังเคราะห์ ห้อง roster โจทย์ งาน แจ้งเตือน และ attempt เหลือศูนย์ ลบ private manifest และ temporary key file แล้ว รายละเอียดใน [STAGING_NOTIFICATION_E2E_20261020.md](STAGING_NOTIFICATION_E2E_20261020.md) บันทึกนี้แทนสถานะรอ migration/SSO และ hosted E2E ของรอบก่อน ส่วนบันทึกพัฒนารุ่นก่อนด้านล่างคงไว้เป็นประวัติ
+
+
+ขอบเขตรอบส่งมอบที่เหลือ: ตรวจเทียบ `origin/master` `983a405` กับ `origin/staging` `290c50b` แล้ว โค้ดแอปของแชทนี้ทั้งหมดอยู่บน master แล้ว ตั้งแต่ grading/teaching, gradebook/deadline extensions, ป๊อปอัปเตือนงาน และป๊อปอัปงานใหม่ รอบนี้นำขึ้นเฉพาะ guarded QA runner/ชุดทดสอบกับเอกสารผล E2E ไม่ย้ายงาน Auth/Resend/SEB หรือไฟล์ SEB history ที่กู้คืนเฉพาะ Staging และไม่มี migration ใหม่สำหรับ Production ตรวจสดแล้ว Production Ready ที่ `983a405` และโค้ดขอบเขตนี้ตรงกับ primary `localhost:3000` ทุกไฟล์ที่ตรวจ ป๊อปอัปงานใหม่/เตือนงานกับการรับทราบบนโลคอลผ่าน ไม่มี browser/Next runtime error รายละเอียดและข้อจำกัดใน [ASSIGNED_WORK_NOTICES_RELEASE_20261020.md](ASSIGNED_WORK_NOTICES_RELEASE_20261020.md)
+
 ## แท็บหลักในห้องเรียนครู — 20 ตุลาคม 2026 (Production released; local parity verified)
 
 ห้องเรียนรายวิชาของครูเพิ่มแท็บ “ภาพรวม / งานที่มอบหมาย” ใต้กรอบชื่อโดยอ้างอิง UI นักเรียน ภาพรวมคงประกาศและสรุปห้อง; แท็บงานเปิด ClassroomAssignmentsTab เดิมพร้อมตัวกรอง จัดกลุ่ม และมอบหมายงาน ใช้ `?view=` และ server navigation เดิม ไม่ใช้ `?tab=` ของนักเรียน ไม่เปลี่ยนเมนูด้านข้าง สิทธิ์ผู้ช่วย หรือโฮมรูม แก้การกดกลับไปแท็บเดิมระหว่างมี navigation ค้างให้คำขอล่าสุดเป็นผู้กำหนดหน้า
