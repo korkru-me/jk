@@ -328,7 +328,28 @@
       "missingDmarcProvenSoleWarningCause": false,
       "dnsChanged": false
     },
-    "currentBlocker": "Gmail warning disables the recovery link action despite a valid MIME anchor. Owner handoff: personally assess Looks safe only for this authenticated, self-requested 12:42 email, then report whether the link returns before continuing.",
+    "currentBlocker": "Gmail danger warning disables the valid MIME recovery link. Repair sender authentication before public use; Cloudflare owner login is pending. Owner Looks safe is not a readiness gate or a fix for other recipients.",
+    "senderAuthenticationRepairPlan": {
+      "status": "planned only; Cloudflare owner login pending; not applied",
+      "dnsType": "TXT",
+      "dnsName": "_dmarc.mail.korkru.com",
+      "dnsValue": "v=DMARC1; p=none;",
+      "ttl": "Auto",
+      "ruaIncluded": false,
+      "spfOrBounceCnamesChanged": false,
+      "enforcementUpgraded": false,
+      "dnsAuthOrTemplateChangesPerformed": false,
+      "warningMayAffectOtherRecipients": true,
+      "gmailClassificationCanVaryByRecipientAndMessage": true,
+      "ownerLooksSafeIsGlobalFix": false,
+      "freshEmailRecipients": "owner-controlled only",
+      "freshEmailRequiredResults": [
+        "dmarc=pass in authentication results",
+        "no Gmail danger warning",
+        "active recovery link with original target and no tracking rewrite"
+      ],
+      "ifWarningPersists": "Continue sender reputation, link reputation and template investigation; do not claim DMARC was the sole cause."
+    },
     "additionalEmailSentByAgent": false,
     "recoveryLinkConsumed": false,
     "productionPasswordChanged": false,
