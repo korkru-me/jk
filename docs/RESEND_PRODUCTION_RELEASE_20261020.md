@@ -21,15 +21,20 @@ Production base ยังเป็น daily-only 80/90/97 รุ่นใหม�
 
 หลักฐาน Staging ก่อนหน้า: implementation เดียวกันผ่าน signed Next HTTP fixture9กรณี, signed provider webhook→Usage APIจริง และอีเมล TEST1ฉบับDeliveredพร้อมเจ้าของยืนยันInbox วันที่19ตุลาคม รายละเอียด `RESEND_SETUP.md` ไม่ถือว่าบังคับให้ยอดจริงแตะทั้ง6thresholdและไม่ใช่ผล Production
 
-## Production ที่ยังต้องทำก่อนเปิด flag
+## Production readiness และขั้นตอนที่เหลือ
 
-1. ตรวจ `supabase migration list`/remote history ใหม่กับ Production เป้าหมายจริงจาก isolated workspace ก่อน apply เฉพาะ **20261018154826_resend_quota_alert_delivery_ledger.sql** ห้าม broad db push/replay backlog/repairประวัติเดิม ไม่ apply SEB หรือ migration ที่ไม่อยู่ใน scope ตรวจ catalog/RLS/grants/RPC แบบอ่านหลังปล่อย ไม่มีการทำ test data บน Production
-2. เก็บ monitor key/ผู้ส่ง/ผู้รับ/signing secret ใหม่ใน Vercel **Production**; คง **RESEND_QUOTA_ALERTS_ENABLED=false** จน code/ledger/config พร้อม ไม่อ่านค่าลับมาใส่ log/repo หรือคัดลอก Staging secrets
-3. ใช้ current canonical endpoint `https://www.korkru.com/api/webhooks/resend` Free มี 1 webhook จึงย้าย endpoint เดิมหลังหยุด Staging monitor ใช้ rotation เพื่อสร้าง Production signing secret ต่างค่าเดิมได้; dual-sign24hไม่ใช่ถอนoldsecretทันที คง events email.sent/email.received ตรวจ currentwindow receipts/ระดับจริงก่อนเปลี่ยน scope เพื่อกันเตือนซ้ำ
-4. เปิด Production flag/redeployเฉพาะรุ่นที่ตรวจแล้ว รอReady/sourceSHA/canonicaldomainให้ตรงก่อนสลับ provider URL ตรวจ delivery/log response แบบอ่าน ไม่ส่ง fixture/ลดเกณฑ์/ล้าง ledger หรือทำอีเมลจริงเพิ่มโดยไม่มีขอบเขตที่เจ้าของตกลง
-5. หลัง ProductionReady ต้อง sync เฉพาะ released files/deps ไป checkout ที่เสิร์ฟ **localhost:3000** จริง รักษางาน dirty question UI และ local env การตรวจที่ preview worktree/buildเพียงอย่างเดียวไม่ใช่ primary parity
+- **ฐานข้อมูลพร้อมแล้ว 20 ตุลาคม:** ตรวจ remote baseline 151 versions ตรงกันใน isolated CLI workspace `/private/tmp/korkru-quota-prod-delivery-7Gtequ` เพิ่มเฉพาะ `20261018154826_resend_quota_alert_delivery_ledger.sql` ที่ commit/push แล้วใน candidate `8478f884` Dry-run พบ pending เพียงไฟล์เดียว จากนั้น apply ไฟล์เดียวกันโดยไม่เพิ่ม roles/seeds และใช้ `--skip-vault` ไม่ replay/repair ประวัติเดิมหรือ apply SEB/backlog
+- SQL SHA-256 ที่ตรวจตรงกับ candidate: `185073728e4960988fcb4c47757dd6ba9a960eb21f6dc3dca144ed5b42d9e04c` หลัง apply history **152/152**, pending **0**
+- Post-apply read-only catalog: RLS เปิด, anon/authenticated ไม่มี table privilege หรือ RPC execute; service-role grants ถูกต้อง RPC เป็น **SECURITY INVOKER** และ `search_path` ว่าง Receipt count **0** ไม่มีการสร้างข้อมูลทดสอบบน Production
+- Fingerprints ของฟังก์ชันเดิม/table security/policies คงเดิม New WARN **0**; มี INFO ที่คาดไว้เพียง RLS-enabled/no-policy ของ service-only ledger ไม่ใช่หลักฐานว่าเปิด browser access
+- **Vercel ที่เจ้าของบันทึกแล้ว:** Production monitor key แบบ sensitive และผู้ส่ง `auth@mail.korkru.com`/ผู้รับ `korkru.me@gmail.com` Root ยืนยันแถวใน UI แล้ว ไม่อ่านหรือบันทึกค่าคีย์ Production flag คง **`RESEND_QUOTA_ALERTS_ENABLED=false`**
 
-Candidate นี้ **ยังไม่ apply SQL, เปลี่ยน env/flag/webhook, เปิด Production SMTP/Google หรือ deploy**; rootทำ rolloutแยกและต้องบันทึกผลตามจริงก่อนประกาศพร้อม Production Primarylocalยังไม่syncเพราะยังไม่มีProductionreleaseจากcandidateนี้
+1. เตรียม signing secret ใหม่สำหรับ Production และบันทึกเฉพาะ Vercel Production จากนั้น deploy code/config โดย flag ยัง `false` จนพร้อม ไม่คัดลอก Staging secrets
+2. Free มี 1 webhook จึงย้าย endpoint เดิมหลังหยุด Staging monitor ใช้ rotation สร้าง Production signing secret ต่างค่าเดิมได้; dual-sign 24 ชั่วโมงไม่ใช่ถอน old secret ทันที คง events `email.sent`/`email.received` และตรวจ current-window receipts/ระดับจริงก่อนเปลี่ยน scope เพื่อกันเตือนซ้ำ
+3. เปิด Production flag/redeploy เฉพาะรุ่นที่ตรวจแล้ว รอ Ready/source SHA/canonical domain ให้ตรงก่อนเปลี่ยน provider URL เป็น `https://www.korkru.com/api/webhooks/resend` ตรวจ delivery/log response แบบอ่าน ไม่ส่ง fixture/ลดเกณฑ์/ล้าง ledger หรือทำอีเมลจริงเพิ่มโดยไม่มีขอบเขตที่เจ้าของตกลง
+4. หลัง Production Ready ต้อง sync เฉพาะ released files/deps ไป checkout ที่เสิร์ฟ **localhost:3000** จริง รักษางาน dirty question UI และ local env การตรวจที่ preview worktree/build เพียงอย่างเดียวไม่ใช่ primary parity
+
+**แอป candidate ยังไม่ deploy; signing secret, webhook cutover และ localhost:3000 parity ยังรอ** การ apply additive ledger และบันทึก monitor/from/to ไม่ได้เปิดการส่งแจ้งเตือน Production SMTP/Google และ SEB ไม่อยู่ใน scope นี้ รอบเอกสารสถานะนี้ไม่เปลี่ยน app/SQL/env/provider และไม่รัน test/build ซ้ำจากผล `8478f884` เพราะไม่มี application change
 
 ## ข้อจำกัดและ rollback
 
