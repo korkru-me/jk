@@ -7,9 +7,10 @@ import { canManageAssignment } from '@/lib/auth/assignment-access'
 import { linkReachesGroup } from '@/lib/classroom-groups'
 import { fetchAllRows, SUPABASE_IN_FILTER_CHUNK_SIZE } from '@/lib/supabase/fetch-all-rows'
 import {
-  isAssignmentReminderId, isFinishedReminderSubmission, latestAssignmentReminderRecords,
+  assignmentNoticeKind, isAssignmentReminderId, isFinishedReminderSubmission, latestAssignmentNoticeRecords,
   missingSubmissionStudentIds, reminderAssignmentIsPublished,
-  type AssignmentReminderRecord, type PendingAssignmentReminder, type ReminderSubmission,
+  type AssignmentNoticeKind, type AssignmentNoticeRecord, type PendingAssignmentNotice,
+  type PendingAssignmentReminder, type ReminderSubmission,
 } from '@/lib/assignment-reminders'
 
 async function getAuthUser(supabase: Awaited<ReturnType<typeof createClient>>) {
@@ -192,27 +193,30 @@ async function reminderRowsForIds<T>(ids: string[], query: (chunk: string[], fro
 
 /** The notification row is recipient-owned but mutable by that recipient. Its
  * related IDs, title and link never authorize privileged assignment reads. */
-export async function getPendingAssignmentReminders(): Promise<{ reminders: PendingAssignmentReminder[]; error?: string }> {
+async function pendingAssignmentNotices(kinds: readonly AssignmentNoticeKind[]): Promise<{ notices: PendingAssignmentNotice[]; error?: string }> {
   try {
     const session = await reminderSession('student')
-    if ('error' in session) return { reminders: [], error: session.error }
+    if ('error' in session) return { notices: [], error: session.error }
     const { supabase, user } = session
+    const types = kinds.map(kind => kind === 'assigned' ? 'classroom_post' : 'assignment_reminder')
     const [history, roster] = await Promise.all([
-      fetchAllRows<AssignmentReminderRecord>((from, to) => supabase.from('notifications')
-        .select('id, related_assignment_id, related_classroom_id, is_read, created_at')
-        .eq('recipient_id', user.id).eq('type', 'assignment_reminder')
-        .order('created_at', { ascending: false }).order('id', { ascending: false }).range(from, to)),
+      fetchAllRows<AssignmentNoticeRecord>((from, to) => {
+        const query = supabase.from('notifications')
+          .select('id, type, related_assignment_id, related_classroom_id, is_read, created_at').eq('recipient_id', user.id)
+        const scoped = types.length === 1 ? query.eq('type', types[0]) : query.in('type', types)
+        return scoped.order('created_at', { ascending: false }).order('id', { ascending: false }).range(from, to)
+      }),
       fetchAllRows<{ classroom_id: string }>((from, to) => supabase.from('classroom_students')
         .select('classroom_id').eq('student_id', user.id).order('classroom_id').range(from, to)),
     ])
-    if (history.error || roster.error) return { reminders: [], error: REMINDER_READ_ERROR }
+    if (history.error || roster.error) return { notices: [], error: REMINDER_READ_ERROR }
     const enrolled = new Set(roster.rows.map(row => row.classroom_id))
-    const pending = latestAssignmentReminderRecords(history.rows).filter(row => enrolled.has(row.related_classroom_id!))
-    if (pending.length === 0) return { reminders: [] }
+    const pending = latestAssignmentNoticeRecords(history.rows).filter(row => enrolled.has(row.related_classroom_id!))
+    if (pending.length === 0) return { notices: [] }
     const roomIds = [...new Set(pending.map(row => row.related_classroom_id!))]
     const rooms = await reminderRowsForIds<{ id: string; name: string }>(roomIds, (chunk, from, to) => supabase.from('classrooms')
       .select('id, name').in('id', chunk).eq('status', 'active').order('id').range(from, to))
-    if (rooms.error) return { reminders: [], error: REMINDER_READ_ERROR }
+    if (rooms.error) return { notices: [], error: REMINDER_READ_ERROR }
     const roomById = new Map(rooms.rows.map(row => [row.id, row]))
     const activePending = pending.filter(row => roomById.has(row.related_classroom_id!))
     const assignmentIds = [...new Set(activePending.map(row => row.related_assignment_id!))]
@@ -224,12 +228,12 @@ export async function getPendingAssignmentReminders(): Promise<{ reminders: Pend
       const result = await reminderRowsForIds<ReminderLink>(assignmentIds, (chunk, from, to) => supabase.from('assignment_classrooms')
         .select('assignment_id, classroom_id, group_ids').in('assignment_id', chunk)
         .in('classroom_id', roomChunk).order('assignment_id').order('classroom_id').range(from, to))
-      if (result.error || result.rows.some(row => !validReminderGroups(row.group_ids))) return { reminders: [], error: REMINDER_READ_ERROR }
+      if (result.error || result.rows.some(row => !validReminderGroups(row.group_ids))) return { notices: [], error: REMINDER_READ_ERROR }
       links.push(...result.rows)
     }
     const linkByPair = new Map(links.map(row => [`${row.assignment_id}:${row.classroom_id}`, row]))
     const linked = activePending.filter(row => linkByPair.has(`${row.related_assignment_id}:${row.related_classroom_id}`))
-    if (linked.length === 0) return { reminders: [] }
+    if (linked.length === 0) return { notices: [] }
 
     const admin = createAdminClient()
     const groupRooms = [...new Set(linked.filter(row => linkByPair.get(`${row.related_assignment_id}:${row.related_classroom_id}`)!.group_ids !== null)
@@ -238,23 +242,23 @@ export async function getPendingAssignmentReminders(): Promise<{ reminders: Pend
     // in classrooms already proven through their recipient/session membership.
     const groups = await reminderRowsForIds<{ classroom_id: string; group_id: string }>(groupRooms, (chunk, from, to) => admin.from('classroom_group_members')
       .select('classroom_id, group_id').eq('student_id', user.id).in('classroom_id', chunk).order('classroom_id').range(from, to))
-    if (groups.error) return { reminders: [], error: REMINDER_READ_ERROR }
+    if (groups.error) return { notices: [], error: REMINDER_READ_ERROR }
     const groupOf = new Map(groups.rows.map(row => [row.classroom_id, row.group_id]))
     const reachable = linked.filter(row => linkReachesGroup(linkByPair.get(`${row.related_assignment_id}:${row.related_classroom_id}`)!.group_ids, groupOf.get(row.related_classroom_id!)))
     const reachableIds = [...new Set(reachable.map(row => row.related_assignment_id!))]
-    if (reachableIds.length === 0) return { reminders: [] }
+    if (reachableIds.length === 0) return { notices: [] }
     // Direct student assignment SELECT was intentionally removed by the
     // plaintext-access-code hardening migration. Current own roster, active
     // classroom, exact assignment link and group reach above authorize this
     // narrowly projected admin read; never select access codes or whole rows.
     const [assignments, submissions] = await Promise.all([
-      reminderRowsForIds<{ id: string; title: string; end_at: string | null; created_by: string }>(reachableIds, (chunk, from, to) => admin.from('assignments')
-        .select('id, title, end_at, created_by').in('id', chunk).eq('status', 'published').eq('mode', 'online')
+      reminderRowsForIds<{ id: string; title: string; end_at: string | null; due_at: string | null; start_at: string | null; created_by: string; type: 'exercise' | 'exam'; mode: 'online' }>(reachableIds, (chunk, from, to) => admin.from('assignments')
+        .select('id, title, end_at, due_at, start_at, created_by, type, mode').in('id', chunk).eq('status', 'published').eq('mode', 'online')
         .in('type', ['exercise', 'exam']).order('id').range(from, to)),
       reminderRowsForIds<ReminderSubmission>(reachableIds, (chunk, from, to) => admin.from('submissions')
         .select('assignment_id, status').eq('student_id', user.id).in('assignment_id', chunk).order('id').range(from, to)),
     ])
-    if (assignments.error || submissions.error) return { reminders: [], error: REMINDER_READ_ERROR }
+    if (assignments.error || submissions.error) return { notices: [], error: REMINDER_READ_ERROR }
     const finished = new Set(submissions.rows.filter(row => isFinishedReminderSubmission(row.status)).map(row => row.assignment_id))
     const inProgress = new Set(submissions.rows.filter(row => row.status === 'in_progress').map(row => row.assignment_id))
     const assignmentById = new Map(assignments.rows.map(row => [row.id, row]))
@@ -262,27 +266,56 @@ export async function getPendingAssignmentReminders(): Promise<{ reminders: Pend
     const authorIds = [...new Set(remaining.map(row => assignmentById.get(row.related_assignment_id!)!.created_by))]
     const authors = await reminderRowsForIds<{ id: string; full_name: string }>(authorIds, (chunk, from, to) => admin.from('users')
       .select('id, full_name').in('id', chunk).order('id').range(from, to))
-    if (authors.error) return { reminders: [], error: REMINDER_READ_ERROR }
+    if (authors.error) return { notices: [], error: REMINDER_READ_ERROR }
     const authorById = new Map(authors.rows.map(row => [row.id, row.full_name]))
-    return { reminders: remaining.map(row => {
+    return { notices: remaining.map(row => {
       const assignment = assignmentById.get(row.related_assignment_id!)!
+      const kind = assignmentNoticeKind(row)!
       return {
         id: row.id, assignmentId: assignment.id, classroomId: row.related_classroom_id!,
         assignmentTitle: assignment.title, classroomName: roomById.get(row.related_classroom_id!)!.name,
         teacherName: authorById.get(assignment.created_by) ?? null, createdAt: row.created_at,
-        endAt: assignment.end_at, href: `/assignments/${assignment.id}/take`, inProgress: inProgress.has(assignment.id),
+        endAt: assignment.end_at, href: kind === 'assigned' ? `/classrooms/${row.related_classroom_id}` : `/assignments/${assignment.id}/take`,
+        inProgress: inProgress.has(assignment.id), kind, assignmentType: assignment.type, mode: assignment.mode,
+        dueAt: assignment.due_at ?? null, startAt: assignment.start_at ?? null,
       }
     }) }
-  } catch { return { reminders: [], error: REMINDER_READ_ERROR } }
+  } catch { return { notices: [], error: REMINDER_READ_ERROR } }
+}
+
+export async function getPendingAssignmentNotices(): Promise<{ notices: PendingAssignmentNotice[]; error?: string }> {
+  return pendingAssignmentNotices(['assigned', 'reminder'])
+}
+
+/** Kept for older callers/fixtures; it neither consumes new-work notices nor
+ * changes their separate newest-per-assignment receipt history. */
+export async function getPendingAssignmentReminders(): Promise<{ reminders: PendingAssignmentReminder[]; error?: string }> {
+  const result = await pendingAssignmentNotices(['reminder'])
+  return {
+    reminders: result.notices.map(({ id, assignmentId, classroomId, assignmentTitle, classroomName, teacherName, createdAt, endAt, href, inProgress }) => ({
+      id, assignmentId, classroomId, assignmentTitle, classroomName, teacherName, createdAt, endAt, href, inProgress,
+    })),
+    ...(result.error ? { error: result.error } : {}),
+  }
 }
 
 export async function acknowledgeAssignmentReminder(id: string): Promise<{ success?: true; error?: string }> {
+  return acknowledgeWorkNotice(id, ['assignment_reminder'])
+}
+
+export async function acknowledgeAssignmentNotice(id: string): Promise<{ success?: true; error?: string }> {
+  return acknowledgeWorkNotice(id, ['assignment_reminder', 'classroom_post'])
+}
+
+async function acknowledgeWorkNotice(id: string, types: string[]): Promise<{ success?: true; error?: string }> {
   if (!isAssignmentReminderId(id)) return { error: 'รายการแจ้งเตือนไม่ถูกต้อง' }
   try {
     const session = await reminderSession('student')
     if ('error' in session) return { error: session.error }
-    const { data, error } = await session.supabase.from('notifications').update({ is_read: true })
-      .eq('id', id).eq('recipient_id', session.user.id).eq('type', 'assignment_reminder')
+    const query = session.supabase.from('notifications').update({ is_read: true })
+      .eq('id', id).eq('recipient_id', session.user.id)
+    const scoped = types.length === 1 ? query.eq('type', types[0]) : query.in('type', types)
+    const { data, error } = await scoped.not('related_assignment_id', 'is', null)
       .select('id').maybeSingle()
     if (error || !data || data.id !== id) return { error: 'รับทราบการแจ้งเตือนไม่สำเร็จ กรุณาโหลดรายการล่าสุดแล้วลองใหม่' }
     return { success: true }

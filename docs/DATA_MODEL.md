@@ -1,5 +1,15 @@
 # Data model และ invariants
 
+## Assigned-work notice projection — 20 October 2026 (local application change; no migration)
+
+New-work notifications reuse existing `notifications` columns: `type = 'classroom_post'`, nonnull `related_assignment_id`, one canonical eligible `related_classroom_id`, recipient, actor, assignment organization, title/body/link and `is_read`. Ordinary classroom announcement notifications keep no related assignment ID; explicit reminders keep `type = 'assignment_reminder'`. There is no new persisted type enum, table, column, receipt table, RLS grant or migration. No historical notification backfill runs.
+
+The application discriminator maps `classroom_post` + valid assignment ID to `assigned` and `assignment_reminder` + valid assignment ID to `reminder`; ordinary posts are not work notices. `PendingAssignmentNotice` adds `kind`, `assignmentType: 'exercise' | 'exam'`, `mode: 'online'`, `dueAt` and `startAt` to the existing narrow reminder DTO. Canonical title, classroom label, author, `endAt` and route are recomputed after access checks; notification text/foreign IDs are not authority. `dueAt` is the due date, `startAt` is opening time and `endAt` is hard close; null due date means no configured due date, not a fallback to hard close.
+
+Publisher deduplication is lifetime recipient+assignment for assigned notices, including already read rows and links across classrooms; the current lookup/insert has no uniqueness/atomicity guarantee across concurrent calls. Reader latest-row selection is per assignment **and kind**, considering read rows before unread display, so acknowledging a new assignment does not consume an explicit reminder for it. Acknowledge updates only the session recipient's exact allowed work-notice row and requires its returned ID. Any own submitted/graded attempt suppresses both kinds regardless of score strategy; otherwise `inProgress` is presentation metadata. No attempt or answer is created by reading/acknowledging a notice.
+
+This model addition is implemented locally only while final release checks/deployment are pending. No new hosted schema or fixture write was made. The prior reminder release below and in [ASSIGNMENT_REMINDERS_RELEASE_20261020.md](ASSIGNMENT_REMINDERS_RELEASE_20261020.md) does not establish deployment of these new-work hooks; current handoff is [ASSIGNED_WORK_NOTICES_RELEASE_20261020.md](ASSIGNED_WORK_NOTICES_RELEASE_20261020.md).
+
 ## Resend quota delivery ledger — Staging migration 20261018154826
 
 Apply เฉพาะ Staging เมื่อ 19 ตุลาคม 2026: ledger แยกจาก Auth/ข้อมูลผู้เรียน เก็บ scope (`local/staging/production`), period (`daily/monthly`), window key, threshold (`80/90/95`), delivery UUID, payload SHA-256 และ timestamps ของ claim/acceptance ไม่เก็บผู้รับ เนื้อหาอีเมล reset link หรือ snapshot usage รายคน รายวันใช้วันแจ้งเตือน UTC; รายเดือนใช้ canonical `monthly.resets_at` จาก provider จึงคงสถานะข้ามวันได้

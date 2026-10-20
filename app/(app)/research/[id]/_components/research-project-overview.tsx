@@ -299,7 +299,8 @@ function ScheduleDialog({ measurement, open, onOpenChange }: { measurement: Rese
         toast.error(result.error)
         return
       }
-      toast.success('บันทึกกำหนดการแล้ว')
+      if (result.notificationWarning) toast.warning(result.notificationWarning)
+      else toast.success('บันทึกกำหนดการแล้ว')
       onOpenChange(false)
     })
   }

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { ArrowRight, CheckCheck, Clock, Megaphone, Pin, UserRound, BellRing } from 'lucide-react'
+import { ArrowRight, BookOpen, CheckCheck, Clock, Megaphone, Pin, UserRound, BellRing, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -13,8 +13,9 @@ import { ClassroomIcon } from '@/components/classrooms/classroom-icon'
 import { ClassroomCoverPattern } from '@/components/classrooms/classroom-cover-pattern'
 import { coverOf, parseDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
 import { acknowledgeClassroomAnnouncement } from '@/lib/actions/classroom-announcement-acknowledgements'
-import { acknowledgeAssignmentReminder, getPendingAssignmentReminders } from '@/lib/actions/notifications'
-import type { PendingAssignmentReminder } from '@/lib/assignment-reminders'
+import { acknowledgeAssignmentNotice, getPendingAssignmentNotices } from '@/lib/actions/notifications'
+import type { acknowledgeAssignmentReminder, getPendingAssignmentReminders } from '@/lib/actions/notifications'
+import type { PendingAssignmentNotice, PendingAssignmentReminder } from '@/lib/assignment-reminders'
 import { announcementReceiptKey, type PendingClassroomAnnouncement, type AcknowledgeAnnouncementAction } from '@/lib/classroom-announcement-acknowledgements'
 import { isStudentNoticeSuspendedPath } from '@/lib/student-notice-path'
 import { formatThaiDateTime } from '@/lib/thai-time'
@@ -22,14 +23,19 @@ import { linkify } from '@/lib/linkify'
 import { cn } from '@/lib/utils'
 
 const REMINDER_POLL_MS = 45_000
-type ActiveNotice = { kind: 'announcement' | 'reminder'; key: string; pathname: string }
-interface ReminderFeed { pathname: string | null; reminders: PendingAssignmentReminder[]; error?: string }
+type AssignmentNotice = PendingAssignmentNotice | (PendingAssignmentReminder & { kind: 'reminder' })
+type ActiveNotice = { kind: 'announcement' | 'assignment'; key: string; pathname: string }
+interface AssignmentNoticeFeed { pathname: string | null; notices: AssignmentNotice[]; error?: string }
 
 interface Props {
   initialPosts: PendingClassroomAnnouncement[]
   initialError?: string
   acknowledgeAction?: AcknowledgeAnnouncementAction
   /** Explicit opt-in keeps the existing announcement-only lab isolated. */
+  assignmentNoticesEnabled?: boolean
+  loadNoticeAction?: typeof getPendingAssignmentNotices
+  acknowledgeNoticeAction?: typeof acknowledgeAssignmentNotice
+  /** Legacy reminder-only fixtures keep their existing action contracts. */
   remindersEnabled?: boolean
   loadReminderAction?: typeof getPendingAssignmentReminders
   acknowledgeReminderAction?: typeof acknowledgeAssignmentReminder
@@ -38,20 +44,22 @@ interface Props {
   pathnameOverride?: string
 }
 
-/** Announcements and missing-hand-in reminders share one automatic dialog.
+/** Announcements, newly assigned work and reminders share one automatic dialog.
  * Current-route reads and the server's eligibility check settle the latter. */
 export function StudentAnnouncementInbox({
   initialPosts, initialError, acknowledgeAction = acknowledgeClassroomAnnouncement,
-  remindersEnabled = false, loadReminderAction = getPendingAssignmentReminders,
-  acknowledgeReminderAction = acknowledgeAssignmentReminder, pollReminders = true, pathnameOverride,
+  assignmentNoticesEnabled, loadNoticeAction, acknowledgeNoticeAction,
+  remindersEnabled = false, loadReminderAction,
+  acknowledgeReminderAction, pollReminders = true, pathnameOverride,
 }: Props) {
   const router = useRouter()
   const currentPathname = usePathname()
   const pathname = pathnameOverride ?? currentPathname ?? ''
   const suspended = isStudentNoticeSuspendedPath(pathname)
+  const noticesEnabled = assignmentNoticesEnabled ?? remindersEnabled
   const [receipts, setReceipts] = useState<Set<string>>(() => new Set())
-  const [reminderReceipts, setReminderReceipts] = useState<Set<string>>(() => new Set())
-  const [reminderFeed, setReminderFeed] = useState<ReminderFeed>({ pathname: null, reminders: [] })
+  const [noticeReceipts, setNoticeReceipts] = useState<Set<string>>(() => new Set())
+  const [assignmentFeed, setAssignmentFeed] = useState<AssignmentNoticeFeed>({ pathname: null, notices: [] })
   const [reminderLoading, setReminderLoading] = useState(false)
   const [active, setActive] = useState<ActiveNotice | null>(null)
   const [deferred, setDeferred] = useState(false)
@@ -67,17 +75,19 @@ export function StudentAnnouncementInbox({
   const mutationPending = useRef(false)
   const pathRef = useRef(pathname)
   pathRef.current = pathname
-  const actionsRef = useRef({ loadReminderAction, acknowledgeReminderAction, acknowledgeAction })
-  actionsRef.current = { loadReminderAction, acknowledgeReminderAction, acknowledgeAction }
+  const actionsRef = useRef({ loadNoticeAction, acknowledgeNoticeAction, loadReminderAction, acknowledgeReminderAction, acknowledgeAction })
+  actionsRef.current = { loadNoticeAction, acknowledgeNoticeAction, loadReminderAction, acknowledgeReminderAction, acknowledgeAction }
   const reloadReminders = useRef<() => void>(() => {})
   const remainingPosts = initialPosts.filter(post => !receipts.has(announcementReceiptKey(post.id, post.round)))
-  const currentReminders = remindersEnabled && reminderFeed.pathname === pathname
-    ? reminderFeed.reminders.filter(reminder => !reminderReceipts.has(reminder.id)) : []
+  const currentNotices = noticesEnabled && assignmentFeed.pathname === pathname
+    ? assignmentFeed.notices.filter(notice => !noticeReceipts.has(notice.id)) : []
   const post = active?.pathname === pathname && active.kind === 'announcement'
     ? remainingPosts.find(item => announcementReceiptKey(item.id, item.round) === active.key) : undefined
-  const reminder = active?.pathname === pathname && active.kind === 'reminder'
-    ? currentReminders.find(item => item.id === active.key) : undefined
-  const open = hydrated && visible && !suspended && !deferred && Boolean(post || reminder)
+  const notice = active?.pathname === pathname && active.kind === 'assignment'
+    ? currentNotices.find(item => item.id === active.key) : undefined
+  const reminder = notice?.kind === 'reminder' ? notice : undefined
+  const assigned = notice?.kind === 'assigned' ? notice : undefined
+  const open = hydrated && visible && !suspended && !deferred && Boolean(post || notice)
   const meta = parseDescription(post?.classroomDescription ?? null)
   const cover = coverOf(meta)
 
@@ -111,13 +121,13 @@ export function StudentAnnouncementInbox({
     setConfirmClose(false)
     // Revisiting the same pathname after answering elsewhere still needs a
     // new eligibility read; a matching old pathname is not a fresh response.
-    setReminderFeed({ pathname: null, reminders: [] })
+    setAssignmentFeed({ pathname: null, notices: [] })
   }, [pathname])
 
   useEffect(() => {
     let cancelled = false
     let inFlight = false
-    if (!remindersEnabled || suspended) {
+    if (!noticesEnabled || suspended) {
       reloadReminders.current = () => {}
       setReminderLoading(false)
       return
@@ -129,14 +139,20 @@ export function StudentAnnouncementInbox({
       inFlight = true
       setReminderLoading(true)
       try {
-        const result = await actionsRef.current.loadReminderAction()
+        const overrides = actionsRef.current
+        let result: { notices: AssignmentNotice[]; error?: string }
+        if (overrides.loadNoticeAction) result = await overrides.loadNoticeAction()
+        else if (overrides.loadReminderAction) {
+          const legacy = await overrides.loadReminderAction()
+          result = { notices: legacy.reminders.map(row => ({ ...row, kind: 'reminder' as const })), error: legacy.error }
+        } else result = await getPendingAssignmentNotices()
         if (cancelled || !mounted.current || pathRef.current !== pathname) return
-        setReminderFeed(result.error
-          ? { pathname, reminders: [], error: result.error }
-          : { pathname, reminders: result.reminders })
+        setAssignmentFeed(result.error
+          ? { pathname, notices: [], error: result.error }
+          : { pathname, notices: result.notices })
       } catch {
         if (!cancelled && mounted.current && pathRef.current === pathname) {
-          setReminderFeed({ pathname, reminders: [], error: 'โหลดการเตือนงานไม่สำเร็จ กรุณาลองใหม่' })
+          setAssignmentFeed({ pathname, notices: [], error: 'โหลดการแจ้งงานไม่สำเร็จ กรุณาลองใหม่' })
         }
       } finally {
         inFlight = false
@@ -156,10 +172,10 @@ export function StudentAnnouncementInbox({
       window.removeEventListener('focus', onVisible)
       document.removeEventListener('visibilitychange', onVisible)
     }
-  }, [pathname, remindersEnabled, pollReminders, suspended])
+  }, [pathname, noticesEnabled, pollReminders, suspended])
 
   useEffect(() => {
-    if (active && (active.pathname !== pathname || (!post && !reminder))) {
+    if (active && (active.pathname !== pathname || (!post && !notice))) {
       setActive(null)
       setConfirmClose(false)
       return
@@ -167,10 +183,11 @@ export function StudentAnnouncementInbox({
     if (active || !hydrated || !visible || suspended || deferred || pending || otherDialogOpen) return
     const nextPost = remainingPosts[0]
     if (nextPost) setActive({ kind: 'announcement', key: announcementReceiptKey(nextPost.id, nextPost.round), pathname })
-    else if (!reminderFeed.error && currentReminders[0]) {
-      setActive({ kind: 'reminder', key: currentReminders[0].id, pathname })
+    else if (!assignmentFeed.error) {
+      const next = currentNotices.find(item => item.kind === 'assigned') ?? currentNotices[0]
+      if (next) setActive({ kind: 'assignment', key: next.id, pathname })
     }
-  }, [active, post, reminder, pathname, hydrated, visible, suspended, deferred, pending, otherDialogOpen, remainingPosts, currentReminders, reminderFeed.error])
+  }, [active, post, notice, pathname, hydrated, visible, suspended, deferred, pending, otherDialogOpen, remainingPosts, currentNotices, assignmentFeed.error])
 
   useEffect(() => {
     if (open) {
@@ -191,20 +208,25 @@ export function StudentAnnouncementInbox({
   }
 
   function acknowledge(goToWork = false) {
-    if ((!post && !reminder) || mutationPending.current || suspended) return
+    if ((!post && !notice) || mutationPending.current || suspended) return
     const currentPost = post
-    const currentReminder = reminder
+    const currentNotice = notice
     const operationPath = pathname
     mutationPending.current = true
     startTransition(async () => {
       let acknowledged = false
       try {
+        const overrides = actionsRef.current
         const result = currentPost
-          ? await actionsRef.current.acknowledgeAction(currentPost.id, currentPost.round)
-          : await actionsRef.current.acknowledgeReminderAction(currentReminder!.id)
+          ? await overrides.acknowledgeAction(currentPost.id, currentPost.round)
+          : overrides.acknowledgeNoticeAction
+            ? await overrides.acknowledgeNoticeAction(currentNotice!.id)
+            : currentNotice!.kind === 'reminder' && overrides.acknowledgeReminderAction
+              ? await overrides.acknowledgeReminderAction(currentNotice!.id)
+              : await acknowledgeAssignmentNotice(currentNotice!.id)
         if (!mounted.current) return
         if (result.error || !result.success) {
-          toast.error(result.error ?? (currentPost ? 'รับทราบประกาศไม่สำเร็จ กรุณาลองใหม่' : 'รับทราบการเตือนงานไม่สำเร็จ กรุณาลองใหม่'))
+          toast.error(result.error ?? (currentPost ? 'รับทราบประกาศไม่สำเร็จ กรุณาลองใหม่' : 'รับทราบการแจ้งงานไม่สำเร็จ กรุณาลองใหม่'))
           if (currentPost && 'stale' in result && result.stale
             && pathRef.current === operationPath && !isStudentNoticeSuspendedPath(pathRef.current)) router.refresh()
           return
@@ -212,27 +234,27 @@ export function StudentAnnouncementInbox({
         acknowledged = true
         if (currentPost) setReceipts(previous => new Set([...previous, announcementReceiptKey(currentPost.id, currentPost.round)]))
         else {
-          setReminderReceipts(previous => new Set([...previous, currentReminder!.id]))
+          setNoticeReceipts(previous => new Set([...previous, currentNotice!.id]))
           window.dispatchEvent(new Event('korkru:notifications-changed'))
         }
         setActive(null)
         setConfirmClose(false)
         if (pathRef.current !== operationPath || isStudentNoticeSuspendedPath(pathRef.current)) return
-        if (goToWork && currentReminder) {
+        if (goToWork && currentNotice) {
           setDeferred(true)
-          router.push(currentReminder.href)
+          router.push(currentNotice.href)
         } else if (currentPost) router.refresh()
       } catch {
         if (mounted.current) {
           if (acknowledged) toast.warning('รับทราบแล้ว แต่ยังเปิดหน้าถัดไปไม่ได้ กรุณาลองเปิดใหม่')
-          else toast.error(currentPost ? 'รับทราบประกาศไม่สำเร็จ กรุณาลองใหม่' : 'รับทราบการเตือนงานไม่สำเร็จ กรุณาลองใหม่')
+          else toast.error(currentPost ? 'รับทราบประกาศไม่สำเร็จ กรุณาลองใหม่' : 'รับทราบการแจ้งงานไม่สำเร็จ กรุณาลองใหม่')
         }
       }
       finally { mutationPending.current = false }
     })
   }
 
-  const feedError = remindersEnabled && reminderFeed.pathname === pathname ? reminderFeed.error : undefined
+  const feedError = noticesEnabled && assignmentFeed.pathname === pathname ? assignmentFeed.error : undefined
   const errorsVisible = hydrated && visible && !suspended
   const reminderError = feedError && <p role="alert" className="text-sm text-destructive">
     {feedError} <Button type="button" variant="link" size="xs" disabled={reminderLoading} onClick={() => reloadReminders.current()}>ลองใหม่</Button>
@@ -240,11 +262,13 @@ export function StudentAnnouncementInbox({
 
   return <>
     {errorsVisible && initialError && <p role="alert" className="mb-3 text-sm text-destructive">{initialError} <Button type="button" variant="link" size="xs" onClick={() => router.refresh()}>ลองใหม่</Button></p>}
-    {errorsVisible && !reminder && reminderError && <div className="mb-3">{reminderError}</div>}
+    {errorsVisible && !notice && reminderError && <div className="mb-3">{reminderError}</div>}
     <Dialog open={open} onOpenChange={(next, details) => {
       if (!next) { details.cancel(); if (!mutationPending.current) requestClose() }
     }}>
-      <DialogContent data-student-notice-dialog className="gap-0 overflow-hidden p-0 sm:max-w-lg motion-reduce:animate-none" initialFocus={bodyRef}
+      <DialogContent data-student-notice-dialog data-notice-kind={post ? 'announcement' : notice?.kind}
+        data-assignment-id={notice?.assignmentId} showCloseButton={false}
+        className="gap-0 overflow-hidden p-0 sm:max-w-lg motion-reduce:animate-none" initialFocus={bodyRef}
         onFocusCapture={event => { lastFocus.current = event.target as HTMLElement }} aria-busy={pending}>
         {post ? <>
           <DialogHeader className={cn('relative gap-1.5 border-b px-4 py-3 pr-12', cover?.surface)}>
@@ -273,11 +297,47 @@ export function StudentAnnouncementInbox({
             <Button type="button" variant="ghost" disabled={pending} className="pointer-coarse:min-h-[44px]" onClick={deferNotices}>ไว้ภายหลัง</Button>
             <Button type="button" disabled={pending} className="pointer-coarse:min-h-[44px]" onClick={() => acknowledge()}><CheckCheck data-icon="inline-start" aria-hidden="true" />{pending ? 'กำลังรับทราบ…' : 'รับทราบ'}</Button>
           </DialogFooter>
+        </> : assigned ? <>
+          <DialogHeader className="gap-1.5 border-b bg-primary/5 px-4 py-3 pr-12">
+            <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-primary">
+              <BookOpen className="size-3.5" aria-hidden="true" /> มีงานใหม่จากผู้สอน
+              <span className="ml-auto text-muted-foreground">เหลือ {currentNotices.filter(item => item.kind === 'assigned').length} งานใหม่</span>
+            </div>
+            <DialogTitle className="break-words text-lg font-bold leading-snug">{assigned.assignmentTitle}</DialogTitle>
+            <DialogDescription className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+              <span>{assigned.classroomName}</span>
+              {assigned.teacherName && <span className="inline-flex items-center gap-1"><UserRound className="size-3" aria-hidden="true" />{assigned.teacherName}</span>}
+              <span>มอบหมายเมื่อ {formatThaiDateTime(assigned.createdAt)}</span>
+            </DialogDescription>
+          </DialogHeader>
+          <div ref={bodyRef} className="flex max-h-[min(26rem,50dvh)] flex-col gap-3 overflow-y-auto overscroll-contain px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring" tabIndex={0} role="region" aria-label="รายละเอียดงานใหม่">
+            <Badge variant={assigned.assignmentType === 'exam' ? 'workExam' : 'workExercise'}>{assigned.assignmentType === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'}</Badge>
+            <p className="text-sm leading-relaxed">ผู้สอนมอบหมาย{assigned.assignmentType === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'}ใหม่ให้คุณ ดูรายละเอียดงานได้ในห้องเรียน</p>
+            <dl className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1.5 text-sm">
+              <dt className="flex items-center gap-1.5 text-muted-foreground"><Clock className="size-3.5 shrink-0" aria-hidden="true" />กำหนดส่ง</dt>
+              <dd className="min-w-0 break-words font-medium tabular-nums">{assigned.dueAt ? formatThaiDateTime(assigned.dueAt) : 'ไม่กำหนดวันส่ง'}</dd>
+              {assigned.startAt && Date.parse(assigned.startAt) > Date.now() && <>
+                <dt className="text-muted-foreground">เริ่มทำได้</dt>
+                <dd className="min-w-0 break-words tabular-nums">{formatThaiDateTime(assigned.startAt)}</dd>
+              </>}
+              {assigned.endAt && (!assigned.dueAt || Date.parse(assigned.endAt) !== Date.parse(assigned.dueAt)) && <>
+                <dt className="text-muted-foreground">ปิดรับ</dt>
+                <dd className="min-w-0 break-words tabular-nums">{formatThaiDateTime(assigned.endAt)}</dd>
+              </>}
+            </dl>
+            {reminderError}
+          </div>
+          <DialogFooter className="m-0 gap-2 rounded-none px-4 py-3">
+            <Button type="button" variant="ghost" disabled={pending} className="pointer-coarse:min-h-[44px]" onClick={deferNotices}>ไว้ภายหลัง</Button>
+            <Button type="button" disabled={pending} className="pointer-coarse:min-h-[44px]" onClick={() => acknowledge()}>
+              <CheckCheck data-icon="inline-start" aria-hidden="true" />{pending ? 'กำลังรับทราบ…' : 'รับทราบ'}
+            </Button>
+          </DialogFooter>
         </> : reminder ? <>
           <DialogHeader className="gap-1.5 border-b bg-primary/5 px-4 py-3 pr-12">
             <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-primary">
               <BellRing className="size-3.5" aria-hidden="true" /> ครูเตือนให้ส่งงาน
-              <span className="ml-auto text-muted-foreground">เหลือ {currentReminders.length} งาน</span>
+              <span className="ml-auto text-muted-foreground">เหลือ {currentNotices.filter(item => item.kind === 'reminder').length} งาน</span>
             </div>
             <DialogTitle className="break-words text-lg font-bold leading-snug">{reminder.assignmentTitle}</DialogTitle>
             <DialogDescription className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
@@ -302,10 +362,13 @@ export function StudentAnnouncementInbox({
             </Button>
           </DialogFooter>
         </> : null}
+        <Button type="button" variant="ghost" size="icon-sm" disabled={pending} aria-label="ปิด"
+          className="absolute right-2 top-2 pointer-coarse:min-h-[44px] pointer-coarse:min-w-[44px]"
+          onClick={() => { if (!mutationPending.current) requestClose() }}><X aria-hidden="true" /></Button>
       </DialogContent>
-      <ConfirmDialog open={confirmClose && open} onOpenChange={setConfirmClose} title={post ? 'รับทราบประกาศภายหลัง?' : 'ดูการเตือนงานภายหลัง?'}
-        description={post ? 'ประกาศและการเตือนงานที่ยังไม่รับทราบจะแสดงอีกครั้งเมื่อคุณเข้ามาใหม่' : 'การเตือนนี้ยังไม่ถูกทำเครื่องหมายว่าอ่านแล้ว และจะแสดงอีกครั้งเมื่อคุณเข้ามาใหม่'}
-        cancelLabel={post ? 'อ่านประกาศต่อ' : 'ดูการเตือนต่อ'} confirmLabel="ไว้ภายหลัง"
+      <ConfirmDialog open={confirmClose && open} onOpenChange={setConfirmClose} title={post ? 'รับทราบประกาศภายหลัง?' : assigned ? 'รับทราบงานใหม่ภายหลัง?' : 'ดูการเตือนงานภายหลัง?'}
+        description="รายการที่ยังไม่รับทราบจะแสดงอีกครั้งเมื่อคุณเข้ามาใหม่"
+        cancelLabel={post ? 'อ่านประกาศต่อ' : assigned ? 'ดูงานใหม่ต่อ' : 'ดูการเตือนต่อ'} confirmLabel="ไว้ภายหลัง"
         finalFocus={open ? returnFocus : undefined} onConfirm={deferNotices} />
     </Dialog>
   </>
