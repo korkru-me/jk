@@ -2,6 +2,8 @@
 
 Status: **Migration parity restored; synthetic fixture ready; hosted browser flow awaits the owner's Vercel sign-in.** This record supersedes the prior migration-history stop in the assigned-work/reminder release notes. It does not claim teacher publication, student popup or durable acknowledgement has passed yet.
 
+The repair and guarded runner are pushed through PR [#78](https://github.com/korkru-me/jk/pull/78), merged into `staging` as `26c010aed9133f928213719c5fed4dda7d4c840d` (implementation commit `876692927cdd0bb51268fbce887546b03d7da1de`). Read-only Vercel inspection confirms canonical Staging is READY at deployment `dpl_9QXYozgMj7yWihEDL4vP2pT2GP7n`; READY metadata is not an authenticated UI test. No Production release is part of this repair.
+
 ## Scope and authorization
 
 The owner requested repairing migration history and Staging access, then testing real teacher assignment publication through student popup and acknowledgement. After automatic approval review rejected the initial retention execution and broad Preview environment download, the owner explicitly approved (1) existing migration `20261015132234` on Staging only and (2) only the Staging anon/service-role keys for synthetic fixture management. The broad environment download was not performed. No Production data, credentials or configuration were changed.
@@ -30,6 +32,6 @@ Cleanup independently verifies Auth `qa_run`/`qa_kind`/email and exclusive sole-
 
 ## Browser gate and remaining acceptance
 
-Opening canonical Staging currently reaches Vercel login before KorKru. An ordinary GitHub login attempt reached GitHub's credential form; no existing session was available. The owner is signing in through the normal Vercel page. No authentication bypass, protection override, secret-in-URL, permission expansion or weakening of Staging protection was used.
+Opening canonical Staging currently reaches Vercel login before KorKru. Ordinary GitHub and Google login attempts each reached their credential forms; no existing provider session was available. The owner said they would sign in; the latest observation still shows the normal Vercel login page. That tab is retained for handoff. No authentication bypass, protection override, secret-in-URL, permission expansion or weakening of Staging protection was used.
 
 Before the manual flow, verify the visible `STAGING · ระบบทดสอบ` badge. Then sign in as the synthetic teacher, create and publish the exact run-owned exercise (and ordinary-browser exam variant), verify canonical unread notice rows, sign in as the synthetic student, inspect the popup metadata, click **รับทราบ**, verify the same notice becomes `is_read=true`, and reload to confirm it stays acknowledged with zero submissions. Record screenshot evidence and exact bounded cleanup results here. Until then, hosted publication-to-acknowledgement remains unverified.
