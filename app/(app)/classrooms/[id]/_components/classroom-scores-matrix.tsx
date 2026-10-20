@@ -314,23 +314,35 @@ function SortableAssignmentHeader({
           </PendingReviewLink>
         )}
         <div className="flex flex-wrap items-center justify-center gap-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="xs"
-            onPointerDown={event => event.stopPropagation()}
-            onClick={event => { event.stopPropagation(); onRemind() }}
-            disabled={!hasNonSubmitter || reminding}
-            className={cn(
-              'h-auto items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium pointer-coarse:min-h-[44px]',
-              hasNonSubmitter
-                ? 'border-warning/20 bg-warning/10 text-[color-mix(in_oklab,var(--warning)_50%,var(--foreground))] hover:bg-warning/15'
-                : 'border-border bg-muted text-muted-foreground cursor-default',
-            )}
-          >
-            <Bell className="w-2.5 h-2.5" />
-            {reminding ? 'กำลังเตือน...' : 'เตือน'}
-          </Button>
+          <Tooltip>
+            <TooltipTrigger
+              render={<span />}
+              tabIndex={!hasNonSubmitter ? 0 : undefined}
+              aria-label={!hasNonSubmitter ? `ไม่มีนักเรียนที่ต้องเตือนในงาน ${assignment.title}` : undefined}
+              className="inline-flex rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                onPointerDown={event => event.stopPropagation()}
+                onClick={event => { event.stopPropagation(); onRemind() }}
+                disabled={!hasNonSubmitter || reminding}
+                className={cn(
+                  'h-auto items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium pointer-coarse:min-h-[44px]',
+                  hasNonSubmitter
+                    ? 'border-warning/20 bg-warning/10 text-[color-mix(in_oklab,var(--warning)_50%,var(--foreground))] hover:bg-warning/15'
+                    : 'border-border bg-muted text-muted-foreground cursor-default',
+                )}
+              >
+                <Bell className="w-2.5 h-2.5" />
+                {reminding ? 'กำลังเตือน...' : 'เตือน'}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{hasNonSubmitter
+              ? 'แจ้งเตือนผู้ที่ยังไม่ส่ง รวมผู้ที่กำลังทำ โดยแสดงป๊อปอัปเมื่อเข้าเว็บ ผู้ที่ส่งแล้วจะไม่ถูกเตือน'
+              : 'ไม่มีนักเรียนที่ต้องเตือน ทุกคนที่ได้รับงานนี้ส่งงานแล้ว'}</TooltipContent>
+          </Tooltip>
           {assignment.mode === 'online' && (assignment.type === 'exercise' || assignment.type === 'exam') && assignment.status === 'published' && (
             <Tooltip>
               <TooltipTrigger

@@ -46,9 +46,12 @@ export function NotificationsBell({ initialUnreadCount }: { initialUnreadCount: 
     }
     const interval = setInterval(refreshWhenVisible, POLL_MS)
     document.addEventListener('visibilitychange', refreshWhenVisible)
+    // The student popup acknowledges the same durable notification as this bell.
+    window.addEventListener('korkru:notifications-changed', refreshWhenVisible)
     return () => {
       clearInterval(interval)
       document.removeEventListener('visibilitychange', refreshWhenVisible)
+      window.removeEventListener('korkru:notifications-changed', refreshWhenVisible)
     }
   }, [refreshCount])
 
