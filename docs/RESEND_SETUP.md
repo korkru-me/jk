@@ -29,7 +29,9 @@ WAF config `waf_0G4wivLDsFkX` version1, rule `rule_korkru_staging_resend_webhook
 
 ## Production candidate — 20 ตุลาคม 2026
 
-Candidate `8478f884` ที่ทดสอบและ push แล้วแยกจาก Production base `7065d32` ใช้เฉพาะ quota implementation `0352be1` เจ้าของบันทึก monitor key แบบ sensitive และ FROM=`auth@mail.korkru.com`/TO=`korkru.me@gmail.com` บน Vercel Production แล้ว โดย root ยืนยันแถวใน UI Production flag ยัง `false` แอปยังไม่ deploy และ signing secret/cutover/primary localhost parity ยังรอ
+Candidate `8478f884` ที่ทดสอบและ push แล้วแยกจาก Production base `7065d32` ใช้เฉพาะ quota implementation `0352be1` เจ้าของบันทึก monitor key แบบ sensitive และ FROM=`auth@mail.korkru.com`/TO=`korkru.me@gmail.com` บน Vercel Production แล้ว โดย root ยืนยันแถวใน UI ตรวจค่าที่ไม่ลับ `KORKRU_DEPLOYMENT_ENV=production` แล้ว Production flag ยัง `false` แอปยังไม่ deploy และ signing secret/cutover/primary localhost parity ยังรอ
+
+เจ้าของยืนยันว่าเห็นกล่องยืนยันหลัง Rotate signing secret และกดยืนยันแล้ว เป็น owner-reported confirmation ไม่ใช่ผล provider logs ที่ตรวจอย่างอิสระ API Logs list ไม่มี rotate row และ dashboard ไม่คง success toast; การไม่มีแถวไม่ยืนยันว่าล้มเหลว ไม่อ่าน secret หรือกดหมุนซ้ำ เตรียม Vercel Secret/Production-only `RESEND_QUOTA_WEBHOOK_SECRET` โดย Value ว่างให้เจ้าของคัดลอก current provider secret มาวางและ Save เอง **ยังรอ Save** ไม่ deploy/เปลี่ยน flag หรือ provider URL ในขั้นเตรียมนี้
 
 Production apply เฉพาะ migration `20261018154826_resend_quota_alert_delivery_ledger.sql` แล้วจาก isolated CLI remote-history workspace: baseline151ตรงกัน, dry-run pendingไฟล์เดียว และ actualapplyไฟล์เดียวโดยไม่เพิ่มroles/seeds ใช้ `--skip-vault` หลัง apply history152/152 pending0 Catalogยืนยัน RLS, browserไม่มี table/RPC grants, service-only SECURITY INVOKER และ emptysearch_path Receipt0 fingerprintsของฟังก์ชัน/security/policiesเดิมคงเดิม NewWARN0 มีINFOservice-onlyRLS/no-policyที่คาดไว้ ไม่ replay/repair backlog หรือเปลี่ยน SEB รายละเอียด/hash/ผลตรวจอยู่ใน `docs/RESEND_PRODUCTION_RELEASE_20261020.md` การเตรียมนี้ยังไม่ยืนยันว่า Production ส่งแจ้งเตือนได้
 

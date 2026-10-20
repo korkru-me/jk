@@ -28,13 +28,16 @@ Production base ยังเป็น daily-only 80/90/97 รุ่นใหม�
 - Post-apply read-only catalog: RLS เปิด, anon/authenticated ไม่มี table privilege หรือ RPC execute; service-role grants ถูกต้อง RPC เป็น **SECURITY INVOKER** และ `search_path` ว่าง Receipt count **0** ไม่มีการสร้างข้อมูลทดสอบบน Production
 - Fingerprints ของฟังก์ชันเดิม/table security/policies คงเดิม New WARN **0**; มี INFO ที่คาดไว้เพียง RLS-enabled/no-policy ของ service-only ledger ไม่ใช่หลักฐานว่าเปิด browser access
 - **Vercel ที่เจ้าของบันทึกแล้ว:** Production monitor key แบบ sensitive และผู้ส่ง `auth@mail.korkru.com`/ผู้รับ `korkru.me@gmail.com` Root ยืนยันแถวใน UI แล้ว ไม่อ่านหรือบันทึกค่าคีย์ Production flag คง **`RESEND_QUOTA_ALERTS_ENABLED=false`**
+- ตรวจแถว Vercel และเปิดดูเฉพาะค่าที่ไม่ลับของ **`KORKRU_DEPLOYMENT_ENV=production`** แล้ว scope ฝั่งแอปตรง Production
+- **Rotation เป็น owner-reported confirmation:** หลังเลือก Rotate signing secret เจ้าของตอบว่า “เห็นกล่องยืนยัน และกดยืนยันแล้ว” ไม่ได้ยืนยันโดย provider logs อย่างอิสระ Dashboard ไม่คง success toast และ API Logs list ไม่พบ rotate row; การไม่พบแถวนั้นไม่ใช่หลักฐานว่า rotation ล้มเหลว ไม่อ่านหรือบันทึก secret และไม่กด rotation ซ้ำเพื่อเดาผล
+- เตรียมฟอร์ม Vercel **Secret / Production เท่านั้น / `RESEND_QUOTA_WEBHOOK_SECRET`** โดย Value ยังว่าง เจ้าของจะคัดลอก current provider secret มาวางและกด Save เอง ขั้นบันทึกใหม่นี้ **ยังรอ** ไม่มี Save/deploy/flag/provider-URL change จากการเตรียมฟอร์ม
 
-1. เตรียม signing secret ใหม่สำหรับ Production และบันทึกเฉพาะ Vercel Production จากนั้น deploy code/config โดย flag ยัง `false` จนพร้อม ไม่คัดลอก Staging secrets
+1. รอเจ้าของวาง current signing secret หลัง rotation ที่รายงานแล้วและ Save ใน `RESEND_QUOTA_WEBHOOK_SECRET` เฉพาะ Production จากนั้นยืนยัน metadata ก่อน deploy code/config โดย flag ยัง `false` จนพร้อม ไม่คัดลอกค่าจาก Staging หรืออ่านค่า secret กลับ
 2. Free มี 1 webhook จึงย้าย endpoint เดิมหลังหยุด Staging monitor ใช้ rotation สร้าง Production signing secret ต่างค่าเดิมได้; dual-sign 24 ชั่วโมงไม่ใช่ถอน old secret ทันที คง events `email.sent`/`email.received` และตรวจ current-window receipts/ระดับจริงก่อนเปลี่ยน scope เพื่อกันเตือนซ้ำ
 3. เปิด Production flag/redeploy เฉพาะรุ่นที่ตรวจแล้ว รอ Ready/source SHA/canonical domain ให้ตรงก่อนเปลี่ยน provider URL เป็น `https://www.korkru.com/api/webhooks/resend` ตรวจ delivery/log response แบบอ่าน ไม่ส่ง fixture/ลดเกณฑ์/ล้าง ledger หรือทำอีเมลจริงเพิ่มโดยไม่มีขอบเขตที่เจ้าของตกลง
 4. หลัง Production Ready ต้อง sync เฉพาะ released files/deps ไป checkout ที่เสิร์ฟ **localhost:3000** จริง รักษางาน dirty question UI และ local env การตรวจที่ preview worktree/build เพียงอย่างเดียวไม่ใช่ primary parity
 
-**แอป candidate ยังไม่ deploy; signing secret, webhook cutover และ localhost:3000 parity ยังรอ** การ apply additive ledger และบันทึก monitor/from/to ไม่ได้เปิดการส่งแจ้งเตือน Production SMTP/Google และ SEB ไม่อยู่ใน scope นี้ รอบเอกสารสถานะนี้ไม่เปลี่ยน app/SQL/env/provider และไม่รัน test/build ซ้ำจากผล `8478f884` เพราะไม่มี application change
+**แอป candidate ยังไม่ deploy; การ Save signing secret ใหม่, webhook cutover และ localhost:3000 parity ยังรอ** การ apply additive ledger และบันทึก monitor/from/to ไม่ได้เปิดการส่งแจ้งเตือน Production SMTP/Google และ SEB ไม่อยู่ใน scope นี้ รอบเอกสารสถานะนี้ไม่เปลี่ยน app/SQL/env/provider และไม่รัน test/build ซ้ำจากผล `8478f884` เพราะไม่มี application change
 
 ## ข้อจำกัดและ rollback
 
