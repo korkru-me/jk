@@ -1,5 +1,9 @@
 # Security และ privacy guardrails
 
+## Staging notification verification boundary — 20 October 2026
+
+The owner explicitly approved the exact Staging retention migration and the use of only this Staging project's anon/service-role keys for synthetic setup/cleanup. Broad Preview environment download was rejected and not executed. Migration reconciliation changes no Production data/configuration, preserves evidence rows and restores version parity without replaying applied SEB SQL. The new bounded runner proves exact run-owned identities/resources, contains all requests to the fixed Staging project, keeps credentials in private temporary storage, validates canonical notification ownership and fails closed on unexpected/shared cleanup resources. Its 59 new safety cases (103 combined) pass. Normal Vercel sign-in remains required for the real UI flow; protection is not weakened and no bypass credential is used. See [STAGING_NOTIFICATION_E2E_20261020.md](STAGING_NOTIFICATION_E2E_20261020.md) for current evidence and retained fixture state.
+
 ## New-work notification boundaries — 20 October 2026 (local; no hosted writes or release yet)
 
 The publication notifier independently verifies the session user against its actor argument, active teacher/admin status and `canManageAssignment`. After exact assignment authorization it enumerates the full canonical assignment-room link set, including links a co-teacher's session could otherwise hide, and requires current owner/admin/manage authority in every active room before reading learner rosters. It uses the assignment's canonical organization, validates identifiers/group shape, reads in bounded pages/chunks and targets only active students currently reached by those links/groups. Any submitted or graded attempt excludes a recipient. Caller IDs, writable notification metadata and a merely readable assignment never supply privileged learner authority.

@@ -1,5 +1,11 @@
 # Feature status
 
+## Staging migration parity and real notification verification — 20 October 2026
+
+- ตามคำขอและการอนุมัติเฉพาะ Staging กู้ไฟล์ SEB ที่เคยรันจาก remote history โดยตรวจ SHA ตรงต้นฉบับ และใช้ migration เดิม `20261015132234` เพียงตัวเดียวพร้อมบันทึก applied ตรวจสดผ่าน **165 local / 165 remote** ไม่มี version ตกค้าง ข้อมูลหลักฐานเดิมไม่เปลี่ยน ไม่แตะ Production และไม่ replay migration SEB
+- เตรียม guarded runner สำหรับครู/นักเรียนสังเคราะห์อย่างละหนึ่งบัญชี ห้องและโจทย์หนึ่งชุด สร้าง fixture จริงผ่านแล้วโดยยังมีงาน/แจ้งเตือน/attempt เป็นศูนย์ Safety tests ใหม่ 59 เคส รวมกับ runner เดิม **103 เคสผ่าน** ใช้เฉพาะสอง Staging key ที่เจ้าของอนุมัติ ไม่ดึง Preview environment ทั้งชุด
+- การเข้า canonical Staging ยังรอเจ้าของเข้าสู่ Vercel ตามปกติ ยังไม่อ้างว่าครูมอบหมาย → นักเรียนเห็น popup → กดรับทราบผ่านจริง รายละเอียดและขั้นตอนต่อใน [STAGING_NOTIFICATION_E2E_20261020.md](STAGING_NOTIFICATION_E2E_20261020.md) ผล migration สดนี้แทนข้อจำกัดประวัติจากรอบก่อน แต่ไม่แทนผล E2E ที่ยังเหลือ
+
 ## แจ้งงานใหม่ให้นักเรียนอัตโนมัติ — 20 ตุลาคม 2026 (โค้ดโลคอลเสร็จ; รอ final release checks)
 
 - เมื่อบันทึกการเผยแพร่หรือการมอบหมายงานสำเร็จ ระบบสร้างการแจ้งงานใหม่ให้ผู้เรียน active ในห้อง/กลุ่มเป้าหมายที่ยังไม่มีรอบ `submitted` หรือ `graded` สำหรับงาน online ชนิดแบบฝึกหัด/ข้อสอบที่ published แล้ว ใช้ `classroom_post` เดิมร่วมกับ `related_assignment_id` โดยประกาศห้องเรียนทั่วไปยังไม่มี assignment ID ไม่เพิ่ม notification type, schema หรือ migration และไม่สร้างรายการย้อนหลังให้ทุกงานเดิม
