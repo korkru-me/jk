@@ -1,5 +1,5 @@
 {
-  "description": "Primary source/check audit plus Production release and SMTP checkpoints: two credential failures followed by one verified Inbox delivery; Gmail warning disables the valid MIME recovery link, so password reset remains unperformed.",
+  "description": "Primary source/check audit plus Production release/SMTP checkpoints: post-DMARC 13:29 email passes SPF/DKIM/DMARC but Gmail danger warning persists; a Thai recovery-template-only candidate is prepared and not applied, with real password reset still unperformed.",
   "primaryCheckedAt": "2026-10-20T05:04:28.316Z",
   "sourceRefs": {
     "baseline": "216d492469259a3e22945413e4ca798e71439a1f",
@@ -304,7 +304,11 @@
       "validRecoveryAnchorPresent": true,
       "host": "libsutfinswqkruihwdx.supabase.co",
       "path": "/auth/v1/verify",
-      "queryKeysOnly": ["token", "type", "redirect_to"],
+      "queryKeysOnly": [
+        "token",
+        "type",
+        "redirect_to"
+      ],
       "type": "recovery",
       "redirectHost": "www.korkru.com",
       "redirectPath": "/auth/callback",
@@ -328,15 +332,18 @@
       "missingDmarcProvenSoleWarningCause": false,
       "dnsChanged": true,
       "postSaveVerifiedAt": "2026-10-20T06:22:58Z",
-      "publicResolvers": ["Cloudflare DoH", "Google DoH"],
+      "publicResolvers": [
+        "Cloudflare DoH",
+        "Google DoH"
+      ],
       "dmarcSenderTxt": "v=DMARC1; p=none;",
       "observedTtlSeconds": 300,
       "globalPropagationClaimed": false,
-      "postDmarcMessagePassVerified": false
+      "postDmarcMessagePassVerified": true
     },
-    "currentBlocker": "Sender-subdomain DMARC is saved and visible at two public resolvers; a fresh post-DMARC email still needs dmarc=pass, no Gmail danger warning and an active original recovery link. The 12:42 delivery predates DMARC. Owner Looks safe is not a global fix.",
+    "currentBlocker": "Fresh 13:29 post-DMARC Production email passes SPF/DKIM/DMARC yet Gmail danger warning persists. Thai recovery template candidate is prepared and not applied; no warning-free message or manual password-reset completion verified.",
     "senderAuthenticationRepairPlan": {
-      "status": "saved in Cloudflare and visible at two public DoH resolvers; fresh email verification pending",
+      "status": "Sender TXT saved and visible at two public resolvers; fresh 13:29 message passes SPF/DKIM/DMARC but Gmail danger warning remains.",
       "savedApproximatelyAt": "2026-10-20T06:22:38Z",
       "cloudflareOwnerLoginCompleted": true,
       "savedRows": 1,
@@ -359,7 +366,13 @@
         "no Gmail danger warning",
         "active recovery link with original target and no tracking rewrite"
       ],
-      "ifWarningPersists": "Continue sender reputation, link reputation and template investigation; do not claim DMARC was the sole cause."
+      "ifWarningPersists": "Continue sender reputation, link reputation and template investigation; do not claim DMARC was the sole cause.",
+      "freshEmailRequiredResultsStatus": {
+        "dmarcPass": true,
+        "noGmailDangerWarning": false,
+        "originalLinkActionAvailable": null,
+        "originalLinkActionAvailableNote": "Not independently established in this candidate record; danger warning still blocks readiness."
+      }
     },
     "additionalEmailSentByAgent": false,
     "ownerConfirmedPreDmarcMessageNotMarkedSafe": true,
@@ -372,5 +385,72 @@
     "readyForAllUsers": false,
     "applicationSchemaMigrationDeploymentOrFlagsChanged": false,
     "messageIdsOrAccountEmailStored": false
+  },
+  "postDmarcRecoveryMessageVerification": {
+    "date": "2026-10-20",
+    "ownerRequestedLocalTimeMinute": "13:29 Asia/Bangkok",
+    "utcTimeMinute": "06:29 UTC",
+    "performedBy": "root read-only exact-message headers, Resend Insights, native sanitized Auth-config comparison and Google Safe Browsing UI",
+    "authentication": {
+      "spf": "pass",
+      "dkim": "pass",
+      "dmarc": "pass"
+    },
+    "gmailDangerWarningPresent": true,
+    "warningFreeDeliveryVerified": false,
+    "recoveryLinkConsumed": false,
+    "productionPasswordChanged": false,
+    "resendInsights": {
+      "needsAttentionOnly": [
+        "link-domain mismatch"
+      ],
+      "priorStagingAlsoHadLinkDomainMismatch": true,
+      "priorStagingAlsoLackedDmarc": true,
+      "soleWarningCauseProven": false
+    },
+    "safeBrowsingUi": {
+      "productionSupabaseHostname": "No available data",
+      "canonicalAppHostname": "No available data",
+      "safeOrUnsafeVerdictInferred": false
+    },
+    "templateComparison": {
+      "productionSubject": "Reset Your Password",
+      "productionDefaultBodyStart": "Follow this link to reset the password for your user",
+      "stagingHasRequestContextAndIgnoreIfNotRequested": true,
+      "templateCopyProvenWarningCause": false
+    },
+    "tokensActualUrlsMessageIdsOrAccountEmailsStored": false
+  },
+  "thaiRecoveryTemplateCandidate": {
+    "status": "prepared for root review; not applied",
+    "htmlPath": "supabase/templates/recovery.html",
+    "managementApiPayloadPath": "supabase/templates/recovery.management-api.json",
+    "subject": "ตั้งรหัสผ่านใหม่สำหรับบัญชี KorKru",
+    "onlyConfigKeys": [
+      "mailer_subjects_recovery",
+      "mailer_templates_recovery_content"
+    ],
+    "singleExactConfirmationUrlAnchor": true,
+    "extraUrlsImagesScriptsPixelsOrRecipientVariables": false,
+    "requestsOriginatingBrowserAndDevice": true,
+    "includesIgnoreIfNotRequestedAndDoNotShareLink": true,
+    "guessedExpiryOrMarketingCopy": false,
+    "providerPatchPerformed": false,
+    "primaryCheckoutChanged": false,
+    "applicationChanged": false,
+    "dnsChanged": false,
+    "schemaMigrationOrDeploymentChanged": false,
+    "otherAuthSmtpSiteUrlAutoconfirmSecurityEmailOrQuotaConfigChanged": false,
+    "gmailWarningRemovalProven": false,
+    "hostedTemplateRenderingOrDeliveryTested": false,
+    "checks": {
+      "htmlSingleAnchorAndNoActiveAssets": true,
+      "payloadOnlyTwoKeysAndExactBody": true,
+      "jsonAndDiff": true,
+      "applicationBuildOrSuiteRepeated": false
+    },
+    "supportEscalationDraftPrepared": true,
+    "supportEscalationSent": false,
+    "futureFirstPartyGateOrPaidCustomDomainActivated": false
   }
 }

@@ -1,6 +1,14 @@
 # ระบบสมัครและความน่าเชื่อถือของบัญชี — 17 ตุลาคม 2026
 
-## สถานะปัจจุบัน 20 ตุลาคม — SMTP ถึง Inbox แล้ว; Gmail warning ยังปิด recovery link
+## สถานะล่าสุด 20 ตุลาคม — DMARC ผ่าน แต่ Gmail ยังเตือน; template ไทยยังไม่ apply
+
+อีเมล Production ใหม่เวลา **13:29 น. ไทย** หลังเพิ่ม DMARC เข้าถึง Gmail แต่ยังมี red danger warning Root ตรวจ header ฉบับนี้ได้ SPF/DKIM/DMARC=`pass` จึงไม่ใช้ sender authentication แทน readiness Resend Insights มี needs-attention เฉพาะ link-domain mismatch ซึ่ง Staging เก่าก็เคยมี; Google Safe Browsing UI ของ Production Supabase hostname กับ `www.korkru.com` แสดง **No available data** ไม่ใช่ verdict ปลอดภัย/อันตราย Native config พบ Production default English ต่างจาก Staging ที่ปรับบริบทแล้ว แต่ยังไม่พิสูจน์สาเหตุ warning
+
+เตรียม `supabase/templates/recovery.html` กับ `recovery.management-api.json` เป็นอีเมลสั้นภาษาไทย/ชื่อ KorKru มี anchor เดียว `{{ .ConfirmationURL }}` เดิมและ payload เพียง subject/body สอง keys ไม่มี URL อื่น รูป script tracking ข้อมูลผู้รับ หรือการเดา expiry **ยังไม่ apply/provider PATCH** และไม่รับรองว่าการปรับ copy จะทำให้ warning หาย Root review/apply แบบ before/after config guard แล้วค่อยให้เจ้าของขออีเมลใหม่หนึ่งครั้ง ตรวจ no-warning/ลิงก์ก่อนทดสอบ reset โดยไม่กด Looks safe แทน gate คง app/primary/callback/PKCE/nonce/grant/SMTP/Site URL/autoconfirm/security policies/อีเมลอื่น/quota flags เดิม ไม่มี schema/migration/deploy หรือการใช้ลิงก์/เปลี่ยนรหัสในรอบนี้ HTML/payload/manifest/diff checks ผ่าน; ไม่รัน app build/full suite เพราะ code ไม่เปลี่ยน รายละเอียดและร่าง support escalation ที่ยังไม่ส่งอยู่ใน [SMTP_PRODUCTION_RELEASE_20261020.md](SMTP_PRODUCTION_RELEASE_20261020.md)
+
+### ประวัติ checkpoints ก่อนฉบับ 13:29
+
+#### SMTP ถึง Inbox แล้ว; Gmail warning ยังปิด recovery link
 
 PR [#76](https://github.com/korkru-me/jk/pull/76) merge เป็น `f488c93894346cf74736a43783a9cf6f5369a2f2` และ Production deployment `dpl_AGq5Kj9LbA3vgRVjfPTTbjZpwK5C` READY พร้อม canonical `www.korkru.com` แล้ว ตรวจ public auth notices/gate และ actual primary source/runtime หลัง Ready ผ่าน เจ้าของยืนยันบันทึก SMTP Production แล้ว Root ตรวจ native Auth แบบ sanitized พบ SMTP ทั้งสี่รายการ present=`true` โดยไม่เปิดเผย secret; Site URL `https://www.korkru.com`, autoconfirm=`true` และ recovery `{{ .ConfirmationURL }}` คงเดิม
 
