@@ -1,5 +1,11 @@
 # Architecture
 
+## Recovery result handoff — 20 October 2026 (Production candidate)
+
+The recovery-only candidate ports the already Staging-validated `be7ee0d` and `e952b4b` behavior onto Production base `216d492`. Reset POST still requires the exact verified user/session and ten-minute recovery grant. A provider `same_password` response becomes a persistent field error without consuming that grant or signing out. After an accepted password update, the action clears the grant, awaits global sign-out and redirects with `RedirectType.replace` to `/login?password_changed=1`; revocation errors or exceptions add `sessions_revoked=0`. Client `unstable_rethrow` preserves Next navigation, so cookie cleanup cannot replace success with the expired-link gate. The login notice persists through refresh and conveys honest success/warning states; its query parameters never authorize recovery.
+
+No callback, intent/grant policy, signup, Google, quota, schema, dependency or environment contract changes are included. Production SMTP activation, hosted manual recovery and actual primary localhost parity remain separate pending release gates in [SMTP_PRODUCTION_RELEASE_20261020.md](SMTP_PRODUCTION_RELEASE_20261020.md).
+
 ## Newly assigned work notices — 20 October 2026 (Production app released; local parity verified)
 
 `lib/assignment-publication-notifications.ts` adds a server-only `notifyAssignmentPublished` publisher after acknowledged assignment/audience persistence. It verifies the session matches the active actor, exact assignment management and management of every canonical linked active classroom before privileged learner reads. Recipients are the current active roster/group audience without any submitted or graded attempt. Assignment organization supplies notification scope; shared-roster recipients receive one deterministic eligible room link. Paginated/chunked reads fail closed, and a recipient+assignment history lookup covers both read and unread new-work notices for best-effort lifetime deduplication. Concurrent lookup/insert hooks are not an exactly-once protocol.

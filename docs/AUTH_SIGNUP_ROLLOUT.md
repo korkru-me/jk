@@ -1,5 +1,13 @@
 # ระบบสมัครและความน่าเชื่อถือของบัญชี — 17 ตุลาคม 2026
 
+## สถานะปัจจุบัน 20 ตุลาคม — Production SMTP/recovery candidate
+
+เจ้าของอนุญาตตั้ง Production SMTP และทดสอบ recovery จริงแบบทีละขั้นตอนแล้ว และรายงานว่าสร้าง key `korkru-production-supabase-smtp` แบบ Sending access เฉพาะ `mail.korkru.com` โดยเก็บค่าเป็นส่วนตัว ต่อจาก handoff `d34acf4` การตรวจ native Auth ล่าสุดแบบกรองค่าลับพบ custom SMTP 4 รายการยัง absent, Site URL `https://www.korkru.com`, autoconfirm `true` และ recovery `{{ .ConfirmationURL }}` เดิม ยังไม่บันทึก SMTP หรือส่งอีเมลจากการเตรียม candidate
+
+Production master `216d492` มี recovery safeguards เดิม แต่ยังขาดผลลัพธ์ `be7ee0d`/`e952b4b` Candidate branch `codex/recovery-production-20261020` จึงเลือกเฉพาะ 5 application/test files ของสองแพตช์นี้ ไม่ merge source branch ทั้งชุด ไม่เพิ่ม schema/package/env และไม่พ่วง signup feedback/branding/Google/SEB ต้องผ่าน checks → Production deploy → actual primary localhost parity ก่อนเปิด SMTP และให้เจ้าของทดสอบอีเมลใหม่ในเบราว์เซอร์เดิม รักษา autoconfirm `true`, current-password policy, callback nonce/PKCE/intent/grant และ quota flags Production `true`/Staging `false` รายละเอียด gates อยู่ใน [SMTP_PRODUCTION_RELEASE_20261020.md](SMTP_PRODUCTION_RELEASE_20261020.md)
+
+## ประวัติการเตรียม 17 ตุลาคม
+
 สถานะ: เตรียมโค้ดและทดสอบในเครื่องแล้ว **ยังไม่ deploy, ยังไม่ apply migration และยังไม่เชื่อม SMTP/ส่งอีเมลจริง** งานนี้ต่อจาก `codex/resend-quota-alert` จึงมีระบบเตือน 80/90/97% เดิมรวมอยู่ด้วย การสมัคร Resend พักไว้ตามคำขอเจ้าของ
 
 ## ข้อตกลงที่เจ้าของยืนยัน

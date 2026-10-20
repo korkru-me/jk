@@ -1,5 +1,11 @@
 # Feature status
 
+## เตรียม Production SMTP และผลกู้รหัสผ่าน — 20 ตุลาคม 2026 (candidate ยังไม่ deploy)
+
+เจ้าของอนุญาตตั้ง Production SMTP และทดสอบลืมรหัสผ่านทีละขั้นตอน พร้อมรายงานว่าสร้าง Sending access key แยกสำหรับ `mail.korkru.com` แล้วโดยเก็บค่าเป็นส่วนตัว Candidate จาก `216d492` รับเฉพาะ recovery feedback `be7ee0d` และ notice สี `e952b4b` รวม 5 application/test files ไม่พ่วง signup feedback, branding, Google หรือ SEB และไม่เพิ่ม schema/package/env การตั้ง SMTP ยังไม่บันทึกและยังไม่ทดสอบอีเมล Production ณ checkpoint นี้
+
+รักษา Production autoconfirm `true`, hosted current-password policy และ recovery template `{{ .ConfirmationURL }}`; quota Production เปิดแล้ว/Staging ปิดตาม rollout เดิม ไม่เปลี่ยน flags หรือ webhook ในงานนี้ สถานะ checks, deploy, localhost parity และ manual test แยกใน [SMTP_PRODUCTION_RELEASE_20261020.md](SMTP_PRODUCTION_RELEASE_20261020.md) ข้อความเก่าด้านล่างเป็นหลักฐานตาม checkpoint ของแต่ละรอบ
+
 ## แจ้งงานใหม่ให้นักเรียนอัตโนมัติ — 20 ตุลาคม 2026 (Production app released; local parity verified)
 
 - เมื่อบันทึกการเผยแพร่หรือการมอบหมายงานสำเร็จ ระบบสร้างการแจ้งงานใหม่ให้ผู้เรียน active ในห้อง/กลุ่มเป้าหมายที่ยังไม่มีรอบ `submitted` หรือ `graded` สำหรับงาน online ชนิดแบบฝึกหัด/ข้อสอบที่ published แล้ว ใช้ `classroom_post` เดิมร่วมกับ `related_assignment_id` โดยประกาศห้องเรียนทั่วไปยังไม่มี assignment ID ไม่เพิ่ม notification type, schema หรือ migration และไม่สร้างรายการย้อนหลังให้ทุกงานเดิม
