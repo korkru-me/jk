@@ -1,5 +1,12 @@
 # Data model และ invariants
 
+## Staging history reconciliation — 20 October 2026
+
+The owner-approved Staging-only reconciliation restores the already-applied `20261009142610` source from recorded history without replay, applies the exact committed retention migration `20261015132234` once and records only that applied version. A fresh CLI comparison confirms 165 local/165 remote versions with no difference. Retention purge functions/indexes/jobs are absent while all five evidence-table row counts are unchanged. No notification schema, RLS or Production migration changes were required.
+
+The resumed hosted test passed real teacher creation/publication and student popup acknowledgement for one synthetic exercise without a due date and one ordinary-browser exam with Asia/Bangkok start/due/close dates. Guarded verification recorded work/notice/read/unread/attempt counts `0/0/0/0/0 → 1/1/0/1/0 → 1/1/1/0/0 → 2/2/1/1/0 → 2/2/2/0/0`; scoped SQL observed the same exam notification ID changing from `is_read=false` to `true`. Reload kept both acknowledgements durable and created no attempts. This resumed run adds no application, schema, RLS or migration change and does not cover SEB, real student data, SMTP or Production testing. Exact cleanup passed: the runner verified personal-organization deletion; independent scoped SQL confirmed zero synthetic Auth users, classrooms, roster rows, questions, assignments, notices and attempts. The private manifest and temporary key file were removed. Current evidence supersedes the earlier hosted-test stop in [STAGING_NOTIFICATION_E2E_20261020.md](STAGING_NOTIFICATION_E2E_20261020.md); older sections retain their original development-stage evidence.
+
+
 ## Resend quota delivery ledger — migration 20261018154826 applied to Production 20 October 2026
 
 Production apply เฉพาะ migration นี้แล้ววันที่ 20 ตุลาคม และ Staging ผ่านก่อนหน้า: ledger แยกจาก Auth/ข้อมูลผู้เรียน เก็บ scope (`local/staging/production`), period (`daily/monthly`), window key, threshold (`80/90/95`), delivery UUID, payload SHA-256 และ timestamps ของ claim/acceptance ไม่เก็บผู้รับ เนื้อหาอีเมล reset link หรือ snapshot usage รายคน รายวันใช้วันแจ้งเตือน UTC; รายเดือนใช้ canonical `monthly.resets_at` จาก provider จึงคงสถานะข้ามวันได้
