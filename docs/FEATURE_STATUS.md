@@ -6,6 +6,8 @@
 
 รักษา Production autoconfirm `true`, hosted current-password policy และ recovery template `{{ .ConfirmationURL }}`; quota Production เปิดแล้ว/Staging ปิดตาม rollout เดิม ไม่เปลี่ยน flags หรือ webhook ในงานนี้ สถานะ checks, deploy, localhost parity และ manual test แยกใน [SMTP_PRODUCTION_RELEASE_20261020.md](SMTP_PRODUCTION_RELEASE_20261020.md) ข้อความเก่าด้านล่างเป็นหลักฐานตาม checkpoint ของแต่ละรอบ
 
+Candidate full 4,671 tests/TypeScript/token lint และ clean-env Node24 Webpack build 76 pages ผ่าน Primary pre-release integration 18 paths ผ่าน full 4,500/focused 47 tests/TypeScript/token lint/build 71 pages พร้อม Cua desktop actual localhost3000 ผ่านกรณี reused-password/success durability/revocation/provider/network และ real login callout ไม่อ้าง mobile 390px หรือ SMTP จริง ฟอร์ม SMTP ยังไม่ Save, PR #76 ยัง Draft และ Ready/post-release parity/manual email test ยังรอ
+
 ## แจ้งงานใหม่ให้นักเรียนอัตโนมัติ — 20 ตุลาคม 2026 (Production app released; local parity verified)
 
 - เมื่อบันทึกการเผยแพร่หรือการมอบหมายงานสำเร็จ ระบบสร้างการแจ้งงานใหม่ให้ผู้เรียน active ในห้อง/กลุ่มเป้าหมายที่ยังไม่มีรอบ `submitted` หรือ `graded` สำหรับงาน online ชนิดแบบฝึกหัด/ข้อสอบที่ published แล้ว ใช้ `classroom_post` เดิมร่วมกับ `related_assignment_id` โดยประกาศห้องเรียนทั่วไปยังไม่มี assignment ID ไม่เพิ่ม notification type, schema หรือ migration และไม่สร้างรายการย้อนหลังให้ทุกงานเดิม
