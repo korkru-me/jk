@@ -8,6 +8,14 @@ The release audit compares current Production source `origin/master` `983a405` w
 
 This remaining candidate promotes only the guarded Staging QA runner, its safety tests and the recorded verification evidence. It introduces no application behavior, Production schema/configuration change or new migration. The restored `20261009142610_atomic_seb_exam_start.sql` stays in Staging history and is excluded; unrelated Auth/Resend/SEB changes and newer Production release records are preserved. The fresh deployment and primary-local checks for this handoff are recorded below; the earlier application release evidence remains historical.
 
+## Completed QA promotion and local handoff — 20 October 2026
+
+PR [#81](https://github.com/korkru-me/jk/pull/81) merged the remaining eight QA/evidence paths into `master` as `342be24ca3a9a0cfda83298757515a4d5c958976` (source branch `codex/assignment-notice-e2e-release-20261020`, pushed commit `56e6343173db2e96d7d521848b6106c3e73508f5`). Canonical Production inspection after the merge confirms **READY** deployment `dpl_9iEobdYNEeocZDJQa3EVqC28xPtS`, exact Git SHA `342be24ca3a9a0cfda83298757515a4d5c958976`; `www.korkru.com` and `korkru.com` both point to it. Application files remain identical to the earlier audited Ready source. This following handoff changes documentation only.
+
+The eight task paths were synced into the actual primary checkout on port 3000: the four shared documents received only the task's added sections, preserving their existing content; the assigned-work release record and three new QA/evidence files received the committed task versions. The primary branch/index and running server remain unchanged. Re-running both runner test files **on primary itself** passes **103/103**; syntax and scoped whitespace checks also pass. A byte/status verifier confirms all original **50 unrelated dirty/untracked paths** remain unchanged, aggregate SHA-256 `12cc31a6dc197dbf0f25869a178540bc60b78ebf259a0fa66b26f9bdf46defa2`. The local task filesystem changes are backed by the isolated, pushed master release; no snapshot commit or broad staging of the shared primary checkout was used. The handoff record is committed/pushed from the isolated release checkout.
+
+No chat application work, migration dependency or local application sync remains pending. Real manual reminder-button delivery, SEB/SMTP and real-student UAT are outside the completed new-work publication/acknowledgement acceptance run; no new claim is made for those cases.
+
 ## Fresh release/parity audit — 20 October 2026, 21:26 Asia/Bangkok
 
 - Read-only canonical Production inspection confirms `https://www.korkru.com` is **READY**, deployment `dpl_Bp2qHKyhEP1f7i8LkEtiQPxdUhYp`, exact Git source `983a405aa023bfb439838fe98a200c3ce4686bd8` on `master`; both canonical aliases resolve to it. Public `/login` returns 200 and the isolated notification lab returns 404. This verifies deployment/public isolation, not Production data delivery.
