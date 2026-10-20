@@ -1,5 +1,9 @@
 # Feature status
 
+## ปุ่มเตือนงาน — ทดสอบ Staging จริงครบวงจร, 20 ตุลาคม 2026
+
+กด **เตือน** ที่หัวคอลัมน์งานผ่าน UI ครูจริงแล้ว สร้าง `assignment_reminder` สองรายการเฉพาะผู้ยังไม่เริ่มและกำลังทำ; ผู้ส่งแล้ว/ตรวจแล้วไม่มีรายการ นักเรียนสังเคราะห์ทั้งสี่เข้าสู่ dashboard จริง: สองผู้รับเห็นป้ายและปุ่มถูกต้อง กด **รับทราบ** แล้ว exact notice ID เปลี่ยนจากยังไม่อ่านเป็นอ่านแล้วตามลำดับ **0 → 1 → 2** รีโหลดไม่แสดงซ้ำ; อีกสองคนไม่มีป๊อปอัป Snapshot สาม attempts/สาม answers คะแนน รุ่นและเวลาไม่เปลี่ยน Browser warning/error ว่าง ใช้ Staging ที่ parity **165/165** ไม่เปลี่ยนแอป/RLS/schema/migration และไม่ทดสอบข้อมูล Production Runner QA ผ่าน **51 เคส / 175 เคสรวม 5 suites** รวม PGlite **cleanup ผ่านแล้ว:** revoke sessions ก่อนลบ Runner ยืนยันห้าบัญชีและข้อมูลของ run; SQL แยกยืนยันทั้งเก้าหมวดรวม personal organizations เหลือศูนย์ ลบ manifest/temporary key file แล้ว รายละเอียดใน [STAGING_MANUAL_REMINDER_E2E_20261020.md](STAGING_MANUAL_REMINDER_E2E_20261020.md); สถานะ hosted manual-reminder ที่ยังรอในบันทึกเก่าด้านล่างเป็นประวัติ ไม่อ้างทดสอบกดซ้ำ/concurrency/SMTP/SEB
+
 ## Staging migration parity and real notification verification — 20 October 2026
 
 - ตามคำขอและการอนุมัติเฉพาะ Staging กู้ไฟล์ SEB ที่เคยรันจาก remote history โดยตรวจ SHA ตรงต้นฉบับ และใช้ migration เดิม `20261015132234` เพียงตัวเดียวพร้อมบันทึก applied ตรวจสดผ่าน **165 local / 165 remote** ไม่มี version ตกค้าง ข้อมูลหลักฐานเดิมไม่เปลี่ยน ไม่แตะ Production และไม่ replay migration SEB

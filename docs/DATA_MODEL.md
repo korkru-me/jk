@@ -1,5 +1,9 @@
 # Data model และ invariants
 
+## Durable manual-reminder receipts — 20 October 2026
+
+A real Staging teacher reminder click changed the exact synthetic assignment from zero notices to two unread `assignment_reminder` rows, exclusively for never-started/in-progress recipients; submitted/graded recipients retained zero rows. Real student acknowledgements changed exact IDs `67421516-0f3b-4274-a984-18c7b19c5923` and `f8ae57e4-0074-4516-b41b-b188abaa4d10` to `is_read=true`, producing read counts 0 → 1 → 2 and reload suppression. The existing three-attempt/three-answer baseline, scores, revisions and timers stayed unchanged. No application/schema/RLS/migration change or Production data test was required; fresh Staging parity was 165/165. **Exact-run cleanup passed:** sessions were revoked before deletion, independent SQL confirmed all nine synthetic resource categories including the five personal organizations at zero, and the private manifest/temporary key file were removed. See [STAGING_MANUAL_REMINDER_E2E_20261020.md](STAGING_MANUAL_REMINDER_E2E_20261020.md) for IDs, focused tests and bounded scope; old manual-delivery stops below remain historical.
+
 ## Staging history reconciliation — 20 October 2026
 
 The owner-approved Staging-only reconciliation restores the already-applied `20261009142610` source from recorded history without replay, applies the exact committed retention migration `20261015132234` once and records only that applied version. A fresh CLI comparison confirms 165 local/165 remote versions with no difference. Retention purge functions/indexes/jobs are absent while all five evidence-table row counts are unchanged. No notification schema, RLS or Production migration changes were required.

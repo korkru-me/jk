@@ -1,5 +1,7 @@
+import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { assertStagingEnvironment, createStagingFetch, main, parseRunMode, privateFixturePath, validateFixtureManifest, verifyReminderRows } from './verify-assignment-reminders-staging.mjs'
+import { assertStagingEnvironment, buildReminderAssignmentSchedule, createStagingFetch, main, parseRunMode, privateFixturePath, validateFixtureManifest, verifyReminderRows } from './verify-assignment-reminders-staging.mjs'
+import { normalizeAssignmentLateSchedule } from '../lib/late-submission.ts'
 
 const project = 'dyuxkrzeveknqgtuzpbh'
 const args = ['--execute', '--confirm=assignment-reminders-staging-synthetic']
@@ -10,6 +12,7 @@ const environment = () => ({
   NEXT_PUBLIC_SITE_URL: 'https://staging.korkru.com', NEXT_PUBLIC_SUPABASE_URL: `https://${project}.supabase.co`,
   NEXT_PUBLIC_SUPABASE_ANON_KEY: jwt('anon'), SUPABASE_SERVICE_ROLE_KEY: jwt('service_role'),
 })
+const temporaryPaths = []
 function manifest() {
   const run = id(1)
   const accounts = ['owner', 'never-started', 'in-progress', 'submitted', 'graded'].map((label, index) => ({
@@ -30,7 +33,30 @@ function reminders(state = manifest()) {
     related_assignment_id: state.assignmentId, related_classroom_id: state.classroomId, is_read: false,
   }))
 }
-afterEach(() => vi.restoreAllMocks())
+afterEach(() => { vi.restoreAllMocks(); for (const path of temporaryPaths.splice(0)) rmSync(path, { force: true }) })
+
+describe('synthetic reminder assignment schedule contract', () => {
+  it('supplies one valid late band at the exact due instant using one captured clock value', () => {
+    const now = Date.parse('2026-10-20T15:30:47.123Z')
+    const schedule = buildReminderAssignmentSchedule(now, id(90))
+    const validated = normalizeAssignmentLateSchedule({ startAt: schedule.start_at, dueAt: schedule.due_at,
+      endAt: schedule.end_at, bands: schedule.late_bands })
+    expect(validated).toEqual({ value: { dueAt: schedule.due_at, bands: schedule.late_bands } })
+    expect(schedule.late_bands).toHaveLength(1)
+    expect(schedule.late_bands[0].starts_at).toBe(schedule.due_at)
+    expect(Date.parse(schedule.due_at) - now).toBe(86_400_000)
+    expect(Date.parse(schedule.end_at) - Date.parse(schedule.due_at)).toBe(86_400_000)
+    expect(Date.parse(schedule.start_at)).toBeLessThan(now)
+  })
+  it('reproduces the rejected old fixture contract so a due date cannot lose its required band again', () => {
+    const schedule = buildReminderAssignmentSchedule(Date.parse('2026-10-20T15:30:47.123Z'), id(90))
+    expect(normalizeAssignmentLateSchedule({ startAt: schedule.start_at, dueAt: schedule.due_at,
+      endAt: schedule.end_at, bands: [] })).toMatchObject({ error: expect.any(String) })
+    expect(normalizeAssignmentLateSchedule({ startAt: schedule.start_at, dueAt: schedule.due_at,
+      endAt: schedule.end_at, bands: [{ ...schedule.late_bands[0], starts_at: schedule.end_at }] }))
+      .toMatchObject({ error: expect.any(String) })
+  })
+})
 
 describe('assignment reminder Staging execution fence', () => {
   it('requires the exact Staging project/site and explicit synthetic confirmation', () => {
@@ -103,6 +129,7 @@ describe('fixture provenance and cleanup bounds', () => {
     state => { state.prefix = 'unrelated run' },
     state => { state.accounts[0].email = 'real@example.com' },
     state => { state.accounts[0].role = 'student' },
+    state => { state.accounts[0].orgIds = [] },
     state => { state.accounts[1].label = 'owner' },
     state => { state.accounts.push({ ...state.accounts[0] }) },
     state => { state.submissions.push({ ...state.submissions[0] }) },
@@ -170,5 +197,90 @@ describe('bounded Staging-only request reuse', () => {
     const output = JSON.stringify(trace.mock.calls)
     expect(output).not.toContain(id(50))
     expect(output).not.toContain('private-token')
+  })
+})
+
+describe('partial synthetic account setup cleanup recovery', () => {
+  // Exercise the actual SDK and runner against fake HTTP. Simulate a setup
+  // membership read failure and one failed automatic cleanup read, leaving a
+  // private receipt that the explicit cleanup invocation must safely recover.
+  function partialSetupTransport(path, { wrongAuth = false, shared = false, extraMembership = false } = {}) {
+    let account = null, membershipFailuresRemaining = 2
+    const orgId = id(90), requests = [], repairedReceipts = []
+    const json = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } })
+    const fetch = vi.fn(async (input, init) => {
+      const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url)
+      expect(url.origin).toBe(`https://${project}.supabase.co`)
+      const method = init?.method ?? 'GET'
+      requests.push({ method, path: url.pathname })
+      if (url.pathname.startsWith('/rest/v1/') && url.searchParams.get('limit') === '0') return json([])
+      if (url.pathname === '/auth/v1/admin/users' && method === 'POST') {
+        const payload = JSON.parse(init.body)
+        account = { id: id(80), email: payload.email, user_metadata: payload.user_metadata, aud: 'authenticated', role: 'authenticated' }
+        return json(account)
+      }
+      if (url.pathname === `/auth/v1/admin/users/${id(80)}`) {
+        if (method === 'DELETE') return json(account)
+        return json({ ...account, user_metadata: wrongAuth ? { ...account.user_metadata, qa_run: id(999) } : account.user_metadata })
+      }
+      if (url.pathname === '/rest/v1/organization_members') {
+        if (url.searchParams.has('user_id')) {
+          expect(url.searchParams.get('user_id')).toBe(`eq.${account.id}`)
+          if (membershipFailuresRemaining > 0) { membershipFailuresRemaining -= 1; return json({ code: 'P0001', message: 'Synthetic setup read failed' }, 400) }
+          return json(extraMembership ? [{ org_id: orgId, org_role: 'owner' }, { org_id: id(91), org_role: 'owner' }] : [{ org_id: orgId, org_role: 'owner' }])
+        }
+        expect(url.searchParams.get('org_id')).toBe(`eq.${orgId}`)
+        return json(shared ? [{ user_id: account.id, org_role: 'owner' }, { user_id: id(999), org_role: 'member' }] : [{ user_id: account.id, org_role: 'owner' }])
+      }
+      if (url.pathname === '/auth/v1/token') {
+        expect(JSON.parse(init.body).email).toBe(account.email)
+        return json({ access_token: jwt('authenticated'), refresh_token: 'fixture-refresh-token', expires_in: 3600, token_type: 'bearer', user: account })
+      }
+      if (url.pathname === '/auth/v1/logout') return new Response(null, { status: 204 })
+      if (url.pathname === '/rest/v1/organizations' && method === 'DELETE') {
+        expect(url.searchParams.get('id')).toBe(`eq.${orgId}`)
+        repairedReceipts.push(JSON.parse(readFileSync(path, 'utf8')).accounts[0])
+        return new Response(null, { status: 204 })
+      }
+      if (['/rest/v1/classrooms', '/rest/v1/assignments', '/rest/v1/questions'].includes(url.pathname)) {
+        expect(url.searchParams.get('org_id')).toBe(`eq.${orgId}`)
+        return json([])
+      }
+      throw new Error(`Unexpected mocked request ${method} ${url.pathname}`)
+    })
+    return { fetch, requests, repairedReceipts, orgId }
+  }
+  async function failSetupThenRetryCleanup(options = {}) {
+    const path = `/private/tmp/korkru-assignment-reminders-staging-partial-${process.pid}.json`; temporaryPaths.push(path)
+    const fake = partialSetupTransport(path, options)
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fake.fetch)
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined)
+    expect(await main([...args, '--create-fixture', '--keep-fixture', `--fixture-file=${path}`], environment())).toBe(1)
+    const state = JSON.parse(readFileSync(path, 'utf8'))
+    expect(state.accounts).toHaveLength(1)
+    expect(state.accounts[0]).toMatchObject({ label: 'owner', membershipVerified: false, orgIds: [] })
+    expect(state.classroomId).toBeNull()
+    expect(fake.requests.filter(row => row.method === 'DELETE')).toHaveLength(0)
+    const result = await main([...args, `--cleanup-fixture=${path}`], environment())
+    expect(JSON.stringify(log.mock.calls)).not.toContain(state.accounts[0].password)
+    expect(JSON.stringify(log.mock.calls)).not.toContain(environment().SUPABASE_SERVICE_ROLE_KEY)
+    return { ...fake, result, path, state }
+  }
+  it('recovers the exact provisioned personal organization after failed setup reads, persists ownership, and cleans up only that account', async () => {
+    const recovered = await failSetupThenRetryCleanup()
+    expect(recovered.result).toBe(0)
+    expect(existsSync(recovered.path)).toBe(false)
+    expect(recovered.repairedReceipts).toHaveLength(1)
+    expect(recovered.repairedReceipts[0]).toMatchObject({ id: recovered.state.accounts[0].id, membershipVerified: true, orgIds: [recovered.orgId] })
+    expect(recovered.requests.filter(row => row.method === 'DELETE').map(row => row.path))
+      .toEqual(['/rest/v1/organizations', `/auth/v1/admin/users/${recovered.state.accounts[0].id}`])
+    expect(recovered.requests.findIndex(row => row.path === '/auth/v1/logout')).toBeLessThan(recovered.requests.findIndex(row => row.method === 'DELETE'))
+  })
+  it.each([{ wrongAuth: true }, { shared: true }, { extraMembership: true }])('retains a failed partial fixture without deletion or sign-out when recovery provenance is unsafe (%j)', async options => {
+    const recovered = await failSetupThenRetryCleanup(options)
+    expect(recovered.result).toBe(1)
+    expect(existsSync(recovered.path)).toBe(true)
+    expect(JSON.parse(readFileSync(recovered.path, 'utf8')).accounts[0]).toMatchObject({ membershipVerified: false, orgIds: [] })
+    expect(recovered.requests.filter(row => row.method === 'DELETE' || row.path === '/auth/v1/logout')).toHaveLength(0)
   })
 })
