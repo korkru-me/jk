@@ -1,5 +1,11 @@
 # Feature status
 
+## กรอบห้องเรียนครูเห็นกวางชัดเจน — 20 ตุลาคม 2026 (local only; not released)
+
+ปรับเฉพาะหัว `TeacherViewClient`: ขอบ 2px พื้น primary จาง หัวข้อ/สถิติ/ไอคอน/ปุ่มมีสัดส่วนใหญ่ขึ้น และให้กวางจาก brand asset เดิมมีช่อง grid แยกจากปุ่มเลือก/สร้าง ห้องเรียนและการจัดการข้อมูลยังใช้พฤติกรรมเดิม เมื่อ container แคบกว่า 48rem ปุ่มอยู่แถวเต็มใต้หัวข้อกับกวาง; แถบเลือกยังแสดงจำนวนและเลือกทั้งหมดได้
+
+ตรวจ TypeScript, token lint และ isolated Webpack production build ผ่าน; Next MCP compilation issues และ runtime errors ว่าง ใช้ข้อมูลสมมติบน localhost:3000 ตรวจ desktop, tablet, 390px, 320px, dark mode, ห้องว่าง, เลือกทั้งหมด/ยกเลิก และ app shell ย่อเมนู โดยปุ่มสูง 44px ไม่ทับกวางและไม่ล้นแนวนอน หน้าครูจริงที่เจ้าของเข้าสู่ระบบให้ ตรวจเฉพาะตัวเลข DOM: header 119.2px, border 2px, title 28px และปุ่มไม่ทับกวาง ไม่เก็บภาพ/รายละเอียดบัญชีจริงหลัง automatic approval review ปฏิเสธการตรวจแบบกว้าง ใช้ route ตัวอย่างเดิม `/exam-screen-lab/classroom-list`; ลบ route ชั่วคราวและคืนการเปลี่ยน tsconfig ที่ build สร้างแล้ว ไม่รัน unit suite เพราะไม่มีการแก้ logic/lib ไม่มี migration หรือการเขียนข้อมูลทดสอบ และยังไม่ deploy Production
+
 ## เตรียม Production SMTP และผลกู้รหัสผ่าน — 20 ตุลาคม 2026 (candidate ยังไม่ deploy)
 
 เจ้าของอนุญาตตั้ง Production SMTP และทดสอบลืมรหัสผ่านทีละขั้นตอน พร้อมรายงานว่าสร้าง Sending access key แยกสำหรับ `mail.korkru.com` แล้วโดยเก็บค่าเป็นส่วนตัว Candidate จาก `216d492` รับเฉพาะ recovery feedback `be7ee0d` และ notice สี `e952b4b` รวม 5 application/test files ไม่พ่วง signup feedback, branding, Google หรือ SEB และไม่เพิ่ม schema/package/env การตั้ง SMTP ยังไม่บันทึกและยังไม่ทดสอบอีเมล Production ณ checkpoint นี้
