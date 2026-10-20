@@ -1,10 +1,10 @@
 # Architecture
 
-## Recovery result handoff — 20 October 2026 (Production candidate)
+## Recovery result handoff — 20 October 2026 (Production application released)
 
 The recovery-only candidate ports the already Staging-validated `be7ee0d` and `e952b4b` behavior onto Production base `216d492`. Reset POST still requires the exact verified user/session and ten-minute recovery grant. A provider `same_password` response becomes a persistent field error without consuming that grant or signing out. After an accepted password update, the action clears the grant, awaits global sign-out and redirects with `RedirectType.replace` to `/login?password_changed=1`; revocation errors or exceptions add `sessions_revoked=0`. Client `unstable_rethrow` preserves Next navigation, so cookie cleanup cannot replace success with the expired-link gate. The login notice persists through refresh and conveys honest success/warning states; its query parameters never authorize recovery.
 
-No callback, intent/grant policy, signup, Google, quota, schema, dependency or environment contract changes are included. The committed candidate passes a clean-environment Node24 Webpack build. Actual primary pre-release integration closes 18 narrowly selected paths while preserving unrelated/Auth callback work; tests, a separate clean build and Cua desktop checks pass. This does not replace pending Ready-source verification, post-release parity, SMTP activation or hosted manual recovery. See [SMTP_PRODUCTION_RELEASE_20261020.md](SMTP_PRODUCTION_RELEASE_20261020.md) and its sanitized reconstruction manifest.
+No callback, intent/grant policy, signup, Google, quota, schema, dependency or environment contract changes are included. The committed candidate passes a clean-environment Node24 Webpack build. Actual primary pre-release integration closes 18 narrowly selected paths while preserving unrelated/Auth callback work; tests, a separate clean build and Cua desktop checks pass. PR #76 / `f488c93` is Ready on Production and post-Ready primary source/runtime checks pass. SMTP activation and hosted manual recovery still await the owner; primary mobile rendering was not reverified. See [SMTP_PRODUCTION_RELEASE_20261020.md](SMTP_PRODUCTION_RELEASE_20261020.md) and its sanitized reconstruction manifest.
 
 ## Newly assigned work notices — 20 October 2026 (Production app released; local parity verified)
 

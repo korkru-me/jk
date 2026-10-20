@@ -181,8 +181,8 @@
   },
   "temporaryFixtureFilesRemoved": 4,
   "fixtureDirectoryAbsent": true,
-  "postReadyVerificationPending": true,
-  "productionDeployedAtThisCheckpoint": false,
+  "postReadyVerificationPending": false,
+  "productionDeployedAtThisCheckpoint": true,
   "smtpSavedAtThisCheckpoint": false,
   "productionEmailTestedAtThisCheckpoint": false,
   "privatePatchIncluded": false,
@@ -198,5 +198,17 @@
     "quotaFlagsChanged": false,
     "candidateEnvironmentContractChanged": false,
     "note": "Earlier no-environment-change findings describe the source/check audit before this later local configuration step."
+  },
+  "productionRelease": {
+    "source": "f488c93894346cf74736a43783a9cf6f5369a2f2",
+    "deployment": "dpl_AGq5Kj9LbA3vgRVjfPTTbjZpwK5C",
+    "state": "READY",
+    "readyAt": "2026-10-20T05:13:45.043Z",
+    "canonicalOrigin": "https://www.korkru.com",
+    "publicAuthChecksPassed": 4,
+    "postReadyPrimaryHashesMatched": 18,
+    "postReadyPrimaryCompilationIssues": 0,
+    "postReadyPrimaryLoginNoticeVisible": true,
+    "realAccountOrEmailUsedForTheseChecks": false
   }
 }

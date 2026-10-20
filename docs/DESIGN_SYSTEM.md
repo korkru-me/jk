@@ -1,6 +1,6 @@
 # Brand, language และ UI rules
 
-## ผลเปลี่ยนรหัสผ่าน — 20 ตุลาคม 2026 (Production candidate)
+## ผลเปลี่ยนรหัสผ่าน — 20 ตุลาคม 2026 (Production application released)
 
 `Alert` เพิ่ม variant `success`/`warning` โดยใช้ semantic tokens เดิม พื้นและขอบอ่อน ตัวอักษรผสม foreground และไอคอน CircleCheck/TriangleAlert ทำให้ “เปลี่ยนรหัสผ่านแล้ว” เด่นชัดโดยไม่พึ่งสีอย่างเดียว คำเตือนใช้เมื่อ global sign-out ยังยืนยันไม่สำเร็จ ฟอร์ม reset ใช้ Field/InputGroup/error association ร่วมกับระบบ ปุ่ม/ช่องสูงอย่างน้อย 44px และ gap 12px แสดงข้อผิดพลาดใต้ช่องพร้อมคืน focus หลังเปิดช่อง ไม่เปลี่ยนขนาดโลโก้หรือการจัดหน้า signup ใน release นี้
 

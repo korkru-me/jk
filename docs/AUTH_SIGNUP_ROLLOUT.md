@@ -1,6 +1,10 @@
 # ระบบสมัครและความน่าเชื่อถือของบัญชี — 17 ตุลาคม 2026
 
-## สถานะปัจจุบัน 20 ตุลาคม — Production SMTP/recovery candidate
+## สถานะปัจจุบัน 20 ตุลาคม — recovery application released; SMTP Save ยังรอ
+
+PR [#76](https://github.com/korkru-me/jk/pull/76) merge เป็น `f488c93894346cf74736a43783a9cf6f5369a2f2` และ Production deployment `dpl_AGq5Kj9LbA3vgRVjfPTTbjZpwK5C` READY พร้อม canonical `www.korkru.com` แล้ว ตรวจ public auth notices/gate และ actual primary source/runtime หลัง Ready ผ่าน ฟอร์ม SMTP เตรียมครบแต่ Password ยังว่าง เจ้าของต้องวางคีย์และ Save เอง จากนั้นจึงตรวจ SMTP และทดสอบอีเมล recovery จริงทีละขั้น ยังไม่มีการบันทึก SMTP/ส่งอีเมลหรือเปลี่ยนรหัส Production ในรอบนี้ รักษา signup/current-password/Google/SEB/quota ตามเดิม ดู [SMTP_PRODUCTION_RELEASE_20261020.md](SMTP_PRODUCTION_RELEASE_20261020.md)
+
+### ประวัติการเตรียม candidate ก่อน release
 
 เจ้าของอนุญาตตั้ง Production SMTP และทดสอบ recovery จริงแบบทีละขั้นตอนแล้ว และรายงานว่าสร้าง key `korkru-production-supabase-smtp` แบบ Sending access เฉพาะ `mail.korkru.com` โดยเก็บค่าเป็นส่วนตัว ต่อจาก handoff `d34acf4` การตรวจ native Auth ล่าสุดแบบกรองค่าลับพบ custom SMTP 4 รายการยัง absent, Site URL `https://www.korkru.com`, autoconfirm `true` และ recovery `{{ .ConfirmationURL }}` เดิม ยังไม่บันทึก SMTP หรือส่งอีเมลจากการเตรียม candidate
 

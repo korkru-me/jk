@@ -1,6 +1,10 @@
 # Feature status
 
-## เตรียม Production SMTP และผลกู้รหัสผ่าน — 20 ตุลาคม 2026 (candidate ยังไม่ deploy)
+## Production SMTP และผลกู้รหัสผ่าน — 20 ตุลาคม 2026 (application released; SMTP Save ยังรอ)
+
+PR [#76](https://github.com/korkru-me/jk/pull/76) ปล่อย source `f488c93894346cf74736a43783a9cf6f5369a2f2` แล้ว Deployment `dpl_AGq5Kj9LbA3vgRVjfPTTbjZpwK5C` READY พร้อม canonical `www.korkru.com`; public auth rendering/gate และ actual primary port 3000 ตรวจหลัง Ready แล้ว ผลกู้รหัสผ่านคงอยู่บน login ใช้สีสำเร็จ/คำเตือนและอธิบายรหัสเดิมซ้ำ SMTP ยังรอเจ้าของกรอก Password/Save และยังไม่ทดสอบอีเมล Production รายละเอียดและข้อจำกัดจอ 390px อยู่ใน [SMTP_PRODUCTION_RELEASE_20261020.md](SMTP_PRODUCTION_RELEASE_20261020.md)
+
+### ขอบเขตการเตรียมที่ปล่อยแล้ว
 
 เจ้าของอนุญาตตั้ง Production SMTP และทดสอบลืมรหัสผ่านทีละขั้นตอน พร้อมรายงานว่าสร้าง Sending access key แยกสำหรับ `mail.korkru.com` แล้วโดยเก็บค่าเป็นส่วนตัว Candidate จาก `216d492` รับเฉพาะ recovery feedback `be7ee0d` และ notice สี `e952b4b` รวม 5 application/test files ไม่พ่วง signup feedback, branding, Google หรือ SEB และไม่เพิ่ม schema/package/env การตั้ง SMTP ยังไม่บันทึกและยังไม่ทดสอบอีเมล Production ณ checkpoint นี้
 
