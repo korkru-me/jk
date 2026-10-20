@@ -1,6 +1,14 @@
 # Assignment reminders — 20 October 2026
 
-Status: the clean Production-base candidate passes final unit/type/token/build checks, and the actual localhost:3000 synthetic UI passes browser verification. Application publication is still pending. Hosted real teacher-to-student Staging delivery was intentionally not performed because migration preflight found the recorded history mismatch and AGENTS requires stopping database mutations. This record does not describe the already released 19 October gradebook/deadline work as unfinished.
+Status: **Production application released and actual primary-local parity verified.** PR [#71](https://github.com/korkru-me/jk/pull/71) merged as `949c44d72839d5fea0f6e32c27cdba7cc2b690b8`; its Production deployment is READY with canonical aliases. Full candidate checks and actual localhost:3000 UI/runtime checks pass. Hosted real teacher-to-student delivery remains explicitly unverified: the recorded Staging history mismatch stopped database mutations, and hosted browser navigation reached Vercel SSO/login only. No authentication bypass or fixture writes were used to close that gap.
+
+## Published application and primary-local parity
+
+- Production merge: `949c44d72839d5fea0f6e32c27cdba7cc2b690b8`; deployment `dpl_8SVMyARhA4hGmKFb7ZMC488Yt9P6`, READY, canonical aliases `www.korkru.com` and `korkru.com` confirmed.
+- Read-only public Production checks returned HTTP 200 for `https://www.korkru.com/login` and HTTP 404 for `/exam-screen-lab/assignment-reminders`, confirming that the synthetic lab remains disabled on Production. These responses do not verify authenticated reminder delivery.
+- Staging commit: `1916b46c3101df1f853ae17cb1b349e7741611f9`; deployment `dpl_EPnBH6xtHE5azGhdftXiXj99c7cv`, READY, canonical `staging.korkru.com` confirmed by deployment metadata. This is not a claim of hosted lab or visible environment-badge verification.
+- Primary application commit `a03ce5f` is pushed on `codex/student-classroom-cards`. All seven actual application files match the release byte-for-byte: score matrix, app layout, student announcement inbox, notification bell, notification actions, assignment reminder helper and notice-path helper.
+- The actual primary port 3000 server was verified with CUA and Next MCP; runtime errors are **0**. Keyboard focus on the real reminder control showed the intended explanatory Tooltip. Existing protected tsconfig, PDF-preview and patch hashes remain unchanged, and independent Auth/unrelated local work is preserved.
 
 ## Behavior
 
@@ -25,12 +33,12 @@ No migration, table, RLS grant, notification type or external email/Auth/passwor
 
 ## Staging preflight stop and unverified delivery
 
-Read-only Staging migration preflight returned **165 history rows** and the already recorded exceptions: remote-only `20261009142610` and local-only `20261015132234`. No new reminder migration is needed, but the AGENTS history-mismatch rule still requires stopping database mutations. No synthetic fixture/account/notification was created, no project keys were read, and no schema was applied, repaired or replayed in this task. The exception was not silently reconciled or treated as permission to continue test writes.
+Read-only Staging migration preflight returned **165 history rows** and the already recorded exceptions: remote-only `20261009142610` and local-only `20261015132234`. No new reminder migration is needed, but the AGENTS history-mismatch rule still requires stopping database mutations. No synthetic fixture/account/notification was created, no project keys were used for hosted fixture requests, and no schema was applied, repaired or replayed in this task. The exception was not silently reconciled or treated as permission to continue test writes.
 
 **Hosted real teacher button → stored notification → student popup → acknowledgement was intentionally not performed.** Deployed RLS/data behavior and real delivery remain a release-verification limitation, not a passing test. No cleanup run is required because no hosted fixture was created.
 
 The prepared fixed-target `scripts/verify-assignment-reminders-staging.mjs` supports explicit create/retain, read-only notification verification and exact cleanup modes for a later permitted run. It would create one synthetic teacher and four students (never started, in progress, submitted and graded), with nonzero completed scores and legal close/grade/review transitions. Its mode-0600 private manifest would contain synthetic credentials, exact IDs and score/timer metadata baselines; project keys and session tokens are never persisted. Verification expects only the two unfinished recipients and can check read counts after real UI acknowledgement. Cleanup verifies provenance and revokes sessions before deleting exact run-owned rows, personal organizations and accounts. Creating a new attempt through the never-started learner's take URL falls outside its saved baseline; use acknowledgement or the already in-progress learner for that scoped browser check.
 
-## Remaining release work
+## Handoff and remaining verification gap
 
-Commit and push only the scoped application/tests/docs, publish the prepared application candidate while preserving independent Auth work, wait for Ready/canonical alias confirmation, and verify the released scope on the actual primary localhost:3000. Record exact commits, deployments and any remaining limitations here. Do not portray the completed offline/local checks as a hosted end-to-end pass; any later Staging data test must first satisfy the repository's migration-history rule and use synthetic accounts only.
+The application is deployed; do not repeat publication merely because the hosted data test was not run. This handoff records the Ready deployments, pushed primary application commit and primary-local parity. A subsequent documentation-only merge may advance hosting without changing the verified application files. Any later real Staging delivery/acknowledgement test must first satisfy the migration-history rule and normal hosting access, use synthetic accounts only, and verify exact cleanup. Completed offline/local checks and deployment metadata must not be described as a hosted end-to-end pass.
