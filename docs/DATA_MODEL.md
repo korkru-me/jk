@@ -1,5 +1,9 @@
 # Data model และ invariants
 
+## Staging history reconciliation — 20 October 2026
+
+The owner-approved Staging-only reconciliation restores the already-applied `20261009142610` source from recorded history without replay, applies the exact committed retention migration `20261015132234` once and records only that applied version. A fresh CLI comparison confirms 165 local/165 remote versions with no difference. Retention purge functions/indexes/jobs are absent while all five evidence-table row counts are unchanged. No notification schema, RLS or Production migration changes were required. Hosted notification delivery remains pending normal Vercel sign-in and UI verification; exact evidence is in [STAGING_NOTIFICATION_E2E_20261020.md](STAGING_NOTIFICATION_E2E_20261020.md).
+
 ## Assigned-work notice projection — 20 October 2026 (local application change; no migration)
 
 New-work notifications reuse existing `notifications` columns: `type = 'classroom_post'`, nonnull `related_assignment_id`, one canonical eligible `related_classroom_id`, recipient, actor, assignment organization, title/body/link and `is_read`. Ordinary classroom announcement notifications keep no related assignment ID; explicit reminders keep `type = 'assignment_reminder'`. There is no new persisted type enum, table, column, receipt table, RLS grant or migration. No historical notification backfill runs.
