@@ -16,7 +16,7 @@ interface Query { view?: string; people?: string; role?: string; type?: string; 
 export const dynamic = 'force-dynamic'
 
 export default async function ClassroomEntryLabPage({ searchParams }: { searchParams: Promise<Query> }) {
-  if (process.env.NODE_ENV === 'production' || !isExamScreenLabEnabled(process.env)) notFound()
+  if (!isExamScreenLabEnabled(process.env)) notFound()
   const query = await searchParams
   const canManage = query.role !== 'view'
   const homeroom = query.type === 'homeroom'
