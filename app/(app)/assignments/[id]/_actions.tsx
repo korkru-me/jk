@@ -26,7 +26,8 @@ export function AssignmentActions({ assignmentId, currentStatus }: Props) {
     const result = await updateAssignmentStatus(assignmentId, status)
     if (result?.error) toast.error(result.error)
     else {
-      toast.success(
+      if ('notificationWarning' in result && result.notificationWarning) toast.warning(result.notificationWarning)
+      else toast.success(
         status === 'published'
           ? currentStatus === 'closed' ? 'เปิดชุดข้อสอบให้ทำอีกครั้งแล้ว' : 'เผยแพร่ชุดข้อสอบแล้ว'
           : 'ปิดชุดข้อสอบแล้ว'

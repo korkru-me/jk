@@ -11,12 +11,27 @@ export interface PendingAssignmentReminder {
   inProgress: boolean
 }
 
+export type AssignmentNoticeKind = 'assigned' | 'reminder'
+
+export interface PendingAssignmentNotice extends PendingAssignmentReminder {
+  kind: AssignmentNoticeKind
+  assignmentType: 'exercise' | 'exam'
+  /** Print assignments were removed; only the current online model is valid. */
+  mode: 'online'
+  dueAt: string | null
+  startAt: string | null
+}
+
 export interface AssignmentReminderRecord {
   id: string
   related_assignment_id: string | null
   related_classroom_id: string | null
   is_read: boolean
   created_at: string
+}
+
+export interface AssignmentNoticeRecord extends AssignmentReminderRecord {
+  type: string
 }
 
 export interface ReminderSubmission {
@@ -39,8 +54,8 @@ export function missingSubmissionStudentIds(rosterIds: readonly string[], submis
 /** An acknowledged newest reminder suppresses older duplicates. A subsequent
  * explicit reminder is a new row and may appear again. Metadata in these rows
  * remains untrusted until the reader rechecks the student's assignment reach. */
-export function latestAssignmentReminderRecords(rows: readonly AssignmentReminderRecord[]): AssignmentReminderRecord[] {
-  const latest = new Map<string, AssignmentReminderRecord>()
+export function latestAssignmentReminderRecords<T extends AssignmentReminderRecord>(rows: readonly T[]): T[] {
+  const latest = new Map<string, T>()
   for (const row of rows) {
     if (!isAssignmentReminderId(row.id) || !isAssignmentReminderId(row.related_assignment_id)
       || !isAssignmentReminderId(row.related_classroom_id) || !Number.isFinite(Date.parse(row.created_at))) continue
@@ -51,6 +66,20 @@ export function latestAssignmentReminderRecords(rows: readonly AssignmentReminde
   }
   return [...latest.values()].filter(row => !row.is_read)
     .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at) || b.id.localeCompare(a.id))
+}
+
+/** Ordinary classroom posts have no related assignment and are not work
+ * notices. The recipient may edit their own rows, so IDs remain untrusted. */
+export function assignmentNoticeKind(row: Pick<AssignmentNoticeRecord, 'type' | 'related_assignment_id'>): AssignmentNoticeKind | null {
+  if (!isAssignmentReminderId(row.related_assignment_id)) return null
+  return row.type === 'assignment_reminder' ? 'reminder' : row.type === 'classroom_post' ? 'assigned' : null
+}
+
+/** A new-work receipt never consumes an independent explicit reminder. */
+export function latestAssignmentNoticeRecords(rows: readonly AssignmentNoticeRecord[]): AssignmentNoticeRecord[] {
+  const assigned = latestAssignmentReminderRecords(rows.filter(row => assignmentNoticeKind(row) === 'assigned'))
+  const reminders = latestAssignmentReminderRecords(rows.filter(row => assignmentNoticeKind(row) === 'reminder'))
+  return [...assigned, ...reminders]
 }
 
 export function reminderAssignmentIsPublished(row: { status: string; mode: string; type: string }): boolean {

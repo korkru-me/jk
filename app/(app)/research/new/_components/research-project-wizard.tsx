@@ -155,7 +155,8 @@ export function ResearchProjectWizard({
         toast.error(result.error)
         return
       }
-      toast.success('สร้างโครงการวิจัยแล้ว')
+      if (result.notificationWarning) toast.warning(result.notificationWarning)
+      else toast.success('สร้างโครงการวิจัยแล้ว')
       router.push(`/research/${result.project_id}`)
     })
   }
