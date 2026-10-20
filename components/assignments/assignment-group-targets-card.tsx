@@ -50,7 +50,8 @@ export function AssignmentGroupTargetsCard({ assignmentId, classrooms, groupsByC
       const res = await updateAssignmentGroupTargets(assignmentId, payload)
       if (res?.error) { toast.error(res.error); return }
       setSaved(payload)
-      toast.success('บันทึกการมอบหมายแล้ว')
+      if ('notificationWarning' in res && res.notificationWarning) toast.warning(res.notificationWarning)
+      else toast.success('บันทึกการมอบหมายแล้ว')
       router.refresh()
     })
   }

@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState, useTransition } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
+import { ASSIGNMENT_NOTIFICATION_WARNING, ASSIGNMENT_NOTIFICATION_WARNING_PARAM } from '@/lib/assignment-publication-feedback'
 import {
   Users, BookOpen, Home,
 } from 'lucide-react'
@@ -188,6 +190,17 @@ export function ClassroomDetailClient({
     }
     return map
   }, [classroomAssignments])
+
+  useEffect(() => {
+    if (!canManage) return
+    const url = new URL(window.location.href)
+    if (url.searchParams.get('notification') !== ASSIGNMENT_NOTIFICATION_WARNING_PARAM) return
+    // A saved assignment must still redirect successfully if only the
+    // notification fan-out failed. Remove this one-time warning before toast.
+    url.searchParams.delete('notification')
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
+    toast.warning(ASSIGNMENT_NOTIFICATION_WARNING)
+  }, [canManage])
 
   const navigateTo = useCallback((nextItem: ClassroomNavigationKey) => {
     if (window.location.pathname !== navigationPath) {

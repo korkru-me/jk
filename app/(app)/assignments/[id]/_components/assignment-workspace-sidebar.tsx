@@ -41,7 +41,8 @@ export function AssignmentWorkspaceSidebar({
       const result = await updateAssignmentStatus(a.id, 'published')
       if (result?.error) toast.error(result.error)
       else {
-        toast.success(a.status === 'closed'
+        if ('notificationWarning' in result && result.notificationWarning) toast.warning(result.notificationWarning)
+        else toast.success(a.status === 'closed'
           ? `เปิด${assignmentTypeLabel}ให้ทำอีกครั้งแล้ว`
           : `เผยแพร่${assignmentTypeLabel}แล้ว`)
         router.refresh()

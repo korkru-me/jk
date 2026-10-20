@@ -36,6 +36,17 @@ import {
   type AssignmentLateBandInput,
 } from '@/lib/late-submission'
 import { sanitizeRichTextForStorage } from '@/lib/rich-text-sanitize'
+import { notifyAssignmentPublished } from '@/lib/assignment-publication-notifications'
+import { ASSIGNMENT_NOTIFICATION_WARNING, ASSIGNMENT_NOTIFICATION_WARNING_PARAM } from '@/lib/assignment-publication-feedback'
+
+async function publicationNotificationWarning(assignmentId: string, actorId: string): Promise<string | undefined> {
+  try {
+    const result = await notifyAssignmentPublished(assignmentId, actorId)
+    if ('error' in result) return ASSIGNMENT_NOTIFICATION_WARNING
+  } catch {
+    return ASSIGNMENT_NOTIFICATION_WARNING
+  }
+}
 
 const SHOW_RESULTS_MODES: ShowResultsMode[] = ['immediate', 'score_only', 'after_due', 'never']
 
@@ -486,9 +497,14 @@ export async function createAssignment(data: CreateAssignmentData) {
     // even a create form that requested publish remains draft here.
   }
 
+  // Notify only after the complete published assignment and classroom links
+  // exist. SEB creation deliberately remains draft until its release is ready.
+  const notificationWarning = secureBrowserMode !== 'seb_required' && data.status === 'published'
+    ? await publicationNotificationWarning(assignment.id, user.id) : undefined
   revalidatePath('/assignments')
   for (const classroomId of data.classroom_ids) revalidatePath(`/classrooms/${classroomId}`)
-  redirect(classroomNavigationPath(data.classroom_ids[0], 'assignments'))
+  const destination = classroomNavigationPath(data.classroom_ids[0], 'assignments')
+  redirect(notificationWarning ? `${destination}&notification=${ASSIGNMENT_NOTIFICATION_WARNING_PARAM}` : destination)
 }
 
 export async function updateAssignmentStatus(id: string, status: AssignmentStatus) {
@@ -546,16 +562,20 @@ export async function updateAssignmentStatus(id: string, status: AssignmentStatu
   // No explicit created_by filter — RLS (assignments_org_teacher_all /
   // assignments_co_teacher_all, the latter scoped to admin/manage
   // permission) already restricts this update to owner or authorized
-  // co-teacher; an update matching zero rows fails silently (0 rows
-  // affected, not an error), which is acceptable here.
-  const { error } = await supabase
+  // co-teacher). Require a returned row before claiming success or notifying.
+  const { data: updated, error } = await supabase
     .from('assignments')
     .update(clearExpiredEndAt ? { status, end_at: null } : { status })
     .eq('id', id)
+    .select('id, status')
+    .maybeSingle()
 
   if (error) return { error: error.message }
+  if (!updated || updated.id !== id || updated.status !== status) return { error: 'ไม่พบงานนี้ หรือคุณไม่มีสิทธิ์เปลี่ยนสถานะงานนี้' }
+  const notificationWarning = status === 'published'
+    ? await publicationNotificationWarning(id, user.id) : undefined
   revalidatePath(`/assignments/${id}`)
-  return { success: true }
+  return { success: true, ...(notificationWarning ? { notificationWarning } : {}) }
 }
 
 interface UpdateAssignmentData {
@@ -1078,6 +1098,10 @@ export async function updateAssignmentGroupTargets(
   if (!await canManageAssignment(assignmentId, user.id)) return { error: 'ไม่มีสิทธิ์แก้ไขงานนี้' }
   if (!targets || typeof targets !== 'object' || Array.isArray(targets)) return { error: 'ข้อมูลกลุ่มที่มอบหมายไม่ถูกต้อง' }
 
+  const { data: assignment, error: assignmentError } = await supabase.from('assignments')
+    .select('status').eq('id', assignmentId).maybeSingle()
+  if (assignmentError || !assignment) return { error: 'ตรวจสอบสถานะงานก่อนบันทึกการมอบหมายไม่สำเร็จ' }
+
   const admin = createAdminClient()
   const { data: links } = await admin
     .from('assignment_classrooms')
@@ -1104,17 +1128,21 @@ export async function updateAssignmentGroupTargets(
       || (link.group_ids !== null && next !== null
         && link.group_ids.length === next.length && next.every(id => link.group_ids!.includes(id)))
     if (same) continue
-    const { error } = await admin
+    const { data: updated, error } = await admin
       .from('assignment_classrooms')
       .update({ group_ids: next })
       .eq('id', link.id)
       .eq('assignment_id', assignmentId)
-    if (error) return { error: 'บันทึกการมอบหมายไม่สำเร็จ กรุณาลองใหม่' }
+      .select('id')
+      .maybeSingle()
+    if (error || !updated || updated.id !== link.id) return { error: 'บันทึกการมอบหมายไม่สำเร็จ กรุณาลองใหม่' }
     revalidatePath(`/classrooms/${classroomId}`)
   }
 
   revalidatePath(`/assignments/${assignmentId}`)
-  return { success: true }
+  const notificationWarning = assignment.status === 'published'
+    ? await publicationNotificationWarning(assignmentId, user.id) : undefined
+  return { success: true, ...(notificationWarning ? { notificationWarning } : {}) }
 }
 
 export async function getMyAssignments() {

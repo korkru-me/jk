@@ -129,7 +129,8 @@ export function AssignmentDetailClient({
       const res = await updateAssignmentStatus(a.id, 'published')
       if (res?.error) toast.error(res.error)
       else {
-        toast.success(a.status === 'closed'
+        if ('notificationWarning' in res && res.notificationWarning) toast.warning(res.notificationWarning)
+        else toast.success(a.status === 'closed'
           ? `เปิด${assignmentTypeLabel}ให้ทำอีกครั้งแล้ว`
           : `เผยแพร่${assignmentTypeLabel}แล้ว`)
         router.refresh()

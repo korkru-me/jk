@@ -2,7 +2,7 @@
 
 ## ขอบเขตและสถานะ
 
-เจ้าของอนุญาตตั้งแจ้งเตือนโควตา Production แบบทีละขั้นตอน Candidate นี้อยู่ branch `codex/resend-quota-production-20261020` ใน checkout `korkru-quota-production-20261020` เริ่มจาก `origin/master` **7065d32ee841f904312aa12d4eced11938bab199** และนำเฉพาะ quota implementation **0352be1bc6bfbf2d88b5780b025dfe88294dbb7e** มาปรับเอกสาร ไม่ merge Stage ทั้ง branch
+เจ้าของอนุญาตตั้งแจ้งเตือนโควตา Production แบบทีละขั้นตอน Candidate นี้อยู่ branch `codex/resend-quota-production-20261020` ใน checkout `korkru-quota-production-20261020` เริ่มจาก `origin/master` **7065d32ee841f904312aa12d4eced11938bab199** และนำเฉพาะ quota implementation **0352be1bc6bfbf2d88b5780b025dfe88294dbb7e** มาปรับเอกสาร ต่อมารวม current Production master **d3b864ff601ce5a14f42e30e19d233b719de3d0b** ซึ่งมี assigned-work popup ที่ปล่อยแล้ว โดยรักษาโค้ด master ทั้งชุด ไม่ merge Stage ทั้ง branch
 
 Production base ยังเป็น daily-only 80/90/97 รุ่นใหม่ตรวจ **80/90/95 ทั้งรายวันและรายเดือน** มี durable claim/receipt แยก scope/period/window และให้ provider idempotency key ใช้ UUID คงที่ ป้องกันส่งซ้ำหรือส่งระดับต่ำกว่าหลังระดับสูงเริ่มแล้ว Request ที่ไม่ผ่าน Svix ไม่แตะ provider หรือ admin client Missing ledger/config ต้องหยุดส่ง
 
@@ -21,6 +21,16 @@ Production base ยังเป็น daily-only 80/90/97 รุ่นใหม�
 
 หลักฐาน Staging ก่อนหน้า: implementation เดียวกันผ่าน signed Next HTTP fixture9กรณี, signed provider webhook→Usage APIจริง และอีเมล TEST1ฉบับDeliveredพร้อมเจ้าของยืนยันInbox วันที่19ตุลาคม รายละเอียด `RESEND_SETUP.md` ไม่ถือว่าบังคับให้ยอดจริงแตะทั้ง6thresholdและไม่ใช่ผล Production
 
+## ตรวจ integration กับ Production master ล่าสุด
+
+รวม `d3b864f` บน quota candidate โดยรักษา assigned-work publisher/inbox และเอกสารที่ปล่อยแล้วทั้งหมด Dependency/package/lock/proxy/Next config ไม่เปลี่ยนจาก master แก้ add/add conflict เฉพาะหัวข้อ `DATA_MODEL.md` โดยเก็บทั้ง quota ledger และ assigned-work projection
+
+Quota runtime/store/route, tests และ SQL ทั้งแปด non-document paths ยังคงตรง `0352be1` byte-for-byte Diff เทียบ master `d3b864f` มีเฉพาะ 14 paths โควตา Programmatic comparison ยืนยันทุก application path และ unrelated document ที่ master เพิ่มจากฐานเดิมคงเดิม byte-for-byte รวมทั้ง package/lock/proxy/Next config
+
+ผล integrated candidate ผ่าน **full Vitest 326 ไฟล์ / 4,663 เคส**, TypeScript, token lint ไม่มี regression, **Node24.19 production Webpack build** และ compiled Next HTTP **9 fixtures** เดิมครบ ใช้ output `.next-quota-production-integrated-build` และ placeholder keys/loopback provider+ledger จำลอง ไม่ใช้ Production credentials ไม่ส่งอีเมลจริง ไม่ใช้ build เก่าที่ฐาน `7065d32` แทนผล integration นี้ ปิด fixture server3072 และคืน build-generated tsconfig ก่อน commit
+
+การตรวจนี้ครอบคลุม integration ในเครื่องและ quota runtime ไม่ใช่ผล Production signed delivery หรือ primary localhost:3000 parity ซึ่งต้องทำหลัง deploy จริง ไม่มี app/code/SQL ที่ปรับเพิ่มหลัง checks
+
 ## Production readiness และขั้นตอนที่เหลือ
 
 - **ฐานข้อมูลพร้อมแล้ว 20 ตุลาคม:** ตรวจ remote baseline 151 versions ตรงกันใน isolated CLI workspace `/private/tmp/korkru-quota-prod-delivery-7Gtequ` เพิ่มเฉพาะ `20261018154826_resend_quota_alert_delivery_ledger.sql` ที่ commit/push แล้วใน candidate `8478f884` Dry-run พบ pending เพียงไฟล์เดียว จากนั้น apply ไฟล์เดียวกันโดยไม่เพิ่ม roles/seeds และใช้ `--skip-vault` ไม่ replay/repair ประวัติเดิมหรือ apply SEB/backlog
@@ -30,14 +40,14 @@ Production base ยังเป็น daily-only 80/90/97 รุ่นใหม�
 - **Vercel ที่เจ้าของบันทึกแล้ว:** Production monitor key แบบ sensitive และผู้ส่ง `auth@mail.korkru.com`/ผู้รับ `korkru.me@gmail.com` Root ยืนยันแถวใน UI แล้ว ไม่อ่านหรือบันทึกค่าคีย์ Production flag คง **`RESEND_QUOTA_ALERTS_ENABLED=false`**
 - ตรวจแถว Vercel และเปิดดูเฉพาะค่าที่ไม่ลับของ **`KORKRU_DEPLOYMENT_ENV=production`** แล้ว scope ฝั่งแอปตรง Production
 - **Rotation เป็น owner-reported confirmation:** หลังเลือก Rotate signing secret เจ้าของตอบว่า “เห็นกล่องยืนยัน และกดยืนยันแล้ว” ไม่ได้ยืนยันโดย provider logs อย่างอิสระ Dashboard ไม่คง success toast และ API Logs list ไม่พบ rotate row; การไม่พบแถวนั้นไม่ใช่หลักฐานว่า rotation ล้มเหลว ไม่อ่านหรือบันทึก secret และไม่กด rotation ซ้ำเพื่อเดาผล
-- เตรียมฟอร์ม Vercel **Secret / Production เท่านั้น / `RESEND_QUOTA_WEBHOOK_SECRET`** โดย Value ยังว่าง เจ้าของจะคัดลอก current provider secret มาวางและกด Save เอง ขั้นบันทึกใหม่นี้ **ยังรอ** ไม่มี Save/deploy/flag/provider-URL change จากการเตรียมฟอร์ม
+- **Signing secret บันทึกแล้ว:** เจ้าของคัดลอก current provider secret หลัง rotation ที่รายงานแล้วมา Save เอง Root ยืนยันแถว `RESEND_QUOTA_WEBHOOK_SECRET` แบบ sensitive เฉพาะ Production พร้อม success toast โดยไม่อ่านค่าลับ ไม่กด rotation ซ้ำ ไม่เปลี่ยน flag หรือ provider URL
 
-1. รอเจ้าของวาง current signing secret หลัง rotation ที่รายงานแล้วและ Save ใน `RESEND_QUOTA_WEBHOOK_SECRET` เฉพาะ Production จากนั้นยืนยัน metadata ก่อน deploy code/config โดย flag ยัง `false` จนพร้อม ไม่คัดลอกค่าจาก Staging หรืออ่านค่า secret กลับ
-2. Free มี 1 webhook จึงย้าย endpoint เดิมหลังหยุด Staging monitor ใช้ rotation สร้าง Production signing secret ต่างค่าเดิมได้; dual-sign 24 ชั่วโมงไม่ใช่ถอน old secret ทันที คง events `email.sent`/`email.received` และตรวจ current-window receipts/ระดับจริงก่อนเปลี่ยน scope เพื่อกันเตือนซ้ำ
+1. ตรวจ candidate ที่รวม master ล่าสุดให้ผ่านก่อน deploy code/config โดย flag ยัง `false` การบันทึก key/from/to/signing secret และ scope Production พร้อมแล้ว แต่ไม่ใช่หลักฐานว่า provider ส่งถึงแอปรุ่นใหม่นี้ได้ ไม่อ่าน secret กลับ
+2. Free มี 1 webhook จึงย้าย endpoint เดิมหลังหยุด Staging monitor ใช้ signing secret ที่เจ้าของรายงานว่าหมุนและ Save แล้ว ไม่หมุนซ้ำเพื่อเดาผล Dual-sign 24 ชั่วโมงไม่ใช่ถอน old secret ทันที คง events `email.sent`/`email.received` และตรวจ current-window receipts/ระดับจริงก่อนเปลี่ยน scope เพื่อกันเตือนซ้ำ
 3. เปิด Production flag/redeploy เฉพาะรุ่นที่ตรวจแล้ว รอ Ready/source SHA/canonical domain ให้ตรงก่อนเปลี่ยน provider URL เป็น `https://www.korkru.com/api/webhooks/resend` ตรวจ delivery/log response แบบอ่าน ไม่ส่ง fixture/ลดเกณฑ์/ล้าง ledger หรือทำอีเมลจริงเพิ่มโดยไม่มีขอบเขตที่เจ้าของตกลง
 4. หลัง Production Ready ต้อง sync เฉพาะ released files/deps ไป checkout ที่เสิร์ฟ **localhost:3000** จริง รักษางาน dirty question UI และ local env การตรวจที่ preview worktree/build เพียงอย่างเดียวไม่ใช่ primary parity
 
-**แอป candidate ยังไม่ deploy; การ Save signing secret ใหม่, webhook cutover และ localhost:3000 parity ยังรอ** การ apply additive ledger และบันทึก monitor/from/to ไม่ได้เปิดการส่งแจ้งเตือน Production SMTP/Google และ SEB ไม่อยู่ใน scope นี้ รอบเอกสารสถานะนี้ไม่เปลี่ยน app/SQL/env/provider และไม่รัน test/build ซ้ำจากผล `8478f884` เพราะไม่มี application change
+**แอป candidate ยังไม่ deploy; webhook cutover และ localhost:3000 parity ยังรอ** การ apply additive ledger และบันทึก monitor/from/to ไม่ได้เปิดการส่งแจ้งเตือน Production SMTP/Google และ SEB ไม่อยู่ใน scope นี้ รอบเอกสารสถานะนี้ไม่เปลี่ยน app/SQL/env/provider และไม่รัน test/build ซ้ำจากผล `8478f884` เพราะไม่มี application change
 
 ## ข้อจำกัดและ rollback
 
