@@ -1,16 +1,16 @@
 # Feature status
 
-## แท็บหลักในห้องเรียนครู — 20 ตุลาคม 2026 (local only; not released)
+## แท็บหลักในห้องเรียนครู — 20 ตุลาคม 2026 (Production released; local parity verified)
 
 ห้องเรียนรายวิชาของครูเพิ่มแท็บ “ภาพรวม / งานที่มอบหมาย” ใต้กรอบชื่อโดยอ้างอิง UI นักเรียน ภาพรวมคงประกาศและสรุปห้อง; แท็บงานเปิด ClassroomAssignmentsTab เดิมพร้อมตัวกรอง จัดกลุ่ม และมอบหมายงาน ใช้ `?view=` และ server navigation เดิม ไม่ใช้ `?tab=` ของนักเรียน ไม่เปลี่ยนเมนูด้านข้าง สิทธิ์ผู้ช่วย หรือโฮมรูม แก้การกดกลับไปแท็บเดิมระหว่างมี navigation ค้างให้คำขอล่าสุดเป็นผู้กำหนดหน้า
 
-TypeScript, token lint, diff check และ isolated Webpack production build ผ่าน ตรวจด้วย Next MCP ไม่มี compilation/runtime errors และใช้ route ข้อมูลจำลอง `/exam-screen-lab/classroom-entry` ที่ไม่อ่าน Auth/ฐานข้อมูล ทดสอบเลือกแท็บ/โหลด server payload, direct assignment URL, คง role/back query, Back/Forward, กดกลับขณะโหลด, คีย์บอร์ด/focus, dark mode, 390px/320px ไม่ล้น, ห้องว่าง, ผู้ช่วยดูอย่างเดียว และโฮมรูม ปุ่มแท็บสูง 44px ตรวจ React tree ว่าใช้คอมโพเนนต์ครูจริง ไม่ได้ทดสอบเขียนงาน/ประกาศ/ฐานข้อมูลหรือรัน unit suite เพราะไม่แก้ logic/lib ไม่มี migration; ยังไม่ push หรือ deploy Production ตามขอบเขตโลคอล
+TypeScript, token lint, diff check และ isolated Webpack production build ผ่าน ตรวจด้วย Next MCP ไม่มี compilation/runtime errors และใช้ route ข้อมูลจำลอง `/exam-screen-lab/classroom-entry` ที่ไม่อ่าน Auth/ฐานข้อมูล ทดสอบเลือกแท็บ/โหลด server payload, direct assignment URL, คง role/back query, Back/Forward, กดกลับขณะโหลด, คีย์บอร์ด/focus, dark mode, 390px/320px ไม่ล้น, ห้องว่าง, ผู้ช่วยดูอย่างเดียว และโฮมรูม ปุ่มแท็บสูง 44px ตรวจ React tree ว่าใช้คอมโพเนนต์ครูจริง ไม่ได้ทดสอบเขียนงาน/ประกาศ/ฐานข้อมูลหรือรัน unit suite เพราะไม่แก้ logic/lib ไม่มี migration; บันทึกช่วงพัฒนานี้ตรวจเฉพาะโลคอล; ภายหลังเจ้าของอนุมัติเผยแพร่แล้วและยืนยัน Production/primary-local parity ตาม [CLASSROOM_UI_RELEASE_20261020.md](CLASSROOM_UI_RELEASE_20261020.md)
 
-## กรอบห้องเรียนครูเห็นกวางชัดเจน — 20 ตุลาคม 2026 (local only; not released)
+## กรอบห้องเรียนครูเห็นกวางชัดเจน — 20 ตุลาคม 2026 (Production released; local parity verified)
 
 ปรับเฉพาะหัว `TeacherViewClient`: ขอบ 2px พื้น primary จาง หัวข้อ/สถิติ/ไอคอน/ปุ่มมีสัดส่วนใหญ่ขึ้น และให้กวางจาก brand asset เดิมมีช่อง grid แยกจากปุ่มเลือก/สร้าง ห้องเรียนและการจัดการข้อมูลยังใช้พฤติกรรมเดิม เมื่อ container แคบกว่า 48rem ปุ่มอยู่แถวเต็มใต้หัวข้อกับกวาง; แถบเลือกยังแสดงจำนวนและเลือกทั้งหมดได้
 
-ตรวจ TypeScript, token lint และ isolated Webpack production build ผ่าน; Next MCP compilation issues และ runtime errors ว่าง ใช้ข้อมูลสมมติบน localhost:3000 ตรวจ desktop, tablet, 390px, 320px, dark mode, ห้องว่าง, เลือกทั้งหมด/ยกเลิก และ app shell ย่อเมนู โดยปุ่มสูง 44px ไม่ทับกวางและไม่ล้นแนวนอน หน้าครูจริงที่เจ้าของเข้าสู่ระบบให้ ตรวจเฉพาะตัวเลข DOM: header 119.2px, border 2px, title 28px และปุ่มไม่ทับกวาง ไม่เก็บภาพ/รายละเอียดบัญชีจริงหลัง automatic approval review ปฏิเสธการตรวจแบบกว้าง ใช้ route ตัวอย่างเดิม `/exam-screen-lab/classroom-list`; ลบ route ชั่วคราวและคืนการเปลี่ยน tsconfig ที่ build สร้างแล้ว ไม่รัน unit suite เพราะไม่มีการแก้ logic/lib ไม่มี migration หรือการเขียนข้อมูลทดสอบ และยังไม่ deploy Production
+ตรวจ TypeScript, token lint และ isolated Webpack production build ผ่าน; Next MCP compilation issues และ runtime errors ว่าง ใช้ข้อมูลสมมติบน localhost:3000 ตรวจ desktop, tablet, 390px, 320px, dark mode, ห้องว่าง, เลือกทั้งหมด/ยกเลิก และ app shell ย่อเมนู โดยปุ่มสูง 44px ไม่ทับกวางและไม่ล้นแนวนอน หน้าครูจริงที่เจ้าของเข้าสู่ระบบให้ ตรวจเฉพาะตัวเลข DOM: header 119.2px, border 2px, title 28px และปุ่มไม่ทับกวาง ไม่เก็บภาพ/รายละเอียดบัญชีจริงหลัง automatic approval review ปฏิเสธการตรวจแบบกว้าง ใช้ route ตัวอย่างเดิม `/exam-screen-lab/classroom-list`; ลบ route ชั่วคราวและคืนการเปลี่ยน tsconfig ที่ build สร้างแล้ว ไม่รัน unit suite เพราะไม่มีการแก้ logic/lib ไม่มี migration หรือการเขียนข้อมูลทดสอบ ผลเผยแพร่หลังเจ้าของอนุมัติและการตรวจ parity อยู่ใน [CLASSROOM_UI_RELEASE_20261020.md](CLASSROOM_UI_RELEASE_20261020.md)
 
 ## เตรียม Production SMTP และผลกู้รหัสผ่าน — 20 ตุลาคม 2026 (candidate ยังไม่ deploy)
 
