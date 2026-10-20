@@ -1,5 +1,5 @@
 {
-  "description": "Primary source/check audit plus later Production release, local configuration, owner SMTP Save and failed real recovery-send checkpoints; delivery and password reset remain unverified.",
+  "description": "Primary source/check audit plus Production release and SMTP checkpoints: two credential failures followed by one verified Inbox delivery; Gmail warning disables the valid MIME recovery link, so password reset remains unperformed.",
   "primaryCheckedAt": "2026-10-20T05:04:28.316Z",
   "sourceRefs": {
     "baseline": "216d492469259a3e22945413e4ca798e71439a1f",
@@ -225,7 +225,7 @@
     "autoconfirmPreserved": true,
     "recoveryConfirmationUrlTemplatePreserved": true,
     "secretValuesReadIntoOutputOrCommitted": false,
-    "actualEmailDeliveryVerified": false,
+    "actualEmailDeliveryVerified": true,
     "manualProductionRecoveryTested": true,
     "manualProductionRecoveryEndToEndPassed": false,
     "quotaOrOtherActivationFlagsChanged": false
@@ -264,7 +264,8 @@
     "actualEmailDeliveryVerified": false,
     "productionPasswordChanged": false,
     "manualRecoveryEndToEndPassed": false,
-    "currentBlocker": "SMTP authentication credentials rejected; owner must re-paste the correct privately stored Sending access key into Supabase Password and Save before another send test.",
+    "blockerAtThatCheckpoint": "SMTP authentication credentials rejected before the owner re-pasted the privately stored Sending access key and saved it.",
+    "resolvedForOneLaterSmtpDelivery": true,
     "appLimiter": {
       "failedProviderSendsConsumeReservation": true,
       "emailCooldownSeconds": 60,
@@ -279,5 +280,62 @@
     "deploymentChanged": false,
     "activationFlagsChanged": false,
     "secretsOrLogAccountPiiIncluded": false
+  },
+  "productionRecoveryInboxVerification": {
+    "requestAt": "2026-10-20T05:42:28Z",
+    "requestMethod": "POST",
+    "requestPath": "/recover",
+    "httpStatus": 200,
+    "ownerPrivatelyRepastedKeyAndSaved": true,
+    "performedBy": "root read-only Supabase Auth logs, Gmail MIME/header and Cua native Gmail UI",
+    "gmailInboxVerified": true,
+    "subject": "Reset Your Password",
+    "sender": "KorKru <auth@mail.korkru.com>",
+    "authentication": {
+      "spf": "pass",
+      "returnPathDomain": "rsend.mail.korkru.com",
+      "dkim": "pass",
+      "dkimDomain": "mail.korkru.com",
+      "dkimSelector": "resend",
+      "additionalSesSignaturePresent": true,
+      "dmarcResultHeaderPresent": false
+    },
+    "mimeLinkShape": {
+      "validRecoveryAnchorPresent": true,
+      "host": "libsutfinswqkruihwdx.supabase.co",
+      "path": "/auth/v1/verify",
+      "queryKeysOnly": ["token", "type", "redirect_to"],
+      "type": "recovery",
+      "redirectHost": "www.korkru.com",
+      "redirectPath": "/auth/callback",
+      "nextPath": "/reset-password",
+      "recoveryNoncePresent": true,
+      "clickTrackingPresent": false,
+      "actualHrefOrTokenOrNonceStored": false
+    },
+    "gmailUi": {
+      "redDangerWarningPresent": true,
+      "resetPasswordTextPresent": true,
+      "recoveryLinkActionPresent": false,
+      "agentClickedLooksSafeOrRecoveryLink": false
+    },
+    "publicDns": {
+      "senderDkimTxtPresent": true,
+      "dkimRsaBits": 1024,
+      "bothBounceCnamesAndTargetSpfPresent": true,
+      "dmarcMailSubdomainStatus": "NXDOMAIN",
+      "dmarcOrganizationalDomainStatus": "NXDOMAIN",
+      "missingDmarcProvenSoleWarningCause": false,
+      "dnsChanged": false
+    },
+    "currentBlocker": "Gmail warning disables the recovery link action despite a valid MIME anchor. Owner handoff: personally assess Looks safe only for this authenticated, self-requested 12:42 email, then report whether the link returns before continuing.",
+    "additionalEmailSentByAgent": false,
+    "recoveryLinkConsumed": false,
+    "productionPasswordChanged": false,
+    "manualRecoveryEndToEndPassed": false,
+    "freshEmailWithoutGmailWarningVerified": false,
+    "readyForAllUsers": false,
+    "applicationSchemaMigrationDeploymentOrFlagsChanged": false,
+    "messageIdsOrAccountEmailStored": false
   }
 }

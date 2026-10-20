@@ -1,10 +1,12 @@
 # ระบบสมัครและความน่าเชื่อถือของบัญชี — 17 ตุลาคม 2026
 
-## สถานะปัจจุบัน 20 ตุลาคม — recovery application released; SMTP credentials ยังถูกปฏิเสธ
+## สถานะปัจจุบัน 20 ตุลาคม — SMTP ถึง Inbox แล้ว; Gmail warning ยังปิด recovery link
 
 PR [#76](https://github.com/korkru-me/jk/pull/76) merge เป็น `f488c93894346cf74736a43783a9cf6f5369a2f2` และ Production deployment `dpl_AGq5Kj9LbA3vgRVjfPTTbjZpwK5C` READY พร้อม canonical `www.korkru.com` แล้ว ตรวจ public auth notices/gate และ actual primary source/runtime หลัง Ready ผ่าน เจ้าของยืนยันบันทึก SMTP Production แล้ว Root ตรวจ native Auth แบบ sanitized พบ SMTP ทั้งสี่รายการ present=`true` โดยไม่เปิดเผย secret; Site URL `https://www.korkru.com`, autoconfirm=`true` และ recovery `{{ .ConfirmationURL }}` คงเดิม
 
-เจ้าของขอ recovery จริงแล้วแต่ไม่ได้รับอีเมล Root ตรวจ read-only Auth logs พบ `POST /recover` ที่ `2026-10-20T05:31:43Z` และ `05:33:35Z` (12:31/12:33 น. ไทย) เป็น HTTP `500` / SMTP `535 Authentication credentials invalid` ทั้งคู่ Native nonsecret GET ยืนยัน `smtp.resend.com:465`, username `resend`, sender `auth@mail.korkru.com`, name `KorKru`; password presence ไม่ใช่ validity ขณะนี้รอเจ้าของวาง key ส่วนตัวที่ถูกต้องในช่อง Password แล้ว Save เอง ยังไม่เปลี่ยนรหัสและ delivery/recovery end-to-end ยังไม่ผ่าน Failed sends ใช้ app reservation ตามเดิม (60 วินาที, 5/ชั่วโมง, 10/24 ชั่วโมงต่ออีเมล) ไม่ล้าง/ข้าม limiter ไม่มี schema/migration/deploy/application/flags change เพิ่มจากการตรวจนี้ รักษา signup/current-password/Google/SEB/quota ตามเดิม ดู [SMTP_PRODUCTION_RELEASE_20261020.md](SMTP_PRODUCTION_RELEASE_20261020.md)
+สองคำขอแรกที่ `2026-10-20T05:31:43Z` และ `05:33:35Z` (12:31/12:33 น. ไทย) ได้ HTTP `500` / SMTP `535 Authentication credentials invalid` หลังเจ้าของวาง key ส่วนตัวและ Save ใหม่ คำขอ `POST /recover` ที่ `2026-10-20T05:42:28Z` (12:42 น. ไทย) ได้ `200` และ Root ตรวจฉบับจริงใน Gmail **INBOX** แล้ว SPF=`pass` / Return-Path domain `rsend.mail.korkru.com`, DKIM=`pass` / `d=mail.korkru.com`, `s=resend` ไม่พบ DMARC result header MIME มี recovery anchor และ callback/nonce shape ถูกต้อง ไม่มี tracking แต่ Gmail native UI แสดง red warning และไม่มี link action จึงยังเปิดลิงก์/เปลี่ยนรหัสไม่ได้ Public DNS ไม่มี DMARC ทั้ง sender subdomain และ organizational domain เป็นช่องว่างจริงแต่ยังไม่ใช่หลักฐานสาเหตุเดียวของ warning ยังไม่แก้ DNS
+
+ขั้นต่อไปให้เจ้าของตัดสินใจกด `Looks safe` เองเฉพาะฉบับที่ขอเองเวลา 12:42 และตรวจ authentication แล้ว จากนั้นรายงานว่าลิงก์กลับมาก่อนทำต่อ Agent ไม่กด/ไม่ใช้ token/ไม่ส่งซ้ำ ไม่มีการเปลี่ยนรหัสหรือ recovery end-to-end ผ่าน Failed sends ยังนับ app reservation (60 วินาที, 5/ชั่วโมง, 10/24 ชั่วโมงต่ออีเมล) ไม่ล้าง/ข้าม limiter ไม่มี schema/migration/deploy/application/flags change เพิ่มจากการตรวจนี้ รักษา signup/current-password/Google/SEB/quota ตามเดิม ไม่เก็บ actual href/token/nonce/message ID/อีเมลบัญชีใน handoff ดู [SMTP_PRODUCTION_RELEASE_20261020.md](SMTP_PRODUCTION_RELEASE_20261020.md)
 
 ### ประวัติการเตรียม candidate ก่อน release
 
