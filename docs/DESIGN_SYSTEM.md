@@ -1,5 +1,11 @@
 # Brand, language และ UI rules
 
+## ป๊อปอัปประกาศและเตือนงานร่วมกัน — 20 ตุลาคม 2026 (local)
+
+ประกาศและการเตือนงานใช้ Dialog เดียวใน student app shell โดยเลือกประกาศก่อนและแสดงทีละรายการ ไม่เปิดกล่องใหม่ทับ dialog ที่ใช้งานอยู่ และพักการเปิดอัตโนมัติระหว่างหน้าทำงาน/ข้อสอบ/ฝึกที่รองรับ การเตือนงานใช้หัวกระดิ่ง ข้อความ “ครูเตือนให้ส่งงาน” ชื่องานเต็ม รายละเอียดห้อง/ครู/เวลา และ badge warning แยก “ยังไม่ได้ส่งงาน” กับ “กำลังทำ · ยังไม่ส่ง” ใช้พื้นที่กระชับ มีพื้นที่เนื้อหาเลื่อนภายในและปุ่มสัมผัสอย่างน้อย 44px
+
+แยก “ไว้ภายหลัง” ซึ่งไม่ตั้งสถานะอ่านแล้ว ออกจาก “รับทราบ” และ “ไปทำงาน”/“ทำต่อ” ซึ่งรอผลรับทราบสำเร็จก่อนเลื่อนคิวหรือเปิดงาน แสดงข้อผิดพลาดพร้อมทางลองใหม่โดยไม่ปิดรายการ การปิด X/Escape/backdrop เปิดคำยืนยันให้กลับมาอ่านหรือไว้ภายหลัง ปุ่ม “เตือน” ในหัวตารางคะแนนมี Tooltip อธิบายว่าเตือนเฉพาะผู้ยังไม่ส่ง รวมผู้กำลังทำ; สถานะที่ปิดเพราะทุกคนส่งแล้วมีคำอธิบายให้โฟกัสอ่านได้ด้วย
+
 ## Assignment names navigate; arrows sort — 19 October 2026
 
 Score-matrix headers separate the drag grip, full-name link and adjacent sort icon button as sibling controls. Names link to assignment detail, use a two-line clamp with full native title, and have hover/focus affordances. The arrow alone toggles student score sorting and shows the next direction in a Thai label/tooltip; `aria-sort` stays on the column header. Active sort styling belongs to the arrow rather than the link. Preserve compact header spacing and 44px coarse-pointer targets for the grip, link and arrow.
