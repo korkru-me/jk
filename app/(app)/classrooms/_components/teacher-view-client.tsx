@@ -22,7 +22,7 @@ import {
 import { ClassroomCard } from './classroom-card'
 import type { Classroom } from '@/lib/types'
 import { Card } from '@/components/ui/card'
-import { ClassroomCoverPattern } from '@/components/classrooms/classroom-cover-pattern'
+import { BRAND_MARK_ASPECT_RATIO, BRAND_MARK_URL } from '@/components/brand-mark-data'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 
 interface Props {
@@ -132,35 +132,44 @@ export function TeacherViewClient({
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
-      <Card padding="md" className="@container/classrooms-header relative isolate overflow-hidden border-primary/20 bg-primary/5" data-classrooms-header>
-        <ClassroomCoverPattern patternKey="korkru-deer" placement="end" className="pointer-events-none absolute inset-0 size-full text-primary opacity-15" />
-        <div className="relative flex min-w-0 flex-wrap items-center justify-between gap-x-6 gap-y-3">
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <h1 className="text-xl font-bold text-foreground sm:text-2xl">ห้องเรียนของฉัน</h1>
-            <ul aria-label="สรุปห้องเรียน" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-foreground/75 @min-[30rem]/classrooms-header:text-sm">
+      <Card className="@container/classrooms-header border-2 border-primary/20 bg-primary/5" data-classrooms-header>
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-3 p-4 @min-[48rem]/classrooms-header:grid-cols-[minmax(0,1fr)_auto_auto] @min-[48rem]/classrooms-header:gap-x-5 @min-[48rem]/classrooms-header:px-5">
+          <div className="flex min-w-0 flex-col gap-2">
+            <h1 className="text-2xl leading-snug font-bold text-foreground @min-[48rem]/classrooms-header:text-[1.75rem]">ห้องเรียนของฉัน</h1>
+            <ul aria-label="สรุปห้องเรียน" className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-foreground/75 @min-[48rem]/classrooms-header:gap-x-4 @min-[48rem]/classrooms-header:text-base">
               {[
                 { value: classrooms.length, label: 'ห้องเรียน', icon: School },
                 { value: totalStudents, label: 'นักเรียน', unit: 'คน', icon: Users },
                 { value: totalAssignments, label: 'งานทั้งหมด', icon: BookOpen },
               ].map(({ value, label, unit, icon: Icon }) => <li key={label} className="flex items-center gap-1.5">
-                <Icon aria-hidden="true" className="size-4 shrink-0 text-primary" />
+                <Icon aria-hidden="true" className="size-4 shrink-0 text-primary @min-[48rem]/classrooms-header:size-4.5" />
                 <span>{label} <strong className="font-semibold text-foreground">{value.toLocaleString('th-TH')}</strong>{unit && ` ${unit}`}</span>
               </li>)}
             </ul>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <span
+            aria-hidden="true"
+            data-classrooms-header-brand
+            className="pointer-events-none col-start-2 row-start-1 block h-14 shrink-0 bg-primary opacity-20 @min-[48rem]/classrooms-header:col-start-3 @min-[48rem]/classrooms-header:h-16"
+            style={{
+              WebkitMask: `url('${BRAND_MARK_URL}') center / contain no-repeat`,
+              mask: `url('${BRAND_MARK_URL}') center / contain no-repeat`,
+              aspectRatio: BRAND_MARK_ASPECT_RATIO,
+            }}
+          />
+          <div className="col-span-full flex flex-wrap items-center gap-2 @min-[48rem]/classrooms-header:col-span-1 @min-[48rem]/classrooms-header:col-start-2 @min-[48rem]/classrooms-header:row-start-1">
             {!isSelecting ? <>
-              {classrooms.length > 0 && <Button variant="outline" size="sm" className="min-h-[44px]" onClick={() => setIsSelecting(true)}>
+              {classrooms.length > 0 && <Button variant="outline" className="min-h-[44px]" onClick={() => setIsSelecting(true)}>
                 <CheckSquare data-icon="inline-start" /> เลือก
               </Button>}
-              <Link href="/classrooms/new" className={cn(buttonVariants({ size: 'sm' }), 'min-h-[44px] gap-1.5')}>
-                <Plus aria-hidden="true" className="size-4" /> สร้างห้องเรียน
+              <Link href="/classrooms/new" className={cn(buttonVariants(), 'min-h-[44px] gap-1.5')}>
+                <Plus aria-hidden="true" data-icon="inline-start" /> สร้างห้องเรียน
               </Link>
-            </> : <Button variant="outline" size="sm" className="min-h-[44px]" onClick={exitSelection}>
+            </> : <Button variant="outline" className="min-h-[44px]" onClick={exitSelection}>
               <X data-icon="inline-start" /> ยกเลิก
             </Button>}
           </div>
-          {isSelecting && <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 border-t border-primary/15 pt-2">
+          {isSelecting && <div className="col-span-full flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 border-t border-primary/15 pt-2">
             <span className="text-sm font-medium text-foreground">เลือกแล้ว {selected.size} ห้องเรียน</span>
             <Button variant="link" size="sm" className="min-h-[44px]" onClick={selected.size === classrooms.length ? () => setSelected(new Set()) : selectAll}>
               {selected.size === classrooms.length ? 'ยกเลิกทั้งหมด' : 'เลือกทั้งหมด'}
