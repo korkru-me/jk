@@ -109,6 +109,20 @@ RESEND_QUOTA_ALERT_TO=korkru.me@gmail.com
 
 **20 ตุลาคม — ยืนยัน scope และเตรียม Signing secret:** ตรวจค่า non-secret `KORKRU_DEPLOYMENT_ENV` ในแถว Production ของ Vercel ได้ `production` แล้ว เจ้าของยืนยันว่าเห็นกล่องยืนยันหลังเลือก Rotate signing secret และกดยืนยันแล้ว จึงบันทึกขั้นหมุน secret เป็น **owner-reported**: หน้า provider ไม่มี success toast ค้าง และ Logs list ไม่มีรายการ Rotate จึงไม่ได้อ้างว่าเห็นหลักฐานย้อนหลังจาก provider การไม่มี log ไม่ถือว่า rotation ล้มเหลว ไม่กด Rotate ซ้ำ ไม่เปิดหรือคัดลอกค่าลับผ่าน agent เตรียม Add Environment Variable แบบ Secret ชื่อ `RESEND_QUOTA_WEBHOOK_SECRET` เฉพาะ Production โดยเว้น Value ว่างให้เจ้าของคัดลอกค่าปัจจุบันจาก Resend แล้ว paste/Save เอง **ยังไม่ Save secret, deploy, เปิด flag หรือแก้ endpoint URL**
 
+### Production เปิดใช้งานแล้ว — 20 ตุลาคม 2026
+
+สถานะนี้แทนขั้นเตรียมที่ยังระบุ pending ด้านบน เจ้าของบันทึก secret แล้ว UI success และ metadata ยืนยัน API key/from/to/webhook secret แบบ sensitive เฉพาะ Production; scope เป็น production โดยไม่อ่านค่าลับ
+
+- Release [PR75](https://github.com/korkru-me/jk/pull/75): master `216d492469259a3e22945413e4ca798e71439a1f`, integrated candidate `6ec459c` includes prior master `d3b864f`. Full suite326ไฟล์/4,663เคส, TypeScript, token lint, Node24.19 Webpack build และ compiled HTTP fixtures9กรณีผ่าน ใช้ Git source build ด้วย Production env ไม่ใช้ local prebuilt ที่มี mock env
+- Staging flagfalse/redeploy sourcec77f4ec Ready11:08:28ไทย exact public aliasตอบ503เวลา11:11:04 และปล่อยให้ in-flight เกิน60วินาทีแล้ว จึงเปิด Production flagtrue/redeploy source216d492 Ready11:15:07ไทยพร้อม canonical www.korkru.com. ไม่มี monitor สอง scope ทำงานซ้อน
+- ย้าย Webhook เดิมเป็น `https://www.korkru.com/api/webhooks/resend`, Enabled และคง email.sent/email.received ไม่ disable/delete provider endpoint Unsigned Production POST400 invalid_webhookเวลา11:16:36
+- Replay event email.sent จริงของอีเมล TEST เดิมวันที่19ตุลาคมเพียงครั้งเดียว ไม่ส่งอีเมลใหม่ Production POST200เวลา11:17:05ไทยตรงกับ Resend Success200/Attempts2/response below_threshold ยืนยัน signature และ Usage API จริง Timestamp eventยังเป็นวันสร้างเดิม จึงไม่ใช่เวลาของ replay ยอด UI ก่อน cutoverรายวัน0/100 รายเดือน8/3,000 Final read-only ledger ทั้ง Stage/Prodยัง0 total/0 pending/0 completed ไม่มี claimหรือalertเพิ่ม
+- Primary localhost parityเสร็จ: released quota app/test/SQL7ไฟล์ตรง216d492, append envexample15บรรทัด และเพิ่มเฉพาะ svix2.8.0/fourlockentriesใน `/Users/korkusonmasaen/Korkru/korkru`, port3000/PID54741เดิม branchcodex/student-classroom-cards@794077bf ไม่ restart/copy envหรือsecret Quota132, tsc, isolated Node24.19 buildจากsnapshotprimaryปัจจุบัน และ diff checksผ่าน Actual Next MCP compile/runtimeไม่มีerrors และ POST503not_configuredตรงlocalflagที่ไม่เปิด รักษา18protecteddirtyfilehashesและงานteacher-view-client/classrooms-headerที่แก้พร้อมกัน Sourceอยู่ในmasterแล้ว; งานsharedprimaryไม่stage/commitเพื่อคงงานเจ้าของ แต่บันทึกhandoffpushแยก
+- npm installแบบignore-scripts/no-auditได้prune extraneous CLI node_modules/cn ที่ไม่อยู่ในpackageหรือlockและไม่มีsourceimports ไม่เดาversionติดตั้งกลับ ไม่ลบtrackedsourceหรือแก้dependencyอื่น
+
+Production พร้อมใช้80/90/95ทั้งรายวันและรายเดือน ประเมินเมื่อมี signed send/receive event และเลือกเฉพาะระดับสูงสุดที่ถึง ไม่เพิ่ม cron หรือ paid plan และไม่เปิด Production SMTP/Google/SEBจากงานนี้ ไม่บังคับให้ยอดจริงแตะ6thresholdหรือส่งalertจริง6ฉบับ; coverageด้านthreshold/dedup/retryมาจากfixturesและStaging RPC checks ส่วนตัวอย่าง1ฉบับก่อนหน้าผ่านDelivered/Inboxแล้ว
+
+
 ## ระบบเตือนทำอะไรบ้าง
 
 - ทุก signed `email.sent`/`email.received` ที่ยอมรับจะอ่าน Usage API แล้วประเมิน **daily และ monthly แยกกัน** ใช้ยอดและเพดานจาก provider คำนวณ `ceil(limit × percentage / 100)` ถ้าข้ามหลายระดับ ส่งเฉพาะระดับสูงสุดที่ถึงของช่วงนั้น ไม่ไล่ส่งย้อนหลัง ระดับที่ต่ำกว่าหรือเท่าระดับสูงสุดที่รับงานไว้แล้วไม่ส่งใหม่ `daily.limit=null` ข้ามเฉพาะรายวัน ส่วนรายเดือนยังตรวจตามเดิม

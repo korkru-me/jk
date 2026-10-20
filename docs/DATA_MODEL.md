@@ -10,6 +10,8 @@ RPC แบบ atomic ตรวจ payload เดิมและ high-water ต�
 
 Production วันที่ 20 ตุลาคมใช้ isolated workspace ที่ fetch ประวัติจริงครบ 151 รายการ ตรวจ parity ก่อนเพิ่ม committed ledger migration เพียงไฟล์เดียว และ dry-run/apply ผ่าน CLI ที่ระบุ project-ref กับ `--skip-vault` โดยไม่มี seeds/roles และไม่รวม SEB 12 รายการที่พักไว้ หลัง apply ประวัติ 152/152 ตรงกัน ไม่มี pending migration; catalog ยืนยัน RLS, grants และ service-only SECURITY INVOKER RPC พร้อม search_path ว่าง Fingerprint ฟังก์ชัน สิทธิ์ตาราง และ policy เดิมตรงกับก่อน apply; ledger มี 0 แถว ตรวจแบบอ่านเท่านั้น ไม่ทดสอบ claim หรือสร้าง test data บน Production ส่วน app candidate ยังไม่ deploy และ flag ยังเป็น false จึงยังไม่ถือว่า monitor เปิดแล้ว
 
+Current outcome20October: release216d492 is Ready and Production monitoring is enabled after Staging was disabled. A genuine signed replay returned200/below_threshold; final read-only aggregates in both ledgers remain0. No Production test claim or threshold-forcing write was used. The earlier application-pending statement above records the pre-release audit phase.
+
 ## Private grading drafts — local migration 20261018133739
 
 ยังไม่ apply: `grading_score_drafts` keyed ด้วย `(actor_id, assignment_id, answer_id)` เก็บคะแนนส่วนที่แตะ, `base_score_edited_at` และ `updated_at` แบบ compare-and-set ร่างไม่เปลี่ยนคะแนนจริง/ยอดรวม/สถานะรอบ และไม่มี student reader หรือ browser grant อ่านได้ `read_grading_drafts` ตรวจ actor active และสิทธิ์ exact assignment ซ้ำ ตัวโหลดครูส่งเฉพาะร่างของตนใน official scope
