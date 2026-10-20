@@ -1,6 +1,6 @@
 # Data model และ invariants
 
-## Assigned-work notice projection — 20 October 2026 (local application change; no migration)
+## Assigned-work notice projection — 20 October 2026 (Production app released; no migration)
 
 New-work notifications reuse existing `notifications` columns: `type = 'classroom_post'`, nonnull `related_assignment_id`, one canonical eligible `related_classroom_id`, recipient, actor, assignment organization, title/body/link and `is_read`. Ordinary classroom announcement notifications keep no related assignment ID; explicit reminders keep `type = 'assignment_reminder'`. There is no new persisted type enum, table, column, receipt table, RLS grant or migration. No historical notification backfill runs.
 
@@ -8,7 +8,7 @@ The application discriminator maps `classroom_post` + valid assignment ID to `as
 
 Publisher deduplication is lifetime recipient+assignment for assigned notices, including already read rows and links across classrooms; the current lookup/insert has no uniqueness/atomicity guarantee across concurrent calls. Reader latest-row selection is per assignment **and kind**, considering read rows before unread display, so acknowledging a new assignment does not consume an explicit reminder for it. Acknowledge updates only the session recipient's exact allowed work-notice row and requires its returned ID. Any own submitted/graded attempt suppresses both kinds regardless of score strategy; otherwise `inProgress` is presentation metadata. No attempt or answer is created by reading/acknowledging a notice.
 
-This model addition is implemented locally only while final release checks/deployment are pending. No new hosted schema or fixture write was made. The prior reminder release below and in [ASSIGNMENT_REMINDERS_RELEASE_20261020.md](ASSIGNMENT_REMINDERS_RELEASE_20261020.md) does not establish deployment of these new-work hooks; current handoff is [ASSIGNED_WORK_NOTICES_RELEASE_20261020.md](ASSIGNED_WORK_NOTICES_RELEASE_20261020.md).
+This application projection is released through PR #73 / Production merge `a1f542cff80380e22b3adb627aaf0380febbb92f`, READY deployment `dpl_9YLvKTRFu9rjRikkXeuKdcXZgcQZ`. Primary commit `36036465a6d2d7c3f2639d20ab3626ea4ecdef73` is pushed and application files match the candidate byte-for-byte. No hosted schema or external fixture write was made; real hosted inserts/acknowledgements remain unverified under the prior ledger mismatch and hosting access limitation. The prior reminder release remains historical in [ASSIGNMENT_REMINDERS_RELEASE_20261020.md](ASSIGNMENT_REMINDERS_RELEASE_20261020.md); the current release and local-parity evidence is [ASSIGNED_WORK_NOTICES_RELEASE_20261020.md](ASSIGNED_WORK_NOTICES_RELEASE_20261020.md).
 
 ## Private grading drafts — local migration 20261018133739
 

@@ -1,6 +1,14 @@
 # Assigned-work notices — 20 October 2026
 
-Status: **Local implementation, clean Production-base tests and local runtime/UI checks complete; commit and deployment pending.** This record covers automatic newly assigned work notices. The earlier reminder-only application release is recorded separately in [ASSIGNMENT_REMINDERS_RELEASE_20261020.md](ASSIGNMENT_REMINDERS_RELEASE_20261020.md) and remains historical. Its Production deployment is not evidence that this addition is deployed.
+Status: **Production application released; actual primary-local parity verified.** PR [#73](https://github.com/korkru-me/jk/pull/73) is merged and the Production deployment is READY with canonical aliases. The clean candidate passed full tests, TypeScript, token lint and build, and actual localhost:3000 UI/runtime checks pass. Real hosted publication → student popup → acknowledgement remains unverified because of the prior Staging ledger mismatch and hosting SSO gate. The earlier reminder-only release in [ASSIGNMENT_REMINDERS_RELEASE_20261020.md](ASSIGNMENT_REMINDERS_RELEASE_20261020.md) remains a separate historical record.
+
+## Published application and primary-local parity
+
+- Production merge: `a1f542cff80380e22b3adb627aaf0380febbb92f`; deployment `dpl_9YLvKTRFu9rjRikkXeuKdcXZgcQZ`, READY. Canonical aliases `www.korkru.com` and `korkru.com` are confirmed by deployment metadata.
+- Read-only Production checks returned HTTP **200** for `/login` and **404** for `/exam-screen-lab/assignment-reminders`. They verify public availability and lab isolation only, not authenticated notification delivery.
+- Staging commit: `c77f4ecf87a63b3f82d75df16435e9ee40f4dae5`; deployment `dpl_3tUATfRQohKUo5pQv7ApmVP6mzhA`, READY, canonical `staging.korkru.com` confirmed by metadata. This is not a claim of authenticated hosted lab or delivery verification.
+- Primary application commit `36036465a6d2d7c3f2639d20ab3626ea4ecdef73` is pushed on `codex/student-classroom-cards`. The released application files match the candidate byte-for-byte on the actual primary localhost:3000 checkout. Protected tsconfig, PDF-preview and patch hashes remain unchanged from the prior baseline, preserving unrelated local work.
+- Actual primary-local UI/runtime checks pass, including the mixed queue, acknowledgement success/failure, dismissal confirmation/focus, narrow viewport, exam-route suspension and one-time publication-warning toast/query cleanup. Next MCP reports **0 runtime errors**. The detailed injected evidence below is separate from hosted notification-write evidence.
 
 ## Behavior and scope
 
@@ -38,8 +46,8 @@ No table, column, type enum, RLS grant, RPC or migration is introduced. Authenti
 
 These checks do not verify deployed RLS, a real publication notification insert, student hosted delivery or durable hosted acknowledgement.
 
-## Environment boundary and remaining work
+## Environment boundary and remaining verification gap
 
 The immediately preceding read-only Staging preflight recorded **165 migration history rows**, with remote-only `20261009142610` and local-only `20261015132234`. This task has not run a new external preflight or resolved that difference. The repository rule requires stopping database mutations at a mismatch. No external fixture/account/notification was written, no new migration exists, and no schema was applied, repaired or replayed for this addition.
 
-No new deployed test or Production release has occurred for assigned-work notices at this point. The release owner has composed a clean Production-base candidate and must inspect the final diff, commit/push/deploy through the established workflow and verify actual primary localhost:3000 release parity while preserving unrelated Auth/question work. Update this record with exact commits/deployments and completed evidence afterward. Hosted end-to-end publication → notice → acknowledgement remains unverified until normal hosting access and the database-history rule permit a bounded synthetic run.
+The application is released and actual primary-local parity is verified; do not repeat publication because the hosted data test remains unperformed. No hosted fixture test was run for this addition, and deployment READY metadata must not be described as an authenticated end-to-end pass. Hosted publication → notice → acknowledgement remains unverified until normal hosting access and the database-history rule permit a bounded synthetic run. A later documentation-only merge may advance hosting without changing the verified application files. Any future hosted data test must use permitted synthetic accounts and exact cleanup; no cleanup is required for this release because no external fixture was created.
