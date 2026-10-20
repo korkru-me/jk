@@ -1,5 +1,13 @@
 # Data model และ invariants
 
+## Resend quota delivery ledger — migration 20261018154826 applied to Production 20 October 2026
+
+Production apply เฉพาะ migration นี้แล้ววันที่ 20 ตุลาคม และ Staging ผ่านก่อนหน้า: ledger แยกจาก Auth/ข้อมูลผู้เรียน เก็บ scope (`local/staging/production`), period (`daily/monthly`), window key, threshold (`80/90/95`), delivery UUID, payload SHA-256 และ timestamps ของ claim/acceptance ไม่เก็บผู้รับ เนื้อหาอีเมล reset link หรือ snapshot usage รายคน รายวันใช้วันแจ้งเตือน UTC; รายเดือนใช้ canonical `monthly.resets_at` จาก provider จึงคงสถานะข้ามวันได้
+
+RPC แบบ atomic ตรวจ payload เดิมและ high-water ต่อ scope/period/window ก่อน claim เพื่อกัน concurrent events หรือระดับต่ำกว่าหลังระดับสูงเริ่มแล้ว UUID เดิมเป็นส่วนของ Resend idempotency key สำหรับ retry ภายใน 24 ชั่วโมง; claim ที่ยังยืนยัน acceptance ไม่ได้และเก่าเกิน 23 ชั่วโมงต้อง reconcile ไม่สร้าง delivery ใหม่หรือส่งซ้ำอัตโนมัติหลัง idempotency expiry Signed own-email event อาจยืนยัน acceptance แต่ไม่ปิดการประเมินโควตาอีกช่วง
+
+เปิด RLS และถอน PUBLIC/anon/authenticated grants; RPC เป็น SECURITY INVOKER พร้อม fixed search_path เปิดเฉพาะ service role หลัง route ตรวจ Svix แล้ว ไม่เป็น browser table/API ไม่เพิ่ม cron และ missing schema ต้องหยุดส่ง Production isolated CLI baseline 151 ตรงกันก่อนเพิ่มเฉพาะ migration นี้; หลัง apply history 152/152 และ pending 0 Catalog ยืนยัน RLS/grants/RPC invoker/search_path ถูกต้อง Receipt count 0 ไม่ใช้ broad db push/reset/replay งาน SEB และ security/policy/function fingerprints เดิมคงเดิม รายละเอียด `RESEND_SETUP.md` และ `RESEND_PRODUCTION_RELEASE_20261020.md`
+
 ## Assigned-work notice projection — 20 October 2026 (Production app released; no migration)
 
 New-work notifications reuse existing `notifications` columns: `type = 'classroom_post'`, nonnull `related_assignment_id`, one canonical eligible `related_classroom_id`, recipient, actor, assignment organization, title/body/link and `is_read`. Ordinary classroom announcement notifications keep no related assignment ID; explicit reminders keep `type = 'assignment_reminder'`. There is no new persisted type enum, table, column, receipt table, RLS grant or migration. No historical notification backfill runs.
