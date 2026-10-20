@@ -44,6 +44,8 @@ The pure classifier reuses scoreParts, frozen grading rules, published per-part 
 
 ## Classroom entry streaming and tab-scoped data — local, 18 October 2026
 
+20 October 2026 (local only): TeacherClassroomTabs wraps the existing overview/assignment content in the same Tabs primitives used by the student view. It appears only for manageable subject classrooms and delegates to the existing navigateTo and `?view=` server payload flow, preserving unrelated query/back state and sidebar navigation. Pending clicks back to the currently loaded view also dispatch router navigation, superseding the previous request. No data loader, authorization or database contract changes.
+
 The teacher classroom route returns a Suspense boundary only after verified authentication and exact owner/co-teacher authorization. Its early ClassroomEntryLoading projects id/name/description/type and registers the contextual sidebar without roster counts, class codes or invitation tokens. Neutral detail loading replaces the unrelated generic classroom navigation before this authorized payload arrives. TeacherClassroomContent resolves dependencies as promises and loads only the requested tab's extra data.
 
 Real ClassroomDetailClient payloads carry loadedNavigationItem. Changing tabs requests the corresponding server payload while showing a pending panel; Back/Forward uses Next's router payloads and query/back state. Existing eager fixtures retain local tab navigation. The classroom-keyed boundary preserves room identity, and deferred group/profile state follows refreshed props. Summary and scoring algorithms remain unchanged.

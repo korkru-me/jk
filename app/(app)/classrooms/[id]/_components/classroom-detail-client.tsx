@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState, useTransition } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState, useTransition, type ReactNode } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -39,6 +39,30 @@ import type { PeopleView } from './classroom-people-tabs'
 import { ClassroomAccessPanel } from './classroom-access-panel'
 import { cn } from '@/lib/utils'
 import { ClassroomTheme } from '@/components/classrooms/classroom-theme'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+
+function TeacherClassroomTabs({ navigationItem, enabled, onNavigate, children }: {
+  navigationItem: ClassroomNavigationKey
+  enabled: boolean
+  onNavigate: (item: ClassroomNavigationKey) => void
+  children: ReactNode
+}) {
+  if (!enabled || (navigationItem !== 'overview' && navigationItem !== 'assignments')) return children
+
+  return (
+    <Tabs value={navigationItem} onValueChange={value => {
+      if ((value === 'overview' || value === 'assignments') && value !== navigationItem) onNavigate(value)
+    }} className="min-w-0 gap-3" data-teacher-classroom-tabs>
+      <TabsList aria-label="หน้าห้องเรียน" className="max-w-full self-start p-0 group-data-horizontal/tabs:h-auto">
+        <TabsTrigger value="overview" data-classroom-navigation className="min-h-[44px] px-1.5 @min-[34rem]/teacher-classroom:px-3">ภาพรวม</TabsTrigger>
+        <TabsTrigger value="assignments" data-classroom-navigation className="min-h-[44px] px-1.5 @min-[34rem]/teacher-classroom:px-3">งานที่มอบหมาย</TabsTrigger>
+      </TabsList>
+      <TabsContent value={navigationItem} className="min-w-0">
+        {children}
+      </TabsContent>
+    </Tabs>
+  )
+}
 
 function TabLoading() {
   return <div className="h-32 rounded-2xl bg-muted animate-pulse" aria-label="กำลังโหลดเนื้อหา" />
@@ -207,7 +231,8 @@ export function ClassroomDetailClient({
       router.push(classroomNavigationPath(classroom.id, nextItem))
       return
     }
-    if (loadedNavigationItem !== undefined && nextItem !== loadedNavigationItem) {
+    // A return to the loaded tab must also supersede an in-flight navigation.
+    if (loadedNavigationItem !== undefined && (nextItem !== loadedNavigationItem || navigationPending)) {
       setRequestedTab(nextItem)
       startNavigation(() => router.push(classroomNavigationHref(window.location.href, nextItem), { scroll: false }))
       return
@@ -217,7 +242,7 @@ export function ClassroomDetailClient({
     const nextUrl = classroomNavigationHref(window.location.href, nextItem)
     const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`
     if (nextUrl !== currentUrl) window.history.pushState(null, '', nextUrl)
-  }, [classroom.id, loadedNavigationItem, navigationPath, router])
+  }, [classroom.id, loadedNavigationItem, navigationPath, navigationPending, router])
 
   const changePeopleView = useCallback((nextView: PeopleView) => {
     setPeopleView(nextView)
@@ -288,7 +313,7 @@ export function ClassroomDetailClient({
   }
 
   return (
-    <ClassroomTheme cover={classroomMeta.cover} className="flex w-full min-w-0 flex-col gap-6">
+    <ClassroomTheme cover={classroomMeta.cover} className="@container/teacher-classroom flex w-full min-w-0 flex-col gap-3">
       {/* Header card */}
       <div
         className={cn(
@@ -351,6 +376,11 @@ export function ClassroomDetailClient({
       </div>
 
       {/* Tab content */}
+      <TeacherClassroomTabs
+        navigationItem={navigationPending ? requestedTab : activeTab}
+        enabled={!isHomeroom && canManage}
+        onNavigate={navigateTo}
+      >
       <div aria-busy={navigationPending}>
         {navigationPending ? <TabLoading /> : <>
         {activeTab === 'overview' && (
@@ -461,6 +491,7 @@ export function ClassroomDetailClient({
         )}
         </>}
       </div>
+      </TeacherClassroomTabs>
     </ClassroomTheme>
   )
 }
