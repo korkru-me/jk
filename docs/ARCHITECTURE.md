@@ -1,5 +1,9 @@
 # Architecture
 
+## Hosted manual-reminder path verified — 20 October 2026
+
+The real Staging teacher assignment-header reminder action produced exactly two `assignment_reminder` rows for a never-started and an in-progress synthetic learner, excluding submitted/graded learners. Normal student dashboard logins and real Dialog acknowledgement persisted the exact notice IDs from unread to read, survived reload and left the three-attempt/three-answer score/revision/timer baseline unchanged; both excluded dashboards had no dialog. Staging parity was 165/165; this QA-only run changes no application/RLS/schema/migration and does not test Production data. Focused tooling checks passed 51 own/175 combined cases; **exact cleanup passed**: sessions were revoked before deletion; independent exact-run SQL confirmed all nine resource categories, including all five personal organizations, at zero, and the private manifest/temporary key file were removed. Current bounded evidence is in [STAGING_MANUAL_REMINDER_E2E_20261020.md](STAGING_MANUAL_REMINDER_E2E_20261020.md), superseding the old unperformed manual-reminder check only; repeated sends, concurrency, SMTP and SEB remain outside this run.
+
 ## Hosted assigned-work notice verification — 20 October 2026
 
 The resumed Staging test passed the existing application path end to end: a normally authenticated synthetic teacher created and published one exercise and one ordinary-browser exam; the synthetic student received each canonical work notice, saw its room/teacher/type and correct no-due or dated metadata, acknowledged through the real Dialog, and reloaded without the notice returning. The existing `classroom_post` + assignment relation and recipient-scoped `is_read` update provided durable acknowledgement. Guarded reads verified two works/two notices/two read records and zero attempts; scoped SQL observed the same exam notice change from unread to read.

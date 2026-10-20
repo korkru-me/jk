@@ -26,6 +26,16 @@ const same = (left, right, label) => check(JSON.stringify(left) === JSON.stringi
 const log = (status, name, counts = {}) => console.log(JSON.stringify({ status, check: name, ...counts }))
 const option = (argv, name) => argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3)
 
+export function buildReminderAssignmentSchedule(now, bandId) {
+  const dueAt = new Date(now + 86_400_000).toISOString()
+  return {
+    start_at: new Date(now - 3_600_000).toISOString(),
+    due_at: dueAt,
+    end_at: new Date(now + 172_800_000).toISOString(),
+    late_bands: [{ id: bandId, starts_at: dueAt, label: 'ส่งช้า', color: 'amber' }],
+  }
+}
+
 export function assertStagingEnvironment(env, argv) {
   check(argv.includes('--execute') && argv.includes('--confirm=assignment-reminders-staging-synthetic'), 'Exact synthetic execution confirmation required')
   check(env.EXAM_QA_ENVIRONMENT === 'staging' && env.KORKRU_DEPLOYMENT_ENV === 'staging' && env.VERCEL_ENV === 'preview', 'Staging-only deployment flags required')
@@ -69,7 +79,7 @@ export function validateFixtureManifest(state) {
       && row.email === `reminder-qa-${state.run}-${row.label}@qa.staging.korkru.com`
       && typeof row.password === 'string' && row.password.length >= 16
       && Array.isArray(row.orgIds) && row.orgIds.length <= 1 && row.orgIds.every(id => UUID.test(id))
-      && typeof row.membershipVerified === 'boolean', 'Invalid synthetic fixture account provenance')
+      && typeof row.membershipVerified === 'boolean' && (!row.membershipVerified || row.orgIds.length === 1), 'Invalid synthetic fixture account provenance')
   }
   for (const name of ['classroomId', 'assignmentId', 'questionId']) check(state[name] === null || UUID.test(state[name]), 'Invalid fixture resource ID')
   check(Array.isArray(state.submissions) && state.submissions.length <= 3, 'Invalid fixture attempt bounds')
@@ -171,9 +181,10 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
       title: `${state.prefix} question`, question_text: '<p>คำถามสังเคราะห์สำหรับทดสอบการเตือนส่งงาน</p>', question_type: 'written',
       variables: [], logic_rules: [], answer_formula: '1', answer_tolerance: 0.01, extra_data: {}, requires_work_image: true, team_edit_allowed: true }), 'Create synthetic automatic question')
     state.assignmentId = randomUUID(); persist()
+    const schedule = buildReminderAssignmentSchedule(Date.now(), randomUUID())
     must(await admin.from('assignments').insert({ id: state.assignmentId, classroom_id: state.classroomId, created_by: owner.id, org_id: owner.orgIds[0],
       title: `${state.prefix} exercise`, type: 'exercise', mode: 'online', status: 'published', question_ids: [state.questionId], question_points: { [state.questionId]: 2 },
-      start_at: new Date(Date.now() - 3_600_000).toISOString(), due_at: new Date(Date.now() + 86_400_000).toISOString(), end_at: new Date(Date.now() + 172_800_000).toISOString(),
+      ...schedule,
       require_work_image: true, duration_minutes: null, max_attempts: 3, score_strategy: 'best', shuffle_questions: false, shuffle_options: false,
       fullscreen_required: false, proctoring_enabled: false, secure_browser_mode: 'browser', android_exam_mode: 'blocked', show_results: 'never', show_solutions: false }), 'Create synthetic published exercise')
     must(await admin.from('assignment_classrooms').insert({ assignment_id: state.assignmentId, classroom_id: state.classroomId }), 'Attach synthetic exercise')
@@ -249,7 +260,23 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
   async function cleanup() {
     if (!trusted) return true
     try {
-      validateFixtureManifest(state); await validateOwnedRows()
+      validateFixtureManifest(state)
+      for (const account of state.accounts.filter(row => !row.membershipVerified)) {
+        // Auth provisioning may have committed its personal organization even
+        // when the following setup read failed. Recover only this exact run's
+        // verified identity and exclusive owner receipt before any deletion.
+        const lookup = must(await admin.auth.admin.getUserById(account.id), 'Read partial synthetic Auth provenance')
+        check(lookup.user?.id === account.id && lookup.user.email === account.email
+          && lookup.user.user_metadata?.qa_run === state.run && lookup.user.user_metadata?.qa_kind === KIND, 'Partial synthetic Auth provenance mismatch')
+        const memberships = must(await admin.from('organization_members').select('org_id,org_role').eq('user_id', account.id).limit(2), 'Recover synthetic personal organization')
+        check(memberships.length === 1 && UUID.test(memberships[0].org_id) && memberships[0].org_role === 'owner', 'Partial synthetic organization ownership mismatch')
+        const orgId = memberships[0].org_id
+        check(account.orgIds.length === 0 || account.orgIds[0] === orgId, 'Partial synthetic organization receipt changed')
+        const members = must(await admin.from('organization_members').select('user_id,org_role').eq('org_id', orgId).limit(2), 'Verify partial organization exclusivity')
+        check(members.length === 1 && members[0].user_id === account.id && members[0].org_role === 'owner', 'Refusing partial shared organization cleanup')
+        account.orgIds = [orgId]; account.membershipVerified = true; persist()
+      }
+      await validateOwnedRows()
       // Revoke every synthetic login before deleting data or identities.
       for (const account of state.accounts) {
         const lookup = await admin.auth.admin.getUserById(account.id)
@@ -300,9 +327,9 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
   try {
     if (mode !== 'create') {
       const stat = lstatSync(fixturePath)
-      check(stat.isFile() && !stat.isSymbolicLink() && (stat.mode & 0o077) === 0 && stat.size <= 128_000, 'Fixture requires a private regular file')
+      check(stat.isFile() && !stat.isSymbolicLink() && (stat.mode & 0o077) === 0 && stat.uid === process.getuid?.() && stat.size <= 128_000, 'Fixture requires a private owned regular file')
       state = validateFixtureManifest(JSON.parse(readFileSync(fixturePath, 'utf8'))); trusted = true
-      await validateOwnedRows()
+      if (mode !== 'cleanup') await validateOwnedRows()
       if (mode === 'verify') {
         check(state.baseline, 'Fixture has no verified score baseline')
         same(await snapshot(), state.baseline, 'Reminder interaction changed synthetic scores, attempts, answers or timers')

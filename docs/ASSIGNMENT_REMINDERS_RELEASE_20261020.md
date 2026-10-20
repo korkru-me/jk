@@ -1,6 +1,12 @@
 # Assignment reminders — 20 October 2026
 
-Status: **Production application released and actual primary-local parity verified.** PR [#71](https://github.com/korkru-me/jk/pull/71) merged as `949c44d72839d5fea0f6e32c27cdba7cc2b690b8`; its Production deployment is READY with canonical aliases. Full candidate checks and actual localhost:3000 UI/runtime checks pass. Hosted real teacher-to-student delivery remains explicitly unverified: the recorded Staging history mismatch stopped database mutations, and hosted browser navigation reached Vercel SSO/login only. No authentication bypass or fixture writes were used to close that gap.
+Status: **Application released earlier through PR #71; real Staging teacher reminder-button → exact unfinished student popup → durable acknowledgement now PASS for all four synthetic student states. Exact synthetic cleanup PASS.** Both recipient acknowledgements survived reload; submitted/graded learners received no reminder. The initial local checks and environment stop below remain historical evidence. Current hosted results and cleanup status are in [STAGING_MANUAL_REMINDER_E2E_20261020.md](STAGING_MANUAL_REMINDER_E2E_20261020.md).
+
+## Hosted manual-reminder verification — 20 October 2026
+
+After the separately approved Staging repair, fresh migration checks confirmed 165/165 versions with no differences and normal Chrome Vercel access succeeded. The real teacher header **เตือน** click created exactly two unread notices for the never-started and in-progress synthetic students. Both actual dashboards showed the correct reminder state and real **รับทราบ** clicks durably changed their exact rows to read; reload showed no dialog. Submitted and graded synthetic dashboards had zero reminders/dialogs. Final guarded read counts were 2 read/0 unread, with the full three-attempt/three-answer score/revision/timer baseline unchanged and no browser warning/error entries.
+
+This test changed only bounded QA tooling; no application/RLS/schema/migration or Production data test was involved. Focused runner validation passed 51 cases/175 combined across five suites, including PGlite. **Exact fixture cleanup passed:** sessions were revoked before deletion, the runner removed all five synthetic accounts and exact resources, and independent SQL confirmed all nine resource categories—including five personal organizations—at zero. The private manifest and temporary two-key file were removed. IDs, screenshots, first-fixture constraint correction and scope limits are in [STAGING_MANUAL_REMINDER_E2E_20261020.md](STAGING_MANUAL_REMINDER_E2E_20261020.md). This later evidence supersedes the unperformed hosted manual-reminder claim below; repeated-send suppression, concurrency, SMTP, SEB and Production writes were not exercised.
 
 ## Published application and primary-local parity
 
@@ -31,7 +37,7 @@ No migration, table, RLS grant, notification type or external email/Auth/passwor
 - New Staging-harness safety suite: 44 offline tests passed; together with the reused deadline harness suite, 84 passed. Script syntax and scoped diff checks passed. These checks made no hosted requests.
 - CUA browser checks on the actual primary localhost:3000 fixture passed reminder sequencing, acknowledgement, deferral and X/backdrop dismissal confirmation; announcement-first order followed by reminders; completed-work/exam-route suppression; acknowledgement failure retaining the notice; and CTA navigation to an injected mock URL. The measured narrow viewport was **410px**, with no horizontal page overflow. Polling/external actions were injected/disabled; no live notification was written. These checks do not prove a real Supabase send or receipt update.
 
-## Staging preflight stop and unverified delivery
+## Historical Staging preflight stop and unverified delivery
 
 Read-only Staging migration preflight returned **165 history rows** and the already recorded exceptions: remote-only `20261009142610` and local-only `20261015132234`. No new reminder migration is needed, but the AGENTS history-mismatch rule still requires stopping database mutations. No synthetic fixture/account/notification was created, no project keys were used for hosted fixture requests, and no schema was applied, repaired or replayed in this task. The exception was not silently reconciled or treated as permission to continue test writes.
 
@@ -39,6 +45,6 @@ Read-only Staging migration preflight returned **165 history rows** and the alre
 
 The prepared fixed-target `scripts/verify-assignment-reminders-staging.mjs` supports explicit create/retain, read-only notification verification and exact cleanup modes for a later permitted run. It would create one synthetic teacher and four students (never started, in progress, submitted and graded), with nonzero completed scores and legal close/grade/review transitions. Its mode-0600 private manifest would contain synthetic credentials, exact IDs and score/timer metadata baselines; project keys and session tokens are never persisted. Verification expects only the two unfinished recipients and can check read counts after real UI acknowledgement. Cleanup verifies provenance and revokes sessions before deleting exact run-owned rows, personal organizations and accounts. Creating a new attempt through the never-started learner's take URL falls outside its saved baseline; use acknowledgement or the already in-progress learner for that scoped browser check.
 
-## Handoff and remaining verification gap
+## Historical handoff and remaining verification gap
 
 The application is deployed; do not repeat publication merely because the hosted data test was not run. This handoff records the Ready deployments, pushed primary application commit and primary-local parity. A subsequent documentation-only merge may advance hosting without changing the verified application files. Any later real Staging delivery/acknowledgement test must first satisfy the migration-history rule and normal hosting access, use synthetic accounts only, and verify exact cleanup. Completed offline/local checks and deployment metadata must not be described as a hosted end-to-end pass.
