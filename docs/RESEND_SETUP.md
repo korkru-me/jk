@@ -73,9 +73,11 @@ Recovery contract: `forgotPassword` หรือขอตั้งรหัส�
 2. **เสร็จแล้วเฉพาะ Staging:** ปล่อย migration CLI **`20261018154826_resend_quota_alert_delivery_ledger.sql`** เพียงไฟล์เดียว ตรวจ history รวม **162 รายการ**, ledger เปิด RLS, browser ไม่มี direct grants และ RPC เปิดเฉพาะ service role ผ่านแล้ว ก่อนหน้านี้ CLI `migration list --linked` ติด `LegacyProjectNotLinkedError` และ live history เทียบไฟล์มีความต่าง จึงไม่ได้ใช้ db push/reset/replay เพื่อข้ามความต่างหรือปล่อย migration SEB ที่พักไว้ หลักฐาน apply รอบนี้ไม่ครอบคลุม Production
 3. **ตั้งแล้ว:** Vercel project **`jk`** → Settings → Environment Variables มี API key/signing secret/from/to **เฉพาะ Preview ของ gitBranch `staging`** แล้ว ไม่เพิ่มสำเนา Preview แบบทุก branch อีก เริ่มด้วย flag `false` ระหว่างเตรียม ก่อนเปลี่ยนเฉพาะ Staging เป็น `true` และ redeploy จนรับ signed event ผ่าน ค่าปัจจุบันของ Staging เป็น server-only:
 
+Current20October: Production is enabled; keep the Staging quota flag false after cutover. The preceding integration steps describe the earlier Staging rollout.
+
 ```dotenv
 KORKRU_DEPLOYMENT_ENV=staging
-RESEND_QUOTA_ALERTS_ENABLED=true
+RESEND_QUOTA_ALERTS_ENABLED=false
 RESEND_QUOTA_API_KEY=key_full_access_ที่เก็บเป็น_secret
 RESEND_QUOTA_WEBHOOK_SECRET=signing_secret_ของ_endpoint_ที่ตั้งไว้
 RESEND_QUOTA_ALERT_FROM=auth@mail.korkru.com
