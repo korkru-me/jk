@@ -1,0 +1,202 @@
+{
+  "description": "Pre-release primary recovery integration only; no Production Ready, SMTP save or hosted email proof.",
+  "primaryCheckedAt": "2026-10-20T05:04:28.316Z",
+  "sourceRefs": {
+    "baseline": "216d492469259a3e22945413e4ca798e71439a1f",
+    "recovery": "be7ee0d7c258a3519d60f98d651c6e98383f1d02",
+    "notice": "e952b4b8cba20a004a29e5b21ff6149589dbf21b"
+  },
+  "candidateApplicationCommit": "cd7268769ab77fba72c71fa7d484feb0a75d4de6",
+  "copySources": {
+    "app/reset-password/page.tsx": "216d492",
+    "components/auth/reset-password-form.tsx": "be7ee0d",
+    "app/login/page.tsx": "e952b4b",
+    "components/ui/alert.tsx": "e952b4b",
+    "components/brand-logo.tsx": "216d492",
+    "components/ui/input-group.tsx": "216d492",
+    "lib/auth/recovery-grant.ts": "216d492",
+    "lib/auth/recovery-grant.server.ts": "216d492",
+    "lib/auth/recovery-intent.ts": "216d492",
+    "lib/auth/recovery-intent.server.ts": "216d492",
+    "lib/auth/email-request-limit.server.ts": "216d492",
+    "lib/auth/recovery-grant.test.ts": "216d492",
+    "lib/auth/recovery-intent.test.ts": "216d492",
+    "lib/auth/recovery-callback.test.ts": "216d492",
+    "lib/auth/email-request-limit.test.ts": "216d492"
+  },
+  "narrowMerges": [
+    {
+      "file": "lib/actions/auth.ts",
+      "scope": "Merge recovery imports/helpers, forgot-password intent flow and reset result behavior; preserve existing unrelated authentication functions."
+    },
+    {
+      "file": "app/auth/callback/route.ts",
+      "scope": "Merge baseline recovery intent/nonce, PKCE identity and grant checks; preserve existing non-recovery profile handling and failure behavior."
+    }
+  ],
+  "sourceDerivedFocusedTest": "lib/auth/email-actions.test.ts",
+  "afterHashes": [
+    {
+      "file": "lib/actions/auth.ts",
+      "sha256": "1492ce9c87a8516f81a01b611d0994be4d7c8d35f183cb6cab99c4a625ba073a"
+    },
+    {
+      "file": "app/auth/callback/route.ts",
+      "sha256": "6e3f8712e5a49d9d86adfe349d31daaaeeb3c1ce2e84136c3c5f8fedd591426c"
+    },
+    {
+      "file": "app/reset-password/page.tsx",
+      "sha256": "c568593f77fe6f233791ad198ff7c82b178d6cd9b3dda50d931cb19ea87c5e99"
+    },
+    {
+      "file": "components/auth/reset-password-form.tsx",
+      "sha256": "78a465630b9a5f3958c0ab5bc0dc0dfa6b50b6459954cb171ece7b5f717fd0d7"
+    },
+    {
+      "file": "app/login/page.tsx",
+      "sha256": "c23a3f762e445e80d1228d72c86cba414154e415be005e4a6f754fc0fffb3866"
+    },
+    {
+      "file": "components/ui/alert.tsx",
+      "sha256": "88bf41392cb705c8b0296162f661a4570c6a8c2f132d03dc6188a46f012fa9eb"
+    },
+    {
+      "file": "components/brand-logo.tsx",
+      "sha256": "14892fc601d2388421f4ceaefdc7ed834c47890ab5785b322d314afb7f1423b6"
+    },
+    {
+      "file": "components/ui/input-group.tsx",
+      "sha256": "7aa6f4acf51f3c47b64f9515b69fff47286512d28efcebcfe4b1f0bc2a4d4dc2"
+    },
+    {
+      "file": "lib/auth/recovery-grant.ts",
+      "sha256": "46b562facea834093330b37ae1a0c88910cda70351613e3ad6124ff107d7aee0"
+    },
+    {
+      "file": "lib/auth/recovery-grant.server.ts",
+      "sha256": "31a10e525416cc78fd594f8c676ea30a3bd791f20c0fb052e6e924d57b6031bf"
+    },
+    {
+      "file": "lib/auth/recovery-intent.ts",
+      "sha256": "2c0b14f7c66707e4680917ec7d6d43f0816bd151f20a3d84d45691330f499bd9"
+    },
+    {
+      "file": "lib/auth/recovery-intent.server.ts",
+      "sha256": "98a922d6060ce739b508e57fd616c6b17623e45515af1ffedbe803bc47afe27c"
+    },
+    {
+      "file": "lib/auth/email-request-limit.server.ts",
+      "sha256": "66f6d4a929ed10bd15060d4888ca1761f08d5637d946cf0e90f183805c46680a"
+    },
+    {
+      "file": "lib/auth/recovery-grant.test.ts",
+      "sha256": "31a4032bbdb1e33ddb8795bb9ca93bcca50285c6661ab441c37f775baae8d49a"
+    },
+    {
+      "file": "lib/auth/recovery-intent.test.ts",
+      "sha256": "07c92624590a77c2e5ed837c27e57a0dee82ec3fe4266e4b89eefd397086f110"
+    },
+    {
+      "file": "lib/auth/recovery-callback.test.ts",
+      "sha256": "20f1d5705e48044477727affa9ac195cb8d86ba30d34b04bc286318e68b40f87"
+    },
+    {
+      "file": "lib/auth/email-request-limit.test.ts",
+      "sha256": "e79226d736f69850eecfa8019c8aa9ca4c38d5ba2243b53feaced9a1a59e3ad5"
+    },
+    {
+      "file": "lib/auth/email-actions.test.ts",
+      "sha256": "c7c1bf0a66fb25021f044ae21e0159fce763bc61ed773547d6328010d8907e8e"
+    }
+  ],
+  "preservation": {
+    "protectedPathsChanged": 0,
+    "unrelatedAuthFunctionsUnchanged": true,
+    "nonRecoveryProfileHandlingUnchanged": true,
+    "originalNonRecoveryFailuresPreserved": true,
+    "copyFilesExact": true,
+    "noSchemaChanges": true,
+    "noPackageChanges": true,
+    "primaryIntegrationNoEnvironmentValuesReadOrChanged": true
+  },
+  "primary": {
+    "branch": "codex/student-classroom-cards",
+    "head": "c36fb8b3fdd1e84b21eb0e87307ba9528779bbc8",
+    "pid": 54741,
+    "restarted": false,
+    "committed": false,
+    "pushed": false
+  },
+  "primaryCheckoutName": "korkru",
+  "primaryChecks": {
+    "focused": {
+      "files": 5,
+      "cases": 47,
+      "passed": true
+    },
+    "fullSuite": {
+      "files": 321,
+      "cases": 4500,
+      "passed": true
+    },
+    "typecheck": {
+      "passed": true,
+      "incremental": false
+    },
+    "tokenLint": {
+      "passed": true,
+      "noRegressions": true
+    },
+    "diffCheck": {
+      "passed": true
+    },
+    "build": {
+      "passed": true,
+      "exitCode": 0,
+      "runtime": "Node24.19.0",
+      "bundler": "Webpack",
+      "nextVersion": "16.3.5",
+      "staticPages": 71,
+      "cleanConstructedEnvironment": true,
+      "realEnvironmentFilesCopied": false,
+      "productionCredentialsUsed": false,
+      "fixtureIncluded": false
+    }
+  },
+  "uiEvidence": {
+    "actualSite": "http://localhost:3000",
+    "performedBy": "root via Cua",
+    "actions": "synthetic fixture only",
+    "results": [
+      "same_password Thai field error + aria-invalid true + focus password",
+      "success persisted after reload, green notice",
+      "revocation warning, yellow notice",
+      "provider rejection visible",
+      "network failure visible",
+      "actual login success/warning notice rendering"
+    ],
+    "viewport": 1507,
+    "mobileVerified": false,
+    "fixtureRemoved": true
+  },
+  "temporaryFixtureFilesRemoved": 4,
+  "fixtureDirectoryAbsent": true,
+  "postReadyVerificationPending": true,
+  "productionDeployedAtThisCheckpoint": false,
+  "smtpSavedAtThisCheckpoint": false,
+  "productionEmailTestedAtThisCheckpoint": false,
+  "privatePatchIncluded": false,
+  "laterLocalConfigParityStep": {
+    "status": "completed; ignored-file presence, minimum length and dev reload verified",
+    "priorAuthFlowSecretPresent": false,
+    "completedAction": "Root generated an independent local-only crypto256-bit AUTH_FLOW_SECRET in ignored primary .env.local and appended a blank placeholder/comment to primary .env.example without overwriting existing dirty work.",
+    "productionOrStagingSecretsCopied": false,
+    "secretValuesPrintedOrCommitted": false,
+    "ignoredFileVerified": true,
+    "nativeNextEnvLoaderMinimumLengthValid": true,
+    "devEnvLocalReloadObserved": true,
+    "quotaFlagsChanged": false,
+    "candidateEnvironmentContractChanged": false,
+    "note": "Earlier no-environment-change findings describe the source/check audit before this later local configuration step."
+  }
+}

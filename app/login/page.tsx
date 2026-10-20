@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { CircleCheck, TriangleAlert } from 'lucide-react'
 import { LoginForm } from '@/components/auth/login-form'
 import { Card } from '@/components/ui/card'
 import { BrandLogo } from '@/components/brand-logo'
@@ -23,7 +24,8 @@ export default async function LoginPage({ searchParams }: {
           <p className="mt-1 text-sm text-muted-foreground">เลือกวิธีเข้าสู่บัญชี KorKru ของคุณ</p>
         </div>
         {params.password_changed === '1' && (
-          <Alert role="status">
+          <Alert role="status" variant={params.sessions_revoked === '0' ? 'warning' : 'success'}>
+            {params.sessions_revoked === '0' ? <TriangleAlert aria-hidden /> : <CircleCheck aria-hidden />}
             <AlertTitle>เปลี่ยนรหัสผ่านแล้ว</AlertTitle>
             <AlertDescription>
               {params.sessions_revoked === '0'
