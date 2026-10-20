@@ -1,8 +1,8 @@
 # ระบบสมัครและความน่าเชื่อถือของบัญชี — 17 ตุลาคม 2026
 
-## สถานะปัจจุบัน 20 ตุลาคม — recovery application released; SMTP Save ยังรอ
+## สถานะปัจจุบัน 20 ตุลาคม — recovery application released; SMTP Save แล้ว รอทดสอบอีเมลจริง
 
-PR [#76](https://github.com/korkru-me/jk/pull/76) merge เป็น `f488c93894346cf74736a43783a9cf6f5369a2f2` และ Production deployment `dpl_AGq5Kj9LbA3vgRVjfPTTbjZpwK5C` READY พร้อม canonical `www.korkru.com` แล้ว ตรวจ public auth notices/gate และ actual primary source/runtime หลัง Ready ผ่าน ฟอร์ม SMTP เตรียมครบแต่ Password ยังว่าง เจ้าของต้องวางคีย์และ Save เอง จากนั้นจึงตรวจ SMTP และทดสอบอีเมล recovery จริงทีละขั้น ยังไม่มีการบันทึก SMTP/ส่งอีเมลหรือเปลี่ยนรหัส Production ในรอบนี้ รักษา signup/current-password/Google/SEB/quota ตามเดิม ดู [SMTP_PRODUCTION_RELEASE_20261020.md](SMTP_PRODUCTION_RELEASE_20261020.md)
+PR [#76](https://github.com/korkru-me/jk/pull/76) merge เป็น `f488c93894346cf74736a43783a9cf6f5369a2f2` และ Production deployment `dpl_AGq5Kj9LbA3vgRVjfPTTbjZpwK5C` READY พร้อม canonical `www.korkru.com` แล้ว ตรวจ public auth notices/gate และ actual primary source/runtime หลัง Ready ผ่าน เจ้าของยืนยันบันทึก SMTP Production แล้ว Root ตรวจ native Auth แบบ sanitized สดพบ SMTP ทั้งสี่รายการ present=`true` โดยไม่เปิดเผย secret; Site URL `https://www.korkru.com`, autoconfirm=`true` และ recovery `{{ .ConfirmationURL }}` คงเดิม ยังไม่ส่ง/ทดสอบอีเมลหรือเปลี่ยนรหัส Production จริง ต้องพาทดสอบ recovery ทีละขั้น รักษา signup/current-password/Google/SEB/quota ตามเดิม ดู [SMTP_PRODUCTION_RELEASE_20261020.md](SMTP_PRODUCTION_RELEASE_20261020.md)
 
 ### ประวัติการเตรียม candidate ก่อน release
 

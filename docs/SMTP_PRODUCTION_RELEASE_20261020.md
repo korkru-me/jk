@@ -1,13 +1,14 @@
 # Production SMTP และ recovery — 20 ตุลาคม 2026
 
-สถานะ: **Production application ปล่อยแล้วและตรวจ primary หลัง Ready แล้ว; SMTP ยังรอเจ้าของกรอก Password/Save และยังไม่ทดสอบอีเมล Production** PR [#76](https://github.com/korkru-me/jk/pull/76) merge เป็น `f488c93894346cf74736a43783a9cf6f5369a2f2` งานนี้ไม่เปิด Google, SEB หรือเปลี่ยนการยืนยันอีเมลสมัคร
+สถานะ: **Production application ปล่อยแล้วและตรวจ primary หลัง Ready แล้ว; เจ้าของบันทึก SMTP Production แล้วและตรวจ presence ผ่าน ยังไม่ทดสอบอีเมล/recovery จริง** PR [#76](https://github.com/korkru-me/jk/pull/76) merge เป็น `f488c93894346cf74736a43783a9cf6f5369a2f2` งานนี้ไม่เปิด Google, SEB หรือเปลี่ยนการยืนยันอีเมลสมัคร
 
 ## Production Ready และขั้นถัดไป
 
 - Deployment `dpl_AGq5Kj9LbA3vgRVjfPTTbjZpwK5C` / `jk-7y2bwdxw8-korkru-mes-projects.vercel.app` เป็น **READY** ที่ `2026-10-20T05:13:45.043Z` (12:13:45 น. ไทย) source `f488c93894346cf74736a43783a9cf6f5369a2f2`, branch `master`, target Production และมี canonical alias `www.korkru.com` พร้อม `korkru.com`
 - หลัง Ready: public HTTP แบบไม่ใช้ credentials ได้ 200 ทั้ง login success/warning, forgot-password และ reset-password ที่ไม่มี grant; success ใช้สีเขียว, warning ใช้สีเตือน และ anonymous reset ยังแสดง expired/used-link gate โดยไม่มีฟอร์มเปลี่ยนรหัส ผล query notice ตรวจเฉพาะ rendering ไม่ใช่หลักฐานว่าเปลี่ยนรหัสบัญชีจริงแล้ว
 - ตรวจ actual primary อีกครั้งหลัง Ready: **18/18 hashes ตรง**, Next MCP ชี้ checkout `korkru`/port 3000 และ compilation issues `[]`; Cua หน้า login จริงยังแสดงผลสำเร็จตาม released scope หลัง local env reload ไม่ restart หรือทับงานร่วม ข้อจำกัดจอ 390px ยังบันทึกไว้ด้านล่าง
-- ขั้นที่รอเจ้าของ: วางคีย์ `korkru-production-supabase-smtp` ใน Password ของฟอร์ม Supabase Production ที่เตรียมแล้วและกด Save เอง จากนั้นตรวจค่าแบบไม่เปิดเผย secret และพาทดสอบ recovery จริงทีละขั้น ยังไม่มี SMTP Save หรืออีเมลจริงจากรอบนี้ ไม่มี schema/migration หรือ hosted credential change โดย agent
+- เจ้าของรายงานว่า **บันทึก SMTP Production แล้ว** Root ตรวจ native Auth แบบ sanitized สด ยืนยัน `smtp_host`, `smtp_user`, `smtp_pass`, `smtp_admin_email` เป็น present=`true` ทั้งสี่รายการ โดยไม่เปิดเผยค่าลับ Site URL ยังเป็น `https://www.korkru.com`, autoconfirm=`true` และ recovery `{{ .ConfirmationURL }}` คงเดิม นี่เป็นหลักฐานการ Save/การมี config ไม่ใช่หลักฐานส่งถึง Inbox หรือเปลี่ยนรหัสสำเร็จ
+- ขั้นถัดไปที่ยังรอ: พาเจ้าของขอ recovery ใหม่และทดสอบอีเมลจริงทีละขั้น ยังไม่มีการส่งเมลหรือทดสอบรหัส Production จาก checkpoint นี้ ไม่มี schema/migration หรือการเปลี่ยน flags เพิ่ม
 
 ## ขอบเขต source
 
@@ -18,9 +19,9 @@
 
 ## การตั้งค่าที่ตรวจและสิ่งที่เจ้าของทำแล้ว
 
-- Native Auth read-only แบบกรองค่าลับ: custom SMTP 4 รายการยัง absent, canonical Site URL `https://www.korkru.com`, autoconfirm `true`, recovery template มี `{{ .ConfirmationURL }}` ต้องรักษา autoconfirm เดิมและ current-password policy ไม่เปิด Confirm email จากงานนี้
+- Native Auth read-only แบบกรองค่าลับหลังเจ้าของ Save: custom SMTP 4 รายการที่ตรวจมีค่าแล้ว (`smtp_host`, `smtp_user`, `smtp_pass`, `smtp_admin_email` presence=`true`), canonical Site URL `https://www.korkru.com`, autoconfirm `true`, recovery template มี `{{ .ConfirmationURL }}` ต้องรักษา autoconfirm เดิมและ current-password policy ไม่เปิด Confirm email จากงานนี้
 - เจ้าของรายงานว่าสร้าง `korkru-production-supabase-smtp` แบบ **Sending access** จำกัด `mail.korkru.com` แล้ว เก็บ key เป็นส่วนตัว ไม่ใช้ Full access quota monitor key และไม่อ่าน/บันทึกค่าลับลง Git/แชท
-- ค่าตั้ง SMTP ที่เตรียม: `smtp.resend.com`, port `465`, username `resend`, sender `auth@mail.korkru.com`, sender name `KorKru` ฟอร์ม Supabase เตรียมแล้วแต่ช่อง password ยังว่าง ให้เจ้าของกรอก key เองและ Save ภายหลัง ยังไม่มีการบันทึก SMTP
+- ค่าตั้ง SMTP ที่เตรียมให้เจ้าของ: `smtp.resend.com`, port `465`, username `resend`, sender `auth@mail.korkru.com`, sender name `KorKru` เจ้าของกรอก key เป็นส่วนตัวและยืนยัน Save แล้ว การตรวจหลังบันทึกยืนยันเฉพาะ presence ข้างต้น ไม่อ่านหรือบันทึก password
 - Root ตรวจ Vercel native API สดเฉพาะ public key แล้ว: Production `NEXT_PUBLIC_SITE_URL` ตรง `https://www.korkru.com` และ Supabase Site URL ตรงกัน คง callback query `next=/reset-password`/`recovery_nonce` ผ่าน `{{ .ConfirmationURL }}` ไม่เปลี่ยนเป็น reset URL เปล่าหรือ signup-only token-hash endpoint ปิด tracking ของลิงก์ Auth ตามเดิม
 - Quota rollout เดิมคง Production `RESEND_QUOTA_ALERTS_ENABLED=true`, Staging `false` และ webhook เดิม ไม่เปลี่ยน key/secret/flags/URL จากงานนี้
 
@@ -40,6 +41,6 @@
 - Primary full suite **321 files / 4,500 tests**, focused **5 files / 47 tests**, TypeScript แบบไม่ใช้ incremental, token lint และ clean-env Node24 Webpack snapshot build **71/71 static pages** ผ่าน Snapshot ไม่มี real env/Production credentials หรือ fixture
 - Root ใช้ **Cua บน actual `localhost:3000` ที่ desktop กว้าง 1507px** ตรวจ synthetic reused-password inline error/aria-invalid/focus, success notice สีเขียวที่คงอยู่หลัง reload, revocation warning สีเหลือง, provider/network errors และ success/warning callout ของหน้า login จริงผ่าน **ยังไม่มีหลักฐานจอ 390px ในรอบนี้** ลบ temporary fixture ทั้ง 4 ไฟล์แล้วและยืนยัน directory ไม่มีเหลือ ไม่ใช้ผล synthetic แทน SMTP จริง
 - Integration เริ่มก่อน release และ Root ตรวจ source/runtime ซ้ำหลัง Production Ready ตาม checkpoint ด้านบนแล้ว การเตรียม candidate ไม่เปลี่ยน provider/DB หรือ hosted env; deploy ทำผ่าน merge PR #76 ตามขอบเขตที่เจ้าของอนุญาต
-- หลัง release/parity แล้ว เจ้าของบันทึก SMTP ส่วนตัวและขอ recovery ใหม่หนึ่งครั้งในเบราว์เซอร์เดิม ตรวจ Inbox/ลิงก์/รหัสเดิมซ้ำ/รหัสใหม่/notice สีที่คงอยู่/old-password rejection/new-password login พร้อมตรวจ reused/expired link ตามโอกาส ไม่ใช้ผล mock แทนการยืนยัน SMTP จริง
+- Release/parity และ SMTP Save/presence ผ่านแล้ว ขั้นที่ยังรอคือเจ้าของขอ recovery ใหม่หนึ่งครั้งในเบราว์เซอร์เดิม ตรวจ Inbox/ลิงก์/รหัสเดิมซ้ำ/รหัสใหม่/notice สีที่คงอยู่/old-password rejection/new-password login พร้อมตรวจ reused/expired link ตามโอกาส ไม่ใช้ผล mock หรือ config presence แทนการยืนยัน SMTP จริง
 
 อ้างอิง: [Resend SMTP](https://resend.com/docs/send-with-supabase-smtp), [Supabase SMTP](https://supabase.com/docs/guides/auth/auth-smtp), [Email templates](https://supabase.com/docs/guides/auth/auth-email-templates), [PKCE](https://supabase.com/docs/guides/auth/sessions/pkce-flow)

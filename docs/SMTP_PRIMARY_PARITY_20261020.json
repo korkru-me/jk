@@ -1,5 +1,5 @@
 {
-  "description": "Pre-release primary recovery integration only; no Production Ready, SMTP save or hosted email proof.",
+  "description": "Primary source/check audit plus later Production release, local configuration and owner SMTP-save checkpoints; no real email/password-test proof.",
   "primaryCheckedAt": "2026-10-20T05:04:28.316Z",
   "sourceRefs": {
     "baseline": "216d492469259a3e22945413e4ca798e71439a1f",
@@ -183,7 +183,7 @@
   "fixtureDirectoryAbsent": true,
   "postReadyVerificationPending": false,
   "productionDeployedAtThisCheckpoint": true,
-  "smtpSavedAtThisCheckpoint": false,
+  "smtpSavedAtThisCheckpoint": true,
   "productionEmailTestedAtThisCheckpoint": false,
   "privatePatchIncluded": false,
   "laterLocalConfigParityStep": {
@@ -210,5 +210,23 @@
     "postReadyPrimaryCompilationIssues": 0,
     "postReadyPrimaryLoginNoticeVisible": true,
     "realAccountOrEmailUsedForTheseChecks": false
+  },
+  "smtpManagementVerification": {
+    "ownerReportedSaved": true,
+    "performedBy": "root native sanitized Auth inspector",
+    "checkedDate": "2026-10-20",
+    "presenceOnly": {
+      "smtp_host": true,
+      "smtp_user": true,
+      "smtp_pass": true,
+      "smtp_admin_email": true
+    },
+    "canonicalSiteUrl": "https://www.korkru.com",
+    "autoconfirmPreserved": true,
+    "recoveryConfirmationUrlTemplatePreserved": true,
+    "secretValuesReadIntoOutputOrCommitted": false,
+    "actualEmailDeliveryVerified": false,
+    "manualProductionRecoveryTested": false,
+    "quotaOrOtherActivationFlagsChanged": false
   }
 }
