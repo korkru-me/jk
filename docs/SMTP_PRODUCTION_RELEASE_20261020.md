@@ -1,6 +1,6 @@
 # Production SMTP และ recovery — 20 ตุลาคม 2026
 
-สถานะ: **Production application ปล่อยแล้วและตรวจ primary หลัง Ready แล้ว; เจ้าของบันทึก SMTP Production แล้วและตรวจ presence ผ่าน ยังไม่ทดสอบอีเมล/recovery จริง** PR [#76](https://github.com/korkru-me/jk/pull/76) merge เป็น `f488c93894346cf74736a43783a9cf6f5369a2f2` งานนี้ไม่เปิด Google, SEB หรือเปลี่ยนการยืนยันอีเมลสมัคร
+สถานะ: **Production application ปล่อยแล้วและตรวจ primary หลัง Ready แล้ว; ทดสอบขอ recovery จริงพบ SMTP ปฏิเสธ credentials จึงยังส่งอีเมลไม่สำเร็จและยังไม่เปลี่ยนรหัส** PR [#76](https://github.com/korkru-me/jk/pull/76) merge เป็น `f488c93894346cf74736a43783a9cf6f5369a2f2` งานนี้ไม่เปิด Google, SEB หรือเปลี่ยนการยืนยันอีเมลสมัคร
 
 ## Production Ready และขั้นถัดไป
 
@@ -8,7 +8,15 @@
 - หลัง Ready: public HTTP แบบไม่ใช้ credentials ได้ 200 ทั้ง login success/warning, forgot-password และ reset-password ที่ไม่มี grant; success ใช้สีเขียว, warning ใช้สีเตือน และ anonymous reset ยังแสดง expired/used-link gate โดยไม่มีฟอร์มเปลี่ยนรหัส ผล query notice ตรวจเฉพาะ rendering ไม่ใช่หลักฐานว่าเปลี่ยนรหัสบัญชีจริงแล้ว
 - ตรวจ actual primary อีกครั้งหลัง Ready: **18/18 hashes ตรง**, Next MCP ชี้ checkout `korkru`/port 3000 และ compilation issues `[]`; Cua หน้า login จริงยังแสดงผลสำเร็จตาม released scope หลัง local env reload ไม่ restart หรือทับงานร่วม ข้อจำกัดจอ 390px ยังบันทึกไว้ด้านล่าง
 - เจ้าของรายงานว่า **บันทึก SMTP Production แล้ว** Root ตรวจ native Auth แบบ sanitized สด ยืนยัน `smtp_host`, `smtp_user`, `smtp_pass`, `smtp_admin_email` เป็น present=`true` ทั้งสี่รายการ โดยไม่เปิดเผยค่าลับ Site URL ยังเป็น `https://www.korkru.com`, autoconfirm=`true` และ recovery `{{ .ConfirmationURL }}` คงเดิม นี่เป็นหลักฐานการ Save/การมี config ไม่ใช่หลักฐานส่งถึง Inbox หรือเปลี่ยนรหัสสำเร็จ
-- ขั้นถัดไปที่ยังรอ: พาเจ้าของขอ recovery ใหม่และทดสอบอีเมลจริงทีละขั้น ยังไม่มีการส่งเมลหรือทดสอบรหัส Production จาก checkpoint นี้ ไม่มี schema/migration หรือการเปลี่ยน flags เพิ่ม
+- เจ้าของลองขอ recovery จริงแล้วและรายงานว่าไม่ได้รับอีเมล Root ตรวจ read-only Supabase Auth logs พบ `POST /recover` ที่ `2026-10-20T05:31:43Z` และ `2026-10-20T05:33:35Z` (12:31/12:33 น. ไทย) ทั้งคู่ HTTP `500` และ SMTP `535 Authentication credentials invalid` จึงมีหลักฐานชัดว่าติด credentials ของ SMTP ไม่ใช่เพียงยังไม่พบเมลใน Inbox การมี password อยู่ใน config ไม่ยืนยันว่าค่านั้นใช้ได้ ยังไม่มีการเปลี่ยนรหัส Production
+- ขั้นถัดไป: ให้เจ้าของวาง SMTP Sending access key ที่เก็บส่วนตัวใหม่ในช่อง Password ของ Supabase Production แล้ว Save ด้วยตนเอง Root ไม่อ่าน/พิมพ์/บันทึก key หลังแก้ credentials และพ้น cooldown จึงค่อยขอ recovery ใหม่หนึ่งครั้งในเบราว์เซอร์เดิม ไม่มี schema/migration/deploy/application หรือ flags change เพิ่มจากการวิเคราะห์ครั้งนี้
+
+## SMTP failure และข้อจำกัดการลองซ้ำ — 20 ตุลาคม 2026
+
+- Native sanitized config GET ยืนยันค่าที่ไม่ลับ: host `smtp.resend.com`, port `465`, username `resend`, sender `auth@mail.korkru.com`, sender name `KorKru`; password ตรวจเพียง present=`true` ไม่มีการอ่านหรือเปิดเผยค่า ผล log `535` เป็น blocker ปัจจุบัน ต้องแก้ค่าที่ใช้ authentication ก่อนทดสอบส่งอีกครั้ง
+- `forgotPassword` จองผ่าน app limiter ก่อนเรียก Auth คำขอที่ provider ส่งล้มเหลวยังใช้ reservation: เว้น **60 วินาที**, สูงสุด **5 คำขอ/ช่วง 1 ชั่วโมง** และ **10 คำขอ/ช่วง 24 ชั่วโมง** ต่ออีเมล พร้อม **120 คำขอ/ช่วง 1 ชั่วโมง** ต่อ trusted IP คำขอที่ถูก limiter ปฏิเสธไม่เพิ่ม counter หรือเลื่อนเวลารอ ไม่ล้าง counter/หมุน signing secret/ข้าม limiter เพื่อทดสอบ
+- Generic toast ไม่เปิดเผย provider internals และฟอร์มปัจจุบันยังไม่แสดง `retryAfterSeconds` เป็น countdown; ข้อความส่งถี่หลัง failure จึงเป็นไปได้ตาม reservation policy ยังไม่มี app/UI change ใน checkpoint นี้
+- ผล Ready/source/primary/local checks ด้านล่างยังเป็นหลักฐานเดิมที่ผ่าน การตรวจสองคำขอจริงนี้เป็น **failed delivery** ไม่ใช่ผ่าน SMTP หรือ recovery end-to-end รอ owner credential Save แล้วตรวจ Inbox/ลิงก์/ตั้งรหัส/notice/login ต่อทีละขั้น
 
 ## ขอบเขต source
 
@@ -21,7 +29,7 @@
 
 - Native Auth read-only แบบกรองค่าลับหลังเจ้าของ Save: custom SMTP 4 รายการที่ตรวจมีค่าแล้ว (`smtp_host`, `smtp_user`, `smtp_pass`, `smtp_admin_email` presence=`true`), canonical Site URL `https://www.korkru.com`, autoconfirm `true`, recovery template มี `{{ .ConfirmationURL }}` ต้องรักษา autoconfirm เดิมและ current-password policy ไม่เปิด Confirm email จากงานนี้
 - เจ้าของรายงานว่าสร้าง `korkru-production-supabase-smtp` แบบ **Sending access** จำกัด `mail.korkru.com` แล้ว เก็บ key เป็นส่วนตัว ไม่ใช้ Full access quota monitor key และไม่อ่าน/บันทึกค่าลับลง Git/แชท
-- ค่าตั้ง SMTP ที่เตรียมให้เจ้าของ: `smtp.resend.com`, port `465`, username `resend`, sender `auth@mail.korkru.com`, sender name `KorKru` เจ้าของกรอก key เป็นส่วนตัวและยืนยัน Save แล้ว การตรวจหลังบันทึกยืนยันเฉพาะ presence ข้างต้น ไม่อ่านหรือบันทึก password
+- ค่าตั้ง SMTP ที่เตรียมให้เจ้าของและตรวจซ้ำแบบ nonsecret GET: `smtp.resend.com`, port `465`, username `resend`, sender `auth@mail.korkru.com`, sender name `KorKru` เจ้าของกรอก key เป็นส่วนตัวและยืนยัน Save แล้ว การตรวจ password ยืนยันเฉพาะ presence ไม่อ่านหรือบันทึกค่า; คำขอจริงภายหลังยังได้ SMTP `535` ตาม failure checkpoint ข้างต้น
 - Root ตรวจ Vercel native API สดเฉพาะ public key แล้ว: Production `NEXT_PUBLIC_SITE_URL` ตรง `https://www.korkru.com` และ Supabase Site URL ตรงกัน คง callback query `next=/reset-password`/`recovery_nonce` ผ่าน `{{ .ConfirmationURL }}` ไม่เปลี่ยนเป็น reset URL เปล่าหรือ signup-only token-hash endpoint ปิด tracking ของลิงก์ Auth ตามเดิม
 - Quota rollout เดิมคง Production `RESEND_QUOTA_ALERTS_ENABLED=true`, Staging `false` และ webhook เดิม ไม่เปลี่ยน key/secret/flags/URL จากงานนี้
 
@@ -41,6 +49,6 @@
 - Primary full suite **321 files / 4,500 tests**, focused **5 files / 47 tests**, TypeScript แบบไม่ใช้ incremental, token lint และ clean-env Node24 Webpack snapshot build **71/71 static pages** ผ่าน Snapshot ไม่มี real env/Production credentials หรือ fixture
 - Root ใช้ **Cua บน actual `localhost:3000` ที่ desktop กว้าง 1507px** ตรวจ synthetic reused-password inline error/aria-invalid/focus, success notice สีเขียวที่คงอยู่หลัง reload, revocation warning สีเหลือง, provider/network errors และ success/warning callout ของหน้า login จริงผ่าน **ยังไม่มีหลักฐานจอ 390px ในรอบนี้** ลบ temporary fixture ทั้ง 4 ไฟล์แล้วและยืนยัน directory ไม่มีเหลือ ไม่ใช้ผล synthetic แทน SMTP จริง
 - Integration เริ่มก่อน release และ Root ตรวจ source/runtime ซ้ำหลัง Production Ready ตาม checkpoint ด้านบนแล้ว การเตรียม candidate ไม่เปลี่ยน provider/DB หรือ hosted env; deploy ทำผ่าน merge PR #76 ตามขอบเขตที่เจ้าของอนุญาต
-- Release/parity และ SMTP Save/presence ผ่านแล้ว ขั้นที่ยังรอคือเจ้าของขอ recovery ใหม่หนึ่งครั้งในเบราว์เซอร์เดิม ตรวจ Inbox/ลิงก์/รหัสเดิมซ้ำ/รหัสใหม่/notice สีที่คงอยู่/old-password rejection/new-password login พร้อมตรวจ reused/expired link ตามโอกาส ไม่ใช้ผล mock หรือ config presence แทนการยืนยัน SMTP จริง
+- Release/parity และ SMTP Save/presence ผ่านแล้ว แต่การขอ recovery จริงส่งไม่ผ่าน SMTP `535` ขั้นที่ยังรอคือ owner แก้ Password/Save ให้ authentication ผ่าน แล้วขอ recovery ใหม่หนึ่งครั้งหลังพ้น cooldown ในเบราว์เซอร์เดิม ตรวจ Inbox/ลิงก์/รหัสเดิมซ้ำ/รหัสใหม่/notice สีที่คงอยู่/old-password rejection/new-password login พร้อมตรวจ reused/expired link ตามโอกาส ไม่ใช้ผล mock หรือ config presence แทนการยืนยัน SMTP จริง
 
 อ้างอิง: [Resend SMTP](https://resend.com/docs/send-with-supabase-smtp), [Supabase SMTP](https://supabase.com/docs/guides/auth/auth-smtp), [Email templates](https://supabase.com/docs/guides/auth/auth-email-templates), [PKCE](https://supabase.com/docs/guides/auth/sessions/pkce-flow)

@@ -1,8 +1,10 @@
 # ระบบสมัครและความน่าเชื่อถือของบัญชี — 17 ตุลาคม 2026
 
-## สถานะปัจจุบัน 20 ตุลาคม — recovery application released; SMTP Save แล้ว รอทดสอบอีเมลจริง
+## สถานะปัจจุบัน 20 ตุลาคม — recovery application released; SMTP credentials ยังถูกปฏิเสธ
 
-PR [#76](https://github.com/korkru-me/jk/pull/76) merge เป็น `f488c93894346cf74736a43783a9cf6f5369a2f2` และ Production deployment `dpl_AGq5Kj9LbA3vgRVjfPTTbjZpwK5C` READY พร้อม canonical `www.korkru.com` แล้ว ตรวจ public auth notices/gate และ actual primary source/runtime หลัง Ready ผ่าน เจ้าของยืนยันบันทึก SMTP Production แล้ว Root ตรวจ native Auth แบบ sanitized สดพบ SMTP ทั้งสี่รายการ present=`true` โดยไม่เปิดเผย secret; Site URL `https://www.korkru.com`, autoconfirm=`true` และ recovery `{{ .ConfirmationURL }}` คงเดิม ยังไม่ส่ง/ทดสอบอีเมลหรือเปลี่ยนรหัส Production จริง ต้องพาทดสอบ recovery ทีละขั้น รักษา signup/current-password/Google/SEB/quota ตามเดิม ดู [SMTP_PRODUCTION_RELEASE_20261020.md](SMTP_PRODUCTION_RELEASE_20261020.md)
+PR [#76](https://github.com/korkru-me/jk/pull/76) merge เป็น `f488c93894346cf74736a43783a9cf6f5369a2f2` และ Production deployment `dpl_AGq5Kj9LbA3vgRVjfPTTbjZpwK5C` READY พร้อม canonical `www.korkru.com` แล้ว ตรวจ public auth notices/gate และ actual primary source/runtime หลัง Ready ผ่าน เจ้าของยืนยันบันทึก SMTP Production แล้ว Root ตรวจ native Auth แบบ sanitized พบ SMTP ทั้งสี่รายการ present=`true` โดยไม่เปิดเผย secret; Site URL `https://www.korkru.com`, autoconfirm=`true` และ recovery `{{ .ConfirmationURL }}` คงเดิม
+
+เจ้าของขอ recovery จริงแล้วแต่ไม่ได้รับอีเมล Root ตรวจ read-only Auth logs พบ `POST /recover` ที่ `2026-10-20T05:31:43Z` และ `05:33:35Z` (12:31/12:33 น. ไทย) เป็น HTTP `500` / SMTP `535 Authentication credentials invalid` ทั้งคู่ Native nonsecret GET ยืนยัน `smtp.resend.com:465`, username `resend`, sender `auth@mail.korkru.com`, name `KorKru`; password presence ไม่ใช่ validity ขณะนี้รอเจ้าของวาง key ส่วนตัวที่ถูกต้องในช่อง Password แล้ว Save เอง ยังไม่เปลี่ยนรหัสและ delivery/recovery end-to-end ยังไม่ผ่าน Failed sends ใช้ app reservation ตามเดิม (60 วินาที, 5/ชั่วโมง, 10/24 ชั่วโมงต่ออีเมล) ไม่ล้าง/ข้าม limiter ไม่มี schema/migration/deploy/application/flags change เพิ่มจากการตรวจนี้ รักษา signup/current-password/Google/SEB/quota ตามเดิม ดู [SMTP_PRODUCTION_RELEASE_20261020.md](SMTP_PRODUCTION_RELEASE_20261020.md)
 
 ### ประวัติการเตรียม candidate ก่อน release
 

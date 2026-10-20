@@ -1,16 +1,18 @@
 # Feature status
 
-## Production SMTP และผลกู้รหัสผ่าน — 20 ตุลาคม 2026 (application released; SMTP saved; email test pending)
+## Production SMTP และผลกู้รหัสผ่าน — 20 ตุลาคม 2026 (application released; SMTP credential rejection)
 
-PR [#76](https://github.com/korkru-me/jk/pull/76) ปล่อย source `f488c93894346cf74736a43783a9cf6f5369a2f2` แล้ว Deployment `dpl_AGq5Kj9LbA3vgRVjfPTTbjZpwK5C` READY พร้อม canonical `www.korkru.com`; public auth rendering/gate และ actual primary port 3000 ตรวจหลัง Ready แล้ว ผลกู้รหัสผ่านคงอยู่บน login ใช้สีสำเร็จ/คำเตือนและอธิบายรหัสเดิมซ้ำ เจ้าของบันทึก SMTP Production แล้ว และ Root ตรวจ native Auth สดแบบ presence-only ผ่านทั้งสี่รายการ โดยคง canonical Site URL/autoconfirm/ConfirmationURL เดิม ยังไม่ทดสอบการส่งถึง Inbox หรือ recovery/password จริง และไม่เปลี่ยน quota/Google/SEB flags รายละเอียดและข้อจำกัดจอ 390px อยู่ใน [SMTP_PRODUCTION_RELEASE_20261020.md](SMTP_PRODUCTION_RELEASE_20261020.md)
+PR [#76](https://github.com/korkru-me/jk/pull/76) ปล่อย source `f488c93894346cf74736a43783a9cf6f5369a2f2` แล้ว Deployment `dpl_AGq5Kj9LbA3vgRVjfPTTbjZpwK5C` READY พร้อม canonical `www.korkru.com`; public auth rendering/gate และ actual primary port 3000 ตรวจหลัง Ready แล้ว ผลกู้รหัสผ่านคงอยู่บน login ใช้สีสำเร็จ/คำเตือนและอธิบายรหัสเดิมซ้ำ เจ้าของบันทึก SMTP Production แล้ว และ Root ตรวจ native Auth สดแบบ presence-only ผ่านทั้งสี่รายการ โดยคง canonical Site URL/autoconfirm/ConfirmationURL เดิม
+
+การขอ recovery จริงล่าสุดยังส่งไม่ได้: Root ตรวจ read-only Auth logs ที่ `2026-10-20T05:31:43Z` และ `05:33:35Z` พบ `POST /recover` HTTP `500` / SMTP `535 Authentication credentials invalid` ทั้งคู่ เจ้าของไม่ได้รับอีเมลและยังไม่เปลี่ยนรหัส Native nonsecret GET ยืนยัน host/port/user/sender ถูกค่าที่เตรียมไว้ แต่ password ตรวจเพียง presence รอ owner วาง key ส่วนตัวที่ถูกต้องใน Password/Save แล้วลองใหม่หลังพ้น cooldown Failed sends นับ app reservation (60 วินาที, 5/ชั่วโมง, 10/24 ชั่วโมงต่ออีเมล); ไม่ล้างหรือข้าม limiter ไม่มี application/schema/migration/deploy หรือ quota/Google/SEB flags change เพิ่มจากการวิเคราะห์ รายละเอียดและข้อจำกัดจอ 390px อยู่ใน [SMTP_PRODUCTION_RELEASE_20261020.md](SMTP_PRODUCTION_RELEASE_20261020.md)
 
 ### ขอบเขตการเตรียมที่ปล่อยแล้ว
 
-เจ้าของอนุญาตตั้ง Production SMTP และทดสอบลืมรหัสผ่านทีละขั้นตอน พร้อมรายงานว่าสร้าง Sending access key แยกสำหรับ `mail.korkru.com` แล้วโดยเก็บค่าเป็นส่วนตัว Candidate จาก `216d492` รับเฉพาะ recovery feedback `be7ee0d` และ notice สี `e952b4b` รวม 5 application/test files ไม่พ่วง signup feedback, branding, Google หรือ SEB และไม่เพิ่ม schema/package/env การตั้ง SMTP ยังไม่บันทึกและยังไม่ทดสอบอีเมล Production ณ checkpoint นี้
+เจ้าของอนุญาตตั้ง Production SMTP และทดสอบลืมรหัสผ่านทีละขั้นตอน พร้อมรายงานว่าสร้าง Sending access key แยกสำหรับ `mail.korkru.com` แล้วโดยเก็บค่าเป็นส่วนตัว Candidate จาก `216d492` รับเฉพาะ recovery feedback `be7ee0d` และ notice สี `e952b4b` รวม 5 application/test files ไม่พ่วง signup feedback, branding, Google หรือ SEB และไม่เพิ่ม schema/package/env SMTP Save แล้วตาม checkpoint ด้านบน แต่การส่งจริงยังถูกปฏิเสธด้วย credentials
 
 รักษา Production autoconfirm `true`, hosted current-password policy และ recovery template `{{ .ConfirmationURL }}`; quota Production เปิดแล้ว/Staging ปิดตาม rollout เดิม ไม่เปลี่ยน flags หรือ webhook ในงานนี้ สถานะ checks, deploy, localhost parity และ manual test แยกใน [SMTP_PRODUCTION_RELEASE_20261020.md](SMTP_PRODUCTION_RELEASE_20261020.md) ข้อความเก่าด้านล่างเป็นหลักฐานตาม checkpoint ของแต่ละรอบ
 
-Candidate full 4,671 tests/TypeScript/token lint และ clean-env Node24 Webpack build 76 pages ผ่าน Primary pre-release integration 18 paths ผ่าน full 4,500/focused 47 tests/TypeScript/token lint/build 71 pages พร้อม Cua desktop actual localhost3000 ผ่านกรณี reused-password/success durability/revocation/provider/network และ real login callout ไม่อ้าง mobile 390px หรือ SMTP จริง ฟอร์ม SMTP ยังไม่ Save, PR #76 ยัง Draft และ Ready/post-release parity/manual email test ยังรอ
+Candidate full 4,671 tests/TypeScript/token lint และ clean-env Node24 Webpack build 76 pages ผ่าน Primary pre-release integration 18 paths ผ่าน full 4,500/focused 47 tests/TypeScript/token lint/build 71 pages พร้อม Cua desktop actual localhost3000 ผ่านกรณี reused-password/success durability/revocation/provider/network และ real login callout ไม่อ้าง mobile 390px หรือ SMTP จริง PR #76 ปล่อย Ready และตรวจ post-release parity แล้ว หลักฐานนี้ไม่แทนการส่งเมล/เปลี่ยนรหัส Production ซึ่งยังติด SMTP `535`
 
 ## แจ้งงานใหม่ให้นักเรียนอัตโนมัติ — 20 ตุลาคม 2026 (Production app released; local parity verified)
 

@@ -1,5 +1,5 @@
 {
-  "description": "Primary source/check audit plus later Production release, local configuration and owner SMTP-save checkpoints; no real email/password-test proof.",
+  "description": "Primary source/check audit plus later Production release, local configuration, owner SMTP Save and failed real recovery-send checkpoints; delivery and password reset remain unverified.",
   "primaryCheckedAt": "2026-10-20T05:04:28.316Z",
   "sourceRefs": {
     "baseline": "216d492469259a3e22945413e4ca798e71439a1f",
@@ -184,7 +184,7 @@
   "postReadyVerificationPending": false,
   "productionDeployedAtThisCheckpoint": true,
   "smtpSavedAtThisCheckpoint": true,
-  "productionEmailTestedAtThisCheckpoint": false,
+  "productionEmailTestedAtThisCheckpoint": true,
   "privatePatchIncluded": false,
   "laterLocalConfigParityStep": {
     "status": "completed; ignored-file presence, minimum length and dev reload verified",
@@ -226,7 +226,58 @@
     "recoveryConfirmationUrlTemplatePreserved": true,
     "secretValuesReadIntoOutputOrCommitted": false,
     "actualEmailDeliveryVerified": false,
-    "manualProductionRecoveryTested": false,
+    "manualProductionRecoveryTested": true,
+    "manualProductionRecoveryEndToEndPassed": false,
     "quotaOrOtherActivationFlagsChanged": false
+  },
+  "productionRecoverySendFailure": {
+    "performedBy": "owner manual request; root read-only Supabase Auth query_logs and sanitized config verification",
+    "requestAttempts": [
+      {
+        "at": "2026-10-20T05:31:43Z",
+        "method": "POST",
+        "path": "/recover",
+        "httpStatus": 500,
+        "smtpStatus": 535,
+        "smtpError": "Authentication credentials invalid"
+      },
+      {
+        "at": "2026-10-20T05:33:35Z",
+        "method": "POST",
+        "path": "/recover",
+        "httpStatus": 500,
+        "smtpStatus": 535,
+        "smtpError": "Authentication credentials invalid"
+      }
+    ],
+    "nonsecretConfigVerified": {
+      "host": "smtp.resend.com",
+      "port": 465,
+      "user": "resend",
+      "sender": "auth@mail.korkru.com",
+      "senderName": "KorKru",
+      "passwordPresent": true,
+      "passwordValueReadOrCommitted": false,
+      "passwordValidityVerified": false
+    },
+    "ownerReportedEmailReceived": false,
+    "actualEmailDeliveryVerified": false,
+    "productionPasswordChanged": false,
+    "manualRecoveryEndToEndPassed": false,
+    "currentBlocker": "SMTP authentication credentials rejected; owner must re-paste the correct privately stored Sending access key into Supabase Password and Save before another send test.",
+    "appLimiter": {
+      "failedProviderSendsConsumeReservation": true,
+      "emailCooldownSeconds": 60,
+      "emailRequestsPerHour": 5,
+      "emailRequestsPer24Hours": 10,
+      "trustedIpRequestsPerHour": 120,
+      "deniedAttemptsIncrementOrExtendWindow": false,
+      "countersClearedOrBypassed": false
+    },
+    "applicationChanges": false,
+    "schemaOrMigrationsChanged": false,
+    "deploymentChanged": false,
+    "activationFlagsChanged": false,
+    "secretsOrLogAccountPiiIncluded": false
   }
 }
