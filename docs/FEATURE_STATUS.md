@@ -1293,7 +1293,7 @@ The access assertion helper alone is service-only SECURITY DEFINER with an empty
 
 ### เรียงข้อมูลห้องเรียนก่อนการตกแต่ง (7 ตุลาคม 2026)
 
-- **UI-033** — ย้ายชุดชื่อห้องเรียน คำอธิบาย ระดับชั้น และปีการศึกษา/ภาคเรียนขึ้นมาต่อจากประเภทห้องเรียน ก่อนตัวเลือกไอคอนและธีมสี โดยคง validation, state และ responsive grid เดิม
+- **UI-033** — ย้ายชุดชื่อห้องเรียน คำอธิบาย ระดับชั้น และภาคเรียน/ปีการศึกษาขึ้นมาต่อจากประเภทห้องเรียน ก่อนตัวเลือกไอคอนและธีมสี โดยคง validation, state และ responsive grid เดิม
 - ตรวจลำดับจริงทั้ง desktop และ viewport 320px แล้วข้อมูลหลักอยู่ก่อนตัวเลือกไอคอนและไม่มี horizontal overflow; ทดสอบ state ของชื่อและธีมคงอยู่ระหว่าง interaction · axe accessibility audit ไม่พบ violation, unit test 2,808 รายการ, `npx tsc --noEmit`, design-token lint, webpack production build และ Next.js compilation/runtime checks ผ่าน ไม่มี migration และไม่เขียนฐานข้อมูลจริง
 
 ### พับตัวเลือกธีมและตัดแท็กจากหน้าสร้างห้องเรียน (7 ตุลาคม 2026)

@@ -279,7 +279,7 @@ export function ClassroomSettingsDialog({
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>ปีการศึกษา / ภาคเรียน</Label>
+                <Label>ภาคเรียน / ปีการศึกษา</Label>
                 <CreatableCombobox
                   value={meta.academicTerm}
                   onChange={v => set('academicTerm', v)}
