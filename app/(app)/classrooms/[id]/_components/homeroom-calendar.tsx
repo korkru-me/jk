@@ -9,7 +9,6 @@ import {
   type Severity,
 } from '@/lib/calendar-display'
 import { IconButton } from '@/components/ui/icon-button'
-import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 
 export interface HomeroomCalendarEvent {
@@ -99,14 +98,6 @@ export function HomeroomCalendar({ events }: { events: HomeroomCalendarEvent[] }
           >
             <ChevronRight />
           </IconButton>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => { setViewDate(new Date(today.getFullYear(), today.getMonth(), 1)); setSelected(today) }}
-            className="min-h-[44px]"
-          >
-            วันนี้
-          </Button>
         </div>
       </div>
 

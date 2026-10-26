@@ -2417,3 +2417,8 @@ Physical iPad UAT ของ candidate `r7` ยืนยันแล้วว่�
 - Verified using the synthetic local /exam-screen-lab/homeroom-work page at desktop 1440x1000 and mobile 390x844: status, score 8/10, calendar denominator 1/22, sticky header/name column and no viewport overflow or Next runtime errors. Unit/mocked server tests pass. Live student data and deployed RLS were not tested. No migration, remote database changes, push or deployment; owner requested local work and commit first.
 
 Validation: 4,590 tests across 325 files, TypeScript, semantic token lint and isolated production build all passed. Browser verification used synthetic data only; no real roster assertions or database writes.
+
+
+## Homeroom calendar header — 26 October 2026 (local only)
+
+Removed the Today shortcut button at the owner's request. Previous/next month navigation, initial current-month selection and current-day highlighting remain available. No data, scoring or schema changes.
