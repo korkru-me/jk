@@ -60,9 +60,9 @@ function teacherNavigation(): NavEntry[] {
       label: 'จัดการโจทย์',
       icon: NotebookPen,
       children: [
+        { href: '/questions/sets', label: 'คลังโจทย์', icon: LibraryBig },
         { href: '/questions/new', label: 'สร้างโจทย์', icon: FilePlus2 },
         { href: '/questions/import', label: 'นำเข้าโจทย์', icon: FileUp },
-        { href: '/questions/sets', label: 'คลังโจทย์', icon: LibraryBig },
       ],
     },
     { href: '/classrooms', label: 'ห้องเรียน', icon: School },
@@ -210,16 +210,6 @@ function ClassroomSectionNavigation({ pathname, onNavigate }: {
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
-      <Link
-        href="/dashboard"
-        onClick={onNavigate}
-        title={compact ? 'เมนูหลัก' : undefined}
-        className="flex items-center gap-2 rounded-lg py-2 pl-3.5 pr-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-      >
-        <ChevronLeft aria-hidden="true" className="size-4" />
-        <SidebarLabel>เมนูหลัก</SidebarLabel>
-      </Link>
-
       <div className="flex items-start gap-3 px-2 py-1" title="ห้องเรียน">
         <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
           <School aria-hidden="true" className="size-5" />
@@ -355,7 +345,16 @@ export function Sidebar({
       >
         {/* Nav */}
         {contextualContent || usesClassroomSidebar ? (
-          <div className="flex-1 overflow-y-auto overflow-x-hidden p-3">
+          <div className="flex flex-1 flex-col gap-3 overflow-y-auto overflow-x-hidden p-3">
+            <Link
+              href={homeNav.href}
+              onClick={onClose}
+              title={compactOnDesktop ? 'กลับหน้าหลัก' : undefined}
+              className="flex shrink-0 items-center gap-3 rounded-lg py-2 pl-3.5 pr-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <NavItemIcon icon={House} />
+              <SidebarLabel>กลับหน้าหลัก</SidebarLabel>
+            </Link>
             {contextualContent ?? (isClassroomDetailPath(pathname) ? <div className="flex flex-col gap-3" role="status" aria-label="กำลังเปิดห้องเรียน">
               <Link href="/classrooms" onClick={onClose} className="flex items-center gap-2 px-3.5 py-2 text-sm text-muted-foreground"><ChevronLeft className="size-4" aria-hidden="true" />ห้องเรียนทั้งหมด</Link>
               <p className="px-3.5 text-xs text-muted-foreground">กำลังเปิดห้องเรียน…</p>

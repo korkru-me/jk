@@ -2458,3 +2458,10 @@ Deadline notices are computed on app entry and the existing visible-tab 45-secon
 Existing capability audit: manual teacher reminders and the homeroom weekly digest have producers (the digest migration schedules Monday 07:00 Asia/Bangkok). co_teacher_invite and extension_granted are declared notification types, but this checkout has no producers for those two; their live delivery is not claimed. The notification-settings page's email/in-app toggles are browser preferences and are not wired delivery rules. Extending a deadline is a useful future student notice, but is not added to this three-type bell without further direction.
 
 Validation: all 4,805 tests in 335 files, TypeScript, token lint and isolated production build passed. Pure tests cover 24-hour/due-time boundaries and extensions; mocked server/action tests cover recipient/group scope, receipts, completed attempts, teacher behavior, popup isolation and read failures. Synthetic browser checks cover the three rows, single/all read, failed read preserving the badge, desktop/mobile and no runtime errors. No live account/database/cron delivery test, database mutation, schema migration, push or deployment was performed.
+
+
+### Contextual sidebar home shortcut (26 October 2026, local only)
+
+- Every contextual app sidebar now starts with a shared dashboard shortcut labelled กลับหน้าหลัก, including classroom, assignment, teaching and classroom-loading states. Existing contextual back links remain; duplicate home links at the bottom are removed. Compact desktop and mobile drawer use the same shortcut.
+- Teacher question navigation order is now คลังโจทย์, สร้างโจทย์, นำเข้าโจทย์. Student preview navigation stays restricted.
+- Verified with TypeScript, semantic-token lint and the synthetic localhost sidebar fixture (desktop, compact and mobile). No migration, push or deployment.
