@@ -2465,3 +2465,9 @@ Validation: all 4,805 tests in 335 files, TypeScript, token lint and isolated pr
 - Every contextual app sidebar now starts with a shared dashboard shortcut labelled กลับหน้าหลัก, including classroom, assignment, teaching and classroom-loading states. Existing contextual back links remain; duplicate home links at the bottom are removed. Compact desktop and mobile drawer use the same shortcut.
 - Teacher question navigation order is now คลังโจทย์, สร้างโจทย์, นำเข้าโจทย์. Student preview navigation stays restricted.
 - Verified with TypeScript, semantic-token lint and the synthetic localhost sidebar fixture (desktop, compact and mobile). No migration, push or deployment.
+
+
+### Homeroom assignment header details (26 October 2026)
+
+- Matrix assignment titles use foreground text while source classroom names use primary text. Hovering or focusing the header link shows the source classroom, full assignment title and Bangkok deadline, or an explicit no-deadline message.
+- Local TypeScript/token lint pass and the synthetic homeroom fixture verifies the tooltip. This chat scope is authorized for Staging and Production release; unrelated local work is excluded.

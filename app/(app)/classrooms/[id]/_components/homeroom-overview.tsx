@@ -14,6 +14,7 @@ import { HomeroomCalendar, type HomeroomCalendarEvent } from './homeroom-calenda
 import type { HomeroomAssignmentRow, HomeroomSubmissionRow as SubmissionRow } from '@/lib/homeroom-data'
 import { Card } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 export interface StudentNoteRow {
   id: string
@@ -248,10 +249,18 @@ export function HomeroomOverview({ classroomId, students, assignments, submissio
                   </th>
                   {assignments.map(a => (
                     <th key={a.id} scope="col" className="sticky top-0 z-20 bg-card border-b border-border px-3 py-3 text-center min-w-[180px]">
-                      <Link href={`/assignments/${a.id}`} className="text-xs font-semibold text-muted-foreground hover:text-primary line-clamp-2">
-                        {a.title}
-                      </Link>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">ห้องเรียน: {a.classroomName}</p>
+                      <Tooltip>
+                        <TooltipTrigger render={<Link href={`/assignments/${a.id}`} />} className="block rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                          <span className="line-clamp-2 text-xs font-semibold text-foreground">{a.title}</span>
+                          <span className="mt-0.5 block text-[10px] font-medium text-primary">ห้องเรียน: {a.classroomName}</span>
+                        </TooltipTrigger>
+                        <TooltipContent className="block max-w-[min(24rem,calc(100vw-2rem))] text-left">
+                          <p>ห้องเรียน “{a.classroomName}” มอบหมายงาน “{a.title}”</p>
+                          <p className="mt-1">{a.end_at
+                            ? `กำหนดส่ง ${new Date(a.end_at).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })} น. (เวลาไทย)`
+                            : 'ไม่กำหนดวันส่ง'}</p>
+                        </TooltipContent>
+                      </Tooltip>
                     </th>
                   ))}
                 </tr>
