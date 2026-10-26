@@ -9,6 +9,7 @@ import {
   type Severity,
 } from '@/lib/calendar-display'
 import { IconButton } from '@/components/ui/icon-button'
+import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 
 export interface HomeroomCalendarEvent {
@@ -74,34 +75,38 @@ export function HomeroomCalendar({ events }: { events: HomeroomCalendarEvent[] }
   const selectedEvents = eventsByDay.get(dateKey(selected)) ?? []
 
   return (
-    <Card edge="ring" padding="md" className="space-y-4">
+    <Card edge="ring" padding="sm" className="@container/homeroom-calendar flex min-w-0 flex-col gap-2" data-homeroom-calendar>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-2 @min-[34rem]/homeroom-calendar:flex-row @min-[34rem]/homeroom-calendar:items-center @min-[34rem]/homeroom-calendar:justify-between">
         <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
           <CalendarDays className="w-3.5 h-3.5" /> ปฏิทินกำหนดส่งงาน
         </h2>
-        <div className="flex items-center gap-1">
+        <div className="flex min-w-0 items-center gap-1">
           <IconButton
             onClick={() => setViewDate(new Date(year, month - 1, 1))}
             label="เดือนก่อนหน้า"
             size="sm"
+            className="size-[44px]"
           >
             <ChevronLeft />
           </IconButton>
-          <span className="text-sm font-medium w-32 text-center text-foreground">{MONTH_LABELS[month]} {year + 543}</span>
+          <span className="min-w-0 flex-1 text-xs font-medium text-center text-foreground @min-[34rem]/homeroom-calendar:w-32 @min-[34rem]/homeroom-calendar:flex-none @min-[34rem]/homeroom-calendar:text-sm">{MONTH_LABELS[month]} {year + 543}</span>
           <IconButton
             onClick={() => setViewDate(new Date(year, month + 1, 1))}
             label="เดือนถัดไป"
             size="sm"
+            className="size-[44px]"
           >
             <ChevronRight />
           </IconButton>
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => { setViewDate(new Date(today.getFullYear(), today.getMonth(), 1)); setSelected(today) }}
-            className="ml-1 text-xs font-medium px-2.5 py-1 rounded-lg bg-muted hover:bg-accent text-muted-foreground transition-colors"
+            className="min-h-[44px]"
           >
             วันนี้
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -111,7 +116,7 @@ export function HomeroomCalendar({ events }: { events: HomeroomCalendarEvent[] }
       </div>
 
       {/* Day grid */}
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 gap-1" data-homeroom-calendar-grid>
         {cells.map((d, i) => {
           if (!d) return <div key={i} />
           const dayEvents = eventsByDay.get(dateKey(d)) ?? []
@@ -124,13 +129,15 @@ export function HomeroomCalendar({ events }: { events: HomeroomCalendarEvent[] }
             <button
               key={i}
               onClick={() => setSelected(d)}
+              aria-label={`${d.getDate()} ${MONTH_LABELS[month]} ${year + 543} · ${dayEvents.length} งานกำหนดส่ง`}
+              aria-pressed={isSelected}
               className={cn(
-                'aspect-square rounded-xl flex flex-col items-center justify-center gap-1 text-xs font-medium transition-all relative',
-                isSelected ? 'bg-primary text-primary-foreground' : isToday ? 'bg-primary/10 text-primary ring-1 ring-primary/40' : 'hover:bg-muted text-foreground'
+                'h-[44px] min-w-0 rounded-lg flex flex-col items-center justify-center gap-0.5 text-xs font-medium transition-colors relative focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                isSelected ? 'bg-primary/15 text-foreground ring-1 ring-primary' : isToday ? 'bg-primary/10 text-foreground ring-1 ring-primary/40' : 'hover:bg-muted text-foreground'
               )}
             >
               {hasClash && (
-                <span className={cn('absolute top-1 right-1 w-1.5 h-1.5 rounded-full', isSelected ? 'bg-card' : 'bg-warning')} />
+                <span className="absolute top-1 right-1 size-1.5 rounded-full bg-warning" />
               )}
               <span>{d.getDate()}</span>
               {dayEvents.length > 0 && (
@@ -138,11 +145,11 @@ export function HomeroomCalendar({ events }: { events: HomeroomCalendarEvent[] }
                   {dots.map((entry, di) => (
                     <span
                       key={di}
-                      className={cn('w-1.5 h-1.5 rounded-full', isSelected ? 'bg-card/80' : SEVERITY_DOT[entry.severity])}
+                      className={cn('size-1.5 rounded-full', SEVERITY_DOT[entry.severity])}
                     />
                   ))}
                   {dayEvents.length > 3 && (
-                    <span className={cn('text-[9px] leading-none', isSelected ? 'text-white/80' : 'text-muted-foreground')}>+{dayEvents.length - 3}</span>
+                    <span className="text-[9px] leading-none text-muted-foreground">+{dayEvents.length - 3}</span>
                   )}
                 </span>
               )}
@@ -152,7 +159,7 @@ export function HomeroomCalendar({ events }: { events: HomeroomCalendarEvent[] }
       </div>
 
       {/* Legend */}
-      <div className="flex items-center gap-3 flex-wrap text-[11px] text-muted-foreground border-t border-border pt-3">
+      <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-[11px] text-muted-foreground border-t border-border pt-2">
         {(['overdue', 'soon', 'later', 'done'] as Severity[]).map(s => (
           <span key={s} className="flex items-center gap-1">
             <span className={cn('w-1.5 h-1.5 rounded-full', SEVERITY_DOT[s])} />
@@ -166,7 +173,7 @@ export function HomeroomCalendar({ events }: { events: HomeroomCalendarEvent[] }
       </div>
 
       {/* Selected day detail */}
-      <div className="border-t border-border pt-3 space-y-2">
+      <div className="border-t border-border pt-2 flex flex-col gap-2">
         <p className="text-xs font-semibold text-muted-foreground">
           {selected.toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long' })}
         </p>
@@ -188,7 +195,7 @@ export function HomeroomCalendar({ events }: { events: HomeroomCalendarEvent[] }
                   </Link>
                   <p className="text-xs text-muted-foreground truncate">{event.classroomName} · {event.doneCount}/{event.totalStudents} ส่งแล้ว</p>
                 </div>
-                <span className={cn('text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0', SEVERITY_BADGE[severity])}>
+                <span className={cn('text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0', SEVERITY_BADGE[severity], 'text-foreground')}>
                   {SEVERITY_LABEL[severity]}
                 </span>
               </div>

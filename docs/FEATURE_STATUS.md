@@ -1,5 +1,11 @@
 # Feature status
 
+## ปฏิทินโฮมรูมแสดงครบเดือนในพื้นที่กระชับ — 26 ตุลาคม 2026 (local only)
+
+- ช่องวันสูง 44px แทนสี่เหลี่ยมจัตุรัส ลด padding/gap และจัดแถบเปลี่ยนเดือนตามความกว้าง container คงการเลือกวัน รายการงาน จุดสถานะ งานชนกัน และปุ่มวันนี้ เพิ่มชื่อวันเต็ม/สถานะเลือกสำหรับ screen reader และปรับ contrast ของวันที่เลือกกับป้ายสถานะ
+- ตรวจ local fixture `/exam-screen-lab/homeroom-calendar` ด้วยข้อมูลสังเคราะห์: ที่ความกว้างปฏิทิน 1046px ตารางเดือน 5 แถวลดจาก 718.6px เหลือ 239.2px ทั้ง Card ลดจาก 1016.8px เหลือ 490.1px; เดือน 6 แถวสูง 288px ตรวจ 320/390/1280px เห็นวันที่ครบ ไม่มี horizontal overflow เลือกวันสองงาน/แสดงรายการและคำเตือน/กลับวันนี้ได้ TypeScript, design-token lint, production build แบบแยก output และ Next.js compilation/runtime ผ่าน; scoped axe โหมดสว่าง/มืดไม่มี violation/incomplete
+- ไม่มี migration ไม่อ่านหรือเขียนฐานข้อมูล และยังไม่ push/deploy หรือทดสอบกับบัญชีจริง
+
 ## Staging migration parity and real notification verification — 20 October 2026
 
 - ตามคำขอและการอนุมัติเฉพาะ Staging กู้ไฟล์ SEB ที่เคยรันจาก remote history โดยตรวจ SHA ตรงต้นฉบับ และใช้ migration เดิม `20261015132234` เพียงตัวเดียวพร้อมบันทึก applied ตรวจสดผ่าน **165 local / 165 remote** ไม่มี version ตกค้าง ข้อมูลหลักฐานเดิมไม่เปลี่ยน ไม่แตะ Production และไม่ replay migration SEB
