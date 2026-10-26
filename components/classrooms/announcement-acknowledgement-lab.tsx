@@ -13,7 +13,10 @@ const initial: PendingClassroomAnnouncement[] = ['ฟิสิกส์ 1','ค�
   id: `lab-post-${i}`, classroomId: `lab-room-${i}`, classroomName: name, authorName: 'ครูจำลอง',
   classroomDescription: composeDescription({ ...EMPTY_META, cover: ['orange','blue','green'][i], coverPattern: i === 0 ? 'physics' : 'foreign-language', iconKey: i === 0 ? 'physics' : 'school' }),
   body: i === 0 ? 'เตรียมตัวสอบบทแรงและการเคลื่อนที่\nทบทวนใบงานก่อนวันศุกร์ และนำเครื่องเขียนมาให้พร้อม\nรายละเอียด https://example.invalid/worksheet' : 'ประกาศจำลองจากครู เพื่อทดสอบการกดรับทราบและแจ้งเตือนซ้ำ',
-  attachments: i === 0 ? [{ url: '/samples/simple-circuit.svg', name: 'ใบงานวงจรจำลอง.svg', mime: 'image/svg+xml', size: 0 }] : [], createdAt: '2026-10-14T09:00:00+07:00', editedAt: null, pinned: i === 0, round: 1, remindedAt: null,
+  attachments: i === 0 ? [
+    { url: '/samples/simple-circuit.svg', name: 'ใบงานวงจรจำลอง.svg', mime: 'image/svg+xml', size: 0 },
+    { url: '/exam-screen-lab/grading-workspace/assets/file-0.pdf', name: 'ใบงานประกาศห้องเรียนจำลอง.pdf', mime: 'application/pdf', size: 1024 },
+  ] : [], createdAt: '2026-10-14T09:00:00+07:00', editedAt: null, pinned: i === 0, round: 1, remindedAt: null,
 }))
 
 // The lab alone persists synthetic receipt keys in sessionStorage so reload

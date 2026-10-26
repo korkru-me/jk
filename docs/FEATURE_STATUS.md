@@ -1,5 +1,18 @@
 # Feature status
 
+## เปิด PDF จากประกาศเป็นตัวอย่างก่อนดาวน์โหลด — 26 ตุลาคม 2026 (local only)
+
+- PDF ในประกาศบนหน้าห้องเรียนครู หน้าห้องเรียนนักเรียน และป๊อปอัปประกาศนักเรียนใช้ PostAttachments ร่วมกัน เปิดตัวอย่างเมื่อคลิกไฟล์ ดาวน์โหลดจากปุ่มแยกโดยคงชื่อไฟล์ คลิกนอก/ปิด/Escape ปิดเฉพาะตัวอย่างและคืน focus คงประกาศแม่เมื่อเปิดซ้อน ไม่ถือว่าได้รับทราบประกาศเอง ไฟล์อื่นคงลิงก์เดิม
+- ตัวอ่านโหลดเมื่อเปิดเท่านั้น จำกัด URL เป็น Storage origin ของโปรเจกต์และ bucket classroom-post-files ใช้ fetch แบบไม่แนบ credentials/ไม่ตาม redirect ตรวจ MIME และ %PDF- พร้อมจำกัด stream 10 MiB ก่อนสร้าง typed Blob ให้ native PDF viewer ล้าง Blob/ยกเลิก fetch เมื่อปิด รองรับข้อความผิดพลาด ลองใหม่ และดาวน์โหลดเมื่อเบราว์เซอร์ไม่รองรับ ตัวอย่างไม่ส่ง URL ไฟล์หรือ HTML เข้า iframe
+- ตรวจ local fixture `/exam-screen-lab/classroom-announcements` และ `/exam-screen-lab/announcement-acknowledgements`: เห็นหน้า PDF จริง ดาวน์โหลดไฟล์มี signature ถูกต้อง คลิกภายใน/ภายนอก ปุ่มปิด Escape คืน focus ป๊อปอัปซ้อน error/retry และคืน Blob ผ่าน ตรวจ 320/390/1200px ไม่มีตัวอย่างล้นจอ scoped WCAG 2 A/AA ไม่พบ violation/incomplete (ไม่รวม best-practice landmark ของ native Chrome PDF viewer) TypeScript, token lint, unit suite 323 ไฟล์/4,575 เคส รวมตัวอ่านใหม่ 16 เคส และ production build แบบแยก output ผ่าน
+- ไม่มี migration ไม่มีการเปลี่ยนสิทธิ์ Storage/ฐานข้อมูล ไม่ทดสอบข้อมูลหรือไฟล์ของบัญชีจริง และยังไม่ push/deploy
+
+## ปฏิทินโฮมรูมแสดงครบเดือนในพื้นที่กระชับ — 26 ตุลาคม 2026 (local only)
+
+- ช่องวันสูง 44px แทนสี่เหลี่ยมจัตุรัส ลด padding/gap และจัดแถบเปลี่ยนเดือนตามความกว้าง container คงการเลือกวัน รายการงาน จุดสถานะ งานชนกัน และปุ่มวันนี้ เพิ่มชื่อวันเต็ม/สถานะเลือกสำหรับ screen reader และปรับ contrast ของวันที่เลือกกับป้ายสถานะ
+- ตรวจ local fixture `/exam-screen-lab/homeroom-calendar` ด้วยข้อมูลสังเคราะห์: ที่ความกว้างปฏิทิน 1046px ตารางเดือน 5 แถวลดจาก 718.6px เหลือ 239.2px ทั้ง Card ลดจาก 1016.8px เหลือ 490.1px; เดือน 6 แถวสูง 288px ตรวจ 320/390/1280px เห็นวันที่ครบ ไม่มี horizontal overflow เลือกวันสองงาน/แสดงรายการและคำเตือน/กลับวันนี้ได้ TypeScript, design-token lint, production build แบบแยก output และ Next.js compilation/runtime ผ่าน; scoped axe โหมดสว่าง/มืดไม่มี violation/incomplete
+- ไม่มี migration ไม่อ่านหรือเขียนฐานข้อมูล และยังไม่ push/deploy หรือทดสอบกับบัญชีจริง
+
 ## ปุ่มเตือนงาน — ทดสอบ Staging จริงครบวงจร, 20 ตุลาคม 2026
 
 กด **เตือน** ที่หัวคอลัมน์งานผ่าน UI ครูจริงแล้ว สร้าง `assignment_reminder` สองรายการเฉพาะผู้ยังไม่เริ่มและกำลังทำ; ผู้ส่งแล้ว/ตรวจแล้วไม่มีรายการ นักเรียนสังเคราะห์ทั้งสี่เข้าสู่ dashboard จริง: สองผู้รับเห็นป้ายและปุ่มถูกต้อง กด **รับทราบ** แล้ว exact notice ID เปลี่ยนจากยังไม่อ่านเป็นอ่านแล้วตามลำดับ **0 → 1 → 2** รีโหลดไม่แสดงซ้ำ; อีกสองคนไม่มีป๊อปอัป Snapshot สาม attempts/สาม answers คะแนน รุ่นและเวลาไม่เปลี่ยน Browser warning/error ว่าง ใช้ Staging ที่ parity **165/165** ไม่เปลี่ยนแอป/RLS/schema/migration และไม่ทดสอบข้อมูล Production Runner QA ผ่าน **51 เคส / 175 เคสรวม 5 suites** รวม PGlite **cleanup ผ่านแล้ว:** revoke sessions ก่อนลบ Runner ยืนยันห้าบัญชีและข้อมูลของ run; SQL แยกยืนยันทั้งเก้าหมวดรวม personal organizations เหลือศูนย์ ลบ manifest/temporary key file แล้ว รายละเอียดใน [STAGING_MANUAL_REMINDER_E2E_20261020.md](STAGING_MANUAL_REMINDER_E2E_20261020.md); สถานะ hosted manual-reminder ที่ยังรอในบันทึกเก่าด้านล่างเป็นประวัติ ไม่อ้างทดสอบกดซ้ำ/concurrency/SMTP/SEB
@@ -1365,7 +1378,7 @@ The access assertion helper alone is service-only SECURITY DEFINER with an empty
 
 ### เรียงข้อมูลห้องเรียนก่อนการตกแต่ง (7 ตุลาคม 2026)
 
-- **UI-033** — ย้ายชุดชื่อห้องเรียน คำอธิบาย ระดับชั้น และปีการศึกษา/ภาคเรียนขึ้นมาต่อจากประเภทห้องเรียน ก่อนตัวเลือกไอคอนและธีมสี โดยคง validation, state และ responsive grid เดิม
+- **UI-033** — ย้ายชุดชื่อห้องเรียน คำอธิบาย ระดับชั้น และภาคเรียน/ปีการศึกษาขึ้นมาต่อจากประเภทห้องเรียน ก่อนตัวเลือกไอคอนและธีมสี โดยคง validation, state และ responsive grid เดิม
 - ตรวจลำดับจริงทั้ง desktop และ viewport 320px แล้วข้อมูลหลักอยู่ก่อนตัวเลือกไอคอนและไม่มี horizontal overflow; ทดสอบ state ของชื่อและธีมคงอยู่ระหว่าง interaction · axe accessibility audit ไม่พบ violation, unit test 2,808 รายการ, `npx tsc --noEmit`, design-token lint, webpack production build และ Next.js compilation/runtime checks ผ่าน ไม่มี migration และไม่เขียนฐานข้อมูลจริง
 
 ### พับตัวเลือกธีมและตัดแท็กจากหน้าสร้างห้องเรียน (7 ตุลาคม 2026)
