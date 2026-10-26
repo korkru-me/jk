@@ -270,7 +270,7 @@ function ClassroomFormContent({
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="term-combobox">ปีการศึกษา / ภาคเรียน</Label>
+          <Label htmlFor="term-combobox">ภาคเรียน / ปีการศึกษา</Label>
           <Controller
             control={control}
             name="academicTerm"
