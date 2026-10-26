@@ -1,5 +1,11 @@
 # Feature status
 
+## ปฏิทินโฮมรูมแสดงครบเดือนในพื้นที่กระชับ — 26 ตุลาคม 2026 (local only)
+
+- ช่องวันสูง 44px แทนสี่เหลี่ยมจัตุรัส ลด padding/gap และจัดแถบเปลี่ยนเดือนตามความกว้าง container คงการเลือกวัน รายการงาน จุดสถานะ งานชนกัน และปุ่มวันนี้ เพิ่มชื่อวันเต็ม/สถานะเลือกสำหรับ screen reader และปรับ contrast ของวันที่เลือกกับป้ายสถานะ
+- ตรวจ local fixture `/exam-screen-lab/homeroom-calendar` ด้วยข้อมูลสังเคราะห์: ที่ความกว้างปฏิทิน 1046px ตารางเดือน 5 แถวลดจาก 718.6px เหลือ 239.2px ทั้ง Card ลดจาก 1016.8px เหลือ 490.1px; เดือน 6 แถวสูง 288px ตรวจ 320/390/1280px เห็นวันที่ครบ ไม่มี horizontal overflow เลือกวันสองงาน/แสดงรายการและคำเตือน/กลับวันนี้ได้ TypeScript, design-token lint, production build แบบแยก output และ Next.js compilation/runtime ผ่าน; scoped axe โหมดสว่าง/มืดไม่มี violation/incomplete
+- ไม่มี migration ไม่อ่านหรือเขียนฐานข้อมูล และยังไม่ push/deploy หรือทดสอบกับบัญชีจริง
+
 ## ปุ่มเตือนงาน — ทดสอบ Staging จริงครบวงจร, 20 ตุลาคม 2026
 
 กด **เตือน** ที่หัวคอลัมน์งานผ่าน UI ครูจริงแล้ว สร้าง `assignment_reminder` สองรายการเฉพาะผู้ยังไม่เริ่มและกำลังทำ; ผู้ส่งแล้ว/ตรวจแล้วไม่มีรายการ นักเรียนสังเคราะห์ทั้งสี่เข้าสู่ dashboard จริง: สองผู้รับเห็นป้ายและปุ่มถูกต้อง กด **รับทราบ** แล้ว exact notice ID เปลี่ยนจากยังไม่อ่านเป็นอ่านแล้วตามลำดับ **0 → 1 → 2** รีโหลดไม่แสดงซ้ำ; อีกสองคนไม่มีป๊อปอัป Snapshot สาม attempts/สาม answers คะแนน รุ่นและเวลาไม่เปลี่ยน Browser warning/error ว่าง ใช้ Staging ที่ parity **165/165** ไม่เปลี่ยนแอป/RLS/schema/migration และไม่ทดสอบข้อมูล Production Runner QA ผ่าน **51 เคส / 175 เคสรวม 5 suites** รวม PGlite **cleanup ผ่านแล้ว:** revoke sessions ก่อนลบ Runner ยืนยันห้าบัญชีและข้อมูลของ run; SQL แยกยืนยันทั้งเก้าหมวดรวม personal organizations เหลือศูนย์ ลบ manifest/temporary key file แล้ว รายละเอียดใน [STAGING_MANUAL_REMINDER_E2E_20261020.md](STAGING_MANUAL_REMINDER_E2E_20261020.md); สถานะ hosted manual-reminder ที่ยังรอในบันทึกเก่าด้านล่างเป็นประวัติ ไม่อ้างทดสอบกดซ้ำ/concurrency/SMTP/SEB
