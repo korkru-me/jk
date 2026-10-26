@@ -13,4 +13,15 @@ The owner authorized all work in this chat for isolated Staging and Production r
 
 ## Verification and rollout
 
-Candidate: 335 test files / 4,805 tests passed. TypeScript and semantic-token lint passed. Production Webpack build passed; TypeScript was rerun after generated types settled. Hosted Staging verification is in progress. Primary localhost:3000 is `/Users/korkusonmasaen/Korkru/korkru`, PID 1995 at release preparation. Local synthetic header hover and desktop/mobile sidebar checks passed. No migration, schema, RLS, dependency or environment change is needed. Real Production data is not used for tests.
+Candidate: 335 test files / 4,805 tests passed. TypeScript and semantic-token lint passed. Production Webpack build passed; TypeScript was rerun after generated types settled. Hosted Staging verification passed with the visible environment badge and synthetic fixtures (details below). Primary localhost:3000 is `/Users/korkusonmasaen/Korkru/korkru`, PID 1995 at release preparation. Local synthetic header hover and desktop/mobile sidebar checks passed. No migration, schema, RLS, dependency or environment change is needed. Real Production data is not used for tests.
+
+## Staging evidence
+
+PR #90 merged as `cba6a69f3786515c8d61e51e24ede6e270ca68a4`; deployment `dpl_7pcVwnEqKYuKtDdDianusFTmJo41` is READY with canonical `staging.korkru.com`. Existing origin-scoped automation headers were used without changing protection settings or placing secrets in URLs.
+
+- The visible STAGING badge was verified. Header hover/focus showed the full classroom/work and Thai deadline on desktop/mobile; title and classroom computed colours differed. At 250px internal scrolling, the header top remained unchanged. Non-members and unassigned students had separate statuses, and Today/clash UI was absent.
+- Teacher search left the URL unchanged after typing and an 800ms pause; Enter updated uq and the committed-search label. Student Enter updated q. Practice-card deletion opened a confirmation and removed the synthetic exercise with a success notice; the fixture overrides all mutations in memory.
+- Synthetic bell displayed exactly grades, due-soon and overdue notices; Mark All Read removed the unread action through its in-memory adapter. Classroom/assignment/teaching home links, library/create/import order and mobile drawer were verified.
+- Server authorization, audience, extension, deadline and receipt behavior is covered by mocked tests. Authenticated real database delivery and real exercise deletion were not exercised; no Production records were read or changed for tests.
+
+Evidence: `/private/tmp/korkru-followup-staging-header.png`, `korkru-followup-staging-header-mobile.png`, `korkru-followup-staging-bell.png`, `korkru-followup-staging-sidebar-mobile.png`.
