@@ -25,3 +25,11 @@ PR #90 merged as `cba6a69f3786515c8d61e51e24ede6e270ca68a4`; deployment `dpl_7pc
 - Server authorization, audience, extension, deadline and receipt behavior is covered by mocked tests. Authenticated real database delivery and real exercise deletion were not exercised; no Production records were read or changed for tests.
 
 Evidence: `/private/tmp/korkru-followup-staging-header.png`, `korkru-followup-staging-header-mobile.png`, `korkru-followup-staging-bell.png`, `korkru-followup-staging-sidebar-mobile.png`.
+
+## Production completion and primary parity
+
+PR #91 merged as `108b902458932884a2d488ea5538271fb990fd48`. Deployment `dpl_Gd5FsAGffAsW4oTriNC3MAVHF1HL` is READY, target production, aliasAssigned true. Vercel metadata confirms both `www.korkru.com` and `korkru.com` resolve to this exact deployment/commit. Staging remains READY at `cba6a69`. No Production user-data test or mutation was performed.
+
+The actual primary is still PID 1995 at `/Users/korkusonmasaen/Korkru/korkru`, port 3000. After Production became Ready, all 37 scoped application paths matched the fetched release commit byte-for-byte. Runtime and dev dependency declarations match; no reinstall or environment copy was needed. Hashes of all 115 pre-existing modified/untracked files were unchanged before adding this handoff. No reset, broad stash or blanket copy was used.
+
+After Ready, primary homeroom header hover/focus was inspected again at desktop/mobile sizes; question-search forms, exercise edit/delete/start controls, bell and classroom home navigation were re-opened on port 3000. Next MCP returned no runtime configuration/session or compilation issues. Evidence: `/private/tmp/korkru-followup-primary-header-final.png` and `/private/tmp/korkru-followup-primary-header-mobile-final.png`. Candidate checks: 335 files / 4,805 tests, TypeScript, semantic-token lint and production Webpack build passed. No migration applied or required; authenticated database delivery/deletion remains untested against real records.
