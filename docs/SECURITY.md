@@ -1,5 +1,7 @@
 # Security และ privacy guardrails
 
+Current release status, 26 October: Auth/recovery and Resend quota code are released. Production SMTP/template, quota flag and signed webhook integration are complete as documented in `SMTP_PRODUCTION_RELEASE_20261020.md` and `RESEND_PRODUCTION_RELEASE_20261020.md`. Historical preparation notes below do not authorize replaying migrations or changing provider settings. Google/account linking and Confirm email remain deferred by the owner.
+
 ## Staging notification verification boundary — 20 October 2026
 
 The owner explicitly approved the exact Staging retention migration and the use of only this Staging project's anon/service-role keys for synthetic setup/cleanup. Broad Preview environment download was rejected and not executed. Migration reconciliation changes no Production data/configuration, preserves evidence rows and restores version parity without replaying applied SEB SQL. The new bounded runner proves exact run-owned identities/resources, contains all requests to the fixed Staging project, keeps credentials in private temporary storage, validates canonical notification ownership and fails closed on unexpected/shared cleanup resources. Its 59 new safety cases (103 combined) pass.
@@ -47,7 +49,7 @@ Service-only SECURITY INVOKER RPC uses fixed search_path, repeats actor/owner/te
 
 Validation uses synthetic browser state, server mocks and throwaway PGlite, not deployed RLS tests. Migration is pending and linked history differs. No remote repair, database mutation, push or deployment performed.
 
-## Signup/email safeguards — 17 October 2026 (prepared)
+## Signup/email safeguards — released; Google rollout deferred
 
 Public auth-email actions validate inputs and reserve bounded shared email/IP counters before sending. The server-only fixed RPC is an explicitly permitted anonymous reservation operation: it accepts only keyed HMACs, performs no user/profile/tenant reads, takes no client-selected SQL/table/function, and exposes no browser grants. RLS remains enabled with no anon/authenticated policies; service_role has only this intended application path, while normal account mutations still require verified identity and exact-resource authorization. Failures/configuration gaps reject sending. The limiter cannot protect direct public Supabase Auth calls; hosted rate limits and current-password enforcement must be configured/tested. CAPTCHA is not wired in this phase.
 
@@ -55,7 +57,7 @@ Current-password settings verifies credentials against the exact getUser identit
 
 Google connection ใน settings ใช้ verified identities ไม่เชื่อ provider metadata หรืออนุมานว่ามีรหัสผ่าน ต้องตรวจรหัสปัจจุบันของ exact user และ challenge 5 นาทีที่ผูกอีเมล/access token ก่อนตรวจ JWT RS256 กับ Google JWKS คงที่ผ่าน `jose`; ตรวจ issuer/audience/freshness/nonce/verified same email ก่อน Supabase automatic sign-in client แยก แล้วตรวจ ID/อีเมล/Google subject และยุติ temporary session โดยไม่แทน session เดิม ไม่แก้ profile/role หรือ merge ข้อมูลเมื่อ ID ต่าง Flag ค่าเริ่มต้นปิดและไม่เปิด Manual Linking ข้อป้องกันนี้ไม่บังคับทุก direct Auth request; email-change race อาจสร้าง Auth identity ที่ไม่คาด แม้แอปปฏิเสธผล ID ต่าง ต้องตรวจ collision/race บน Staging ก่อนเปิดตาม `docs/ACCOUNT_SIGN_IN_METHODS.md` ไม่อ้างว่าล้าง challenge cookie แล้วเป็น atomic single-use
 
-## Resend quota webhook — Production candidate 20 October 2026
+## Resend quota webhook — Production released 20 October 2026
 
 POST `/api/webhooks/resend` authenticates the exact raw body with Svix signature/timestamp checks under a 32 KiB streaming cap before provider or service-role access. Only `email.sent`/`email.received` trigger usage checks; event recipients/content never select the configured alert address or enter storage. Fixed Resend HTTPS endpoints reject redirects and use timeouts. Error responses/logs expose no keys, request payloads, provider error bodies or email content. SMTP keeps its separate domain-restricted Sending access key; Full access is needed for the server-only Usage API monitor. Environment keys and signing secrets must be distinct.
 

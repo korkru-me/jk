@@ -1,12 +1,12 @@
 # ระบบสมัครและความน่าเชื่อถือของบัญชี — 17 ตุลาคม 2026
 
-## สถานะปัจจุบัน 20 ตุลาคม — Production SMTP/recovery candidate
+## สถานะปัจจุบัน — 26 ตุลาคม 2026
 
-เจ้าของอนุญาตตั้ง Production SMTP และทดสอบ recovery จริงแบบทีละขั้นตอนแล้ว และรายงานว่าสร้าง key `korkru-production-supabase-smtp` แบบ Sending access เฉพาะ `mail.korkru.com` โดยเก็บค่าเป็นส่วนตัว ต่อจาก handoff `d34acf4` การตรวจ native Auth ล่าสุดแบบกรองค่าลับพบ custom SMTP 4 รายการยัง absent, Site URL `https://www.korkru.com`, autoconfirm `true` และ recovery `{{ .ConfirmationURL }}` เดิม ยังไม่บันทึก SMTP หรือส่งอีเมลจากการเตรียม candidate
+ระบบบัญชีเดิมเผยแพร่ผ่าน PR #57 และ recovery feedback ผ่าน PR #76 แล้ว Production ใช้ custom SMTP `smtp.resend.com:465` และ recovery template ภาษาไทยที่รักษา `{{ .ConfirmationURL }}` ตาม flow เดิม บันทึกล่าสุดใน [SMTP_PRODUCTION_RELEASE_20261020.md](SMTP_PRODUCTION_RELEASE_20261020.md) แยกผลที่ตรวจโดยตรงจากผล login ที่เจ้าของรายงานไว้ครบ ไม่ถือว่า SMTP หรือ recovery ยังรอ deploy
 
-Production master `216d492` มี recovery safeguards เดิม แต่ยังขาดผลลัพธ์ `be7ee0d`/`e952b4b` Candidate branch `codex/recovery-production-20261020` จึงเลือกเฉพาะ 5 application/test files ของสองแพตช์นี้ ไม่ merge source branch ทั้งชุด ไม่เพิ่ม schema/package/env และไม่พ่วง signup feedback/branding/Google/SEB ต้องผ่าน checks → Production deploy → actual primary localhost parity ก่อนเปิด SMTP และให้เจ้าของทดสอบอีเมลใหม่ในเบราว์เซอร์เดิม รักษา autoconfirm `true`, current-password policy, callback nonce/PKCE/intent/grant และ quota flags Production `true`/Staging `false` รายละเอียด gates อยู่ใน [SMTP_PRODUCTION_RELEASE_20261020.md](SMTP_PRODUCTION_RELEASE_20261020.md)
+แพตช์ `30886db` เพิ่มข้อความผิดพลาด/focus ของ signup และให้ `/check-email` รับรู้เฉพาะอีเมลที่ยืนยันแล้วของ session ปัจจุบัน คำนวณ cooldown จากเวลาสิ้นสุดจริงและอัปเดตเมื่อกลับมาเปิดแท็บ อยู่ในชุด release ตามคำอนุมัติ 26 ตุลาคมผ่าน PR #89 รายละเอียดใน [AUTH_FEEDBACK_RELEASE_20261026.md](AUTH_FEEDBACK_RELEASE_20261026.md)
 
-Candidate `cd72687` ผ่าน full suite 326 files/4,671 tests, TypeScript/token lint และ exact clean-env Node24 Webpack build 76/76 pages แล้ว Primary integration 18 paths รักษางานอื่น/PID เดิม ผ่าน full 321 files/4,500 tests, focused 47, TypeScript/token lint/build 71 pages และ Cua desktop 1507px บน actual localhost:3000; ยังไม่ตรวจ 390px Root ตรวจ Vercel Production public Site URL สดตรง canonical แล้ว PR #76 ยัง Draft, ยังไม่ deploy และ SMTP form เตรียมไว้โดย password ว่าง/Save ค้าง ต้องรอ Ready verification และ manual email test แยกจาก local proof
+เจ้าของให้พัก Google login/account linking และการเปลี่ยนนโยบายยืนยันอีเมลไว้พัฒนาต่อ Production คง Google provider ปิด, `GOOGLE_ACCOUNT_LINKING_ENABLED=false`, Manual Linking ปิด และ Confirm email ปิดตามค่าเดิม ไม่เปลี่ยน flags, provider, SMTP, template หรือฐานข้อมูลจากการปล่อย feedback นี้ ระบบโควตา Production เปิด/Staging ปิดและ webhook ชี้เว็บจริงแล้ว ดู [RESEND_PRODUCTION_RELEASE_20261020.md](RESEND_PRODUCTION_RELEASE_20261020.md)
 
 ## ประวัติการเตรียม 17 ตุลาคม
 
@@ -50,7 +50,7 @@ Candidate `cd72687` ผ่าน full suite 326 files/4,671 tests, TypeScript/to
 
 ลิมิตนี้คุม **เส้นทางในแอป** ไม่สามารถบังคับ request ที่เรียก Supabase Auth API โดยตรงด้วย public key ต้องตั้ง hosted Auth rate limits และ Require current password ด้วย หากจะเปิด CAPTCHA ต้องเพิ่ม widget และส่ง `captchaToken` ให้ครบทุก flow รวมการยืนยันรหัสเดิมก่อน แล้วทดสอบ Staging; รอบนี้ยังไม่ได้ต่อ CAPTCHA และไม่ควรเปิด enforcement แล้วอ้างว่า flow พร้อมใช้งาน
 
-## ก่อนนำขึ้น Staging
+## Checklist สำหรับ rollout ถัดไป (ไม่ใช่งานค้างของ release เดิม)
 
 1. เทียบ migration ใหม่อีกครั้ง: การตรวจวันที่ 17 ตุลาคมพบ `20261015132234_retain_proctor_evidence_until_assignment_deletion.sql` เป็น local-only ใน Staging; **ไม่ push/replay/repair migration เดิมอัตโนมัติ** ต้องให้ผู้รับผิดชอบจัดลำดับ rollout เดิมให้เรียบร้อยก่อน migration ใหม่ รอบนี้ไม่มีการเขียนฐานข้อมูล remote
 2. Commit migration กับ code ที่พึ่งพากัน แล้ว apply เฉพาะ Staging ตาม workflow ตรวจ RLS/grants/RPC/cron และทดสอบ concurrent connections จริงก่อน Production
@@ -65,7 +65,7 @@ Candidate `cd72687` ผ่าน full suite 326 files/4,671 tests, TypeScript/to
 
 Terms/privacy อธิบายฟังก์ชันและช่องทางติดต่อที่มีหลักฐานในโค้ด ไม่มีราคา/SLA/ระยะลบที่สมมติขึ้น และการรับทราบไม่รวม marketing หรือ sensitive-data blanket consent เอกสารนี้ยังไม่ใช่การยืนยันความครบถ้วนตามกฎหมาย ก่อนเปิดบริการสาธารณะต้องตรวจตัวบุคคล/บริษัทที่รับผิดชอบข้อมูล ระยะเก็บ/ลบจริง บทบาทโรงเรียน และฐานการใช้ข้อมูลผู้เยาว์/สุขภาพกับผู้รับผิดชอบ ไม่ถือว่า checkbox อย่างเดียวแก้เรื่องเหล่านี้ครบแล้ว
 
-## การตรวจในเครื่อง
+## ประวัติการตรวจในเครื่อง
 
 - TypeScript, token lint, unit tests และ production webpack build ใช้ env จำลอง ไม่มี credential จริง
 - ผลตรวจ: full suite 281 ไฟล์ / 3,499 cases ผ่านก่อนเพิ่ม unsupported-host guard; หลังแก้รอบสุดท้าย auth suite 6 ไฟล์ / 58 cases ผ่าน (รวม guard ใหม่นั้น), TypeScript/token lint/build ผ่าน และ Next MCP `issues`, `configErrors`, `sessionErrors` ว่าง

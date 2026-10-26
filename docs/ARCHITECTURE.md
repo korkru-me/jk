@@ -7,7 +7,9 @@ The resumed Staging test passed the existing application path end to end: a norm
 The owner completed normal Vercel sign-in in Chrome, where the Staging badge was verified; this did not authenticate the separate in-app browser or weaken hosting protection. Previously approved Staging migration parity remains 165/165. The resumed test adds no application, RLS, schema or migration change and covers neither SEB, real student data, SMTP nor Production testing. Exact cleanup passed: the runner verified personal-organization deletion, independent scoped SQL confirmed all synthetic identities/resources/notices/attempts removed, and the private manifest and temporary key file were deleted. Current evidence is in [STAGING_NOTIFICATION_E2E_20261020.md](STAGING_NOTIFICATION_E2E_20261020.md); pending hosted-verification statements in the earlier development-stage sections below are historical.
 
 
-## Recovery result handoff — 20 October 2026 (Production candidate)
+## Recovery result handoff — released 20 October 2026
+
+Current status: PR #76 is released; SMTP/template and verification evidence are in `SMTP_PRODUCTION_RELEASE_20261020.md`. The following paragraph records the pre-release composition.
 
 The recovery-only candidate ports the already Staging-validated `be7ee0d` and `e952b4b` behavior onto Production base `216d492`. Reset POST still requires the exact verified user/session and ten-minute recovery grant. A provider `same_password` response becomes a persistent field error without consuming that grant or signing out. After an accepted password update, the action clears the grant, awaits global sign-out and redirects with `RedirectType.replace` to `/login?password_changed=1`; revocation errors or exceptions add `sessions_revoked=0`. Client `unstable_rethrow` preserves Next navigation, so cookie cleanup cannot replace success with the expired-link gate. The login notice persists through refresh and conveys honest success/warning states; its query parameters never authorize recovery.
 

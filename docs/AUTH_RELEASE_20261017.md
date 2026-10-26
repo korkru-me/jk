@@ -1,6 +1,8 @@
 # แผนปล่อยระบบบัญชี — 17 ตุลาคม 2026
 
-สถานะ checkpoint นี้: **Staging deploy และตรวจ Auth/Data smoke แล้ว; Production prerequisites ครบ แต่ยังไม่ deploy รุ่นนี้** เจ้าของอนุมัติการปล่อย Staging → Production พร้อม secret/migration/URL/current-password policy แล้ว การสมัคร Resend ยังพักไว้ การเปิดความสามารถที่ต้องใช้ SMTP/Google จริงต้องรายงานแยกจากการนำโค้ดขึ้นเว็บ
+สถานะล่าสุด 26 ตุลาคม: PR #57 เผยแพร่ระบบบัญชีแล้ว และ PR #76 เผยแพร่ recovery feedback แล้ว SMTP/แม่แบบกู้รหัสผ่านใช้จริงและมีผลทดสอบเดิมตาม [SMTP_PRODUCTION_RELEASE_20261020.md](SMTP_PRODUCTION_RELEASE_20261020.md) Google/การเปลี่ยน Confirm email ยังพักไว้ตามเจ้าของ ส่วน signup feedback รอบถัดไปติดตาม [AUTH_FEEDBACK_RELEASE_20261026.md](AUTH_FEEDBACK_RELEASE_20261026.md) ข้อความด้านล่างเป็นประวัติเตรียมรุ่น 17 ตุลาคม ไม่ใช่รายการที่ต้อง apply/deploy ซ้ำ
+
+ประวัติ checkpoint ก่อนปล่อย (ถูกแทนที่โดยสถานะล่าสุดข้างต้น): **Staging deploy และตรวจ Auth/Data smoke แล้ว; Production prerequisites ครบ แต่ยังไม่ deploy รุ่นนี้** เจ้าของอนุมัติการปล่อย Staging → Production พร้อม secret/migration/URL/current-password policy แล้ว การสมัคร Resend ยังพักไว้ การเปิดความสามารถที่ต้องใช้ SMTP/Google จริงต้องรายงานแยกจากการนำโค้ดขึ้นเว็บ
 
 ## Source และขอบเขต
 
@@ -41,7 +43,7 @@ Production ยังมี backlog SEB เดิม 13 รายการ แล
 
 ยืนยัน `AUTH_FLOW_SECRET` แบบ sensitive คนละค่าสำหรับ Vercel Production และ Preview เฉพาะ `staging` พร้อม Google linking/Resend flags เป็น false และ tier Production แล้ว ไม่บันทึก secret ใน Git หรือรายงานผล การทดสอบ Staging พบรหัสปฏิเสธจริง `current_password_invalid` (HTTP 400) จึงรองรับใน error mapping ด้วย
 
-## ขั้นตอน Production ที่ยังรอ
+## ประวัติขั้นตอน Production ก่อน release
 
 1. เปิดและ merge PR ผ่าน workflow ของ `master` โดยคงขอบเขต release ที่ตรวจแล้ว
 2. รอ Production deployment เป็น Ready ตรวจ SHA และ alias จริง

@@ -21,7 +21,7 @@ export function AccountRoleField({ id, value, onChange, error, disabled }: {
   disabled?: boolean
 }) {
   return (
-    <FieldSet disabled={disabled} className="gap-1">
+    <FieldSet id={id} disabled={disabled} className="gap-1">
       <FieldLegend variant="label" id={`${id}-label`}>คุณใช้งานในฐานะอะไร?</FieldLegend>
       <Field data-invalid={!!error} className="gap-1">
         <ToggleGroup
@@ -41,6 +41,8 @@ export function AccountRoleField({ id, value, onChange, error, disabled }: {
             <ToggleGroupItem
               key={role}
               value={role}
+              aria-invalid={!!error}
+              aria-describedby={error ? `${id}-error` : undefined}
               className="group/role min-h-[52px] min-w-0 cursor-pointer justify-start gap-1.5 border-2 border-border bg-muted/30 px-2.5 py-1.5 text-foreground shadow-xs hover:border-primary/50 hover:bg-primary/5 aria-pressed:border-primary aria-pressed:bg-primary/10 aria-pressed:text-primary aria-pressed:hover:border-primary aria-pressed:hover:bg-primary/10 motion-safe:active:scale-[0.98]"
             >
               <span className="hidden size-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary group-aria-pressed/role:bg-primary group-aria-pressed/role:text-primary-foreground @min-[280px]/role-options:flex">
