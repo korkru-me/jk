@@ -1,8 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MAX_POST_PDF_BYTES, postPdfSource, readPostPdf } from './post-pdf-preview'
 
 const BASE = 'https://classroom-test.supabase.co'
 const FILE = `${BASE}/storage/v1/object/public/classroom-post-files/teacher/file.pdf`
+
+afterEach(() => vi.unstubAllEnvs())
 
 describe('announcement PDF source', () => {
   it('keeps the approved source while removing download and viewer fragments', () => {
@@ -26,6 +28,16 @@ describe('announcement PDF source', () => {
     expect(postPdfSource(fixture, BASE, true)).toBe(fixture)
     expect(postPdfSource(fixture, BASE, false)).toBeNull()
     expect(postPdfSource(`${fixture}?redirect=elsewhere`, BASE, true)).toBeNull()
+  })
+
+  it('allows the hosted fixture only for the canonical Staging build', () => {
+    const fixture = '/exam-screen-lab/grading-workspace/assets/file-0.pdf'
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://www.korkru.com')
+    expect(postPdfSource(fixture, BASE)).toBeNull()
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://staging.korkru.com')
+    expect(postPdfSource(fixture, BASE)).toBe(fixture)
+    expect(postPdfSource('/exam-screen-lab/grading-workspace/assets/file-1.pdf', BASE)).toBeNull()
   })
 })
 

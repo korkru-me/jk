@@ -1,9 +1,10 @@
 import { isExamScreenLabEnabled } from '@/lib/exam-screen-lab-access'
 
-/** Tiny deterministic, local-only answers; no Storage, Auth or learner records. */
+/** Synthetic answers; only the announcement PDF is also available on isolated Staging. */
 export async function GET(_request: Request, { params }: { params: Promise<{ filename: string }> }) {
-  if (process.env.NODE_ENV === 'production' || !isExamScreenLabEnabled(process.env)) return new Response(null, { status: 404 })
+  if (!isExamScreenLabEnabled(process.env)) return new Response(null, { status: 404 })
   const { filename } = await params
+  if (process.env.NODE_ENV === 'production' && filename !== 'file-0.pdf') return new Response(null, { status: 404 })
   const match = /^(work|file)-(\d+)\.(svg|pdf)$/.exec(filename)
   if (!match || Number(match[2]) > 31 || (match[1] === 'work' ? match[3] !== 'svg' : match[3] !== 'pdf')) return new Response(null, { status: 404 })
   const student = Number(match[2]) + 1
