@@ -356,7 +356,7 @@ export function PracticeLibraryView({
               {Object.entries(searchHiddenFields).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
               {state.reviewOnly && <input type="hidden" name="review" value="1" />}
               {state.tags.map(tag => <input key={tag} type="hidden" name="tag" value={tag} />)}
-              <Input key={state.q} name="q" defaultValue={state.q} placeholder="ค้นหาชื่อหรือเนื้อหาโจทย์" aria-label="ค้นหาชื่อหรือเนื้อหาโจทย์" className="min-w-0 flex-1" />
+              <Input key={state.q} name="q" defaultValue={state.q} enterKeyHint="search" placeholder="ค้นหาชื่อหรือเนื้อหาโจทย์" aria-label="ค้นหาชื่อหรือเนื้อหาโจทย์" className="min-w-0 flex-1" />
               <Button type="submit" size="sm" className="shrink-0 pointer-coarse:min-h-11" aria-label="ค้นหาโจทย์">
                 <Search data-icon="inline-start" aria-hidden="true" /><span className="hidden sm:inline">ค้นหา</span>
               </Button>

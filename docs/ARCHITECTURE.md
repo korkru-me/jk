@@ -550,3 +550,8 @@ npm run build
 PracticeExerciseCard exposes edit/delete/start actions without selecting saved groups. PracticeLibraryView confirms deletion and delegates through a deleteExerciseAction override; PracticeLocalLibraryView re-reads owner/library-scoped browser state, validates the exact exercise revision and persists only the filtered exercise list. The synthetic lab supplies an isolated adapter.
 
 The server action validates a strict UUID/library/revision payload, reuses studentAccess for verified actor and library/access-code authorization, then deletes only student_practice_exercises matching all four fields. Existing service-role grants already permit this operation; no schema change is introduced. Only a returned ID reports success and revalidates the library path. Practice answer attempts, bank questions, pins and other exercises are never deletion targets. Zero rows signals unavailable/stale data. Production integration remains untested in this local-only change.
+
+
+## Explicit teacher question search — 26 October 2026 (local only)
+
+QuestionSearchForm separates a controlled input draft from a committed search through a native form submit callback. LibraryPanel and QuestionBankClient own their drafts, sync from committed props and update the URL only on Enter/Search; their former 500ms debounce effects are removed. Existing parameter writers preserve scopes/sorts and reset only the relevant pagination fields. Student PracticeLibraryView retains Next Form GET submission with a mobile Search enterKeyHint. Search access, server matching/grouping and database queries are unchanged.
