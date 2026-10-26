@@ -2,7 +2,7 @@
 
 import { ExerciseIcon } from '@/lib/assignment-display'
 import Link from 'next/link'
-import { Pencil, Play } from 'lucide-react'
+import { Pencil, Play, Trash2 } from 'lucide-react'
 import { COVER_PRESETS } from '@/app/(app)/classrooms/_components/classroom-meta'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -23,26 +23,22 @@ export function PracticeExercisePattern() {
   </svg>
 }
 
-export function PracticeExerciseCard({ exercise, settings, selected, disabled, onSelect, onEdit, startHref }: {
+export function PracticeExerciseCard({ exercise, settings, disabled, onEdit, onDelete, startHref }: {
   exercise: PracticeExercise
   settings: PracticeExerciseSettings
-  selected: boolean
   disabled: boolean
-  onSelect: (selected: boolean) => void
   onEdit: () => void
+  onDelete: () => void
   startHref: string
 }) {
   const preset = COVER_PRESETS.find(color => color.id === settings.theme) ?? COVER_PRESETS[0]
-  return <Card radius="md" padding="none" className={cn('overflow-hidden transition-shadow', selected && 'ring-2 ring-primary/50')}>
+  return <Card radius="md" padding="none" className="min-w-0 overflow-hidden">
     <div className={cn('relative flex items-start gap-2 border-b px-3 py-2', preset.surface, preset.text)}>
       <PracticeExercisePattern />
-      <label className="relative flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-lg focus-within:ring-2 focus-within:ring-ring pointer-coarse:size-11">
-        <input type="checkbox" checked={selected} disabled={disabled} onChange={event => onSelect(event.target.checked)} aria-label={`เลือกแบบฝึกหัด ${exercise.title}`} className="accent-primary" />
-      </label>
-      <Button type="button" variant="ghost" aria-pressed={selected} disabled={disabled} onClick={() => onSelect(!selected)} className="relative h-auto min-w-0 flex-1 flex-col items-start gap-1 whitespace-normal p-0 text-left hover:bg-transparent">
+      <div className="relative flex min-w-0 flex-1 flex-col items-start gap-1">
         <span className="flex min-w-0 items-center gap-1.5"><ExerciseIcon className="size-4 shrink-0 text-work-exercise" aria-hidden="true" /><span className="truncate text-sm font-semibold" title={exercise.title}>{exercise.title}</span></span>
         <span className={cn('text-xs', preset.textMuted)}>{exercise.questionIds.length} ข้อ · {settings.questionsPerPage} ข้อต่อหน้า</span>
-      </Button>
+      </div>
     </div>
     <div className="flex items-center gap-2 px-3 py-1.5">
       <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -50,7 +46,10 @@ export function PracticeExerciseCard({ exercise, settings, selected, disabled, o
         <Progress className="w-full" value={exercise.attemptedCount / exercise.questionIds.length * 100} aria-label={`ความคืบหน้า ${exercise.title}`} />
       </div>
       <div className="flex items-center justify-end gap-1.5">
-        <Button variant="ghost" size="icon-sm" className="pointer-coarse:size-11" disabled={disabled} onClick={onEdit} aria-label={`แก้ไข ${exercise.title}`} title="แก้ไขแบบฝึกหัด"><Pencil aria-hidden="true" /></Button>
+        <div className="flex items-center gap-0">
+          <Button variant="ghost" size="icon-sm" className="pointer-coarse:size-11" disabled={disabled} onClick={onEdit} aria-label={`แก้ไข ${exercise.title}`} title="แก้ไขแบบฝึกหัด"><Pencil aria-hidden="true" /></Button>
+          <Button type="button" variant="ghost" size="icon-sm" className="pointer-coarse:size-11" disabled={disabled} onClick={onDelete} aria-label={`ลบ ${exercise.title}`} title="ลบแบบฝึกหัด"><Trash2 aria-hidden="true" /></Button>
+        </div>
         <Button size="sm" variant="workExercise" className="pointer-coarse:min-h-11" render={<Link href={startHref} />} aria-label={`เริ่มทำ ${exercise.title}`}><Play data-icon="inline-start" aria-hidden="true" />เริ่มทำ</Button>
       </div>
     </div>

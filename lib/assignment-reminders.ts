@@ -31,6 +31,7 @@ export interface AssignmentReminderRecord {
 }
 
 export interface AssignmentNoticeRecord extends AssignmentReminderRecord {
+  actor_id?: string | null
   type: string
 }
 
