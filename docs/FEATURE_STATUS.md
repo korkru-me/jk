@@ -2407,3 +2407,13 @@ Physical iPad UAT ของ candidate `r7` ยืนยันแล้วว่�
 
 - การ์ดห้องเรียนใช้ native anchor/document GET ไปยัง href เดิมแทน client transition และหน้าทำงานมี loading state “กำลังเปิดงาน”; คง Tooltip สีและ start-on-POST เดิม ไม่เปลี่ยน auth/เวลา/คะแนน
 - ตรวจ mouse/Enter และ Tooltip เปิดอยู่ ด้วยงานใหม่ ทำต่อ เลยกำหนด และส่งแล้วใน fixture พร้อมบล็อก RSC transition ยืนยัน document navigation จริง TypeScript/token/build/Next runtime ผ่าน ยังไม่ยืนยันสาเหตุคำขอของบัญชีจริงหรือทดสอบกับข้อมูล Production ไม่มี migration/push/deploy จากงานนี้ รายละเอียด STUDENT_CLASSROOM_CALENDAR.md
+
+
+## Homeroom assignment audience — 26 October 2026 (local only)
+
+- Subject membership determines assignment reach. Multi-room assignments union recipients without duplicates and display every linked room relevant to the homeroom. Group targeting respects group_ids; existing attempts retain access after group changes only while still enrolled in a linked room.
+- The matrix distinguishes non-members from members outside the assigned groups. Neither counts as missing work. Calendar, individual compliance and overview denominators use the actual assignment audience. A student with no due work sees an explicit empty-work label.
+- The table header identifies the source classroom and stays at the top of a keyboard-focusable scroll region capped at 65dvh. Student names stay at the left. Queries page through memberships, assignments, submissions and groups and propagate failures instead of presenting false non-membership.
+- Verified using the synthetic local /exam-screen-lab/homeroom-work page at desktop 1440x1000 and mobile 390x844: status, score 8/10, calendar denominator 1/22, sticky header/name column and no viewport overflow or Next runtime errors. Unit/mocked server tests pass. Live student data and deployed RLS were not tested. No migration, remote database changes, push or deployment; owner requested local work and commit first.
+
+Validation: 4,590 tests across 325 files, TypeScript, semantic token lint and isolated production build all passed. Browser verification used synthetic data only; no real roster assertions or database writes.

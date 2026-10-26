@@ -233,3 +233,8 @@ MCQ แบบคำนวณสามารถสร้างสูตรคำ�
 ### Item analysis deferred — 14 October 2026
 
 Question-bank, set, dashboard and assignment question cards no longer calculate or expose answer-derived item analysis (usage, empirical difficulty, discrimination or last-used timestamps). The associated answer queries, calculator and sort options are removed at the owner’s request; a future research feature must define its own authorization and data contract. Assignment scoring, completion rules, answer review and submission-level summaries remain in scope. No persisted answers or questions are removed.
+
+
+## Homeroom homework audience — 26 October 2026 (local only)
+
+A homeroom student is responsible only for work reaching their current subject-classroom memberships. Multi-room links union recipients without duplicates; group_ids are evaluated within each room. Existing attempts retain group access only while the student remains enrolled in a linked room. Non-members and untargeted members have distinct neutral states and neither is counted as missing work or included in the denominator. Calendar, per-student compliance and classroom overview use this audience. Historical submissions are retained and scoring is unchanged. No due work is displayed as an empty-work label instead of a misleading 100% claim.

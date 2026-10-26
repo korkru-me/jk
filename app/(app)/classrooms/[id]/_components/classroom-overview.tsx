@@ -99,9 +99,10 @@ export function ClassroomOverview({
   const given = isHomeroom
     ? homeroomAssignments
     : assignments.filter(a => a.status === 'published' || a.status === 'closed')
+  const homeroomAudience = new Map(homeroomAssignments.map(a => [a.id, new Set(a.assignedStudentIds)]))
   const summary = summarizeClassroomProgress(
     studentIds, given, submissions, now,
-    a => (isHomeroom ? null : audienceByAssignment?.get(a.id) ?? null),
+    a => (isHomeroom ? homeroomAudience.get(a.id) ?? new Set<string>() : audienceByAssignment?.get(a.id) ?? null),
   )
 
   const items: OverviewItem[] = given.map(a => ({

@@ -207,6 +207,8 @@ export function HomeroomOverview({ classroomId, students, assignments, submissio
   const isDue = (a: HomeroomAssignmentRow) => !a.end_at || new Date(a.end_at).getTime() <= now
 
   const dueAssignments = assignments.filter(isDue)
+  const audienceByAssignment = new Map(assignments.map(a => [a.id, new Set(a.assignedStudentIds)]))
+  const membersByAssignment = new Map(assignments.map(a => [a.id, new Set(a.classroomStudentIds)]))
 
   const calendarEvents: HomeroomCalendarEvent[] = assignments
     .filter((a): a is HomeroomAssignmentRow & { end_at: string } => !!a.end_at)
@@ -215,14 +217,15 @@ export function HomeroomOverview({ classroomId, students, assignments, submissio
       title: a.title,
       classroomName: a.classroomName,
       endAt: a.end_at,
-      doneCount: students.filter(s => isDone(bestSubmission.get(subKey(a.id, s.id)))).length,
-      totalStudents: students.length,
+      doneCount: students.filter(s => audienceByAssignment.get(a.id)!.has(s.id) && isDone(bestSubmission.get(subKey(a.id, s.id)))).length,
+      totalStudents: a.assignedStudentIds.length,
     }))
 
   const compliance = students.map(student => {
-    const submitted = dueAssignments.filter(a => isDone(bestSubmission.get(subKey(a.id, student.id)))).length
-    const rate = dueAssignments.length > 0 ? Math.round((submitted / dueAssignments.length) * 100) : 100
-    return { student, submitted, total: dueAssignments.length, rate }
+    const assigned = dueAssignments.filter(a => audienceByAssignment.get(a.id)!.has(student.id))
+    const submitted = assigned.filter(a => isDone(bestSubmission.get(subKey(a.id, student.id)))).length
+    const rate = assigned.length > 0 ? Math.round((submitted / assigned.length) * 100) : 100
+    return { student, submitted, total: assigned.length, rate }
   }).sort((a, b) => a.rate - b.rate)
 
   return (
@@ -236,19 +239,19 @@ export function HomeroomOverview({ classroomId, students, assignments, submissio
           <HomeroomCalendar events={calendarEvents} />
 
           {/* Matrix */}
-          <Card data-classroom-panel edge="ring" className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse">
+          <Card data-classroom-panel edge="ring" className="relative isolate max-h-[65dvh] overflow-auto outline-none focus-visible:ring-2 focus-visible:ring-ring" role="region" aria-label="ตารางติดตามการบ้านนักเรียน" tabIndex={0}>
+            <table className="w-full text-sm border-separate border-spacing-0">
               <thead data-classroom-table-header>
                 <tr className="border-b border-border">
-                  <th className="sticky left-0 bg-card text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide min-w-[180px]">
+                  <th className="sticky top-0 left-0 z-30 bg-card border-b border-border text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide min-w-[180px]">
                     นักเรียน
                   </th>
                   {assignments.map(a => (
-                    <th key={a.id} className="px-3 py-3 text-center min-w-[140px]">
+                    <th key={a.id} scope="col" className="sticky top-0 z-20 bg-card border-b border-border px-3 py-3 text-center min-w-[180px]">
                       <Link href={`/assignments/${a.id}`} className="text-xs font-semibold text-muted-foreground hover:text-primary line-clamp-2">
                         {a.title}
                       </Link>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">{a.classroomName}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">ห้องเรียน: {a.classroomName}</p>
                     </th>
                   ))}
                 </tr>
@@ -256,7 +259,7 @@ export function HomeroomOverview({ classroomId, students, assignments, submissio
               <tbody>
                 {students.map(student => (
                   <tr key={student.id} className="border-b border-border last:border-b-0 hover:bg-muted/50">
-                    <td className="sticky left-0 bg-card px-4 py-2.5">
+                    <td className="sticky left-0 z-10 bg-card border-b border-border px-4 py-2.5">
                       <p className="text-sm font-medium text-foreground truncate max-w-[160px]">{student.full_name}</p>
                       <p className="text-xs text-muted-foreground truncate max-w-[160px]">{student.email}</p>
                     </td>
@@ -270,8 +273,12 @@ export function HomeroomOverview({ classroomId, students, assignments, submissio
                         : null
 
                       return (
-                        <td key={a.id} className="px-3 py-2.5 text-center">
-                          {submitted ? (
+                        <td key={a.id} className="border-b border-border px-3 py-2.5 text-center">
+                          {!membersByAssignment.get(a.id)!.has(student.id) ? (
+                            <span className="text-xs text-muted-foreground">ไม่ได้อยู่ในห้องเรียน</span>
+                          ) : !audienceByAssignment.get(a.id)!.has(student.id) ? (
+                            <span className="text-xs text-muted-foreground">ไม่ได้รับมอบหมาย</span>
+                          ) : submitted ? (
                             <div className={`flex items-center justify-center gap-1 ${
                               passed === false ? 'text-destructive' : 'text-success'
                             }`}>
@@ -320,15 +327,15 @@ export function HomeroomOverview({ classroomId, students, assignments, submissio
             const isExpanded = expandedStudent === student.id
             return (
               <div key={student.id}>
-                <div className="flex items-center gap-3 text-sm py-1">
-                  <p className="w-40 truncate text-foreground">{student.full_name}</p>
+                <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-1 py-1 text-sm sm:flex">
+                  <p className="col-span-3 min-w-0 truncate text-foreground sm:w-40 sm:shrink-0">{student.full_name}</p>
                   <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
                     <div
                       className={`h-full rounded-full ${rate >= 80 ? 'bg-success' : rate >= 50 ? 'bg-warning' : 'bg-destructive'}`}
                       style={{ width: `${rate}%` }}
                     />
                   </div>
-                  <span className="w-20 shrink-0 text-right text-xs text-muted-foreground">{submitted}/{total} ({rate}%)</span>
+                  <span className="w-32 shrink-0 text-right text-xs text-muted-foreground">{total === 0 ? 'ไม่มีงานที่ถึงกำหนด' : `${submitted}/${total} (${rate}%)`}</span>
                   <button
                     onClick={() => setExpandedStudent(isExpanded ? null : student.id)}
                     className={`shrink-0 flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg transition-colors ${
