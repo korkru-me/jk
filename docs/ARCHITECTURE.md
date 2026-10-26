@@ -543,3 +543,10 @@ npm run build
 
 
 - Classroom card entry (14 October 2026): native anchors retain the existing state-derived href and perform document GET, avoiding dependence on a pending/stale App Router transition. The take route has a lightweight loading boundary; ownership/access/schedule checks and explicit waiting-room start POST remain unchanged. Synthetic browser verification blocks RSC transitions and asserts a new document plus the expected destination for mouse/keyboard entry. This does not establish the underlying cause of the real account's pending request.
+
+
+## Personal practice deletion — 26 October 2026 (local only)
+
+PracticeExerciseCard exposes edit/delete/start actions without selecting saved groups. PracticeLibraryView confirms deletion and delegates through a deleteExerciseAction override; PracticeLocalLibraryView re-reads owner/library-scoped browser state, validates the exact exercise revision and persists only the filtered exercise list. The synthetic lab supplies an isolated adapter.
+
+The server action validates a strict UUID/library/revision payload, reuses studentAccess for verified actor and library/access-code authorization, then deletes only student_practice_exercises matching all four fields. Existing service-role grants already permit this operation; no schema change is introduced. Only a returned ID reports success and revalidates the library path. Practice answer attempts, bank questions, pins and other exercises are never deletion targets. Zero rows signals unavailable/stale data. Production integration remains untested in this local-only change.

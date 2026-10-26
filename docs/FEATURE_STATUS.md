@@ -2427,3 +2427,12 @@ Removed the Today shortcut button at the owner's request. Previous/next month na
 ## Homeroom calendar collision notice removed — 26 October 2026 (local only)
 
 Removed the same-day collision indicator, its legend and the selected-day warning at the owner's request. All due assignments remain listed with their existing submission/deadline status dots. No data or schema changes.
+
+
+## Personal practice card actions — 26 October 2026 (local only)
+
+Removed selection checkboxes and title selection from My Exercises cards. Question selection for creating/editing exercises remains available. Added a compact trash action beside the pencil, with adjacent edit/delete hit boxes and a small gap before Start so visible action spacing is balanced. Deletion requires confirmation and preserves bank questions, practice attempt history, pins and other exercises.
+
+Both development browser storage and the prepared server path support deletion. Browser storage is re-read before a revision-checked write; the server reuses verified actor/library/access-code authorization and filters deletion by student ID, library, exercise UUID and expected revision. No returned row or a stale revision never reports success. Active deleted filters return to the library and successful deletion clears only that exercise's editor draft.
+
+Validation: TypeScript, semantic token lint, isolated production build and all 4,778 tests in 332 files passed. Synthetic localhost browser checks cover cancellation, confirmed deletion, persistence after reload, preserving another exercise and review pins, and desktop/mobile rendering with no runtime errors. Server authorization/deletion uses mocks; no live student exercise was deleted and deployed RLS was not tested. No migration, push or deployment; owner requested local work and commit first.

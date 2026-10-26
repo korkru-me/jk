@@ -9,7 +9,7 @@ import { PracticeSingleQuestionRunner } from '@/components/practice/practice-sin
 import type { PracticeRunQuestion } from '@/lib/practice-run'
 import type { PracticeRunQuestionLoader, PracticeRunAnswerAction } from '@/lib/practice-run'
 import { PracticeLocalLibraryView } from '@/components/practice/practice-local-library-view'
-import { practiceExerciseSchema, practiceExerciseUpdateSchema, practiceReviewPinSchema, practiceExerciseDtoSchema, type PracticeExercise } from '@/lib/practice-exercises'
+import { practiceExerciseSchema, practiceExerciseUpdateSchema, practiceExerciseDeleteSchema, practiceReviewPinSchema, practiceExerciseDtoSchema, type PracticeExercise } from '@/lib/practice-exercises'
 import type { PracticeQuestionListItem } from '@/lib/practice-question-access.server'
 import { drawFreshValues } from '@/lib/math/fresh-random-values'
 
@@ -158,6 +158,15 @@ export function StudentLibraryLab({ localReview = false }: { localReview?: boole
       const next = exercises.map(group => group.id !== value.id ? group : { ...group, title: value.title, questionIds: value.questionIds,
         revision: group.revision + 1, questionTitles: Object.fromEntries(items.filter(item => value.questionIds.includes(item.id)).map(item => [item.id, item.title])),
         attemptedCount: value.questionIds.includes(ids[0]) ? 1 : 0 })
+      setExercises(next)
+      persist(next, pins)
+      return { ok: true }
+    }}
+    deleteExerciseAction={async input => {
+      const value = practiceExerciseDeleteSchema.parse(input)
+      const current = exercises.find(group => group.id === value.id)
+      if (!current || current.revision !== value.expectedRevision) return { ok: false, conflict: true, error: 'แบบฝึกหัดเปลี่ยนแปลงแล้ว' }
+      const next = exercises.filter(group => group.id !== value.id)
       setExercises(next)
       persist(next, pins)
       return { ok: true }
