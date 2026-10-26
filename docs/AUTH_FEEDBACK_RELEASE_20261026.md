@@ -16,8 +16,14 @@ Guarded `/exam-screen-lab/signup-feedback` แสดง confirmed state ด้�
 
 ## Checks และ deployment
 
-กำลังตรวจ candidate/Staging ก่อนเผยแพร่ ต้องบันทึก Ready SHA, canonical domain, public lab isolation และ actual primary parity หลังปล่อย
+Candidate ผ่าน Vitest 329 files / 4,758 tests, TypeScript, semantic-token lint และ production Webpack build การ build ครั้งแรกถูก sandbox บล็อก Google Fonts; รันใหม่โดยอนุญาต network แล้วผ่าน ไม่เปลี่ยน font/config เพื่อหลบปัญหา
+
+Staging PR #88 merge `42109587d32997d578cf08f9ed155589724953b9` เป็น READY ที่ `dpl_ApRrPJfd76dBXK8g9MBtiCSM9DS1` และ canonical `staging.korkru.com` ตรวจ badge ก่อนทดสอบ Signup ว่างแสดงข้อผิดพลาดครบ/focus role แรก, สลับ Google validation เหลือเฉพาะ role/acknowledgement, mobile 390px ไม่ล้น, invalid-link notice แสดงถูก และ confirmed fixture ไม่มี resend form ไม่สร้างบัญชี/ยอมรับข้อตกลงแทนเจ้าของ/ส่งอีเมลจริง
+
+Production release ใช้ [PR #89](https://github.com/korkru-me/jk/pull/89) เท่านั้น บันทึก exact Ready/deployment/local parity หลัง merge เป็น handoff ใน branch เดียวกันและผลท้าย PR โดยไม่เปิด flags หรือ replay migration
 
 ## Primary sync
 
-Primary `/Users/korkusonmasaen/Korkru/korkru` มีงานห้องเรียนใหม่ `5ed71fe` และ `058ce70` กับงาน dirty เดิม ต้องรักษาไว้ ซิงก์เฉพาะ Auth dependency closure และเอกสารที่อนุมัติ ไม่ reset/stash/merge master ทั้งชุดหรือคัดลอก secrets และไม่ถือว่า app ทั้งเว็บเท่ากับ Production หากยังมีงานร่วมที่ตั้งใจเก็บไว้
+Primary `/Users/korkusonmasaen/Korkru/korkru` มีงานห้องเรียนใหม่ `5ed71fe` และ `058ce70` กับงาน dirty เดิมที่รักษาไว้ ซิงก์ Auth dependency closure 101 paths (เปลี่ยนจริง 48 paths รวม helper/tests, settings ของครู/นักเรียน, legal routes/components, metadata `jose@6.2.2` และ migration source ที่ Production apply ไปแล้ว) และเอกสาร 14 paths โดย merge เฉพาะส่วนสถานะ Auth ในเอกสารที่มีงานร่วม ไม่ apply SQL ไม่ reset/stash/merge master ทั้งชุดหรือคัดลอก secrets
+
+Primary full suite 331 files / 4,772 tests, TypeScript และ token lint ผ่าน Production build ของ actual primary snapshot แยกผ่านโดยไม่แตะ running `.next` การตรวจ hashes พบไฟล์เดิมนอกขอบเขต Auth/docs ที่อนุมัติเปลี่ยน 0 รายการ ไม่ถือว่า app ทั้งเว็บเท่ากับ Production เพราะยังมีงานห้องเรียนร่วมที่ตั้งใจเก็บไว้

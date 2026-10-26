@@ -4,7 +4,7 @@
 
 ระบบบัญชีเดิมเผยแพร่ผ่าน PR #57 และ recovery feedback ผ่าน PR #76 แล้ว Production ใช้ custom SMTP `smtp.resend.com:465` และ recovery template ภาษาไทยที่รักษา `{{ .ConfirmationURL }}` ตาม flow เดิม บันทึกล่าสุดใน [SMTP_PRODUCTION_RELEASE_20261020.md](SMTP_PRODUCTION_RELEASE_20261020.md) แยกผลที่ตรวจโดยตรงจากผล login ที่เจ้าของรายงานไว้ครบ ไม่ถือว่า SMTP หรือ recovery ยังรอ deploy
 
-แพตช์ `30886db` เพิ่มข้อความผิดพลาด/focus ของ signup และให้ `/check-email` รับรู้เฉพาะอีเมลที่ยืนยันแล้วของ session ปัจจุบัน คำนวณ cooldown จากเวลาสิ้นสุดจริงและอัปเดตเมื่อกลับมาเปิดแท็บ กำลังนำขึ้น Production ตามคำอนุมัติ 26 ตุลาคม รายละเอียดสถานะปล่อยใน [AUTH_FEEDBACK_RELEASE_20261026.md](AUTH_FEEDBACK_RELEASE_20261026.md)
+แพตช์ `30886db` เพิ่มข้อความผิดพลาด/focus ของ signup และให้ `/check-email` รับรู้เฉพาะอีเมลที่ยืนยันแล้วของ session ปัจจุบัน คำนวณ cooldown จากเวลาสิ้นสุดจริงและอัปเดตเมื่อกลับมาเปิดแท็บ อยู่ในชุด release ตามคำอนุมัติ 26 ตุลาคมผ่าน PR #89 รายละเอียดใน [AUTH_FEEDBACK_RELEASE_20261026.md](AUTH_FEEDBACK_RELEASE_20261026.md)
 
 เจ้าของให้พัก Google login/account linking และการเปลี่ยนนโยบายยืนยันอีเมลไว้พัฒนาต่อ Production คง Google provider ปิด, `GOOGLE_ACCOUNT_LINKING_ENABLED=false`, Manual Linking ปิด และ Confirm email ปิดตามค่าเดิม ไม่เปลี่ยน flags, provider, SMTP, template หรือฐานข้อมูลจากการปล่อย feedback นี้ ระบบโควตา Production เปิด/Staging ปิดและ webhook ชี้เว็บจริงแล้ว ดู [RESEND_PRODUCTION_RELEASE_20261020.md](RESEND_PRODUCTION_RELEASE_20261020.md)
 
