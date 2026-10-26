@@ -43,13 +43,16 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  forceRenderOverlay = false,
   ...props
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
+  /** Read-only nested previews need their own clickable backdrop. */
+  forceRenderOverlay?: boolean
 }) {
   return (
     <DialogPortal>
-      <DialogOverlay />
+      <DialogOverlay forceRender={forceRenderOverlay} />
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
