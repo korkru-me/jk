@@ -555,3 +555,10 @@ The server action validates a strict UUID/library/revision payload, reuses stude
 ## Explicit teacher question search — 26 October 2026 (local only)
 
 QuestionSearchForm separates a controlled input draft from a committed search through a native form submit callback. LibraryPanel and QuestionBankClient own their drafts, sync from committed props and update the URL only on Enter/Search; their former 500ms debounce effects are removed. Existing parameter writers preserve scopes/sorts and reset only the relevant pagination fields. Student PracticeLibraryView retains Next Form GET submission with a mobile Search enterKeyHint. Search access, server matching/grouping and database queries are unchanged.
+
+
+## Student bell deadline projection — 26 October 2026 (local only)
+
+AppLayout gets its initial unread count from the same bell action used by client polling. After verified Auth and an active profile, student calls use loadStudentBell; other roles use their existing recipient-scoped stored inbox. The student reader combines own grade-published history with a read-only projection of unfinished assignments, deriving 24-hour due-soon and overdue phases from due_at or the legacy end_at, including personal extensions. Session roster/active subject rooms/exact links precede service-only own-group and narrow authorized assignment reads; all lists page and large IN filters are chunked.
+
+Deadline IDs are SHA-256-derived UUIDs bound to recipient, assignment, canonical effective deadline and phase. Notifications are virtual until an explicit mark-read action recomputes the authorized current set and upserts a read receipt into notifications. No actor means a system assignment_reminder receipt; pendingAssignmentNotices reads actor_id and excludes these from teacher popups. Hidden classroom_post/manual reminders remain independent and are not consumed by the student bell's Mark All Read. No cron, schema, RLS, grant, email or grading changes. Polling only runs while the tab is visible; offline background delivery is not implemented.

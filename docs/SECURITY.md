@@ -298,3 +298,10 @@ KorKru จัดการข้อมูลนักเรียนและอ�
 
 
 - Student classroom calendars (14 October 2026): subject events derive only from the membership/group-authorized work list. The student homeroom calendar loader runs after verified Auth/exact homeroom membership, restricts memberships/submissions to that student and published assignment links to enrolled room IDs, then applies the dashboard group-reach projection. It returns no peer attempts or hidden scores. No RLS, schema, storage or Production change is made; Staging verification used zero-row reads only.
+
+
+## Student bell and deadline receipts — 26 October 2026 (local only)
+
+Bell actions verify Auth and an active profile before privileged work. Student roster, active subject classroom links and own submissions/extensions are recipient-scoped session reads; own group rows and assignment metadata use admin only after that verified reach. Group/attempt reach is checked before the narrowly selected published/closed online assignment metadata is loaded. No peer data, access codes, answers or keys enter the DTO. New-work/announcement rows remain available to their original popup authorization path.
+
+An acknowledgement accepts only a UUID and rebuilds the current student's eligible notices before any service write. Receipt IDs hash recipient/assignment/effective deadline/phase; the server supplies every inserted field, including recipient/org. Student Mark All Read updates only grade_published rows plus freshly authorized deadline receipts, leaving hidden popup records untouched. Receipt inserts ignore conflicting IDs, and follow-up updates filter the verified recipient and require every requested ID to be returned; a foreign-recipient UUID conflict never overwrites that row. Receipt writes are chunked and surface errors; loading/counting are read-only. RLS/grants/schema are unchanged. Tests use mocks and labelled synthetic browser state, not live production/student data.
