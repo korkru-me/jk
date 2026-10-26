@@ -2422,3 +2422,8 @@ Validation: 4,590 tests across 325 files, TypeScript, semantic token lint and is
 ## Homeroom calendar header — 26 October 2026 (local only)
 
 Removed the Today shortcut button at the owner's request. Previous/next month navigation, initial current-month selection and current-day highlighting remain available. No data, scoring or schema changes.
+
+
+## Homeroom calendar collision notice removed — 26 October 2026 (local only)
+
+Removed the same-day collision indicator, its legend and the selected-day warning at the owner's request. All due assignments remain listed with their existing submission/deadline status dots. No data or schema changes.
