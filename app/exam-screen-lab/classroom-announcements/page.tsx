@@ -28,6 +28,8 @@ const posts: ClassroomPost[] = [
     attachments: [
       { url: '/brand/deer-mark.svg?v=3', name: 'ภาพแนวตั้งในชุด.png', mime: 'image/png', size: 0 },
       { url: '/samples/simple-circuit.svg', name: 'ภาพแนวนอนในชุด.svg', mime: 'image/svg+xml', size: 0 },
+      { url: '/exam-screen-lab/grading-workspace/assets/file-0.pdf', name: 'ใบงานประกาศห้องเรียนจำลอง.pdf', mime: 'application/pdf', size: 1024 },
+      { url: '/brand/README.md', name: 'คำแนะนำประกอบประกาศ.txt', mime: 'text/plain', size: 0 },
     ],
     pinned: false,
     created_at: '2026-10-04T00:00:00Z',
@@ -44,7 +46,7 @@ export default function ClassroomAnnouncementsLabPage() {
   return (
     <main className="mx-auto w-full max-w-5xl space-y-8 p-4">
       <header className="space-y-2">
-        <h1 className="text-xl font-semibold">ทดสอบรูปประกาศห้องเรียน</h1>
+        <h1 className="text-xl font-semibold">ทดสอบรูปและ PDF ประกาศห้องเรียน</h1>
         <p className="text-sm text-muted-foreground">
           ข้อมูลจำลองสำหรับทดสอบป๊อปอัปเท่านั้น ไม่อ่านหรือเขียนข้อมูลห้องเรียนจริง
         </p>
