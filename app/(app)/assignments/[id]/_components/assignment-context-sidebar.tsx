@@ -7,7 +7,6 @@ import {
   ChevronLeft,
   ClipboardCheck,
   Eye,
-  LayoutDashboard,
   Pencil,
   Play,
   Presentation,
@@ -242,16 +241,6 @@ export function AssignmentContextNavigation({
           <Trash2 data-icon="inline-start" />
         </SidebarButton>
       </div>
-
-      <Separator />
-      <SidebarButton
-        label="เมนูหลัก"
-        variant="ghost"
-        className="w-full justify-start"
-        render={<Link href="/dashboard" onClick={onClose} />}
-      >
-        <LayoutDashboard data-icon="inline-start" />
-      </SidebarButton>
     </div>
   )
 }

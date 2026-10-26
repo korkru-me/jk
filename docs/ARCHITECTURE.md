@@ -577,3 +577,27 @@ npm run build
 
 
 - Classroom card entry (14 October 2026): native anchors retain the existing state-derived href and perform document GET, avoiding dependence on a pending/stale App Router transition. The take route has a lightweight loading boundary; ownership/access/schedule checks and explicit waiting-room start POST remain unchanged. Synthetic browser verification blocks RSC transitions and asserts a new document plus the expected destination for mouse/keyboard entry. This does not establish the underlying cause of the real account's pending request.
+
+
+## Personal practice deletion — 26 October 2026
+
+PracticeExerciseCard exposes edit/delete/start actions without selecting saved groups. PracticeLibraryView confirms deletion and delegates through a deleteExerciseAction override; PracticeLocalLibraryView re-reads owner/library-scoped browser state, validates the exact exercise revision and persists only the filtered exercise list. The synthetic lab supplies an isolated adapter.
+
+The server action validates a strict UUID/library/revision payload, reuses studentAccess for verified actor and library/access-code authorization, then deletes only student_practice_exercises matching all four fields. Existing service-role grants already permit this operation; no schema change is introduced. Only a returned ID reports success and revalidates the library path. Practice answer attempts, bank questions, pins and other exercises are never deletion targets. Zero rows signals unavailable/stale data. Hosted integration verification is recorded in CLASSROOM_FOLLOWUP_RELEASE_20261026.md.
+
+
+## Explicit teacher question search — 26 October 2026
+
+QuestionSearchForm separates a controlled input draft from a committed search through a native form submit callback. LibraryPanel and QuestionBankClient own their drafts, sync from committed props and update the URL only on Enter/Search; their former 500ms debounce effects are removed. Existing parameter writers preserve scopes/sorts and reset only the relevant pagination fields. Student PracticeLibraryView retains Next Form GET submission with a mobile Search enterKeyHint. Search access, server matching/grouping and database queries are unchanged.
+
+
+## Student bell deadline projection — 26 October 2026
+
+AppLayout gets its initial unread count from the same bell action used by client polling. After verified Auth and an active profile, student calls use loadStudentBell; other roles use their existing recipient-scoped stored inbox. The student reader combines own grade-published history with a read-only projection of unfinished assignments, deriving 24-hour due-soon and overdue phases from due_at or the legacy end_at, including personal extensions. Session roster/active subject rooms/exact links precede service-only own-group and narrow authorized assignment reads; all lists page and large IN filters are chunked.
+
+Deadline IDs are SHA-256-derived UUIDs bound to recipient, assignment, canonical effective deadline and phase. Notifications are virtual until an explicit mark-read action recomputes the authorized current set and upserts a read receipt into notifications. No actor means a system assignment_reminder receipt; pendingAssignmentNotices reads actor_id and excludes these from teacher popups. Hidden classroom_post/manual reminders remain independent and are not consumed by the student bell's Mark All Read. No cron, schema, RLS, grant, email or grading changes. Polling only runs while the tab is visible; offline background delivery is not implemented.
+
+
+### Shared contextual home navigation (26 October 2026)
+
+`components/layout/sidebar.tsx` owns the dashboard shortcut above all registered contextual content and the classroom fallback/section navigation. Context renderers keep their own parent/back navigation but no longer render duplicate dashboard links. The shared link uses the shell close callback for mobile and SidebarLabel for compact desktop accessibility. No sidebar-registry matching, pending-navigation state or authorization changes.

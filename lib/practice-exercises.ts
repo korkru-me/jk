@@ -12,6 +12,9 @@ export const practiceExerciseSchema = z.object({
 export const practiceExerciseUpdateSchema = practiceExerciseSchema.extend({
   expectedRevision: z.number().int().positive().max(2147483647),
 })
+export const practiceExerciseDeleteSchema = practiceExerciseUpdateSchema.pick({
+  id: true, libraryId: true, expectedRevision: true,
+})
 export const practiceReviewPinSchema = z.object({
   libraryId: z.string().uuid(),
   questionId: z.string().uuid(),

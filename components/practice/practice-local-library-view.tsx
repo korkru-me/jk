@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { PracticeLibraryView } from '@/components/practice/practice-library-view'
 import {
-  changeLocalPracticeExercise, changeLocalPracticePin, EMPTY_PRACTICE_LOCAL_REVIEW,
+  changeLocalPracticeExercise, deleteLocalPracticeExercise, changeLocalPracticePin, EMPTY_PRACTICE_LOCAL_REVIEW,
   localPracticeExercises, practiceLocalReviewSchema, type PracticeLocalReview,
 } from '@/lib/practice-local-review'
 import { PRACTICE_PAGE_SIZE, practiceTotalPages, type PracticeSearchState } from '@/lib/practice-search'
@@ -79,6 +79,15 @@ export function PracticeLocalLibraryView({ library, items, matchingIds, state, s
           commit(result.state)
           return { ok: true }
         } catch { return { ok: false, error: 'ยังบันทึกในเบราว์เซอร์ไม่ได้ กรุณาลองอีกครั้ง' } }
+      }}
+      deleteExerciseAction={async input => {
+        try {
+          const current = readStored()
+          const result = deleteLocalPracticeExercise(current, library.id, input)
+          if (!result.ok) { setStored(current); return result }
+          commit(result.state)
+          return { ok: true }
+        } catch { return { ok: false, error: 'ยังลบแบบฝึกหัดในเบราว์เซอร์ไม่ได้ กรุณาลองอีกครั้ง' } }
       }}
       pinAction={async input => {
         try {

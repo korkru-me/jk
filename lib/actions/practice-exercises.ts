@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { getAuthUser } from '@/lib/auth/server'
 import { hasPracticeAccessSession } from '@/lib/practice-access-session.server'
 import { loadPracticeLibraryWaiting, loadPracticeQuestionForStudent } from '@/lib/practice-question-access.server'
-import { practiceExerciseSchema, practiceExerciseUpdateSchema, practiceReviewPinSchema } from '@/lib/practice-exercises'
+import { practiceExerciseSchema, practiceExerciseUpdateSchema, practiceExerciseDeleteSchema, practiceReviewPinSchema } from '@/lib/practice-exercises'
 import { isPracticeLibraryEnabled } from '@/lib/practice-question'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { buildQuestionSolution, type QuestionSolution } from '@/lib/question-solution'
@@ -109,4 +109,25 @@ export async function setPracticeReviewPin(input: unknown): Promise<{ ok: true }
     revalidatePath(`/practice/${parsed.data.libraryId}/library`)
     return { ok: true }
   } catch { return { ok: false, error: 'ยังบันทึกการปักโจทย์ไม่ได้ กรุณาลองอีกครั้ง' } }
+}
+
+
+/** Delete only the authenticated student's exact exercise at the reviewed revision. */
+export async function deletePracticeExercise(input: unknown): Promise<
+  { ok: true } | { ok: false; error: string; conflict?: boolean }
+> {
+  const parsed = practiceExerciseDeleteSchema.safeParse(input)
+  if (!parsed.success) return { ok: false, error: 'ข้อมูลแบบฝึกหัดไม่ถูกต้อง' }
+  try {
+    const access = await studentAccess(parsed.data.libraryId)
+    if (!access) return { ok: false, error: 'ไม่สามารถเข้าถึงคลังฝึกนี้ได้ กรุณาเข้าคลังฝึกอีกครั้ง' }
+    const { data, error } = await createAdminClient().from('student_practice_exercises')
+      .delete().eq('id', parsed.data.id).eq('library_id', parsed.data.libraryId)
+      .eq('student_id', access.user.id).eq('revision', parsed.data.expectedRevision)
+      .select('id').maybeSingle()
+    if (error) return { ok: false, error: 'ยังลบแบบฝึกหัดไม่ได้ กรุณาลองอีกครั้ง' }
+    if (!data) return { ok: false, conflict: true, error: 'แบบฝึกหัดเปลี่ยนแปลงหรือถูกลบแล้ว กรุณาโหลดข้อมูลล่าสุดก่อนลบ' }
+    revalidatePath(`/practice/${parsed.data.libraryId}/library`)
+    return { ok: true }
+  } catch { return { ok: false, error: 'ยังลบแบบฝึกหัดไม่ได้ กรุณาลองอีกครั้ง' } }
 }
