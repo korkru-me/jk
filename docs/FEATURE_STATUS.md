@@ -1,13 +1,17 @@
 # Feature status
 
-## เปิด PDF จากประกาศเป็นตัวอย่างก่อนดาวน์โหลด — 26 ตุลาคม 2026 (local only)
+## เปิด PDF จากประกาศเป็นตัวอย่างก่อนดาวน์โหลด — 26 ตุลาคม 2026 (Production released)
+
+ปล่อย PR #85 แล้วและตรวจ Production/actual primary parity ตาม `CLASSROOM_POLISH_RELEASE_20261026.md` รายการ local checks ด้านล่างเป็นหลักฐานก่อนปล่อย
 
 - PDF ในประกาศบนหน้าห้องเรียนครู หน้าห้องเรียนนักเรียน และป๊อปอัปประกาศนักเรียนใช้ PostAttachments ร่วมกัน เปิดตัวอย่างเมื่อคลิกไฟล์ ดาวน์โหลดจากปุ่มแยกโดยคงชื่อไฟล์ คลิกนอก/ปิด/Escape ปิดเฉพาะตัวอย่างและคืน focus คงประกาศแม่เมื่อเปิดซ้อน ไม่ถือว่าได้รับทราบประกาศเอง ไฟล์อื่นคงลิงก์เดิม
 - ตัวอ่านโหลดเมื่อเปิดเท่านั้น จำกัด URL เป็น Storage origin ของโปรเจกต์และ bucket classroom-post-files ใช้ fetch แบบไม่แนบ credentials/ไม่ตาม redirect ตรวจ MIME และ %PDF- พร้อมจำกัด stream 10 MiB ก่อนสร้าง typed Blob ให้ native PDF viewer ล้าง Blob/ยกเลิก fetch เมื่อปิด รองรับข้อความผิดพลาด ลองใหม่ และดาวน์โหลดเมื่อเบราว์เซอร์ไม่รองรับ ตัวอย่างไม่ส่ง URL ไฟล์หรือ HTML เข้า iframe
 - ตรวจ local fixture `/exam-screen-lab/classroom-announcements` และ `/exam-screen-lab/announcement-acknowledgements`: เห็นหน้า PDF จริง ดาวน์โหลดไฟล์มี signature ถูกต้อง คลิกภายใน/ภายนอก ปุ่มปิด Escape คืน focus ป๊อปอัปซ้อน error/retry และคืน Blob ผ่าน ตรวจ 320/390/1200px ไม่มีตัวอย่างล้นจอ scoped WCAG 2 A/AA ไม่พบ violation/incomplete (ไม่รวม best-practice landmark ของ native Chrome PDF viewer) TypeScript, token lint, unit suite 323 ไฟล์/4,575 เคส รวมตัวอ่านใหม่ 16 เคส และ production build แบบแยก output ผ่าน
 - ไม่มี migration ไม่มีการเปลี่ยนสิทธิ์ Storage/ฐานข้อมูล ไม่ทดสอบข้อมูลหรือไฟล์ของบัญชีจริง และยังไม่ push/deploy
 
-## ปฏิทินโฮมรูมแสดงครบเดือนในพื้นที่กระชับ — 26 ตุลาคม 2026 (local only)
+## ปฏิทินโฮมรูมแสดงครบเดือนในพื้นที่กระชับ — 26 ตุลาคม 2026 (Production released)
+
+ปล่อย PR #85 แล้วและตรวจ Production/actual primary parity ตาม `CLASSROOM_POLISH_RELEASE_20261026.md` รายการ local checks ด้านล่างเป็นหลักฐานก่อนปล่อย
 
 - ช่องวันสูง 44px แทนสี่เหลี่ยมจัตุรัส ลด padding/gap และจัดแถบเปลี่ยนเดือนตามความกว้าง container คงการเลือกวัน รายการงาน จุดสถานะ งานชนกัน และปุ่มวันนี้ เพิ่มชื่อวันเต็ม/สถานะเลือกสำหรับ screen reader และปรับ contrast ของวันที่เลือกกับป้ายสถานะ
 - ตรวจ local fixture `/exam-screen-lab/homeroom-calendar` ด้วยข้อมูลสังเคราะห์: ที่ความกว้างปฏิทิน 1046px ตารางเดือน 5 แถวลดจาก 718.6px เหลือ 239.2px ทั้ง Card ลดจาก 1016.8px เหลือ 490.1px; เดือน 6 แถวสูง 288px ตรวจ 320/390/1280px เห็นวันที่ครบ ไม่มี horizontal overflow เลือกวันสองงาน/แสดงรายการและคำเตือน/กลับวันนี้ได้ TypeScript, design-token lint, production build แบบแยก output และ Next.js compilation/runtime ผ่าน; scoped axe โหมดสว่าง/มืดไม่มี violation/incomplete
@@ -36,13 +40,11 @@ TypeScript, token lint, diff check และ isolated Webpack production build �
 
 ตรวจ TypeScript, token lint และ isolated Webpack production build ผ่าน; Next MCP compilation issues และ runtime errors ว่าง ใช้ข้อมูลสมมติบน localhost:3000 ตรวจ desktop, tablet, 390px, 320px, dark mode, ห้องว่าง, เลือกทั้งหมด/ยกเลิก และ app shell ย่อเมนู โดยปุ่มสูง 44px ไม่ทับกวางและไม่ล้นแนวนอน หน้าครูจริงที่เจ้าของเข้าสู่ระบบให้ ตรวจเฉพาะตัวเลข DOM: header 119.2px, border 2px, title 28px และปุ่มไม่ทับกวาง ไม่เก็บภาพ/รายละเอียดบัญชีจริงหลัง automatic approval review ปฏิเสธการตรวจแบบกว้าง ใช้ route ตัวอย่างเดิม `/exam-screen-lab/classroom-list`; ลบ route ชั่วคราวและคืนการเปลี่ยน tsconfig ที่ build สร้างแล้ว ไม่รัน unit suite เพราะไม่มีการแก้ logic/lib ไม่มี migration หรือการเขียนข้อมูลทดสอบ ผลเผยแพร่หลังเจ้าของอนุมัติและการตรวจ parity อยู่ใน [CLASSROOM_UI_RELEASE_20261020.md](CLASSROOM_UI_RELEASE_20261020.md)
 
-## เตรียม Production SMTP และผลกู้รหัสผ่าน — 20 ตุลาคม 2026 (candidate ยังไม่ deploy)
+## Production SMTP, recovery และ Resend — สถานะล่าสุด 26 ตุลาคม 2026
 
-เจ้าของอนุญาตตั้ง Production SMTP และทดสอบลืมรหัสผ่านทีละขั้นตอน พร้อมรายงานว่าสร้าง Sending access key แยกสำหรับ `mail.korkru.com` แล้วโดยเก็บค่าเป็นส่วนตัว Candidate จาก `216d492` รับเฉพาะ recovery feedback `be7ee0d` และ notice สี `e952b4b` รวม 5 application/test files ไม่พ่วง signup feedback, branding, Google หรือ SEB และไม่เพิ่ม schema/package/env การตั้ง SMTP ยังไม่บันทึกและยังไม่ทดสอบอีเมล Production ณ checkpoint นี้
+Recovery feedback เผยแพร่ผ่าน PR #76 แล้ว SMTP และ recovery template ไทยเปิดใช้จริง บันทึกหลักฐาน Inbox/การรับรองอีเมล/ผลเปลี่ยนรหัสที่ตรวจโดยตรงและที่เจ้าของรายงานอยู่ใน [SMTP_PRODUCTION_RELEASE_20261020.md](SMTP_PRODUCTION_RELEASE_20261020.md) ระบบเตือนโควตา 80/90/95% รายวัน/เดือนผ่าน PR #75 เปิด Production flag และ webhook แล้ว มี signed delivery/Usage API proof ตาม [RESEND_PRODUCTION_RELEASE_20261020.md](RESEND_PRODUCTION_RELEASE_20261020.md) ไม่ใช่ candidate ที่ยังรอ deploy และไม่มี migration ใหม่ให้ apply ซ้ำ
 
-รักษา Production autoconfirm `true`, hosted current-password policy และ recovery template `{{ .ConfirmationURL }}`; quota Production เปิดแล้ว/Staging ปิดตาม rollout เดิม ไม่เปลี่ยน flags หรือ webhook ในงานนี้ สถานะ checks, deploy, localhost parity และ manual test แยกใน [SMTP_PRODUCTION_RELEASE_20261020.md](SMTP_PRODUCTION_RELEASE_20261020.md) ข้อความเก่าด้านล่างเป็นหลักฐานตาม checkpoint ของแต่ละรอบ
-
-Candidate full 4,671 tests/TypeScript/token lint และ clean-env Node24 Webpack build 76 pages ผ่าน Primary pre-release integration 18 paths ผ่าน full 4,500/focused 47 tests/TypeScript/token lint/build 71 pages พร้อม Cua desktop actual localhost3000 ผ่านกรณี reused-password/success durability/revocation/provider/network และ real login callout ไม่อ้าง mobile 390px หรือ SMTP จริง ฟอร์ม SMTP ยังไม่ Save, PR #76 ยัง Draft และ Ready/post-release parity/manual email test ยังรอ
+เจ้าของอนุมัติปล่อย signup/check-email feedback พร้อมซิงก์ Auth ให้ actual localhost:3000 ตรงกับ release โดยเก็บงานร่วมอื่นไว้ ติดตามผลใน [AUTH_FEEDBACK_RELEASE_20261026.md](AUTH_FEEDBACK_RELEASE_20261026.md) Google/การเปลี่ยน Confirm email และ Word ตารางจำแนกคงเดิมตามคำสั่งเจ้าของ
 
 ## แจ้งงานใหม่ให้นักเรียนอัตโนมัติ — 20 ตุลาคม 2026 (Production app released; local parity verified)
 
@@ -322,7 +324,7 @@ Reader ใช้ scoreParts และ frozen grading_config ไม่เดา�
 - แยก controller เดิมของหน้าตั้งค่าเป็น AssignmentWorkspaceSidebar เพื่อใช้ร่วมกัน ตรวจ fixture ชั่วคราวที่ใช้ shell/controller/results จริงและข้อมูลจำลอง: แบบฝึกหัดมีชิ้นรอตรวจ, ข้อสอบไม่มีชิ้นรอตรวจ/หน้าตั้งค่า, เมนูเต็ม/ย่อ, มือถือเปิด/ปิดด้วย Escape และโหมดมืด ที่ 320/390/1440px ไม่ล้นแนวนอน ปุ่มเมนูสูง 44px ตาราง desktop สูง 117.79px และอยู่ตำแหน่งเดิมทั้งก่อน/หลัง
 - TypeScript, lint:tokens, isolated webpack production build และ Next compilation/runtime ผ่าน React มี sidebar controller/navigation/results อย่างละ instance; scoped axe บน aside ในโหมดมืดไม่พบ violation/incomplete ลบ fixture ชั่วคราวหลังตรวจ ไม่ได้ทดสอบบัญชีจริงหรือ query/mutation กับบริการภายนอก ไม่รัน unit suite ซ้ำเพราะเปลี่ยนเฉพาะการประกอบ UI ไม่มี migration งานคอมมิตเฉพาะในเครื่อง ไม่ push/deploy ตามคำขอเจ้าของ
 
-## กรอบเลือกวิธีนำเข้าโจทย์ตามธีมเว็บ — 18 ตุลาคม 2026 (Staging ผ่าน รอปล่อย Production · PR #60)
+## กรอบเลือกวิธีนำเข้าโจทย์ตามธีมเว็บ — 18 ตุลาคม 2026 (Production released · PR #60)
 
 - `/questions/import` เปลี่ยนสองกรอบเต็มสีเป็น Card หัวสีอ่อน/ส่วนล่างพื้นขาวตามหน้าหลักและหน้าสร้างโจทย์ ใช้ FileText/PackageOpen 32px เป็นภาพจางขวาบน แสดงนามสกุลไฟล์แยกจากชื่อ ย่อคำอธิบายและวาง “เลือกประเภทโจทย์” / “เลือกไฟล์ KorKru” ด้านล่างขวา กดได้ทั้งกรอบ มี focus ring และพื้นที่คำสั่งอย่างน้อย 44px
 - หน้าขยายเต็มความกว้าง shell และใช้ container grid 1/2 คอลัมน์ที่ 42rem วัดกรอบสูง 113.5px ทุกขนาด 320/390/768/1440px จากเดิมประมาณ 123–143px ไม่มี overflow/ข้อความหรือไอคอนถูกตัด ทดสอบ container 500px บน viewport 1440px แล้วเรียงหนึ่งคอลัมน์ตามพื้นที่จริง
@@ -348,7 +350,9 @@ Reader ใช้ scoreParts และ frozen grading_config ไม่เดา�
 - `/exam-screen-lab/question-samples` ใช้หน้าเลือกประเภทและตัวอย่างจริงชุดเดียวกันโดยไม่เรียก Auth/ฐานข้อมูล เก็บไว้สำหรับ regression บน local/Staging และปิดด้วย guard เดิมใน Production ไม่มี migration หรือการเปลี่ยนรูปแบบโจทย์/Word
 - ตรวจ Chrome บน fixture: เปิดครบ 11 ประเภท; 10 ประเภทที่ไม่มีตัวแปรไม่มี request `mathjs`, จับคู่ทั้งสองแบบเลือกคำตอบได้, จอ 390px ไม่ล้นแนวนอน; จำลอง chunk คณิตศาสตร์โหลดล้มเหลวแล้วกด “ลองใหม่” สำเร็จ โจทย์ตัวเลขคำนวณ/ตรวจถูกทั้งสองช่องและแสดงคะแนนครู 2/2 ผ่าน TypeScript, token lint, production build และ unit tests รวม regression ที่ห้าม scoring metadata import `mathjs` · Staging hosted build `77ea012` ตรวจครบ 11 ประเภท, คะแนน 2/2, cold-browser chunk failure/retry และมือถือผ่าน ไม่มี runtime error หลังเปิดหน้าใหม่ ไม่ได้ทดสอบ authenticated app shell/บันทึกโจทย์ ซึ่งไม่ได้เปลี่ยนในแพตช์ ดูหลักฐานและขั้นตอนปล่อยใน `docs/QUESTION_SAMPLE_PREVIEW_RELEASE_20261017.md`
 
-## สมัครสมาชิกและความน่าเชื่อถือของบัญชี — 17 ตุลาคม 2026 (เตรียมโค้ด ยังไม่ deploy)
+## สมัครสมาชิกและความน่าเชื่อถือของบัญชี — release เดิมขึ้น Production แล้ว; feedback รอบถัดไป 26 ตุลาคม
+
+สถานะปัจจุบันให้อ่านหัวข้อ Production SMTP/Resend ด้านบนและ release record ที่ลิงก์ไว้ รายการต่อไปนี้เก็บผลตาม checkpoint พัฒนาเดิม ไม่ใช่คำสั่งให้ตั้งค่า/apply/deploy ซ้ำ
 
 - หน้า login/signup ใช้ `BrandLogo size="large"` แบบ responsive ตามคำปรับล่าสุด ลดชื่อ KorKru เป็น `text-2xl` เท่าหัวข้อหน้า แล้วขยายกวางเป็น `h-18 sm:h-20` ให้ภาพกวางเด่นกว่า คงขนาดแบรนด์ใน app shell/หน้าอื่นตามเดิม เป็นการปรับภาพลักษณ์เท่านั้น ไม่มี auth/schema/config change
 - รอบแบรนด์ล่าสุด: ตรวจ local browser ที่ 320/390/1200px ทั้งสองหน้าไม่ล้น ลดชื่อจาก 30/36px เป็น 24px เท่าหัวข้อ และขยายกวางจาก ~67.2/76.8px เป็น ~86.4/96px โดยความสูง card เดิมที่ 390/1200px ไม่เปลี่ยน TypeScript/token lint/webpack build ผ่าน ขนาดปกติ/compact คงเดิม ไม่รัน unit suite ซ้ำเพราะแก้เฉพาะ UI ไม่มี lib/auth/migration/config/deploy change ใน commit ปรับสัดส่วน
@@ -367,7 +371,9 @@ Reader ใช้ scoreParts และ frozen grading_config ไม่เดา�
 
 ขอบเขต ผลตรวจ และลำดับ rollout: `docs/AUTH_SIGNUP_ROLLOUT.md` การสมัคร Resend ยังพักไว้ตามคำขอเดิม
 
-## Resend Free: 80/90/95% รายวันและรายเดือน — Production candidate 20 ตุลาคม 2026
+## Resend Free: 80/90/95% รายวันและรายเดือน — Production released 20 ตุลาคม 2026
+
+สถานะปัจจุบันให้อ่านหัวข้อ Production SMTP/Resend ด้านบนและ release record ที่ลิงก์ไว้ รายการต่อไปนี้เก็บผลตาม checkpoint พัฒนาเดิม ไม่ใช่คำสั่งให้ตั้งค่า/apply/deploy ซ้ำ
 
 - เจ้าของเลือกให้เตือน **80%, 90%, 95% ทั้งรายวันและรายเดือน** ไป `korkru.me@gmail.com` Signed webhook ตรวจ Usage API ของ Resend team รวมส่ง/รับ เลือกระดับสูงสุดต่อช่วงและตรวจทั้งสองช่วงแยกกัน; daily cap เป็น null ข้ามเฉพาะรายวัน ไม่เพิ่ม cron หรือเปลี่ยนแพ็กเกจอัตโนมัติ
 - ย้ายเฉพาะ implementation `0352be1` บน Production base `7065d32` ที่เลือกตอนเริ่ม candidate ไม่รวม Stage branch ทั้งชุดหรือ SEB/recovery/UI ที่ยังไม่ปล่อย: runtime, durable store, SQL/tests และเอกสารโควตาเท่านั้น ไม่มี package/lockfile dependency เพิ่ม

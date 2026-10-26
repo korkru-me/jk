@@ -1,5 +1,5 @@
 {
-  "description": "Pre-release primary recovery integration only; no Production Ready, SMTP save or hosted email proof.",
+  "description": "Production recovery Thai subject/body applied on Staging first and Production. One controlled 13:49 email passes authentication, reaches Inbox without Gmail warning and opens the reset form. Owner reports password change, old-password rejection and successful new-password login; root observed actual green notice and old-password error UI but not an authenticated landing. User-reported end-to-end passes with the independent-verification limit stated.",
   "primaryCheckedAt": "2026-10-20T05:04:28.316Z",
   "sourceRefs": {
     "baseline": "216d492469259a3e22945413e4ca798e71439a1f",
@@ -181,10 +181,10 @@
   },
   "temporaryFixtureFilesRemoved": 4,
   "fixtureDirectoryAbsent": true,
-  "postReadyVerificationPending": true,
-  "productionDeployedAtThisCheckpoint": false,
-  "smtpSavedAtThisCheckpoint": false,
-  "productionEmailTestedAtThisCheckpoint": false,
+  "postReadyVerificationPending": false,
+  "productionDeployedAtThisCheckpoint": true,
+  "smtpSavedAtThisCheckpoint": true,
+  "productionEmailTestedAtThisCheckpoint": true,
   "privatePatchIncluded": false,
   "laterLocalConfigParityStep": {
     "status": "completed; ignored-file presence, minimum length and dev reload verified",
@@ -198,5 +198,364 @@
     "quotaFlagsChanged": false,
     "candidateEnvironmentContractChanged": false,
     "note": "Earlier no-environment-change findings describe the source/check audit before this later local configuration step."
+  },
+  "productionRelease": {
+    "source": "f488c93894346cf74736a43783a9cf6f5369a2f2",
+    "deployment": "dpl_AGq5Kj9LbA3vgRVjfPTTbjZpwK5C",
+    "state": "READY",
+    "readyAt": "2026-10-20T05:13:45.043Z",
+    "canonicalOrigin": "https://www.korkru.com",
+    "publicAuthChecksPassed": 4,
+    "postReadyPrimaryHashesMatched": 18,
+    "postReadyPrimaryCompilationIssues": 0,
+    "postReadyPrimaryLoginNoticeVisible": true,
+    "realAccountOrEmailUsedForTheseChecks": false
+  },
+  "smtpManagementVerification": {
+    "ownerReportedSaved": true,
+    "performedBy": "root native sanitized Auth inspector",
+    "checkedDate": "2026-10-20",
+    "presenceOnly": {
+      "smtp_host": true,
+      "smtp_user": true,
+      "smtp_pass": true,
+      "smtp_admin_email": true
+    },
+    "canonicalSiteUrl": "https://www.korkru.com",
+    "autoconfirmPreserved": true,
+    "recoveryConfirmationUrlTemplatePreserved": true,
+    "secretValuesReadIntoOutputOrCommitted": false,
+    "actualEmailDeliveryVerified": true,
+    "manualProductionRecoveryTested": true,
+    "manualProductionRecoveryEndToEndPassed": false,
+    "quotaOrOtherActivationFlagsChanged": false,
+    "ownerReportedManualRecoveryEndToEndPassed": true,
+    "independentEndToEndVerificationLimit": "Root did not directly observe authenticated landing after owner-reported new-password login."
+  },
+  "productionRecoverySendFailure": {
+    "performedBy": "owner manual request; root read-only Supabase Auth query_logs and sanitized config verification",
+    "requestAttempts": [
+      {
+        "at": "2026-10-20T05:31:43Z",
+        "method": "POST",
+        "path": "/recover",
+        "httpStatus": 500,
+        "smtpStatus": 535,
+        "smtpError": "Authentication credentials invalid"
+      },
+      {
+        "at": "2026-10-20T05:33:35Z",
+        "method": "POST",
+        "path": "/recover",
+        "httpStatus": 500,
+        "smtpStatus": 535,
+        "smtpError": "Authentication credentials invalid"
+      }
+    ],
+    "nonsecretConfigVerified": {
+      "host": "smtp.resend.com",
+      "port": 465,
+      "user": "resend",
+      "sender": "auth@mail.korkru.com",
+      "senderName": "KorKru",
+      "passwordPresent": true,
+      "passwordValueReadOrCommitted": false,
+      "passwordValidityVerified": false
+    },
+    "ownerReportedEmailReceived": false,
+    "actualEmailDeliveryVerified": false,
+    "productionPasswordChanged": false,
+    "manualRecoveryEndToEndPassed": false,
+    "blockerAtThatCheckpoint": "SMTP authentication credentials rejected before the owner re-pasted the privately stored Sending access key and saved it.",
+    "resolvedForOneLaterSmtpDelivery": true,
+    "appLimiter": {
+      "failedProviderSendsConsumeReservation": true,
+      "emailCooldownSeconds": 60,
+      "emailRequestsPerHour": 5,
+      "emailRequestsPer24Hours": 10,
+      "trustedIpRequestsPerHour": 120,
+      "deniedAttemptsIncrementOrExtendWindow": false,
+      "countersClearedOrBypassed": false
+    },
+    "applicationChanges": false,
+    "schemaOrMigrationsChanged": false,
+    "deploymentChanged": false,
+    "activationFlagsChanged": false,
+    "secretsOrLogAccountPiiIncluded": false
+  },
+  "productionRecoveryInboxVerification": {
+    "requestAt": "2026-10-20T05:42:28Z",
+    "requestMethod": "POST",
+    "requestPath": "/recover",
+    "httpStatus": 200,
+    "ownerPrivatelyRepastedKeyAndSaved": true,
+    "performedBy": "root read-only Supabase Auth logs, Gmail MIME/header and Cua native Gmail UI",
+    "gmailInboxVerified": true,
+    "subject": "Reset Your Password",
+    "sender": "KorKru <auth@mail.korkru.com>",
+    "authentication": {
+      "spf": "pass",
+      "returnPathDomain": "rsend.mail.korkru.com",
+      "dkim": "pass",
+      "dkimDomain": "mail.korkru.com",
+      "dkimSelector": "resend",
+      "additionalSesSignaturePresent": true,
+      "dmarcResultHeaderPresent": false
+    },
+    "mimeLinkShape": {
+      "validRecoveryAnchorPresent": true,
+      "host": "libsutfinswqkruihwdx.supabase.co",
+      "path": "/auth/v1/verify",
+      "queryKeysOnly": [
+        "token",
+        "type",
+        "redirect_to"
+      ],
+      "type": "recovery",
+      "redirectHost": "www.korkru.com",
+      "redirectPath": "/auth/callback",
+      "nextPath": "/reset-password",
+      "recoveryNoncePresent": true,
+      "clickTrackingPresent": false,
+      "actualHrefOrTokenOrNonceStored": false
+    },
+    "gmailUi": {
+      "redDangerWarningPresent": true,
+      "resetPasswordTextPresent": true,
+      "recoveryLinkActionPresent": false,
+      "agentClickedLooksSafeOrRecoveryLink": false
+    },
+    "publicDns": {
+      "senderDkimTxtPresent": true,
+      "dkimRsaBits": 1024,
+      "bothBounceCnamesAndTargetSpfPresent": true,
+      "dmarcMailSubdomainStatus": "NOERROR",
+      "dmarcOrganizationalDomainStatus": "NXDOMAIN",
+      "missingDmarcProvenSoleWarningCause": false,
+      "dnsChanged": true,
+      "postSaveVerifiedAt": "2026-10-20T06:22:58Z",
+      "publicResolvers": [
+        "Cloudflare DoH",
+        "Google DoH"
+      ],
+      "dmarcSenderTxt": "v=DMARC1; p=none;",
+      "observedTtlSeconds": 300,
+      "globalPropagationClaimed": false,
+      "postDmarcMessagePassVerified": true
+    },
+    "currentBlocker": "Earlier SMTP/Gmail warning checkpoints are historical. Controlled mail/link/form and actual success/error UI pass; owner reports new-password login succeeded. Root did not observe an authenticated landing, so do not claim every end-to-end step independently verified or guarantee all recipients.",
+    "senderAuthenticationRepairPlan": {
+      "status": "Sender TXT saved and visible at two public resolvers; fresh 13:29 message passes SPF/DKIM/DMARC but Gmail danger warning remains.",
+      "savedApproximatelyAt": "2026-10-20T06:22:38Z",
+      "cloudflareOwnerLoginCompleted": true,
+      "savedRows": 1,
+      "originalSixRecordsPreserved": true,
+      "dnsType": "TXT",
+      "dnsName": "_dmarc.mail.korkru.com",
+      "dnsValue": "v=DMARC1; p=none;",
+      "ttl": "Auto",
+      "ruaIncluded": false,
+      "spfOrBounceCnamesChanged": false,
+      "enforcementUpgraded": false,
+      "dnsChangesPerformed": true,
+      "authOrTemplateChangesPerformed": false,
+      "warningMayAffectOtherRecipients": true,
+      "gmailClassificationCanVaryByRecipientAndMessage": true,
+      "ownerLooksSafeIsGlobalFix": false,
+      "freshEmailRecipients": "owner-controlled only",
+      "freshEmailRequiredResults": [
+        "dmarc=pass in authentication results",
+        "no Gmail danger warning",
+        "active recovery link with original target and no tracking rewrite"
+      ],
+      "ifWarningPersists": "Continue sender reputation, link reputation and template investigation; do not claim DMARC was the sole cause.",
+      "freshEmailRequiredResultsStatus": {
+        "dmarcPass": true,
+        "noGmailDangerWarning": false,
+        "originalLinkActionAvailable": null,
+        "originalLinkActionAvailableNote": "Not independently established in this candidate record; danger warning still blocks readiness."
+      }
+    },
+    "additionalEmailSentByAgent": false,
+    "ownerConfirmedPreDmarcMessageNotMarkedSafe": true,
+    "originatingBrowserFreshRequestFormPrepared": true,
+    "postDmarcRequestSendClickedByAgent": false,
+    "recoveryLinkConsumed": false,
+    "productionPasswordChanged": false,
+    "manualRecoveryEndToEndPassed": false,
+    "freshEmailWithoutGmailWarningVerified": false,
+    "readyForAllUsers": false,
+    "applicationSchemaMigrationDeploymentOrFlagsChanged": false,
+    "messageIdsOrAccountEmailStored": false
+  },
+  "postDmarcRecoveryMessageVerification": {
+    "date": "2026-10-20",
+    "ownerRequestedLocalTimeMinute": "13:29 Asia/Bangkok",
+    "utcTimeMinute": "06:29 UTC",
+    "performedBy": "root read-only exact-message headers, Resend Insights, native sanitized Auth-config comparison and Google Safe Browsing UI",
+    "authentication": {
+      "spf": "pass",
+      "dkim": "pass",
+      "dmarc": "pass"
+    },
+    "gmailDangerWarningPresent": true,
+    "warningFreeDeliveryVerified": false,
+    "recoveryLinkConsumed": false,
+    "productionPasswordChanged": false,
+    "resendInsights": {
+      "needsAttentionOnly": [
+        "link-domain mismatch"
+      ],
+      "priorStagingAlsoHadLinkDomainMismatch": true,
+      "priorStagingAlsoLackedDmarc": true,
+      "soleWarningCauseProven": false
+    },
+    "safeBrowsingUi": {
+      "productionSupabaseHostname": "No available data",
+      "canonicalAppHostname": "No available data",
+      "safeOrUnsafeVerdictInferred": false
+    },
+    "templateComparison": {
+      "productionSubject": "Reset Your Password",
+      "productionDefaultBodyStart": "Follow this link to reset the password for your user",
+      "stagingHasRequestContextAndIgnoreIfNotRequested": true,
+      "templateCopyProvenWarningCause": false
+    },
+    "tokensActualUrlsMessageIdsOrAccountEmailsStored": false
+  },
+  "thaiRecoveryTemplateCandidate": {
+    "status": "Applied on Staging first and Production; one controlled delivery and recovery-form pass; owner-reported password/login end-to-end passed with root authenticated landing unobserved.",
+    "htmlPath": "supabase/templates/recovery.html",
+    "managementApiPayloadPath": "supabase/templates/recovery.management-api.json",
+    "subject": "ตั้งรหัสผ่านใหม่สำหรับบัญชี KorKru",
+    "onlyConfigKeys": [
+      "mailer_subjects_recovery",
+      "mailer_templates_recovery_content"
+    ],
+    "singleExactConfirmationUrlAnchor": true,
+    "extraUrlsImagesScriptsPixelsOrRecipientVariables": false,
+    "requestsOriginatingBrowserAndDevice": true,
+    "includesIgnoreIfNotRequestedAndDoNotShareLink": true,
+    "guessedExpiryOrMarketingCopy": false,
+    "providerPatchPerformed": true,
+    "primaryCheckoutChanged": true,
+    "applicationChanged": false,
+    "dnsChanged": false,
+    "schemaMigrationOrDeploymentChanged": false,
+    "otherAuthSmtpSiteUrlAutoconfirmSecurityEmailOrQuotaConfigChanged": false,
+    "gmailWarningRemovalProven": false,
+    "hostedTemplateRenderingOrDeliveryTested": true,
+    "checks": {
+      "htmlSingleAnchorAndNoActiveAssets": true,
+      "payloadOnlyTwoKeysAndExactBody": true,
+      "jsonAndDiff": true,
+      "applicationBuildOrSuiteRepeated": false
+    },
+    "supportEscalationDraftPrepared": true,
+    "supportEscalationSent": false,
+    "futureFirstPartyGateOrPaidCustomDomainActivated": false,
+    "artifactCommit": "47ae021",
+    "htmlSha256": "227a073fdcac46e3afc9d0efa49532ead51924322c79e6deff387d33864af09e",
+    "oneControlledMessageWithoutGmailWarningVerified": true,
+    "warningSoleCauseOrAllRecipientsGuaranteeClaimed": false,
+    "appliedScope": {
+      "stagingFirst": true,
+      "stagingInitialVerifierExitCode": 1,
+      "stagingInitialVerifierReason": "Only the initial top-level diff was captured: intended subject/body and two *_custom_contents maps differed. Initial nested per-entry before/after values were not captured.",
+      "stagingMetadataTypeConfirmedFromOfficialPlatformDts": true,
+      "stagingReadbackRecoveryFlags": true,
+      "guardRevision": "Allow only intended recovery false-to-true nested metadata change; reject other config differences.",
+      "stagingSubsequentNoOpApplyReadbackPassed": true,
+      "stagingNativeThaiPreviewPassed": true,
+      "productionAppliedApproximateUtcMinute": "2026-10-20 06:48 UTC",
+      "productionChangedScalarFields": [
+        "mailer_subjects_recovery",
+        "mailer_templates_recovery_content"
+      ],
+      "productionMetadataMapsUnchanged": true,
+      "allOtherScalarConfigUnchanged": true,
+      "productionAutoconfirm": true,
+      "stagingAutoconfirm": false,
+      "stagingInitialNestedBeforeAfterCaptured": false,
+      "stagingInitialPerEntryNonRecoveryPreservationProven": false,
+      "stagingMetadataExplanation": "Official boolean-flag types support the expected custom-content metadata explanation; current readback is recovery=true and every non-recovery=false. This is not proof of initial nested before/after equality.",
+      "stagingSubsequentNoOpWholeConfigDiffCount": 0,
+      "stagingReadbackAllNonRecoveryFlagsFalse": true
+    },
+    "primaryArtifactParity": {
+      "copiedOnly": [
+        "supabase/templates/recovery.html",
+        "supabase/templates/recovery.management-api.json"
+      ],
+      "preexistingDirtyFileHashesCompared": 48,
+      "preexistingDirtyFileHashesUnchanged": 48,
+      "primaryCommitOrStashOrResetPerformed": false,
+      "applicationSourceChanged": false
+    }
+  },
+  "productionFreshThaiRecoveryVerification": {
+    "requestedBy": "root one send click in originating Chrome Production forgot-password form for the same owner-controlled account",
+    "additionalSendCount": 1,
+    "requestSuccessUiObserved": true,
+    "gmailInboxVerified": true,
+    "thaiSubjectAndBodyRendered": true,
+    "authentication": {
+      "spf": "pass",
+      "dkim": "pass",
+      "dmarc": "pass"
+    },
+    "gmailNativeUiRedWarningPresent": false,
+    "gmailNativeUiActiveLinkPresent": true,
+    "looksSafeOrOtherWarningBypassUsed": false,
+    "mimeShape": {
+      "singleOriginalUntrackedRecoveryAnchor": true,
+      "fixedProductionProviderHostAndVerifyPath": true,
+      "type": "recovery",
+      "nestedCanonicalCallbackPath": "/auth/callback",
+      "nextPath": "/reset-password",
+      "recoveryNoncePresent": true
+    },
+    "legitimateLinkOpenedInOriginatingBrowser": true,
+    "canonicalResetPasswordFormReached": true,
+    "passwordFieldsEmptyAtHandoff": true,
+    "passwordEnteredOrSubmittedByAgent": false,
+    "productionPasswordChanged": true,
+    "successNoticeAfterRealPasswordChangeVerified": true,
+    "oldPasswordRejectionVerified": true,
+    "newPasswordLoginVerified": false,
+    "ownerPasswordAndLoginTestPending": false,
+    "manualRecoveryEndToEndPassed": false,
+    "allRecipientsGuaranteeOrSoleCauseClaimed": false,
+    "actualTokensUrlsNoncesRecipientOrMessageIdsStored": false,
+    "supportEscalationSent": false,
+    "applicationDeploymentSchemaOrMigrationNeeded": false,
+    "emailDateHeader": "2026-10-20T06:49:08Z",
+    "emailDateHeaderLocalTime": "2026-10-20 13:49:08 Asia/Bangkok",
+    "browserSendApproximateLocalMinute": "2026-10-20 13:49 Asia/Bangkok",
+    "separateExactRequestLogTimestampCaptured": false,
+    "timestampMeaning": "Exact 06:49:08 UTC belongs to the sent email Date header; browser send time is approximately 13:49 local.",
+    "passwordChangeOwnerReported": true,
+    "passwordChangeIndependentCredentialLoginVerified": false,
+    "passwordChangeSuccessUi": {
+      "verifiedBy": "root native browser and screenshot after owner handoff",
+      "canonicalLoginPath": "/login?password_changed=1",
+      "greenNotice": "เปลี่ยนรหัสผ่านแล้ว",
+      "instruction": "กรุณาเข้าสู่ระบบอีกครั้งด้วยรหัสผ่านใหม่",
+      "actualPageVerified": true,
+      "agentEnteredOrSubmittedCredential": false
+    },
+    "oldPasswordRejectionOwnerReported": true,
+    "oldPasswordRejectionRootUiObserved": true,
+    "oldPasswordRejectionUiText": "อีเมลหรือรหัสผ่านไม่ถูกต้อง",
+    "ownerReportedNewPasswordLoginSucceeded": true,
+    "newPasswordLoginVerificationBasis": "Owner report only; root reloaded the tracked tab once and still saw login, not an authenticated landing. This does not contradict the owner's report.",
+    "rootAuthenticatedLandingObserved": false,
+    "manualUserReportedEndToEndPassed": true,
+    "allEndToEndStepsIndependentlyVerified": false,
+    "manualEndToEndVerificationScope": "User-reported flow passed. Root independently observed controlled delivery, active link/form, green success notice and old-password error UI; new-password login remains owner-reported.",
+    "ownerOldAndNewPasswordLoginTestPending": false,
+    "latestOwnerGmailScreenshotLocalMinute": "2026-10-20 13:56 Asia/Bangkok",
+    "latestOwnerGmailScreenshotNoRedWarningVisible": true,
+    "latestScreenshotIsAdditionalHeaderVerification": false
   }
 }

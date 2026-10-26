@@ -24,7 +24,9 @@ Local TypeScript, token lint และ production build ผ่าน Independent
 
 ขอบเขต QA ใช้ `/exam-screen-lab/question-import-options` ที่ import หน้าจริง ตรวจ layout, link และการเรียก native file input โดยดัก click เพื่อไม่เลือกไฟล์หรือนำเข้าจริง ไม่ครอบคลุม authenticated shell, Word parser, duplicate resolution หรือการบันทึกโจทย์ ซึ่งไม่ได้เปลี่ยนในแพตช์นี้
 
-## Production และการกู้คืน
+## Production และการกู้คืน — released
+
+PR #60 merge เป็น `1b85c28aae21b0bd2fb8263e74c8a25d298fa5fe` และอยู่ใน Production แล้ว ตรวจ 26 ตุลาคม source ทั้งหน้าและตัวอ่านเดิมตรงกับ release ปัจจุบัน ไม่ต้อง deploy แพตช์นี้ซ้ำ ย่อหน้าต่อไปเก็บแผนก่อนปล่อยเป็นประวัติ
 
 เมื่อ Staging ผ่านให้ merge เฉพาะ PR #60 เข้า `master` แล้วตรวจ Vercel project `jk` เป็น Ready ด้วย merge SHA และ canonical aliases ที่ตรงกัน ตรวจเว็บจริงแบบ read-only: login, route guard ของ `/questions/import` และ lab 404 โดยไม่สร้างหรือแก้ข้อมูล Production
 

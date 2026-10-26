@@ -1,6 +1,6 @@
 # วิธีเข้าสู่ระบบบัญชีเดียวกัน — 17 ตุลาคม 2026
 
-สถานะ: เตรียมโค้ดในเครื่อง **ยังไม่ deploy หรือเปลี่ยน hosted Auth/SMTP/ฐานข้อมูล** ปุ่มเชื่อม Google ปิดด้วย `GOOGLE_ACCOUNT_LINKING_ENABLED=false` จนผ่าน Staging การสมัคร Resend ยังพักไว้ตามคำขอเดิม ผลตรวจในเครื่องอยู่ท้ายเอกสาร ไม่ยกผล mock เป็นหลักฐานว่าผู้ให้บริการจริงผ่าน
+สถานะล่าสุด 26 ตุลาคม: **โค้ดเดิมขึ้น Production แล้ว แต่ Google account linking ยังปิดตามคำสั่งเจ้าของ** SMTP/recovery เสร็จแล้วตาม `SMTP_PRODUCTION_RELEASE_20261020.md` Google และการเปลี่ยน Confirm email ยังรอพัฒนาต่อ คง `GOOGLE_ACCOUNT_LINKING_ENABLED=false` และ Manual Linking ปิดไว้ ผลตรวจด้านล่างเป็นประวัติแต่ละ checkpoint ไม่ยกผล mock เป็นหลักฐาน Google จริง
 
 ## ประสบการณ์ของครูและนักเรียน
 

@@ -1,4 +1,6 @@
-# Resend quota Production candidate — 20 ตุลาคม 2026
+# Resend quota Production release — 20 ตุลาคม 2026
+
+**Release เสร็จแล้ว:** โค้ด 80/90/95 ทั้งรายวันและรายเดือนขึ้น Production Ready, เปิด flag และย้าย webhook แล้ว Signed provider replay ผ่าน HTTP200/`below_threshold` โดยไม่ส่งอีเมลใหม่ Primary localhost:3000 sync และตรวจ runtime แล้ว ไม่มี release gate ที่ค้างสำหรับ quota monitor นี้
 
 ## ขอบเขตและสถานะ
 
@@ -29,25 +31,37 @@ Quota runtime/store/route, tests และ SQL ทั้งแปด non-documen
 
 ผล integrated candidate ผ่าน **full Vitest 326 ไฟล์ / 4,663 เคส**, TypeScript, token lint ไม่มี regression, **Node24.19 production Webpack build** และ compiled Next HTTP **9 fixtures** เดิมครบ ใช้ output `.next-quota-production-integrated-build` และ placeholder keys/loopback provider+ledger จำลอง ไม่ใช้ Production credentials ไม่ส่งอีเมลจริง ไม่ใช้ build เก่าที่ฐาน `7065d32` แทนผล integration นี้ ปิด fixture server3072 และคืน build-generated tsconfig ก่อน commit
 
-การตรวจนี้ครอบคลุม integration ในเครื่องและ quota runtime ไม่ใช่ผล Production signed delivery หรือ primary localhost:3000 parity ซึ่งต้องทำหลัง deploy จริง ไม่มี app/code/SQL ที่ปรับเพิ่มหลัง checks
+การตรวจชุดนี้ครอบคลุม integration ในเครื่องและ quota runtime ผล Production signed delivery และ actual primary localhost:3000 parity ที่ทำหลัง deployจริงบันทึกแยกในหัวข้อถัดไป ไม่มี app/code/SQL ที่ปรับเพิ่มหลัง checks
 
-## Production readiness และขั้นตอนที่เหลือ
+## Production database และ configuration
 
-- **ฐานข้อมูลพร้อมแล้ว 20 ตุลาคม:** ตรวจ remote baseline 151 versions ตรงกันใน isolated CLI workspace `/private/tmp/korkru-quota-prod-delivery-7Gtequ` เพิ่มเฉพาะ `20261018154826_resend_quota_alert_delivery_ledger.sql` ที่ commit/push แล้วใน candidate `8478f884` Dry-run พบ pending เพียงไฟล์เดียว จากนั้น apply ไฟล์เดียวกันโดยไม่เพิ่ม roles/seeds และใช้ `--skip-vault` ไม่ replay/repair ประวัติเดิมหรือ apply SEB/backlog
-- SQL SHA-256 ที่ตรวจตรงกับ candidate: `185073728e4960988fcb4c47757dd6ba9a960eb21f6dc3dca144ed5b42d9e04c` หลัง apply history **152/152**, pending **0**
-- Post-apply read-only catalog: RLS เปิด, anon/authenticated ไม่มี table privilege หรือ RPC execute; service-role grants ถูกต้อง RPC เป็น **SECURITY INVOKER** และ `search_path` ว่าง Receipt count **0** ไม่มีการสร้างข้อมูลทดสอบบน Production
-- Fingerprints ของฟังก์ชันเดิม/table security/policies คงเดิม New WARN **0**; มี INFO ที่คาดไว้เพียง RLS-enabled/no-policy ของ service-only ledger ไม่ใช่หลักฐานว่าเปิด browser access
-- **Vercel ที่เจ้าของบันทึกแล้ว:** Production monitor key แบบ sensitive และผู้ส่ง `auth@mail.korkru.com`/ผู้รับ `korkru.me@gmail.com` Root ยืนยันแถวใน UI แล้ว ไม่อ่านหรือบันทึกค่าคีย์ Production flag คง **`RESEND_QUOTA_ALERTS_ENABLED=false`**
-- ตรวจแถว Vercel และเปิดดูเฉพาะค่าที่ไม่ลับของ **`KORKRU_DEPLOYMENT_ENV=production`** แล้ว scope ฝั่งแอปตรง Production
-- **Rotation เป็น owner-reported confirmation:** หลังเลือก Rotate signing secret เจ้าของตอบว่า “เห็นกล่องยืนยัน และกดยืนยันแล้ว” ไม่ได้ยืนยันโดย provider logs อย่างอิสระ Dashboard ไม่คง success toast และ API Logs list ไม่พบ rotate row; การไม่พบแถวนั้นไม่ใช่หลักฐานว่า rotation ล้มเหลว ไม่อ่านหรือบันทึก secret และไม่กด rotation ซ้ำเพื่อเดาผล
-- **Signing secret บันทึกแล้ว:** เจ้าของคัดลอก current provider secret หลัง rotation ที่รายงานแล้วมา Save เอง Root ยืนยันแถว `RESEND_QUOTA_WEBHOOK_SECRET` แบบ sensitive เฉพาะ Production พร้อม success toast โดยไม่อ่านค่าลับ ไม่กด rotation ซ้ำ ไม่เปลี่ยน flag หรือ provider URL
+- Apply เฉพาะ `20261018154826_resend_quota_alert_delivery_ledger.sql` ที่ commit/push แล้ว ตรวจ remote baseline151ตรงกันใน isolated CLI workspace `/private/tmp/korkru-quota-prod-delivery-7Gtequ` ก่อน dry-run ซึ่งพบ pendingเพียงไฟล์เดียว และ actualapplyไฟล์เดียวกันโดยไม่เพิ่ม roles/seeds พร้อม `--skip-vault` ไม่ replay/repair ประวัติเดิมหรือ apply SEB/backlog
+- SQL SHA-256: `185073728e4960988fcb4c47757dd6ba9a960eb21f6dc3dca144ed5b42d9e04c` หลัง apply history **152/152**, pending **0**
+- Catalog ยืนยัน RLS เปิด, anon/authenticated ไม่มี table privilege/RPC execute, service-role grants ถูกต้อง และ RPC เป็น **SECURITY INVOKER** พร้อม `search_path` ว่าง ฟังก์ชันเดิม/table-security/policy fingerprintsคงเดิม New WARN **0** มี INFOที่คาดไว้ของ service-only RLS/no-policy ไม่ได้เปิด browser access หรือสร้างข้อมูลทดสอบบน Production
+- Vercel monitor key/from/to/signing-secret ทั้งสี่รายการเป็น **sensitive / Production เท่านั้น** ยืนยัน metadata โดยไม่อ่านค่าลับ ผู้ส่ง `auth@mail.korkru.com`, ผู้รับ `korkru.me@gmail.com`; ตรวจค่าที่ไม่ลับ `KORKRU_DEPLOYMENT_ENV=production` แล้ว เจ้าของยืนยันกล่อง Rotate signing secret และ Save secretเอง การหมุนเป็น owner-reported confirmation; ผล signed delivery หลัง cutover เป็นหลักฐาน runtime แยกต่างหาก
+- สถานะปัจจุบัน **Production `RESEND_QUOTA_ALERTS_ENABLED=true` / Staging `false`** ไม่เปิด Production SMTP/Google หรือ SEB จากงานนี้
 
-1. ตรวจ candidate ที่รวม master ล่าสุดให้ผ่านก่อน deploy code/config โดย flag ยัง `false` การบันทึก key/from/to/signing secret และ scope Production พร้อมแล้ว แต่ไม่ใช่หลักฐานว่า provider ส่งถึงแอปรุ่นใหม่นี้ได้ ไม่อ่าน secret กลับ
-2. Free มี 1 webhook จึงย้าย endpoint เดิมหลังหยุด Staging monitor ใช้ signing secret ที่เจ้าของรายงานว่าหมุนและ Save แล้ว ไม่หมุนซ้ำเพื่อเดาผล Dual-sign 24 ชั่วโมงไม่ใช่ถอน old secret ทันที คง events `email.sent`/`email.received` และตรวจ current-window receipts/ระดับจริงก่อนเปลี่ยน scope เพื่อกันเตือนซ้ำ
-3. เปิด Production flag/redeploy เฉพาะรุ่นที่ตรวจแล้ว รอ Ready/source SHA/canonical domain ให้ตรงก่อนเปลี่ยน provider URL เป็น `https://www.korkru.com/api/webhooks/resend` ตรวจ delivery/log response แบบอ่าน ไม่ส่ง fixture/ลดเกณฑ์/ล้าง ledger หรือทำอีเมลจริงเพิ่มโดยไม่มีขอบเขตที่เจ้าของตกลง
-4. หลัง Production Ready ต้อง sync เฉพาะ released files/deps ไป checkout ที่เสิร์ฟ **localhost:3000** จริง รักษางาน dirty question UI และ local env การตรวจที่ preview worktree/build เพียงอย่างเดียวไม่ใช่ primary parity
+## Release และ cutover ที่ตรวจแล้ว
 
-**แอป candidate ยังไม่ deploy; webhook cutover และ localhost:3000 parity ยังรอ** การ apply additive ledger และบันทึก monitor/from/to ไม่ได้เปิดการส่งแจ้งเตือน Production SMTP/Google และ SEB ไม่อยู่ใน scope นี้ รอบเอกสารสถานะนี้ไม่เปลี่ยน app/SQL/env/provider และไม่รัน test/build ซ้ำจากผล `8478f884` เพราะไม่มี application change
+[PR #75](https://github.com/korkru-me/jk/pull/75) merge เป็น **216d492469259a3e22945413e4ca798e71439a1f** Deploymentแรก Readyขณะ Production flagยังfalse: canonical `/login` ได้200 และ webhook POSTได้503 `not_configured` จึงยังไม่เปิดการส่งระหว่างเตรียม
+
+1. ปิด Staging flag เวลา **04:04:55.898 UTC (11:04:55 น. ไทย)** แล้ว redeploy `dpl_3MF5dx9xRELpf18CaoxWKne1Bp12` จาก source `c77f4ec` เป็น Readyเวลา **04:08:28.634 UTC** พร้อม alias Stagingจริง รวม `jk-resend-staging-korkru-mes-projects.vercel.app` Exact-alias POSTได้503 `not_configured` เวลา **04:11:04.094 UTC** หลัง Readyเกิน60วินาที จึงตรวจ quiescence ก่อนเปิด Production
+2. เปิด Production flagเวลา **04:11:47.011 UTC** และ redeploy **`dpl_EU5HJV6xvj4kgZSJ6NbRKjS2nbc4`** source **216d492** เป็น Readyเวลา **04:15:07.111 UTC (11:15:07 น. ไทย)** canonical aliases `www.korkru.com`/`korkru.com` ถูกต้อง Unsigned canonical POSTถูกปฏิเสธ **400 `invalid_webhook`** เวลา **04:16:36.155 UTC**
+3. บันทึก URLของ Resend webhookเดิมเป็น **`https://www.korkru.com/api/webhooks/resend`** คง Enabled และ events `email.sent`, `email.received` ไม่ disable/delete endpoint
+4. Replay **เพียงหนึ่ง event `email.sent` จริงที่ providerเคยสร้างสำหรับอีเมล TESTตัวอย่างวันที่19ตุลาคม** ไม่ส่งอีเมลใหม่ Exact canonical-host POSTของ Productionตอบ **200 เวลา04:17:05.066 UTC (11:17:05 น. ไทย)** หลัง reload Resend detailขึ้น **Success / HTTP200 / Attempts2 / `below_threshold`** Timestampของรายการต้นฉบับยังเป็นวันที่19ตุลาคม; current request timestampใน Vercelและattemptที่เพิ่มยืนยัน replayรอบใหม่นี้ ไม่ใช่อ้างผลเก่าว่าเป็น Production
+5. ผลนี้ยืนยัน **signatureจริง → Production route → Resend Usage APIจริง** ทั้งสองช่วงต่ำกว่าเกณฑ์ ไม่ใช่การบังคับให้ยอดจริงแตะทั้ง6threshold หลัง replayอ่าน aggregate ledgerของ **ทั้ง StagingและProduction** ได้ **total0 / pending0 / completed0** ไม่มีอีเมลส่งระหว่าง rollout และไม่มี alertเพิ่มจาก replay
+
+ไม่เก็บ provider/event IDs, raw payload, secret หรือ request/response bodyที่มีค่าลับลงเอกสาร
+
+## Actual primary localhost parity — complete
+
+- Checkoutจริง **`/Users/korkusonmasaen/Korkru/korkru`**, port **3000**, PID **54741** คงเดิม Primary HEAD **794077bf**; syncทำใน working treeโดยรักษางานร่วม จึงไม่ได้ commit/rewrite primarybranch ขณะ release sourceและhandoffอยู่ใน branchที่pushแล้ว
+- ไฟล์quota7รายการตรงกับ release **216d492** byte-for-byte เพิ่มเฉพาะ `.env.example` อีก15บรรทัด และ dependency `svix@2.8.0` พร้อม lock entries4รายการแล้วติดตั้งจริง ไม่คัดลอก Production/Staging envหรือsecret
+- Quota132cases, TypeScript และ **Node24 isolated snapshotของ current primary → production Webpack buildผ่าน** ไม่แตะ running `.next`/tsconfig และไม่ restart server ตรวจ **Next MCP compile/runtime0** บน actualport3000 และ POSTตอบ503 `not_configured` เพราะ localmonitorยังปิด
+- Protected hashesเดิม18รายการไม่เปลี่ยน รักษางานร่วม `teacher-view-client` และ classroom lab ไม่มี blanket reset/stash/copy ไม่ถือว่า previewworktreeแทนprimary
+- Technical note: ระหว่าง npm install ตัวจัดการแพ็กเกจนำ `node_modules/cn` ที่เป็น undeclared/unlocked extraneous CLIออก ไม่พบ importsหรือversionที่ยืนยันได้ จึงไม่ติดตั้ง artifactที่ไม่ทราบversionกลับ ไม่ใช่ app dependencyที่เปลี่ยนใน releaseนี้
+
+Release source/deployment, signed webhook/Usage integration และ required primary parityครบแล้ว Current behaviorพร้อมใช้งาน Productionตามข้อจำกัดด้านล่าง การปรับเอกสาร handoffครั้งสุดท้ายไม่เปลี่ยน app/SQL/env/provider/deployment และไม่รันชุดเว็บซ้ำจาก checksที่บันทึกไว้
 
 ## ข้อจำกัดและ rollback
 
