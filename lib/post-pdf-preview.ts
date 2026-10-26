@@ -3,7 +3,7 @@ import { POST_FILE_PREFIX } from '@/lib/attachment-display'
 export const MAX_POST_PDF_BYTES = 10 * 1024 * 1024
 
 /** Preview only this project's announcement files, or one local QA document. */
-export function postPdfSource(value: string, storageBaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL, allowLocalFixture = process.env.NODE_ENV !== 'production' || process.env.NEXT_PUBLIC_APP_URL === 'https://staging.korkru.com'): string | null {
+export function postPdfSource(value: string, storageBaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL, allowLocalFixture = process.env.NODE_ENV !== 'production' || (typeof window !== 'undefined' && window.location.origin === 'https://staging.korkru.com')): string | null {
   if (allowLocalFixture && value === '/exam-screen-lab/grading-workspace/assets/file-0.pdf') return value
   try {
     const url = new URL(value)
