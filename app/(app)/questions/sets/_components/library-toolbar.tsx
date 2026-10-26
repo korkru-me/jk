@@ -1,8 +1,7 @@
 'use client'
 
-import { Layers, Search, X } from 'lucide-react'
-import { IconButton } from '@/components/ui/icon-button'
-import { Input } from '@/components/ui/input'
+import { Layers } from 'lucide-react'
+import { QuestionSearchForm } from '@/components/questions/question-search-form'
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator,
@@ -32,15 +31,16 @@ export const scopeKey = (scope: LibraryScope) =>
  * wrap into a wall before the tenth.
  */
 export function LibraryToolbar({
-  scope, sets, search, sort, isPending, onScope, onSearch, onSort,
+  scope, sets, search, sort, isPending, onScope, onSearch, onSearchSubmit, onSort,
 }: {
   scope: LibraryScope
   sets: LibraryScopeOption[]
-  /** The search box's own text — kept by the caller, which debounces it. */
+  /** Draft text stays local until the user submits. */
   search: string
   sort: QuestionSort
   isPending: boolean
   onScope: (scope: LibraryScope) => void
+  onSearchSubmit: (search: string) => void
   onSearch: (search: string) => void
   onSort: (sort: QuestionSort) => void
 }) {
@@ -106,26 +106,7 @@ export function LibraryToolbar({
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
-        <div className="relative flex-1 min-w-52 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="ค้นหาจากชื่อ เนื้อหา หรือแท็ก..."
-            value={search}
-            onChange={event => onSearch(event.target.value)}
-            className="pl-9 pr-9 bg-card"
-            aria-label="ค้นหาโจทย์"
-          />
-          {search && (
-            <IconButton
-              label="ล้างคำค้นหา"
-              size="2xs"
-              onClick={() => onSearch('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
-            >
-              <X />
-            </IconButton>
-          )}
-        </div>
+        <QuestionSearchForm value={search} onValueChange={onSearch} onSearch={onSearchSubmit} className="min-w-52 max-w-md" />
         <QuestionSortControl
           sort={sort}
           onChange={onSort}

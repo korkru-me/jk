@@ -2492,3 +2492,8 @@ Physical iPad UAT ของ candidate `r7` ยืนยันแล้วว่�
 
 - การ์ดห้องเรียนใช้ native anchor/document GET ไปยัง href เดิมแทน client transition และหน้าทำงานมี loading state “กำลังเปิดงาน”; คง Tooltip สีและ start-on-POST เดิม ไม่เปลี่ยน auth/เวลา/คะแนน
 - ตรวจ mouse/Enter และ Tooltip เปิดอยู่ ด้วยงานใหม่ ทำต่อ เลยกำหนด และส่งแล้วใน fixture พร้อมบล็อก RSC transition ยืนยัน document navigation จริง TypeScript/token/build/Next runtime ผ่าน ยังไม่ยืนยันสาเหตุคำขอของบัญชีจริงหรือทดสอบกับข้อมูล Production ไม่มี migration/push/deploy จากงานนี้ รายละเอียด STUDENT_CLASSROOM_CALENDAR.md
+
+
+## Classroom, practice, search and student bell follow-up — 26 October 2026
+
+Release scope and validation are tracked in `docs/CLASSROOM_FOLLOWUP_RELEASE_20261026.md`. Homeroom homework respects each source classroom and group audience, marks non-members/unassigned students separately, pins the matrix headers, separates assignment/classroom text colours, and exposes full assignment and Bangkok deadline details on hover/focus. Calendar Today and same-day clash indicators are removed. Personal practice cards remove checkboxes and add confirmed per-exercise deletion with compact edit/delete/start controls. Student and teacher question searches submit with Enter/Search, without typing-triggered teacher searches. Student bell shows grades and due-soon (24 hours)/overdue unfinished work; classroom posts and posted work retain their popup path. Contextual sidebars share a top dashboard shortcut; teacher question links put the library first. No migration or dependency change.

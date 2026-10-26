@@ -46,7 +46,7 @@ import { Field, FieldLabel, FieldGroup } from '@/components/ui/field'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { createPracticeExercise, updatePracticeExercise, setPracticeReviewPin, getPracticeAttachedSolution } from '@/lib/actions/practice-exercises'
+import { createPracticeExercise, updatePracticeExercise, deletePracticeExercise, setPracticeReviewPin, getPracticeAttachedSolution } from '@/lib/actions/practice-exercises'
 import { PRACTICE_EXERCISE_MAX_QUESTIONS, type PracticeExercise } from '@/lib/practice-exercises'
 import type {
   PracticeQuestionListItem,
@@ -71,6 +71,7 @@ interface PracticeLibraryViewProps {
   pinnedQuestionIds: string[]
   pinsReady: boolean
   searchHiddenFields?: Record<string, string>
+  deleteExerciseAction?: typeof deletePracticeExercise
   updateExerciseAction?: typeof updatePracticeExercise
   pinAction?: typeof setPracticeReviewPin
   libraryHrefBuilder?: typeof buildPracticeSearchHref
@@ -91,6 +92,7 @@ export function PracticeLibraryView({
   pinnedQuestionIds,
   pinsReady,
   searchHiddenFields = {},
+  deleteExerciseAction = deletePracticeExercise,
   updateExerciseAction = updatePracticeExercise,
   pinAction = setPracticeReviewPin,
   libraryHrefBuilder = buildPracticeSearchHref,
@@ -101,6 +103,7 @@ export function PracticeLibraryView({
 }: PracticeLibraryViewProps) {
   const router = useRouter()
   const [confirm, confirmation] = useConfirm()
+  const [deletedIds, setDeletedIds] = useState(new Set<string>())
   const [editing, setEditing] = useState<PracticeExercise | null>(null)
   const [conflict, setConflict] = useState(false)
   const [pins, setPins] = useState(new Set(pinnedQuestionIds))
@@ -243,6 +246,24 @@ export function PracticeLibraryView({
       } catch { setError('ยังบันทึกแบบฝึกหัดไม่ได้ กรุณาลองอีกครั้ง') }
     })
   }
+  async function deleteExercise(group: PracticeExercise) {
+    if (pending) return
+    const accepted = await confirm({ title: `ลบแบบฝึกหัด “${group.title}”?`,
+      description: 'แบบฝึกหัดนี้จะถูกลบ โจทย์ในคลังและประวัติการตอบยังคงอยู่',
+      confirmLabel: 'ลบแบบฝึกหัด', cancelLabel: 'ยกเลิก', variant: 'destructive' })
+    if (!accepted) return
+    startTransition(async () => {
+      try {
+        const result = await deleteExerciseAction({ id: group.id, libraryId: library.id, expectedRevision: group.revision })
+        if (!result.ok) { toast.error(result.error); return }
+        setDeletedIds(previous => new Set([...previous, group.id]))
+        if (editing?.id === group.id) clearEditor()
+        if (state.exerciseId === group.id) router.replace(libraryHrefBuilder(library.id, state, { exerciseId: '', page: 1 }))
+        else router.refresh()
+        toast.success('ลบแบบฝึกหัดแล้ว')
+      } catch { toast.error('ยังลบแบบฝึกหัดไม่ได้ กรุณาลองอีกครั้ง') }
+    })
+  }
   function togglePin(questionId: string) {
     const pinned = !pins.has(questionId)
     startPinTransition(async () => {
@@ -304,17 +325,10 @@ export function PracticeLibraryView({
         </div>
         {!exercisesReady && <Alert><AlertDescription>ยังโหลดแบบฝึกหัดไม่ได้ กรุณาลองโหลดหน้าอีกครั้ง</AlertDescription></Alert>}
         {exercises.length > 0 && <div className="grid gap-2 @min-[32rem]:grid-cols-2 @min-[44rem]:grid-cols-3">
-          {exercises.map(exercise => <PracticeExerciseCard key={exercise.id} exercise={exercise}
+          {exercises.filter(exercise => !deletedIds.has(exercise.id)).map(exercise => <PracticeExerciseCard key={exercise.id} exercise={exercise}
             settings={exerciseSettings[exercise.id] ?? defaultPracticeExerciseSettings(exercise.id)}
-            selected={exercise.questionIds.every(id => selected[id] !== undefined)} disabled={pending || !exercisesReady}
-            onSelect={checked => {
-              const next = { ...selected }
-              for (const id of exercise.questionIds) {
-                if (!checked) delete next[id]
-                else if (Object.keys(next).length < PRACTICE_EXERCISE_MAX_QUESTIONS) next[id] = exercise.questionTitles[id]
-              }
-              updateSelection(next)
-            }}
+            disabled={pending || !exercisesReady}
+            onDelete={() => { void deleteExercise(exercise) }}
             onEdit={() => { namingTriggerRef.current = document.activeElement as HTMLElement; void beginEdit(exercise) }}
             startHref={exerciseHrefBuilder(library.id, exercise.id)} />)}
         </div>}
@@ -342,7 +356,7 @@ export function PracticeLibraryView({
               {Object.entries(searchHiddenFields).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
               {state.reviewOnly && <input type="hidden" name="review" value="1" />}
               {state.tags.map(tag => <input key={tag} type="hidden" name="tag" value={tag} />)}
-              <Input key={state.q} name="q" defaultValue={state.q} placeholder="ค้นหาชื่อหรือเนื้อหาโจทย์" aria-label="ค้นหาชื่อหรือเนื้อหาโจทย์" className="min-w-0 flex-1" />
+              <Input key={state.q} name="q" defaultValue={state.q} enterKeyHint="search" placeholder="ค้นหาชื่อหรือเนื้อหาโจทย์" aria-label="ค้นหาชื่อหรือเนื้อหาโจทย์" className="min-w-0 flex-1" />
               <Button type="submit" size="sm" className="shrink-0 pointer-coarse:min-h-11" aria-label="ค้นหาโจทย์">
                 <Search data-icon="inline-start" aria-hidden="true" /><span className="hidden sm:inline">ค้นหา</span>
               </Button>

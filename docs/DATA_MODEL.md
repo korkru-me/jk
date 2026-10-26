@@ -326,3 +326,8 @@ Notification body ต้องไม่เปิดเผยข้อมูล�
 7. อัปเดตเอกสารนี้และ `docs/FEATURE_STATUS.md`
 
 - 14 ต.ค. 2026: `users.avatar_url` เดิมเก็บ URL ของ PNG crop 512×512 ใน public display-identity bucket `profile-avatars`; ไม่เพิ่ม student profile column. Migration `20261014065458_account_avatars.sql` จำกัด 2 MiB/image/png และ restrictive server-only Storage policy ไม่มีการใช้ bucket รูปโจทย์หรือข้อมูลส่วนตัวร่วมกัน. Staging history `20261009142610_atomic_seb_exam_start.sql` คืนจาก CLI history เป็นสำเนา ไม่รันซ้ำ.
+
+
+## Bell-only deadline read receipts — 26 October 2026
+
+notifications retains its existing type constraint. Computed student deadlines reuse assignment_reminder with actor_id NULL; teacher-issued reminders have an actor. A server-generated deterministic UUID binds the receipt to recipient, assignment, effective deadline and due-soon/overdue phase. Only explicit read acknowledgement writes a receipt with is_read=true; no loading/counting write occurs. The server constructs the row from freshly verified current assignment reach and never trusts client-supplied title/org/recipient/deadline data. Old phase/deadline receipts remain historical and do not appear once no longer current. No table, column, index or migration is added; existing recipient RLS remains in force.

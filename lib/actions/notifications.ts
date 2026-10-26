@@ -3,6 +3,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { Notification } from '@/lib/types'
+import { loadStudentBell, saveDeadlineReadReceipts } from '@/lib/student-bell.server'
+import { isSystemDeadlineNotice } from '@/lib/student-bell'
 import { canManageAssignment } from '@/lib/auth/assignment-access'
 import { linkReachesGroup } from '@/lib/classroom-groups'
 import { fetchAllRows, SUPABASE_IN_FILTER_CHUNK_SIZE } from '@/lib/supabase/fetch-all-rows'
@@ -18,66 +20,74 @@ async function getAuthUser(supabase: Awaited<ReturnType<typeof createClient>>) {
   return user
 }
 
-export async function getMyNotifications(limit = 20): Promise<Notification[]> {
+async function bellSession() {
   const supabase = await createClient()
-  // RLS scopes the list to auth.uid(), so auth validation and the read can run
-  // together instead of paying two serial network round trips.
-  const [userRes, listRes] = await Promise.all([
-    supabase.auth.getUser(),
-    supabase
-      .from('notifications')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(limit),
-  ])
-  if (!userRes.data.user) return []
+  const user = await getAuthUser(supabase)
+  if (!user) return null
+  const { data: profile, error } = await supabase.from('users').select('role, status').eq('id', user.id).maybeSingle()
+  if (error) throw new Error('โหลดการแจ้งเตือนไม่สำเร็จ กรุณาลองใหม่')
+  if (!profile || profile.status !== 'active') return null
+  return { supabase, user, student: profile.role === 'student' }
+}
 
-  return (listRes.data ?? []) as Notification[]
+export async function getMyNotifications(limit = 20): Promise<Notification[]> {
+  const session = await bellSession()
+  if (!session) return []
+  const take = Number.isInteger(limit) ? Math.max(1, Math.min(limit, 100)) : 20
+  if (session.student) return (await loadStudentBell(session.supabase, createAdminClient(), session.user.id)).slice(0, take)
+  const result = await session.supabase.from('notifications').select('*').eq('recipient_id', session.user.id)
+    .order('created_at', { ascending: false }).limit(take)
+  if (result.error) throw new Error('โหลดการแจ้งเตือนไม่สำเร็จ กรุณาลองใหม่')
+  return (result.data ?? []) as Notification[]
 }
 
 export async function getUnreadNotificationCount(): Promise<number> {
-  const supabase = await createClient()
-  // Recipient RLS makes the count query safe to start before getUser returns.
-  const [userRes, countRes] = await Promise.all([
-    supabase.auth.getUser(),
-    supabase
-      .from('notifications')
-      .select('id', { count: 'exact', head: true })
-      .eq('is_read', false),
-  ])
-  if (!userRes.data.user) return 0
-
-  return countRes.count ?? 0
+  const session = await bellSession()
+  if (!session) return 0
+  if (session.student) return (await loadStudentBell(session.supabase, createAdminClient(), session.user.id)).filter(row => !row.is_read).length
+  const result = await session.supabase.from('notifications').select('id', { count: 'exact', head: true })
+    .eq('recipient_id', session.user.id).eq('is_read', false)
+  if (result.error) throw new Error('โหลดการแจ้งเตือนไม่สำเร็จ กรุณาลองใหม่')
+  return result.count ?? 0
 }
 
 export async function markNotificationRead(id: string) {
-  const supabase = await createClient()
-  const user = await getAuthUser(supabase)
-  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
-
-  const { error } = await supabase
-    .from('notifications')
-    .update({ is_read: true })
-    .eq('id', id)
-    .eq('recipient_id', user.id)
-
-  if (error) return { error: error.message }
-  return { success: true }
+  if (!isAssignmentReminderId(id)) return { error: 'รายการแจ้งเตือนไม่ถูกต้อง' }
+  try {
+    const session = await bellSession()
+    if (!session) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+    if (session.student) {
+      const admin = createAdminClient()
+      const notice = (await loadStudentBell(session.supabase, admin, session.user.id)).find(row => row.id === id)
+      if (!notice) return { error: 'ไม่พบการแจ้งเตือนนี้แล้ว กรุณาโหลดข้อมูลล่าสุด' }
+      if (isSystemDeadlineNotice(notice)) {
+        await saveDeadlineReadReceipts(admin, [notice])
+        return { success: true }
+      }
+    }
+    const { data, error } = await session.supabase.from('notifications').update({ is_read: true })
+      .eq('id', id).eq('recipient_id', session.user.id).select('id').maybeSingle()
+    if (error || !data) return { error: 'บันทึกการอ่านไม่สำเร็จ กรุณาลองใหม่' }
+    return { success: true }
+  } catch { return { error: 'บันทึกการอ่านไม่สำเร็จ กรุณาลองใหม่' } }
 }
 
 export async function markAllNotificationsRead() {
-  const supabase = await createClient()
-  const user = await getAuthUser(supabase)
-  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
-
-  const { error } = await supabase
-    .from('notifications')
-    .update({ is_read: true })
-    .eq('recipient_id', user.id)
-    .eq('is_read', false)
-
-  if (error) return { error: error.message }
-  return { success: true }
+  try {
+    const session = await bellSession()
+    if (!session) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+    if (session.student) {
+      const admin = createAdminClient()
+      const notices = await loadStudentBell(session.supabase, admin, session.user.id)
+      await saveDeadlineReadReceipts(admin, notices.filter(row => !row.is_read && isSystemDeadlineNotice(row)))
+    }
+    const query = session.supabase.from('notifications').update({ is_read: true })
+      .eq('recipient_id', session.user.id).eq('is_read', false)
+    // Hidden announcement/new-work rows must stay unread for their own popups.
+    const result = await (session.student ? query.eq('type', 'grade_published') : query)
+    if (result.error) return { error: 'บันทึกการอ่านไม่สำเร็จ กรุณาลองใหม่' }
+    return { success: true }
+  } catch { return { error: 'บันทึกการอ่านไม่สำเร็จ กรุณาลองใหม่' } }
 }
 
 export async function notifyNonSubmitters(assignmentId: string, classroomId: string) {
@@ -202,7 +212,7 @@ async function pendingAssignmentNotices(kinds: readonly AssignmentNoticeKind[]):
     const [history, roster] = await Promise.all([
       fetchAllRows<AssignmentNoticeRecord>((from, to) => {
         const query = supabase.from('notifications')
-          .select('id, type, related_assignment_id, related_classroom_id, is_read, created_at').eq('recipient_id', user.id)
+          .select('id, type, actor_id, related_assignment_id, related_classroom_id, is_read, created_at').eq('recipient_id', user.id)
         const scoped = types.length === 1 ? query.eq('type', types[0]) : query.in('type', types)
         return scoped.order('created_at', { ascending: false }).order('id', { ascending: false }).range(from, to)
       }),
@@ -211,7 +221,7 @@ async function pendingAssignmentNotices(kinds: readonly AssignmentNoticeKind[]):
     ])
     if (history.error || roster.error) return { notices: [], error: REMINDER_READ_ERROR }
     const enrolled = new Set(roster.rows.map(row => row.classroom_id))
-    const pending = latestAssignmentNoticeRecords(history.rows).filter(row => enrolled.has(row.related_classroom_id!))
+    const pending = latestAssignmentNoticeRecords(history.rows.filter(row => !isSystemDeadlineNotice(row))).filter(row => enrolled.has(row.related_classroom_id!))
     if (pending.length === 0) return { notices: [] }
     const roomIds = [...new Set(pending.map(row => row.related_classroom_id!))]
     const rooms = await reminderRowsForIds<{ id: string; name: string }>(roomIds, (chunk, from, to) => supabase.from('classrooms')

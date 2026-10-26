@@ -729,3 +729,12 @@ describe('assigned-work student inbox', () => {
     expect(calls).toContainEqual(expect.objectContaining({ table: 'notifications', range: [1000, 1999] }))
   })
 })
+
+
+describe('system deadline receipts stay out of work popups', () => {
+  it('does not turn a bell-only read receipt into a teacher reminder popup', async () => {
+    useStudent()
+    tables.notifications[0].actor_id = null
+    expect((await getPendingAssignmentReminders()).reminders).toEqual([])
+  })
+})
