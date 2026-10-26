@@ -2,14 +2,13 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ChevronLeft, ChevronRight, CalendarDays, AlertTriangle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   MONTH_LABELS, SEVERITY_BADGE, SEVERITY_DOT, SEVERITY_ORDER, WEEKDAY_LABELS,
   type Severity,
 } from '@/lib/calendar-display'
 import { IconButton } from '@/components/ui/icon-button'
-import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 
 export interface HomeroomCalendarEvent {
@@ -99,14 +98,6 @@ export function HomeroomCalendar({ events }: { events: HomeroomCalendarEvent[] }
           >
             <ChevronRight />
           </IconButton>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => { setViewDate(new Date(today.getFullYear(), today.getMonth(), 1)); setSelected(today) }}
-            className="min-h-[44px]"
-          >
-            วันนี้
-          </Button>
         </div>
       </div>
 
@@ -123,7 +114,6 @@ export function HomeroomCalendar({ events }: { events: HomeroomCalendarEvent[] }
           const isToday = isSameDay(d, today)
           const isSelected = isSameDay(d, selected)
           const dots = dayEvents.slice(0, 3)
-          const hasClash = dayEvents.length >= 2
 
           return (
             <button
@@ -136,9 +126,6 @@ export function HomeroomCalendar({ events }: { events: HomeroomCalendarEvent[] }
                 isSelected ? 'bg-primary/15 text-foreground ring-1 ring-primary' : isToday ? 'bg-primary/10 text-foreground ring-1 ring-primary/40' : 'hover:bg-muted text-foreground'
               )}
             >
-              {hasClash && (
-                <span className="absolute top-1 right-1 size-1.5 rounded-full bg-warning" />
-              )}
               <span>{d.getDate()}</span>
               {dayEvents.length > 0 && (
                 <span className="flex items-center gap-0.5">
@@ -166,10 +153,6 @@ export function HomeroomCalendar({ events }: { events: HomeroomCalendarEvent[] }
             {SEVERITY_LABEL[s]}
           </span>
         ))}
-        <span className="flex items-center gap-1">
-          <span className="w-1.5 h-1.5 rounded-full bg-warning" />
-          งานชนกันในวันนั้น
-        </span>
       </div>
 
       {/* Selected day detail */}
@@ -181,12 +164,6 @@ export function HomeroomCalendar({ events }: { events: HomeroomCalendarEvent[] }
           <p className="text-sm text-muted-foreground py-2">ไม่มีงานกำหนดส่งวันนี้</p>
         ) : (
           <div className="space-y-2">
-            {selectedEvents.length >= 2 && (
-              <div className="flex items-center gap-1.5 text-xs text-warning bg-warning/10 rounded-lg px-3 py-2">
-                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                วันนี้มีงานชนกัน {selectedEvents.length} รายการ — นักเรียนอาจทำงานไม่ทัน
-              </div>
-            )}
             {selectedEvents.map(({ event, severity }) => (
               <div key={event.id} className="flex items-center gap-3 p-2.5 rounded-xl ring-1 ring-border">
                 <div className="min-w-0 flex-1">

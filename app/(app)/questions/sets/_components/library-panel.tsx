@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
@@ -32,9 +32,6 @@ const PreviewModal = dynamic(
   () => import('@/components/questions/preview-modal').then(mod => mod.PreviewModal),
   { ssr: false },
 )
-
-/** How long a typed search waits before it becomes a page load. */
-const SEARCH_DEBOUNCE_MS = 500
 
 /** A แฟ้ม a โจทย์ can be filed into — the teacher's own, the only ones they may edit. */
 export type FilingTarget = LibraryScopeOption
@@ -109,21 +106,6 @@ export function LibraryPanel({
     const query = params.toString()
     startTransition(() => router.push(query ? `${pathname}?${query}` : pathname, { scroll: false }))
   }
-  // `setParams` closes over this render's params; the debounce fires from a
-  // later one, so it reads the ref rather than a stale copy.
-  const setParamsRef = useRef(setParams)
-  setParamsRef.current = setParams
-
-  useEffect(() => {
-    if (searchDraft === search) return
-    const timer = setTimeout(
-      () => setParamsRef.current({ uq: searchDraft, unfiled: null, umatch: null }),
-      SEARCH_DEBOUNCE_MS,
-    )
-    return () => clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchDraft])
-
   const activeSet = scope.kind === 'set' ? sets.find(set => set.id === scope.setId) ?? null : null
   const copy = libraryScopeCopy(scope, sets)
 
@@ -241,6 +223,7 @@ export function LibraryPanel({
           unfiled: null,
         })}
         onSearch={setSearchDraft}
+        onSearchSubmit={query => setParams({ uq: query, unfiled: null, umatch: null })}
         onSort={next => setParams({ ...questionSortParams(next, 'u'), unfiled: null })}
       />
 

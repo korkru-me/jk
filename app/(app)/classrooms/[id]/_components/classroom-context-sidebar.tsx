@@ -5,7 +5,6 @@ import Link from 'next/link'
 import {
   ChevronLeft,
   ChevronsUpDown,
-  LayoutDashboard,
   School,
 } from 'lucide-react'
 import type { Classroom } from '@/lib/types'
@@ -238,16 +237,6 @@ export function ClassroomContextNavigation({
           {managementActions}
         </section>
       )}
-
-      <Separator />
-      <SidebarButton
-        label="เมนูหลัก"
-        variant="ghost"
-        className="w-full justify-start"
-        render={<Link href="/dashboard" onClick={onClose} />}
-      >
-        <LayoutDashboard data-icon="inline-start" />
-      </SidebarButton>
     </ClassroomTheme>
   )
 }

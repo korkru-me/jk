@@ -9,7 +9,7 @@ import {
   Plus, LayoutList, Grid3x3, Search, X, SlidersHorizontal, Tag, BookOpen, Layers, Users, Edit2, Eye, FileUp,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { QuestionSearchForm } from '@/components/questions/question-search-form'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { QuestionCard } from '@/components/questions/question-card'
@@ -60,16 +60,6 @@ const PreviewModal = dynamic(
 
 /** How many tags the filter shows before asking to be expanded. */
 const TAG_FILTER_PREVIEW = 12
-
-/**
- * How long typing pauses before the search is sent.
- *
- * A search costs a server render, so this is really "how sure are we the
- * teacher has stopped typing". It used to be shorter than the render itself,
- * which meant a word could put several requests in flight and the reader spent
- * the whole time watching a list that never settled.
- */
-const SEARCH_DEBOUNCE_MS = 500
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
@@ -210,17 +200,9 @@ export function QuestionBankClient({
   const setTeamSort = (next: QuestionSort) =>
     setParams({ ...questionSortParams(next, 't'), tpage: null })
 
-  // Typing shouldn't fire a query per keystroke, so the input keeps its own
-  // value and pushes it to the URL once the user pauses.
+  // Keep draft text separate from the committed URL search.
   const [searchDraft, setSearchDraft] = useState(filters.q)
   useEffect(() => { setSearchDraft(filters.q) }, [filters.q])
-  useEffect(() => {
-    if (searchDraft === filters.q) return
-    const timer = setTimeout(() => setParams({ q: searchDraft, page: null }), SEARCH_DEBOUNCE_MS)
-    return () => clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchDraft])
-
   const [viewMode,     setViewMode]     = useState<'list' | 'grid'>('list')
   const [previewQ,     setPreviewQ]     = useState<QuestionDetailWithCategory | null>(null)
   const [previewLoadingId, setPreviewLoadingId] = useState<string | null>(null)
@@ -235,12 +217,6 @@ export function QuestionBankClient({
 
   const [teamSearchDraft, setTeamSearchDraft] = useState(teamFilters.q)
   useEffect(() => { setTeamSearchDraft(teamFilters.q) }, [teamFilters.q])
-  useEffect(() => {
-    if (teamSearchDraft === teamFilters.q) return
-    const timer = setTimeout(() => setParams({ teamq: teamSearchDraft, tpage: null }), SEARCH_DEBOUNCE_MS)
-    return () => clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [teamSearchDraft])
   const [flaggedIds,   setFlaggedIds]   = useState<Set<string>>(new Set())
   const [showFilters,  setShowFilters]  = useState(false)
 
@@ -374,24 +350,8 @@ export function QuestionBankClient({
         {/* Wraps rather than squeezes: on a phone the ordering controls drop to
             their own line instead of shrinking the search box to nothing. */}
         <div className="flex gap-2 flex-wrap">
-          <div className="relative flex-1 min-w-48">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="ค้นหาจากชื่อ เนื้อหา หรือแท็ก..."
-              value={searchDraft}
-              onChange={e => setSearchDraft(e.target.value)}
-              className="pl-9 bg-card"
-            />
-            {searchDraft && (
-              <button
-                onClick={() => setSearchDraft('')}
-                aria-label="ล้างคำค้นหาโจทย์ของฉัน"
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-muted-foreground transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
+          <QuestionSearchForm value={searchDraft} onValueChange={setSearchDraft}
+            onSearch={query => setParams({ q: query, page: null })} label="ค้นหาโจทย์ของฉัน" className="min-w-48" />
 
           <QuestionSortControl
             sort={sort}
@@ -665,15 +625,8 @@ export function QuestionBankClient({
             ) : (
               <>
                 <div className="flex gap-2 flex-wrap">
-                  <div className="relative flex-1 min-w-48">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      placeholder="ค้นหาจากชื่อ เนื้อหา หรือแท็ก..."
-                      value={teamSearchDraft}
-                      onChange={e => setTeamSearchDraft(e.target.value)}
-                      className="pl-9 bg-card"
-                    />
-                  </div>
+                  <QuestionSearchForm value={teamSearchDraft} onValueChange={setTeamSearchDraft}
+                    onSearch={query => setParams({ teamq: query, tpage: null })} label="ค้นหาโจทย์ที่แชร์ในทีม" className="min-w-48" />
 
                   <QuestionSortControl
                     sort={teamSort}

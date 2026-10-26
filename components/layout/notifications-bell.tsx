@@ -15,8 +15,11 @@ import {
   markNotificationRead,
 } from '@/lib/actions/notifications'
 import type { Notification } from '@/lib/types'
+import { toast } from 'sonner'
 
 const POLL_MS = 45000
+const DEFAULT_ACTIONS = { getMyNotifications, getUnreadNotificationCount, markNotificationRead, markAllNotificationsRead }
+export type NotificationsBellActions = typeof DEFAULT_ACTIONS
 
 function timeAgo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime()
@@ -28,15 +31,17 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hr / 24)} วันที่แล้ว`
 }
 
-export function NotificationsBell({ initialUnreadCount }: { initialUnreadCount: number }) {
+export function NotificationsBell({ initialUnreadCount, actions = DEFAULT_ACTIONS }: { initialUnreadCount: number; actions?: NotificationsBellActions }) {
   const [unreadCount, setUnreadCount] = useState(initialUnreadCount)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   const refreshCount = useCallback(() => {
-    getUnreadNotificationCount().then(setUnreadCount).catch(() => {})
-  }, [])
+    actions.getUnreadNotificationCount().then(setUnreadCount).catch(() => {})
+    if (open) actions.getMyNotifications().then(list => { setNotifications(list); setError('') }).catch(() => setError('โหลดการแจ้งเตือนไม่สำเร็จ กรุณาเปิดใหม่อีกครั้ง'))
+  }, [open, actions])
 
   useEffect(() => {
     // The server-rendered layout already supplied the initial count. Poll only
@@ -59,24 +64,30 @@ export function NotificationsBell({ initialUnreadCount }: { initialUnreadCount: 
     setOpen(next)
     if (next) {
       setLoading(true)
-      const list = await getMyNotifications()
-      setNotifications(list)
-      setLoading(false)
+      setError('')
+      try { setNotifications(await actions.getMyNotifications()) }
+      catch { setError('โหลดการแจ้งเตือนไม่สำเร็จ กรุณาเปิดใหม่อีกครั้ง') }
+      finally { setLoading(false) }
     }
   }
 
   async function handleItemClick(id: string) {
     const wasUnread = notifications.some(n => n.id === id && !n.is_read)
-    const result = await markNotificationRead(id)
-    if (result.error) return
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n))
-    if (wasUnread) setUnreadCount(prev => Math.max(0, prev - 1))
+    try {
+      const result = await actions.markNotificationRead(id)
+      if (result.error) { toast.error(result.error); return }
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n))
+      if (wasUnread) setUnreadCount(prev => Math.max(0, prev - 1))
+    } catch { toast.error('บันทึกการอ่านไม่สำเร็จ กรุณาลองใหม่') }
   }
 
   async function handleMarkAllRead() {
-    await markAllNotificationsRead()
-    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
-    setUnreadCount(0)
+    try {
+      const result = await actions.markAllNotificationsRead()
+      if (result.error) { toast.error(result.error); return }
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
+      setUnreadCount(0)
+    } catch { toast.error('บันทึกการอ่านไม่สำเร็จ กรุณาลองใหม่') }
   }
 
   return (
@@ -109,10 +120,11 @@ export function NotificationsBell({ initialUnreadCount }: { initialUnreadCount: 
           {loading && (
             <p className="text-xs text-muted-foreground text-center py-6">กำลังโหลด...</p>
           )}
-          {!loading && notifications.length === 0 && (
+          {!loading && error && <p role="alert" className="px-3 py-4 text-xs text-destructive">{error}</p>}
+          {!loading && !error && notifications.length === 0 && (
             <p className="text-xs text-muted-foreground text-center py-6">ยังไม่มีการแจ้งเตือน</p>
           )}
-          {!loading && notifications.map(n => {
+          {!loading && !error && notifications.map(n => {
             const row = (
               <div
                 className={`px-3 py-2.5 border-b last:border-b-0 hover:bg-muted transition-colors ${!n.is_read ? 'bg-primary/10' : ''}`}

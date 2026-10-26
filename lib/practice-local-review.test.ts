@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  changeLocalPracticeExercise, changeLocalPracticePin, EMPTY_PRACTICE_LOCAL_REVIEW,
+  changeLocalPracticeExercise, deleteLocalPracticeExercise, changeLocalPracticePin, EMPTY_PRACTICE_LOCAL_REVIEW,
   isLocalPracticeReviewEnabled, localPracticeExercises, practiceLocalReviewSchema,
 } from './practice-local-review'
 import type { PracticeQuestionListItem } from './practice-question-access.server'
@@ -87,5 +87,27 @@ describe('development-only practice review', () => {
     expect(practiceLocalReviewSchema.safeParse({ ...saved(), answers: {} }).success).toBe(false)
     expect(practiceLocalReviewSchema.safeParse({ exercises: [saved().exercises[0], saved().exercises[0]], pinnedQuestionIds: [] }).success).toBe(false)
     expect(practiceLocalReviewSchema.safeParse({ exercises: [], pinnedQuestionIds: [ids[0], ids[0]] }).success).toBe(false)
+  })
+})
+
+
+describe('deleting personal practice exercises', () => {
+  const deletion = { id: groupId, libraryId, expectedRevision: 1 }
+  it('deletes only the requested group, preserving pins, other groups and attempts', () => {
+    const other = { ...saved().exercises[0], id: ids[2] }
+    const state = { exercises: [...saved().exercises, other], pinnedQuestionIds: [ids[0]] }
+    const result = deleteLocalPracticeExercise(state, libraryId, deletion)
+    expect(result).toEqual({ ok: true, state: { exercises: [other], pinnedQuestionIds: [ids[0]] } })
+    expect(state.exercises).toHaveLength(2)
+    expect(items[0].attemptCount).toBe(2)
+  })
+  it('rejects stale revisions, cross-library inputs, unknown IDs and malformed deletion', () => {
+    const state = saved()
+    expect(deleteLocalPracticeExercise(state, libraryId, { ...deletion, expectedRevision: 2 })).toMatchObject({ ok: false, conflict: true })
+    expect(deleteLocalPracticeExercise(state, ids[1], deletion).ok).toBe(false)
+    expect(deleteLocalPracticeExercise(state, libraryId, { ...deletion, id: ids[2] }).ok).toBe(false)
+    expect(deleteLocalPracticeExercise(state, libraryId, { ...deletion, studentId: ids[1] }).ok).toBe(false)
+    expect(deleteLocalPracticeExercise(state, libraryId, { ...deletion, expectedRevision: 0 }).ok).toBe(false)
+    expect(state).toEqual(saved())
   })
 })

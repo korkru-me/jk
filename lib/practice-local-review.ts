@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import {
-  practiceExerciseSchema, practiceExerciseUpdateSchema, practiceReviewPinSchema,
+  practiceExerciseSchema, practiceExerciseUpdateSchema, practiceExerciseDeleteSchema, practiceReviewPinSchema,
   type PracticeExercise,
 } from '@/lib/practice-exercises'
 import type { PracticeQuestionListItem } from '@/lib/practice-question-access.server'
@@ -75,4 +75,15 @@ export function changeLocalPracticePin(
   if (pinned) ids.add(questionId)
   else ids.delete(questionId)
   return { ok: true, state: { ...state, pinnedQuestionIds: [...ids] } }
+}
+
+
+export function deleteLocalPracticeExercise(state: PracticeLocalReview, libraryId: string, input: unknown): LocalResult {
+  const parsed = practiceExerciseDeleteSchema.safeParse(input)
+  if (!parsed.success || parsed.data.libraryId !== libraryId) return { ok: false, error: 'ข้อมูลแบบฝึกหัดไม่ถูกต้อง' }
+  const value = parsed.data
+  const existing = state.exercises.find(group => group.id === value.id)
+  if (!existing) return { ok: false, error: 'ไม่พบแบบฝึกหัดที่ต้องการลบ กรุณาโหลดข้อมูลล่าสุด' }
+  if (existing.revision !== value.expectedRevision) return { ok: false, conflict: true, error: 'แบบฝึกหัดถูกแก้จากอีกหน้าต่าง กรุณาโหลดข้อมูลล่าสุดก่อนลบ' }
+  return { ok: true, state: { ...state, exercises: state.exercises.filter(group => group.id !== value.id) } }
 }
