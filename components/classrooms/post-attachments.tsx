@@ -11,6 +11,7 @@ import {
   type PostAttachment,
 } from '@/lib/attachment-display'
 import { cn } from '@/lib/utils'
+import { PostPdfAttachment } from './post-pdf-preview'
 
 function AnnouncementImage({ image }: { image: PostAttachment }) {
   const [failed, setFailed] = useState(false)
@@ -63,7 +64,7 @@ function AnnouncementImage({ image }: { image: PostAttachment }) {
   )
 }
 
-/** Images open in place; other attachments retain Storage's original filename download. */
+/** Images and PDFs preview in place; other files retain their download link. */
 export function PostAttachments({ attachments }: { attachments: PostAttachment[] }) {
   if (attachments.length === 0) return null
   const images = attachments.filter(a => isImageAttachment(a.mime))
@@ -78,7 +79,9 @@ export function PostAttachments({ attachments }: { attachments: PostAttachment[]
       )}
       {files.length > 0 && (
         <div className="flex flex-wrap gap-2">
-          {files.map(file => (
+          {files.map(file => file.mime.toLowerCase().split(';')[0].trim() === 'application/pdf' || /\.pdf$/i.test(file.name) ? (
+            <PostPdfAttachment key={file.url} file={file} />
+          ) : (
             <a
               key={file.url}
               href={`${file.url}?download=${encodeURIComponent(file.name)}`}
