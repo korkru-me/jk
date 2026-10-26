@@ -2471,3 +2471,8 @@ Validation: all 4,805 tests in 335 files, TypeScript, token lint and isolated pr
 
 - Matrix assignment titles use foreground text while source classroom names use primary text. Hovering or focusing the header link shows the source classroom, full assignment title and Bangkok deadline, or an explicit no-deadline message.
 - Local TypeScript/token lint pass and the synthetic homeroom fixture verifies the tooltip. This chat scope is authorized for Staging and Production release; unrelated local work is excluded.
+
+
+### Follow-up release completed — 26 October 2026
+
+All local-only work recorded above for this chat is released: Production PR #91 / commit `108b902`, READY on both canonical domains; Staging PR #90 / commit `cba6a69`, READY on staging.korkru.com. See `docs/CLASSROOM_FOLLOWUP_RELEASE_20261026.md` for exact deployments, synthetic hosted QA and post-release primary localhost:3000 parity. All 37 application paths match the release; no migration is needed. Earlier local-only labels describe the implementation phase and are superseded by this release record.
