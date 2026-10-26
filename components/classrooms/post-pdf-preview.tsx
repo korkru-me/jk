@@ -22,7 +22,9 @@ function PdfDocument({ source, name }: { source: string | null; name: string }) 
     setError(false)
     void (async () => {
       try {
-        const response = await fetch(source, { signal: abort.signal, credentials: 'omit', cache: 'no-store', redirect: 'error' })
+        // The protected Staging fixture needs its same-origin hosting session;
+        // Storage requests never include browser credentials.
+        const response = await fetch(source, { signal: abort.signal, credentials: source.startsWith('/') ? 'same-origin' : 'omit', cache: 'no-store', redirect: 'error' })
         const blob = await readPostPdf(response)
         if (abort.signal.aborted) return
         objectUrl = URL.createObjectURL(blob)
