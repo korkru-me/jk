@@ -1,11 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Download, Eye, FileText, LoaderCircle, X } from 'lucide-react'
+import { Download, Eye, FileText, LoaderCircle, Maximize2, Minimize2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { formatFileSize, shortenFileName, type PostAttachment } from '@/lib/attachment-display'
 import { postPdfSource, readPostPdf } from '@/lib/post-pdf-preview'
+import { cn } from '@/lib/utils'
 
 function PdfDocument({ source, name }: { source: string | null; name: string }) {
   const [pdf, setPdf] = useState<string | null>(null)
@@ -47,10 +48,14 @@ function PdfDocument({ source, name }: { source: string | null; name: string }) 
 
 export function PostPdfAttachment({ file }: { file: PostAttachment }) {
   const [open, setOpen] = useState(false)
+  const [expanded, setExpanded] = useState(false)
   const source = postPdfSource(file.url)
   const downloadHref = source ? `${source}${source.includes('?') ? '&' : '?'}download=${encodeURIComponent(file.name)}` : undefined
 
-  return <Dialog open={open} onOpenChange={setOpen}>
+  return <Dialog open={open} onOpenChange={nextOpen => {
+    setOpen(nextOpen)
+    if (!nextOpen) setExpanded(false)
+  }}>
     <DialogTrigger aria-label={`ดูตัวอย่าง PDF ${file.name}`} render={<Button type="button" variant="secondary" className="h-auto min-h-[44px] max-w-64 justify-start gap-2 px-3 py-2 text-left" />}>
       <FileText aria-hidden="true" />
       <span className="min-w-0">
@@ -59,15 +64,33 @@ export function PostPdfAttachment({ file }: { file: PostAttachment }) {
       </span>
       <Eye aria-hidden="true" />
     </DialogTrigger>
-    <DialogContent showCloseButton={false} forceRenderOverlay className="flex h-[min(48rem,calc(100dvh-2rem))] w-[calc(100vw-2rem)] max-w-5xl flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl" data-post-pdf-preview>
+    <DialogContent showCloseButton={false} forceRenderOverlay className={cn(
+      'flex flex-col gap-0 overflow-hidden p-0',
+      expanded
+        ? 'h-dvh max-h-dvh w-screen max-w-none rounded-none sm:max-w-none'
+        : 'h-[min(48rem,calc(100dvh-2rem))] w-[calc(100vw-2rem)] max-w-5xl sm:max-w-5xl',
+    )} data-post-pdf-preview data-expanded={expanded}>
       <header className="flex min-w-0 items-center gap-2 border-b border-border p-3">
         <DialogTitle className="min-w-0 flex-1 truncate text-sm" title={file.name}>{file.name}</DialogTitle>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="min-h-[44px] min-w-[44px] shrink-0"
+          aria-label={expanded ? 'ย่อกลับ' : 'ขยายเต็มหน้าจอ'}
+          aria-pressed={expanded}
+          title={expanded ? 'ย่อกลับ' : 'ขยายเต็มหน้าจอ'}
+          onClick={() => setExpanded(value => !value)}
+        >
+          {expanded ? <Minimize2 aria-hidden="true" data-icon="inline-start" /> : <Maximize2 aria-hidden="true" data-icon="inline-start" />}
+          <span className="hidden sm:inline">{expanded ? 'ย่อกลับ' : 'ขยายเต็มหน้าจอ'}</span>
+        </Button>
         <Button variant="outline" size="sm" className="min-h-[44px] min-w-[44px]" disabled={!downloadHref} aria-label={`ดาวน์โหลด ${file.name}`} render={downloadHref ? <a href={downloadHref} download={file.name} target="_blank" rel="noopener noreferrer" /> : undefined}>
           <Download aria-hidden="true" data-icon="inline-start" /><span className="hidden sm:inline">ดาวน์โหลด</span>
         </Button>
         <DialogClose aria-label="ปิดตัวอย่าง PDF" render={<Button type="button" variant="ghost" size="icon" className="size-[44px]" />}><X aria-hidden="true" /></DialogClose>
       </header>
-      <DialogDescription className="sr-only">ตัวอย่างไฟล์ PDF คลิกด้านนอก กดปุ่มปิด หรือ Escape เพื่อปิด ดาวน์โหลดไฟล์ได้จากปุ่มดาวน์โหลด</DialogDescription>
+      <DialogDescription className="sr-only">ตัวอย่างไฟล์ PDF คลิกด้านนอก กดปุ่มปิด หรือ Escape เพื่อปิด กดขยายเต็มหน้าจอหรือย่อกลับได้จากปุ่มบนหัวกรอบ ดาวน์โหลดไฟล์ได้จากปุ่มดาวน์โหลด</DialogDescription>
       <div className="flex min-h-0 flex-1 flex-col bg-muted/30">{open && <PdfDocument key={source} source={source} name={file.name} />}</div>
     </DialogContent>
   </Dialog>

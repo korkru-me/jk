@@ -1,0 +1,7 @@
+# Full-viewport classroom announcement PDFs — 27 October 2026
+
+Scope: add Expand / Restore to the shared `components/classrooms/post-pdf-preview.tsx` header. Applies to teacher/student classroom streams and nested student announcement previews. The modal expands to the browser viewport using 100dvh; this does not request browser Fullscreen API permission. Original dimensions return on Restore or when reopened. The same mounted PDF reader and Blob URL remain in place while toggling; download, close and existing preview-only dismissal stay available. No shared Dialog, database, dependency or environment change.
+
+Based on Production master `484cb8d`; unrelated primary work is excluded. Implementation is documented in FEATURE_STATUS and DESIGN_SYSTEM.
+
+Validation: production Webpack build, TypeScript, token lint and diff check passed. Actual primary localhost:3000 synthetic PDF expands to 1200×829 at origin 0,0, and 390×844 on mobile; no horizontal overflow and all three mobile actions are 44×44px. Restore keeps the identical Blob URL and resource-request count. Closing and reopening resets expanded=false. Next MCP compilation issues and runtime/config/session errors are empty. Evidence: `/private/tmp/pdf-fullscreen-desktop.png` and `/private/tmp/pdf-fullscreen-mobile.png`. Hosted Staging and Production rollout pending. Unit suite and real user-data/Auth/Storage integration were not run for this reversible presentation change; no migration required.
