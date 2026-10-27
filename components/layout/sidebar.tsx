@@ -56,16 +56,16 @@ const homeNav: NavItem = { href: '/dashboard', label: 'หน้าหลัก'
 function teacherNavigation(): NavEntry[] {
   return [
     homeNav,
+    { href: '/classrooms', label: 'ห้องเรียน', icon: School },
+    { href: '/questions/sets', label: 'คลังโจทย์', icon: LibraryBig },
     {
-      label: 'จัดการโจทย์',
+      label: 'เพิ่มโจทย์',
       icon: NotebookPen,
       children: [
-        { href: '/questions/sets', label: 'คลังโจทย์', icon: LibraryBig },
         { href: '/questions/new', label: 'สร้างโจทย์', icon: FilePlus2 },
         { href: '/questions/import', label: 'นำเข้าโจทย์', icon: FileUp },
       ],
     },
-    { href: '/classrooms', label: 'ห้องเรียน', icon: School },
     {
       label: 'วิจัยการศึกษา',
       icon: FlaskConical,

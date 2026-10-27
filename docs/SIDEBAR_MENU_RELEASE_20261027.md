@@ -1,0 +1,7 @@
+# Teacher sidebar menu — 27 October 2026
+
+Owner-authorized scope: reorder the global teacher/admin navigation as Home → Classrooms → Question library → Add questions → Research → Settings. Library is a top-level link to `/questions/sets`; Add questions contains only Create (`/questions/new`) and Import (`/questions/import`). Existing icons, URL matching, collapsed rail, mobile drawer, contextual classroom navigation and student navigation remain compatible. No migration, dependency or environment change is required.
+
+Candidate based on Production master `108b902`. Changes are limited to `components/layout/sidebar.tsx` and the feature/design/release documentation. Existing primary uncommitted work is excluded from the release.
+
+Validation: semantic token lint, production Webpack build and TypeScript passed. The synthetic sidebar fixture on the actual primary `localhost:3000` showed the requested order, exactly two Add questions children with the original URLs, correct open/closed accessibility state, 44px main menu rows and no mobile horizontal overflow at 390×844. Next MCP reported no compilation or runtime/configuration/session errors. Browser evidence: `/private/tmp/sidebar-local-desktop.png` and `/private/tmp/sidebar-local-mobile.png`. Database/Auth/import actions were not exercised; this presentation-only change needs no unit-suite rerun. Hosted Staging validation and Production rollout are pending.
