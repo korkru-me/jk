@@ -62,6 +62,9 @@ export function ForgotPasswordForm() {
             </span>
           </p>
           <p className="mt-2 text-xs text-muted-foreground">
+            เปิดลิงก์จากอีเมลฉบับล่าสุดในเบราว์เซอร์และอุปกรณ์เดิมที่ใช้ขอลิงก์
+          </p>
+          <p className="text-xs text-muted-foreground">
             ไม่เห็นอีเมล? ลองตรวจสอบโฟลเดอร์ Spam หรือรอสักครู่แล้วลองใหม่
           </p>
         </div>

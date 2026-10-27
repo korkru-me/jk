@@ -1,5 +1,9 @@
 # Architecture
 
+## Recovery failure guidance — local candidate, 27 October 2026
+
+The callback redirects failed recovery attempts with one allowlisted display hint: `browser_required`, `link_expired`, or `verification_failed`. Missing/invalid signed browser intent and PKCE verifier failures get browser guidance; explicit expired/missing provider flow state gets expired/used-link guidance; unknown errors stay generic. Intent absence cannot distinguish another browser from cleared, expired, or superseded local state, so the copy includes a latest-email/new-request fallback. On the denied reset page only, `RecoveryLinkNotice` handles provider error-code fragments unavailable to the server. Provider descriptions and credential values are never rendered. User/session/grant validation still exclusively controls form access; query/fragment hints cannot authorize a password change. A valid grant continues to take precedence over stale URL error hints. No SMTP, template, schema, key, session lifetime or recovery policy change. See `RECOVERY_BROWSER_FEEDBACK_20261027.md` for verification and pending release status.
+
 ## Hosted assigned-work notice verification — 20 October 2026
 
 The resumed Staging test passed the existing application path end to end: a normally authenticated synthetic teacher created and published one exercise and one ordinary-browser exam; the synthetic student received each canonical work notice, saw its room/teacher/type and correct no-due or dated metadata, acknowledged through the real Dialog, and reloaded without the notice returning. The existing `classroom_post` + assignment relation and recipient-scoped `is_read` update provided durable acknowledgement. Guarded reads verified two works/two notices/two read records and zero attempts; scoped SQL observed the same exam notice change from unread to read.

@@ -33,7 +33,7 @@ afterEach(() => { vi.resetAllMocks() })
 describe('recovery email callback authorization', () => {
   it('does not let user-controlled next alone mint a recovery grant through an OAuth code', async () => {
     const response = await GET(request('code=oauth-code&next=%2Freset-password'))
-    expect(response.headers.get('location')).toBe('https://fixture.invalid/reset-password')
+    expect(response.headers.get('location')).toBe('https://fixture.invalid/reset-password?error=verification_failed')
     expect(mocks.exchange).not.toHaveBeenCalled()
     expect(mocks.issueGrant).not.toHaveBeenCalled()
     expect(mocks.createAdmin).not.toHaveBeenCalled()
@@ -41,7 +41,8 @@ describe('recovery email callback authorization', () => {
 
   it('rejects missing, wrong-browser or invalid nonce intent before exchanging a code', async () => {
     mocks.hasIntent.mockResolvedValue(false)
-    await GET(request(recoveryQuery()))
+    const response = await GET(request(recoveryQuery()))
+    expect(response.headers.get('location')).toBe('https://fixture.invalid/reset-password?error=browser_required')
     expect(mocks.hasIntent).toHaveBeenCalledWith(nonce)
     expect(mocks.exchange).not.toHaveBeenCalled()
     expect(mocks.issueGrant).not.toHaveBeenCalled()
@@ -104,6 +105,39 @@ describe('recovery email callback authorization', () => {
     await GET(request(`next=%2Freset-password&recovery_nonce=${nonce}`))
     mocks.hasIntent.mockRejectedValueOnce(new Error('cookie unavailable'))
     await GET(request(recoveryQuery()))
+    expect(mocks.exchange).not.toHaveBeenCalled()
+    expect(mocks.issueGrant).not.toHaveBeenCalled()
+  })
+
+  it('keeps an expired email link distinct from a missing browser intent', async () => {
+    const response = await GET(request('next=%2Freset-password&error_code=otp_expired'))
+    expect(response.headers.get('location')).toBe('https://fixture.invalid/reset-password?error=link_expired')
+    expect(mocks.hasIntent).not.toHaveBeenCalled()
+    expect(mocks.exchange).not.toHaveBeenCalled()
+    expect(mocks.issueGrant).not.toHaveBeenCalled()
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(response.headers.get('referrer-policy')).toBe('no-referrer')
+  })
+
+  it.each([
+    ['flow_state_expired', 'link_expired'],
+    ['flow_state_not_found', 'link_expired'],
+    ['pkce_code_verifier_not_found', 'browser_required'],
+    ['bad_code_verifier', 'browser_required'],
+    ['unexpected_failure', 'verification_failed'],
+  ])('explains exchange failure %s without granting recovery', async (code, reason) => {
+    mocks.exchange.mockResolvedValue({ data: { user: null, session: null }, error: { code } })
+    const response = await GET(request(recoveryQuery()))
+    expect(response.headers.get('location')).toBe(`https://fixture.invalid/reset-password?error=${reason}`)
+    expect(mocks.consumeIntent).not.toHaveBeenCalled()
+    expect(mocks.issueGrant).not.toHaveBeenCalled()
+    expect(mocks.createAdmin).not.toHaveBeenCalled()
+  })
+
+  it('never lets a forged display hint bypass the nonce check or enter the redirect', async () => {
+    mocks.hasIntent.mockResolvedValue(false)
+    const response = await GET(request(recoveryQuery('&error=link_expired&error_description=untrusted')))
+    expect(response.headers.get('location')).toBe('https://fixture.invalid/reset-password?error=browser_required')
     expect(mocks.exchange).not.toHaveBeenCalled()
     expect(mocks.issueGrant).not.toHaveBeenCalled()
   })

@@ -4,9 +4,12 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { cookies } from 'next/headers'
 import { issueRecoveryGrant } from '@/lib/auth/recovery-grant.server'
 import { consumeRecoveryIntent, hasRecoveryIntentNonce } from '@/lib/auth/recovery-intent.server'
+import { recoveryFailureFromCode, type RecoveryFailure } from '@/lib/auth/recovery-feedback'
 
-function recoveryRedirect(origin: string) {
-  const response = NextResponse.redirect(`${origin}/reset-password`)
+function recoveryRedirect(origin: string, failure?: RecoveryFailure) {
+  const destination = new URL('/reset-password', origin)
+  if (failure) destination.searchParams.set('error', failure)
+  const response = NextResponse.redirect(destination)
   response.headers.set('Cache-Control', 'no-store')
   response.headers.set('Referrer-Policy', 'no-referrer')
   return response
@@ -29,7 +32,9 @@ export async function GET(request: NextRequest) {
     : '/dashboard'
 
   if (!code) {
-    if (recoveryFlow || recoveryNonce !== null) return recoveryRedirect(origin)
+    if (recoveryFlow || recoveryNonce !== null) {
+      return recoveryRedirect(origin, recoveryFailureFromCode(searchParams.get('error_code')))
+    }
     return NextResponse.redirect(`${origin}${failedPath}`)
   }
 
@@ -37,11 +42,14 @@ export async function GET(request: NextRequest) {
     // The URL's `next` value and the SDK's mutable redirectType do not prove
     // email ownership. Reject before exchanging a code without its email nonce.
     try {
-      if (!recoveryFlow || signupFlow || !recoveryNonce || !(await hasRecoveryIntentNonce(recoveryNonce))) {
-        return recoveryRedirect(origin)
+      if (!recoveryFlow || signupFlow || !recoveryNonce) {
+        return recoveryRedirect(origin, 'verification_failed')
+      }
+      if (!(await hasRecoveryIntentNonce(recoveryNonce))) {
+        return recoveryRedirect(origin, 'browser_required')
       }
     } catch {
-      return recoveryRedirect(origin)
+      return recoveryRedirect(origin, 'verification_failed')
     }
   }
 
@@ -63,7 +71,7 @@ export async function GET(request: NextRequest) {
   const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
   if (error || !data.user) {
-    if (recoveryFlow) return recoveryRedirect(origin)
+    if (recoveryFlow) return recoveryRedirect(origin, recoveryFailureFromCode(error?.code))
     return NextResponse.redirect(`${origin}${failedPath}`)
   }
 
@@ -72,11 +80,11 @@ export async function GET(request: NextRequest) {
   if (next === '/reset-password') {
     try {
       if (!data.session || !recoveryNonce || !(await consumeRecoveryIntent(recoveryNonce, data.user.email ?? '', data.user.id))) {
-        return recoveryRedirect(origin)
+        return recoveryRedirect(origin, 'verification_failed')
       }
       await issueRecoveryGrant(data.user.id, data.session.access_token)
     } catch {
-      return recoveryRedirect(origin)
+      return recoveryRedirect(origin, 'verification_failed')
     }
     return recoveryRedirect(origin)
   }

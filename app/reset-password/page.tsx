@@ -1,17 +1,20 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { AlertCircle } from 'lucide-react'
 
 import { ResetPasswordForm } from '@/components/auth/reset-password-form'
-import { Button } from '@/components/ui/button'
+import { RecoveryLinkNotice } from '@/components/auth/recovery-link-notice'
 import { Card } from '@/components/ui/card'
 import { BrandLogo } from '@/components/brand-logo'
 import { createClient } from '@/lib/supabase/server'
 import { hasRecoveryGrant } from '@/lib/auth/recovery-grant.server'
+import { recoveryFailure } from '@/lib/auth/recovery-feedback'
 
 export const metadata: Metadata = { title: 'ตั้งรหัสผ่านใหม่ — KorKru' }
 
-export default async function ResetPasswordPage() {
+export default async function ResetPasswordPage({ searchParams }: {
+  searchParams: Promise<{ error?: string | string[] }>
+}) {
+  const { error } = await searchParams
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   const { data: { session } } = await supabase.auth.getSession()
@@ -34,20 +37,7 @@ export default async function ResetPasswordPage() {
         {canReset ? (
           <ResetPasswordForm />
         ) : (
-          <div className="space-y-4 text-center">
-            <div className="flex justify-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-warning/10">
-                <AlertCircle className="h-7 w-7 text-warning" />
-              </div>
-            </div>
-            <div>
-              <p className="font-semibold text-foreground">ลิงก์นี้หมดอายุหรือถูกใช้แล้ว</p>
-              <p className="mt-1 text-sm text-muted-foreground">ขอลิงก์ใหม่เพื่อดำเนินการต่อ</p>
-            </div>
-            <Button className="w-full" render={<Link href="/forgot-password" />}>
-              ขอลิงก์ตั้งรหัสผ่านใหม่
-            </Button>
-          </div>
+          <RecoveryLinkNotice reason={recoveryFailure(error)} />
         )}
       </Card>
     </div>
