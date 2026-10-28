@@ -20,6 +20,8 @@ export function ExamQuestionFrame({
   feedback?: ReactNode
   headerClassName?: string
 }) {
+  const splitIllustration = sideBySide && Boolean(illustration)
+
   return (
     <Card
       radius="md"
@@ -30,8 +32,8 @@ export function ExamQuestionFrame({
     >
       <div className={cn('flex flex-wrap items-center gap-1.5', headerClassName)} data-exam-question-header>{header}</div>
       <div className="flex min-w-0 flex-col gap-2 empty:hidden" data-exam-question-stem>{stem}</div>
-      <div className={cn('grid min-w-0 items-start gap-2.5', sideBySide && '@min-[32rem]/exam-question:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]')}>
-        {illustration && <div className="flex min-w-0 flex-wrap items-start gap-2" data-exam-question-illustration>{illustration}</div>}
+      <div className={cn('grid min-w-0 items-start gap-2.5', splitIllustration && '@min-[44rem]/exam-question:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]')}>
+        {illustration && <div className={cn('flex min-w-0 flex-wrap items-start gap-2', splitIllustration && '[&>div]:w-full [&_img]:h-auto [&_img]:max-h-none [&_img]:w-full')} data-exam-question-illustration>{illustration}</div>}
         <div className="min-w-0" data-exam-question-answer>{children}</div>
       </div>
       {feedback}
