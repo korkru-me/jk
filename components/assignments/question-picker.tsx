@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,9 +13,36 @@ import type { getQuestionPreviewDetails } from '@/lib/actions/question-previews'
 import { Card } from '@/components/ui/card'
 import { QuestionCard } from '@/components/questions/question-card'
 import { getQuestionCardData } from '@/lib/actions/question-card-data'
-import { CARD_DATA_MAX_IDS, EMPTY_CARD_DATA, type QuestionCardData } from '@/lib/question-card-data'
+import { EMPTY_CARD_DATA, type QuestionCardData } from '@/lib/question-card-data'
+import { nextCardDataBatch } from '@/lib/question-card-prefetch'
 
 const DIFFICULTY_FILTERS = ['all', 'easy', 'medium', 'hard', 'analytical'] as const
+
+/**
+ * Cards each part of the list (the picks, then the bank) draws before the
+ * reader asks for more by scrolling to its end.
+ *
+ * The list used to draw every match at once. Over a real 912-question คลัง
+ * (28 ตุลาคม 2026) opening เพิ่มหรือเอาโจทย์ออก built 937 cards — some 19,000
+ * DOM nodes and a 0.3 s freeze on a fast laptop — and every badge batch that
+ * came back re-rendered all of them again. Paging rather than windowing: cards
+ * differ in height and the list keeps a ticked row still under the pointer,
+ * both of which a list that unmounts rows as they scroll away would fight.
+ * Select-all and the match count still work on every match, drawn or not.
+ */
+const PICKER_PAGE_SIZE = 40
+
+type PickerPages = { filterKey: string; selected: number; bank: number }
+
+function firstPages(filterKey: string): PickerPages {
+  return { filterKey, selected: PICKER_PAGE_SIZE, bank: PICKER_PAGE_SIZE }
+}
+
+/** One more page of `part` — from the first page again if the filters changed. */
+function morePages(prev: PickerPages, filterKey: string, part: 'selected' | 'bank'): PickerPages {
+  const base = prev.filterKey === filterKey ? prev : firstPages(filterKey)
+  return { ...base, [part]: base[part] + PICKER_PAGE_SIZE }
+}
 
 interface Props {
   questions: AssignmentQuestionOption[]
@@ -55,15 +82,20 @@ interface Props {
   initialCardData?: QuestionCardData
   /** Local visual fixtures may supply synthetic details without reading Supabase. */
   loadPreviewQuestions?: typeof getQuestionPreviewDetails
+  /** Local load fixtures may supply synthetic card badges the same way. */
+  loadCardData?: typeof getQuestionCardData
 }
 
 export function QuestionPicker({
   questions, selectedIds, onToggle, onSelectionChange, search, onSearchChange, diffFilter, onDiffFilterChange,
   title = 'เลือกโจทย์', toolbar, banner, showSelectedFooter = true, showHeader = true, surface = 'card',
-  baselineIds, collectionNoun = 'แฟ้ม', loadPreviewQuestions, initialCardData,
+  baselineIds, collectionNoun = 'แฟ้ม', loadPreviewQuestions, initialCardData, loadCardData = getQuestionCardData,
 }: Props) {
   const [previewId, setPreviewId] = useState<string | null>(null)
-  const allTags = Array.from(new Set(questions.flatMap(q => q.tags ?? []))).sort()
+  const allTags = useMemo(
+    () => Array.from(new Set(questions.flatMap(q => q.tags ?? []))).sort(),
+    [questions],
+  )
   // The tags the last word typed points at — shown as shortcuts, not as a
   // filter of their own: one box searches names, bodies and tags together,
   // the same rule the คลังโจทย์ page runs server-side.
@@ -79,8 +111,13 @@ export function QuestionPicker({
     onSearchChange(`${words.join(' ')} `)
   }
 
-  // Title, body text and tags, word by word — see lib/question-search.
-  const filteredQs = filterQuestions(questions, { search, difficulty: diffFilter })
+  // Title, body text and tags, word by word — see lib/question-search. Kept
+  // across renders that change neither: a tick or a badge batch arriving
+  // should not strip the markup of the whole คลัง again.
+  const filteredQs = useMemo(
+    () => filterQuestions(questions, { search, difficulty: diffFilter }),
+    [questions, search, diffFilter],
+  )
   const hasFilters = search.trim().length > 0 || diffFilter !== 'all'
   const selectedSet = new Set(selectedIds)
   const matchingSelectedCount = filteredQs.filter(q => selectedSet.has(q.id)).length
@@ -110,10 +147,24 @@ export function QuestionPicker({
     .map(id => filteredById.get(id))
     .filter((question): question is AssignmentQuestionOption => question !== undefined)
 
+  // How far each part is drawn, keyed by the filters so that a new search or
+  // ระดับ starts again from the first page. See PICKER_PAGE_SIZE.
+  const filterKey = `${diffFilter}\n${search}`
+  const [pageState, setPageState] = useState(() => firstPages(filterKey))
+  const pages = pageState.filterKey === filterKey ? pageState : firstPages(filterKey)
+  const shownSelectedQs = selectedQs.slice(0, pages.selected)
+  const shownBankQs = filteredQs.slice(0, pages.bank)
+  const moreSelected = selectedQs.length - shownSelectedQs.length
+  const moreBank = filteredQs.length - shownBankQs.length
+
   const listRef = useRef<HTMLDivElement>(null)
   const bankRowRefs = useRef(new Map<string, HTMLDivElement>())
+  const loadMoreRef = useRef<HTMLDivElement>(null)
   const [cardData, setCardData] = useState(initialCardData ?? EMPTY_CARD_DATA)
   const requestedIds = useRef(new Set(Object.keys(initialCardData?.details ?? {})))
+  const cardDataInFlight = useRef(false)
+  /** The current list's way to ask for the next batch, for a request that just came back. */
+  const scheduleCardData = useRef<(() => void) | null>(null)
   const pendingAnchorRef = useRef<{ id: string; top: number } | null>(null)
 
   useLayoutEffect(() => {
@@ -126,38 +177,87 @@ export function QuestionPicker({
     pendingAnchorRef.current = null
   }, [selectedIds])
 
-  // Read badges only for cards reaching the scroll viewport, in bounded batches.
-  // The bank can contain thousands of questions; opening a picker must not
-  // request all of their folder memberships, duplicates and solution status.
-  const visibleRowsKey = [...selectedQs, ...filteredQs].map(q => q.id).join(',')
+  // Read badges only for drawn cards near the scroll viewport. The bank can
+  // contain thousands of questions; opening a picker must not request all of
+  // their folder memberships, duplicates and solution status. One batch is in
+  // flight at a time and each covers the screen plus the rows after it — see
+  // lib/question-card-prefetch.ts for why.
+  const drawnRowsKey = [...shownSelectedQs, ...shownBankQs].map(q => q.id).join(',')
   useEffect(() => {
     const list = listRef.current
     if (!list) return
+    const onScreen = new Set<HTMLElement>()
+    let timer: ReturnType<typeof setTimeout> | undefined
+
+    const requestNextBatch = () => {
+      if (cardDataInFlight.current) return
+      const rows = [...list.querySelectorAll<HTMLElement>('[data-question-id]')]
+      const ids = nextCardDataBatch(
+        rows.map(row => row.dataset.questionId!),
+        new Set([...onScreen].map(row => row.dataset.questionId!)),
+        requestedIds.current,
+      )
+      if (ids.length === 0) return
+      ids.forEach(id => requestedIds.current.add(id))
+      cardDataInFlight.current = true
+      loadCardData(ids).then(data => {
+        cardDataInFlight.current = false
+        setCardData(prev => ({
+          details: { ...prev.details, ...data.details },
+          duplicateCounts: { ...prev.duplicateCounts, ...data.duplicateCounts },
+          subQuestionCounts: { ...prev.subQuestionCounts, ...data.subQuestionCounts },
+          setMemberships: { ...prev.setMemberships, ...data.setMemberships },
+          solutionPresence: { ...prev.solutionPresence, ...data.solutionPresence },
+        }))
+        // The reader may have scrolled on while this was out.
+        scheduleCardData.current?.()
+      }, error => {
+        cardDataInFlight.current = false
+        console.error('[question-picker] card details failed:', error)
+        // Asked again on the next scroll rather than straight away, so a
+        // server that is failing is not called in a loop.
+        ids.forEach(id => requestedIds.current.delete(id))
+      })
+    }
+    // A scroll fires the observer many times; wait for it to settle so the
+    // batch is chosen from where the reader stopped, not from every row passed.
+    const schedule = () => {
+      clearTimeout(timer)
+      timer = setTimeout(requestNextBatch, 100)
+    }
+    scheduleCardData.current = schedule
+
     const observer = new IntersectionObserver(entries => {
-      const missing = [...new Set(entries
-        .filter(entry => entry.isIntersecting)
-        .map(entry => (entry.target as HTMLElement).dataset.questionId!))]
-        .filter(id => !requestedIds.current.has(id))
-      for (let offset = 0; offset < missing.length; offset += CARD_DATA_MAX_IDS) {
-        const ids = missing.slice(offset, offset + CARD_DATA_MAX_IDS)
-        ids.forEach(id => requestedIds.current.add(id))
-        void getQuestionCardData(ids).then(data => {
-          setCardData(prev => ({
-            details: { ...prev.details, ...data.details },
-            duplicateCounts: { ...prev.duplicateCounts, ...data.duplicateCounts },
-            subQuestionCounts: { ...prev.subQuestionCounts, ...data.subQuestionCounts },
-            setMemberships: { ...prev.setMemberships, ...data.setMemberships },
-            solutionPresence: { ...prev.solutionPresence, ...data.solutionPresence },
-          }))
-        }).catch(error => {
-          console.error('[question-picker] card details failed:', error)
-          ids.forEach(id => requestedIds.current.delete(id))
-        })
+      for (const entry of entries) {
+        const row = entry.target as HTMLElement
+        if (entry.isIntersecting) onScreen.add(row)
+        else onScreen.delete(row)
       }
+      schedule()
     }, { root: list, rootMargin: '100px' })
     list.querySelectorAll('[data-question-id]').forEach(row => observer.observe(row))
+    return () => {
+      observer.disconnect()
+      clearTimeout(timer)
+      if (scheduleCardData.current === schedule) scheduleCardData.current = null
+    }
+  }, [drawnRowsKey, loadCardData])
+
+  // The next page of the bank as its end scrolls near. The ‘แสดงเพิ่ม’ button
+  // under the list does the same for keyboard users.
+  const hasMoreBank = moreBank > 0
+  useEffect(() => {
+    const list = listRef.current
+    const sentinel = loadMoreRef.current
+    if (!list || !sentinel) return
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) {
+        setPageState(prev => morePages(prev, filterKey, 'bank'))
+      }
+    }, { root: list, rootMargin: '0px 0px 400px 0px' })
+    observer.observe(sentinel)
     return () => observer.disconnect()
-  }, [visibleRowsKey])
+  }, [hasMoreBank, pages.bank, filterKey])
 
   function toggleFromBank(id: string) {
     const row = bankRowRefs.current.get(id)
@@ -337,17 +437,24 @@ export function QuestionPicker({
                 <p className="px-1 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   โจทย์ที่เลือก ({selectedIds.length} ข้อ)
                 </p>
-                {selectedQs.map(q => (
+                {shownSelectedQs.map(q => (
                   <div key={`selected-${q.id}`} data-question-id={q.id}>
                     {questionRow(q, () => onToggle(q.id), 'selected')}
                   </div>
                 ))}
+                {moreSelected > 0 && (
+                  <ShowMoreRow
+                    label={`แสดงโจทย์ที่เลือกอีก ${Math.min(PICKER_PAGE_SIZE, moreSelected)} ข้อ`}
+                    detail={`แสดงอยู่ ${shownSelectedQs.length} จาก ${selectedQs.length} ข้อ`}
+                    onClick={() => setPageState(prev => morePages(prev, filterKey, 'selected'))}
+                  />
+                )}
                 <p className="px-1 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   โจทย์ทั้งหมด
                 </p>
               </>
             )}
-            {filteredQs.map(q => (
+            {shownBankQs.map(q => (
               <div
                 key={`bank-${q.id}`}
                 data-question-id={q.id}
@@ -359,6 +466,14 @@ export function QuestionPicker({
                 {questionRow(q, () => toggleFromBank(q.id), 'bank')}
               </div>
             ))}
+            {moreBank > 0 && (
+              <ShowMoreRow
+                ref={loadMoreRef}
+                label={`แสดงเพิ่มอีก ${Math.min(PICKER_PAGE_SIZE, moreBank)} ข้อ`}
+                detail={`แสดงอยู่ ${shownBankQs.length} จาก ${filteredQs.length} ข้อ`}
+                onClick={() => setPageState(prev => morePages(prev, filterKey, 'bank'))}
+              />
+            )}
           </>
         )}
       </div>
@@ -393,6 +508,23 @@ export function QuestionPicker({
       loadQuestions={loadPreviewQuestions}
     />
     </>
+  )
+}
+
+/** The next page of a part of the list, under its last drawn card. */
+function ShowMoreRow({ label, detail, onClick, ref }: {
+  label: string
+  detail: string
+  onClick: () => void
+  ref?: React.Ref<HTMLDivElement>
+}) {
+  return (
+    <div ref={ref} className="flex flex-wrap items-center justify-center gap-x-2 text-xs text-muted-foreground">
+      <Button type="button" variant="link" size="xs" onClick={onClick} className="pointer-coarse:min-h-11">
+        {label}
+      </Button>
+      <span>{detail}</span>
+    </div>
   )
 }
 
