@@ -1,5 +1,9 @@
 # Architecture
 
+## Question library bulk actions — 28 October 2026
+
+`LibraryPanel` retains selection across pages. Sharing calls `exportQuestions`, which validates UUIDs, checks session ownership and snapshot exclusion in bounded 100-ID reads, preserves selection order and fails if any row is missing or any multi-step group is selected. The existing portable JSON/import pipeline remains compatible. `question-bulk.ts` deletes up to 100 selected parent/standalone IDs per request under the session client, verifies ownership before deleting and expands selected groups to their children. Only returned deleted parent IDs are acknowledged; the client retains unacknowledged selections and reports partial progress. Files use the existing release helper. No privileged client, new schema or policy is involved.
+
 ## Hosted assigned-work notice verification — 20 October 2026
 
 The resumed Staging test passed the existing application path end to end: a normally authenticated synthetic teacher created and published one exercise and one ordinary-browser exam; the synthetic student received each canonical work notice, saw its room/teacher/type and correct no-due or dated metadata, acknowledged through the real Dialog, and reloaded without the notice returning. The existing `classroom_post` + assignment relation and recipient-scoped `is_read` update provided durable acknowledgement. Guarded reads verified two works/two notices/two read records and zero attempts; scoped SQL observed the same exam notice change from unread to read.
