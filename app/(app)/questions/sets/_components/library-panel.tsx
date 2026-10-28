@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
-import { Layers, Plus, FolderMinus } from 'lucide-react'
+import { Layers, Plus, FolderMinus, Share2, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Pagination } from '@/components/ui/pagination'
@@ -20,9 +20,11 @@ import {
 import type { QuestionSetRef } from '@/components/questions/question-set-badges'
 import { addQuestionsToSets, removeQuestionsFromQuestionSet } from '@/lib/actions/question-sets'
 import { getQuestionClientDetail } from '@/lib/actions/questions'
+import { deleteSelectedQuestions } from '@/lib/actions/question-bulk'
+import { exportQuestions } from '@/lib/actions/question-export'
 import { questionSortParams, type QuestionSort } from '@/lib/question-sort'
 import type { QuestionSearchScope } from '@/lib/question-search'
-import { cn } from '@/lib/utils'
+import { cn, downloadTextFile } from '@/lib/utils'
 import { LibraryQuestionCard } from './library-question-card'
 import { LibraryToolbar, libraryScopeCopy, scopeKey, type LibraryScopeOption } from './library-toolbar'
 import type { QuestionDetailWithCategory } from '../../page'
@@ -178,6 +180,60 @@ export function LibraryPanel({
     })
   }
 
+  function handleShare() {
+    const ids = [...selectedIds]
+    startTransition(async () => {
+      try {
+        const result = await exportQuestions(ids)
+        if ('error' in result) { toast.error(result.error); return }
+        downloadTextFile(result.filename, result.content)
+        toast.success(`ดาวน์โหลดไฟล์แชร์ ${ids.length} ข้อแล้ว`, {
+          description: 'ส่งไฟล์ให้ครูท่านอื่น แล้วนำเข้าที่ “เพิ่มโจทย์ → นำเข้าไฟล์”',
+          duration: 8000,
+        })
+      } catch {
+        toast.error('ดาวน์โหลดไฟล์ไม่สำเร็จ กรุณาลองใหม่')
+      }
+    })
+  }
+
+  async function handleDelete() {
+    const ids = [...selectedIds]
+    if (!(await confirm({
+      title: `ลบโจทย์ที่เลือก ${ids.length} ข้อ?`,
+      description: 'โจทย์จะถูกลบถาวรออกจากคลังและทุกแฟ้ม กู้คืนไม่ได้ โจทย์หลายขั้นตอนจะลบข้อย่อยทั้งกลุ่มด้วย หากต้องการเก็บสำเนา ให้แชร์เป็นไฟล์ก่อนลบ',
+      confirmLabel: `ลบ ${ids.length} ข้อถาวร`,
+      variant: 'destructive',
+      confirmOutsideDismissal: true,
+    }))) return
+
+    startTransition(async () => {
+      const deleted: string[] = []
+      let failure: string | undefined
+      try {
+        for (let start = 0; start < ids.length; start += 100) {
+          const result = await deleteSelectedQuestions(ids.slice(start, start + 100))
+          if ('error' in result) { failure = result.error; break }
+          deleted.push(...result.deletedIds)
+          if (result.deletedIds.length !== ids.slice(start, start + 100).length) {
+            failure = 'บางข้อไม่ได้ถูกลบ กรุณาโหลดหน้าใหม่ก่อนลองอีกครั้ง'
+            break
+          }
+        }
+      } catch {
+        failure = 'การเชื่อมต่อขัดข้อง กรุณาโหลดหน้าใหม่เพื่อตรวจสอบผลก่อนลองอีกครั้ง'
+      }
+      if (deleted.length > 0) {
+        // Deletion hides cards in every scope, including “ทั้งหมด”.
+        setSettledIds(prev => new Set([...prev, ...deleted]))
+        setSelectedIds(prev => prev.filter(id => !deleted.includes(id)))
+        toast.success(`ลบโจทย์แล้ว ${deleted.length} ข้อ`)
+      }
+      if (failure) toast.error(failure)
+      router.refresh()
+    })
+  }
+
   // Nothing to say to a teacher whose คลัง is empty — the แฟ้ม empty state
   // already tells them to make a โจทย์ first.
   if (ownQuestionTotal === 0) return null
@@ -256,6 +312,7 @@ export function LibraryPanel({
                 <input
                   type="checkbox"
                   checked={allSelected}
+                  disabled={isPending}
                   onChange={() => setSelectedIds(allSelected
                     ? selectedIds.filter(id => !visible.some(question => question.id === id))
                     : [...new Set([...selectedIds, ...visible.map(question => question.id)])])}
@@ -280,9 +337,18 @@ export function LibraryPanel({
                   <span className="text-muted-foreground"> (หน้านี้ {selectedOnPage.length} ข้อ)</span>
                 )}
               </p>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 [&>button]:min-h-11">
                 <Button variant="ghost" size="sm" onClick={() => setSelectedIds([])} disabled={isPending}>
                   ล้างที่เลือก
+                </Button>
+                <Button size="sm" onClick={() => setFilingIds([...selectedIds])} disabled={isPending}>
+                  <Layers data-icon="inline-start" /> เพิ่ม {selectedIds.length} ข้อเข้าแฟ้ม
+                </Button>
+                <Button variant="destructive" size="sm" onClick={() => void handleDelete()} disabled={isPending}>
+                  <Trash2 data-icon="inline-start" /> ลบที่เลือก
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleShare} disabled={isPending}>
+                  <Share2 data-icon="inline-start" /> แชร์ให้ครูท่านอื่น
                 </Button>
                 {activeSet && (
                   <Button
@@ -295,9 +361,6 @@ export function LibraryPanel({
                     <FolderMinus className="w-3.5 h-3.5" /> เอาออกจาก {activeSet.title}
                   </Button>
                 )}
-                <Button size="sm" className="gap-1.5" onClick={() => setFilingIds(selectedIds)} disabled={isPending}>
-                  <Layers className="w-3.5 h-3.5" /> เพิ่ม {selectedIds.length} ข้อเข้าแฟ้ม
-                </Button>
               </div>
             </Card>
           )}
