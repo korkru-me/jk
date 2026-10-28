@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -33,6 +33,7 @@ export function ConfirmDialog({
   cancelLabel = 'ยกเลิก', variant = 'default', onConfirm, finalFocus, confirmOutsideDismissal = false,
 }: Props) {
   const [closing, setClosing] = useState(false)
+  const cancelRef = useRef<HTMLButtonElement>(null)
   return (
     <Dialog open={open} onOpenChange={(next, details) => {
       if (!next && confirmOutsideDismissal && details.reason === 'outside-press') {
@@ -48,7 +49,7 @@ export function ConfirmDialog({
           {description && <DialogDescription render={<div />}>{description}</DialogDescription>}
         </DialogHeader>
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button ref={cancelRef} type="button" variant="outline" onClick={() => onOpenChange(false)}>
             {cancelLabel}
           </Button>
           <Button
@@ -68,6 +69,7 @@ export function ConfirmDialog({
           description="ยังไม่ได้ลบโจทย์ รายการที่เลือกยังคงอยู่"
           confirmLabel="ยืนยันปิด"
           cancelLabel="กลับไปดำเนินการต่อ"
+          finalFocus={cancelRef}
           onConfirm={() => { setClosing(false); onOpenChange(false) }}
         />
       )}
