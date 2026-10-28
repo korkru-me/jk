@@ -10,6 +10,7 @@ import type { Question } from '@/lib/types'
 import { normalizeQuestionText } from '@/lib/question-content-match'
 import { withContentFingerprint } from '@/lib/question-fingerprint'
 import { fileQuestionsIntoSets } from '@/lib/question-set-filing'
+import { z } from 'zod'
 
 type QuestionRow = Question & { question_categories?: { name: string } | null }
 
@@ -18,26 +19,25 @@ function slugifyFilename(title: string) {
 }
 
 export async function exportQuestions(ids: string[]) {
-  if (ids.length === 0) return { error: 'ไม่ได้เลือกโจทย์' }
+  const parsed = z.array(z.uuid()).min(1).max(10000).safeParse(ids)
+  if (!parsed.success) return { error: 'กรุณาเลือกโจทย์ที่ถูกต้อง ไม่เกิน 10,000 ข้อ' }
+  const uniqueIds = [...new Set(parsed.data)]
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
-  const { data, error } = await supabase
-    .from('questions')
-    .select('*, question_categories(name)')
-    .in('id', ids)
-    .eq('created_by', user.id)
-    .eq('is_research_snapshot', false)
-
-  if (error) return { error: error.message }
-  const rows = (data ?? []) as QuestionRow[]
-
-  const exportable = rows.filter(q => !q.group_id)
-  if (exportable.length === 0) {
-    return { error: 'โจทย์แบบหลายขั้นตอน (กลุ่มข้อ) ยังไม่รองรับการส่งออกเป็นไฟล์' }
+  const byId = new Map<string, QuestionRow>()
+  // Selection can span pages. Bound each read to avoid PostgREST's row/URL limits.
+  for (let start = 0; start < uniqueIds.length; start += 100) {
+    const { data, error } = await supabase.from('questions').select('*, question_categories(name)')
+      .in('id', uniqueIds.slice(start, start + 100)).eq('created_by', user.id).eq('is_research_snapshot', false)
+    if (error) return { error: 'ส่งออกโจทย์ไม่สำเร็จ กรุณาลองใหม่' }
+    for (const row of (data ?? []) as QuestionRow[]) byId.set(row.id, row)
   }
+  if (byId.size !== uniqueIds.length) return { error: 'มีโจทย์ที่ถูกลบแล้วหรือคุณไม่มีสิทธิ์ส่งออก กรุณาโหลดหน้าใหม่' }
+  const exportable = uniqueIds.map(id => byId.get(id)!)
+  if (exportable.some(q => q.group_id)) return { error: 'โจทย์แบบหลายขั้นตอน (กลุ่มข้อ) ยังไม่รองรับการส่งออก กรุณายกเลิกเลือกกลุ่มข้อก่อนแชร์' }
 
   const file = buildExportFile(exportable.map(toPortableQuestion))
   const filename = exportable.length === 1
