@@ -1,5 +1,9 @@
 # Architecture
 
+## Question picker paging and badge prefetch — 28 October 2026
+
+`QuestionPicker` (assignment edit/create, แฟ้มโจทย์ editor, คลังฝึก) still receives the whole bank from the server and filters it in the browser, but draws each part of the list — the review copies of the picks, then the bank — 40 cards at a time. The next bank page loads as its end nears (IntersectionObserver on the list, 400px ahead) or from the “แสดงเพิ่ม” button; a new search or ระดับ starts from the first page. Select-all and the match count still cover every match. Card badges still come from the `getQuestionCardData` Server Action, but only one call is in flight per picker: after scrolling settles (100 ms) `nextCardDataBatch` (`lib/question-card-prefetch.ts`) picks the drawn rows on screen and fills the batch up to the 60-id server cap with the rows after them, then above. This works around Next.js dispatching Server Actions one at a time per client, which had queued a call per two or three cards scrolled past. `loadCardData` lets the `/exam-screen-lab/question-picker-load` fixture use a synthetic, serialized loader instead of Supabase. No server, schema or policy change.
+
 ## Question library bulk actions — 28 October 2026
 
 `LibraryPanel` retains selection across pages. Sharing calls `exportQuestions`, which validates UUIDs, checks session ownership and snapshot exclusion in bounded 100-ID reads, preserves selection order and fails if any row is missing or any multi-step group is selected. The existing portable JSON/import pipeline remains compatible. `question-bulk.ts` deletes up to 100 selected parent/standalone IDs per request under the session client, verifies ownership before deleting and expands selected groups to their children. Only returned deleted parent IDs are acknowledged; the client retains unacknowledged selections and reports partial progress. Files use the existing release helper. No privileged client, new schema or policy is involved.
