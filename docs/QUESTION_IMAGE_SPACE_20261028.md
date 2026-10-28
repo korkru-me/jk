@@ -13,4 +13,10 @@ Scope: shared `components/exam/exam-question-frame.tsx`, design guidance and rel
 
 ## Production and primary parity
 
-Production PR #98 awaits promotion after the completed Staging checks. Primary localhost:3000 already contains the identical component; re-verify against the Ready Production commit after deployment. Preserve unrelated primary changes and local environment.
+Production PR #98 merged as `986d2ec19c4572ad8cf372de30d3d639c7ea6873`. Deployment `dpl_9HJqC6hzT8bL7zjKU6qJ83PojNzM` is **Ready / Production / Current** on `https://www.korkru.com`; the Vercel dashboard explicitly lists the canonical domain and exact commit, and GitHub deployment `7376280368` reports success. The deployment's component is byte-identical to the tested Staging component.
+
+Read-only Production smoke: the teacher waiting screen and active teacher preview rendered without creating attempts, answers or scores, with no captured console warnings/errors. The active preview showed existing non-MCQ questions; the detailed MCQ interaction/layout checks were performed on isolated Staging. One older assignment preview returned 404 before rendering its questions; that route/data condition was not changed, and the active preview loaded successfully. No Production data was written or modified.
+
+Actual primary server metadata confirms `/Users/korkusonmasaen/Korkru/korkru` at `http://localhost:3000`. Its shared component exactly matches released commit `986d2ec` (SHA-256 `684945ebd12054fd40793d80c0a0e6b7f0f82c41d3ed7770951ebbf57ca91c46`). No dependency/configuration change was needed. Existing unrelated primary work and local environment were preserved.
+
+Primary browser verification: at 1512px question/choice widths 729.875/364.938px with no max-height; at 390px both widths 330.406px, stacked without horizontal overflow. Screenshots: `/private/tmp/korkru-image-space-primary-desktop.png` and `/private/tmp/korkru-image-space-primary-mobile.png`. Primary TypeScript, token lint, Next compilation and runtime checks passed. The only hosted interaction tests used the synthetic Staging fixture; no database-backed real submission or upload was tested or required for this layout-only release. No migrations, cleanup or remaining rollout step required.

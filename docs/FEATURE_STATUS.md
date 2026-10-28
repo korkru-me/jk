@@ -1,12 +1,14 @@
 # Feature status
 
-## พื้นที่รูปโจทย์ปรนัย — 28 ตุลาคม 2026 (Staging verified; Production pending)
+## พื้นที่รูปโจทย์ปรนัย — 28 ตุลาคม 2026 (Production released; primary local parity verified)
 
 ปรับ ExamQuestionFrame ที่ใช้ร่วมกันในหน้าข้อสอบ แบบฝึกหัด โหมดตัวอย่าง/โหมดโฟกัส และคลังฝึก: เมื่อมีรูปประกอบและกรอบกว้างอย่างน้อย 44rem ให้รูปโจทย์ 2 ส่วนและตัวเลือก 1 ส่วน จากเดิม 1:2 รูปขยายเต็มคอลัมน์ตามสัดส่วนจริงและไม่จำกัดความสูง บนกรอบแคบวางรูปเต็มความกว้างก่อนตัวเลือก โจทย์ไม่มีรูปใช้คำตอบเต็มแถว ไม่เปลี่ยนข้อมูลหรือกติกาคะแนน
 
 ตรวจบน localhost:3000 ด้วย synthetic exam lab: จอ 1200px รูป 261→522px / ตัวเลือก 522→261px, จอ 1440px รูป 682px / ตัวเลือก 341px, จอ 390px วางรูปเต็ม 330px เหนือตัวเลือกและไม่มี horizontal overflow; รูปแนวตั้ง 600×900 แสดง 682×1023 ตามสัดส่วนและไม่มี max-height เลือกคำตอบได้ TypeScript, production build (แยก distDir), lint:tokens และ Next runtime/compilation checks ผ่าน ไม่มี migration; ยังไม่ทดสอบ attempt จริงบน staging/production
 
 Hosted Staging ผ่านที่ merge `84c82dd725b77b4f5daf01a7cc8f088b5cfcec86` (PR #99), deployment `4he9SYPTiPCYjBTh8djLaRsczez1`: badge STAGING มองเห็น, จอ 1512px รูป 729.875px / ตัวเลือก 364.938px, มือถือ 390px รูปและตัวเลือกเต็ม 330.406px คนละแถว ไม่มี overflow; เลือก/ตรวจถูก 1/1/ทำใหม่/ตัดและเรียกคืนตัวเลือก/โหมดโฟกัสผ่าน ไม่มี console warning/error และไม่บันทึกข้อมูลบนระบบ ดู `docs/QUESTION_IMAGE_SPACE_20261028.md`
+
+Production PR #98 merged เป็น `986d2ec19c4572ad8cf372de30d3d639c7ea6873`; deployment `dpl_9HJqC6hzT8bL7zjKU6qJ83PojNzM` Ready/Current บน www.korkru.com ตรวจ teacher preview แบบอ่านอย่างเดียวแล้ว เครื่องหลัก localhost:3000 ใช้ component ตรงกับ release, desktop/mobile ไม่มี overflow และ TypeScript/token lint/Next compilation/runtime ผ่าน ไม่มี migration รายละเอียดขอบเขตและผลตรวจใน release note
 
 ## จัดการโจทย์ที่เลือกหลายข้อ — 28 ตุลาคม 2026
 
