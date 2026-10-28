@@ -19,6 +19,7 @@ interface Props {
   onConfirm: () => void
   /** Where focus returns when a confirmation is nested inside another popup. */
   finalFocus?: React.ComponentProps<typeof DialogContent>['finalFocus']
+  confirmOutsideDismissal?: boolean
 }
 
 /**
@@ -29,10 +30,18 @@ interface Props {
  */
 export function ConfirmDialog({
   open, onOpenChange, title, description, confirmLabel,
-  cancelLabel = 'ยกเลิก', variant = 'default', onConfirm, finalFocus,
+  cancelLabel = 'ยกเลิก', variant = 'default', onConfirm, finalFocus, confirmOutsideDismissal = false,
 }: Props) {
+  const [closing, setClosing] = useState(false)
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(next, details) => {
+      if (!next && confirmOutsideDismissal && details.reason === 'outside-press') {
+        setClosing(true)
+        return
+      }
+      setClosing(false)
+      onOpenChange(next)
+    }}>
       <DialogContent className="sm:max-w-md" finalFocus={finalFocus}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
@@ -51,6 +60,17 @@ export function ConfirmDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
+      {confirmOutsideDismissal && (
+        <ConfirmDialog
+          open={closing}
+          onOpenChange={setClosing}
+          title="ปิดหน้าต่างยืนยันนี้?"
+          description="ยังไม่ได้ลบโจทย์ รายการที่เลือกยังคงอยู่"
+          confirmLabel="ยืนยันปิด"
+          cancelLabel="กลับไปดำเนินการต่อ"
+          onConfirm={() => { setClosing(false); onOpenChange(false) }}
+        />
+      )}
     </Dialog>
   )
 }
@@ -61,6 +81,7 @@ export interface ConfirmOptions {
   confirmLabel: string
   cancelLabel?: string
   variant?: 'default' | 'destructive'
+  confirmOutsideDismissal?: boolean
 }
 
 /**
@@ -99,6 +120,7 @@ export function useConfirm(): [(options: ConfirmOptions) => Promise<boolean>, Re
       confirmLabel={pending?.options.confirmLabel ?? 'ยืนยัน'}
       cancelLabel={pending?.options.cancelLabel}
       variant={pending?.options.variant}
+      confirmOutsideDismissal={pending?.options.confirmOutsideDismissal}
       onConfirm={() => {
         pending?.resolve(true)
         setPending(null)

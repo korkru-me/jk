@@ -204,6 +204,7 @@ export function LibraryPanel({
       description: 'โจทย์จะถูกลบถาวรออกจากคลังและทุกแฟ้ม กู้คืนไม่ได้ โจทย์หลายขั้นตอนจะลบข้อย่อยทั้งกลุ่มด้วย หากต้องการเก็บสำเนา ให้แชร์เป็นไฟล์ก่อนลบ',
       confirmLabel: `ลบ ${ids.length} ข้อถาวร`,
       variant: 'destructive',
+      confirmOutsideDismissal: true,
     }))) return
 
     startTransition(async () => {
