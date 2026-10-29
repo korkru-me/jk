@@ -17,6 +17,7 @@ export function ExamScreenLabClient({
   shell = false,
   optionalWatermark = true,
   requireWorkImage = true,
+  fullscreenEnforced = false,
 }: {
   fixture: ExamScreenQaFixture
   submissionId: string
@@ -27,6 +28,7 @@ export function ExamScreenLabClient({
   shell?: boolean
   optionalWatermark?: boolean
   requireWorkImage?: boolean
+  fullscreenEnforced?: boolean
   /** Opt-in via ?streak=1, so the default lab screen is unchanged. Lets the
    *  "ถูกติดต่อกัน" chrome be looked at on a real device without a teacher
    *  login or a live attempt behind it. */
@@ -52,7 +54,7 @@ export function ExamScreenLabClient({
       config={{
         assignmentType,
         proctoringEnabled: false,
-        isFullscreenEnforced: false,
+        isFullscreenEnforced: fullscreenEnforced,
         blockClipboard: false,
         watermarkText: optionalWatermark ? 'ข้อมูลจำลอง • DEVICE QA' : null,
         solutionWatermark: buildSolutionWatermark({ full_name: 'เด็กชายทดสอบ เรียนรู้ (ข้อมูลจำลอง)', prefix: 'เด็กชาย', first_name: null, last_name: null }, { student_code: '00007', grade_level: 'ม.4', section_number: 1, class_number: 7 }, startedAt),

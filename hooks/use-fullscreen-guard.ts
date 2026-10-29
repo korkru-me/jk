@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { blocksTypingInFullscreen } from '@/lib/fullscreen-guard'
 
 interface FullscreenCapableElement extends HTMLElement {
   webkitRequestFullscreen?: () => Promise<void> | void
@@ -15,9 +16,17 @@ interface FullscreenCapableDocument extends Document {
  * WebKit — ships no Fullscreen API on the document at all. Calling
  * `requestFullscreen()` there is not a rejected promise but a `TypeError` on
  * `undefined`, which used to escape this effect and tear down the whole exam.
+ *
+ * iPad Safari does ship the API, but leaves fullscreen whenever the keyboard
+ * opens, so it is answered with null too — see `blocksTypingInFullscreen`.
+ * Holding fullscreen there meant an overlay over every field the student
+ * tapped, and students reported its button doing nothing until a reload. The
+ * likely reason, not yet watched on a real iPad: closing the overlay hands
+ * focus back to that field, the keyboard returns, and Safari leaves again.
  */
 function fullscreenRequest(): (() => Promise<void>) | null {
   if (typeof document === 'undefined') return null
+  if (blocksTypingInFullscreen(navigator)) return null
   const el = document.documentElement as FullscreenCapableElement
   const request = el.requestFullscreen ?? el.webkitRequestFullscreen
   if (typeof request !== 'function') return null
@@ -37,10 +46,12 @@ function isInFullscreen(): boolean {
  * call on mount is best-effort: if it is refused, `isFullscreen` stays false
  * and the caller can prompt the student to enter fullscreen manually.
  *
- * On a device with no Fullscreen API the requirement is dropped rather than
- * enforced — `isSupported` reports false and the warning never rises. A
- * blocking "return to fullscreen" overlay there can never be satisfied, so it
- * would lock a phone out of the exam entirely instead of deterring anything.
+ * On a device that cannot hold fullscreen while the student answers — no
+ * Fullscreen API at all (iPhone), or one that drops it for the keyboard
+ * (iPad) — the requirement is dropped rather than enforced: `isSupported`
+ * reports false and the warning never rises. A blocking "return to fullscreen"
+ * overlay there can never be satisfied, so it would lock the student out of
+ * the exam instead of deterring anything.
  */
 export function useFullscreenGuard(enabled: boolean) {
   const [isFullscreen, setIsFullscreen] = useState(false)

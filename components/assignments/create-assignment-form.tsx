@@ -1935,7 +1935,7 @@ export function CreateAssignmentForm({
                   <label className="flex items-center justify-between gap-4 cursor-pointer">
                     <div>
                       <p className="text-sm font-medium text-foreground">บังคับกลับเข้าโหมดเต็มจอ</p>
-                      <p data-assignment-description className="text-xs text-muted-foreground">หากออกจากเต็มจอ หน้าข้อสอบจะถูกบังจนกว่าจะกลับเข้า</p>
+                      <p data-assignment-description className="text-xs text-muted-foreground">หากออกจากเต็มจอ หน้าข้อสอบจะถูกบังจนกว่าจะกลับเข้า · iPhone/iPad ไม่บังคับ เพราะพิมพ์คำตอบขณะเต็มจอไม่ได้</p>
                     </div>
                     <input
                       type="checkbox"
