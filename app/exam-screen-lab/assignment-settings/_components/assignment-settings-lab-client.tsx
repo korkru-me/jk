@@ -6,6 +6,7 @@ import {
   type EditableAssignmentQuestion,
 } from '@/components/assignments/edit-assignment-form'
 import type { BankQuestion } from '@/lib/question-bank'
+import type { QuestionPreviewDetail } from '@/lib/actions/question-previews'
 import type { AssignmentType } from '@/lib/types'
 
 const QUESTION_IDS = [
@@ -40,6 +41,26 @@ const questions: EditableAssignmentQuestion[] = [
     has_random_values: false,
   },
 ]
+
+// The ดูตัวอย่าง eye reads these instead of the database.
+const previewQuestions: QuestionPreviewDetail[] = questions.map(question => ({
+  id: question.id,
+  title: question.title,
+  question_text: question.question_text,
+  question_type: question.question_type,
+  is_random: false,
+  variables: [],
+  answer_parts: null,
+  mcq_options: question.question_type === 'mcq'
+    ? [
+        { text: 'วัตถุเคลื่อนที่ด้วยความเร็วคงที่เมื่อแรงลัพธ์เป็นศูนย์', is_correct: true },
+        { text: 'วัตถุต้องหยุดนิ่งเสมอเมื่อแรงลัพธ์เป็นศูนย์', is_correct: false },
+        { text: 'แรงลัพธ์ทำให้ความเร็วคงที่', is_correct: false },
+      ]
+    : null,
+  image_urls: [],
+  extra_data: {},
+}))
 
 const bank: BankQuestion[] = questions.map((question, index) => ({
   ...question,
@@ -115,6 +136,7 @@ export function AssignmentSettingsLabClient({
       <EditAssignmentForm
         assignment={assignmentFixture(type)}
         questions={questions}
+        previewQuestions={previewQuestions}
         bank={bank}
         hasSubmissions={hasSubmissions}
         sebQuitPasswordSetup={{
