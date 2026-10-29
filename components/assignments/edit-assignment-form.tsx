@@ -1140,7 +1140,7 @@ export function EditAssignmentForm({
               <div className="space-y-2 border-t border-border pt-3">
                 <AssignmentSettingToggle
                   label="บังคับกลับเข้าโหมดเต็มจอ"
-                  description="หากออกจากเต็มจอ หน้าข้อสอบจะถูกบังจนกว่าจะกลับเข้า"
+                  description="หากออกจากเต็มจอ หน้าข้อสอบจะถูกบังจนกว่าจะกลับเข้า · iPhone/iPad ไม่บังคับ เพราะพิมพ์คำตอบขณะเต็มจอไม่ได้"
                   checked={fullscreenRequired}
                   onCheckedChange={setFullscreenRequired}
                 />
