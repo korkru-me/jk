@@ -1410,6 +1410,11 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
             || (current.questions.question_type === 'file_upload'
               && ((current.questions.extra_data as FileUploadConfig | null)?.attachment_urls?.length ?? 0) > 0)
 
+          // ดูข้อสอบที่ทำเสร็จแล้ว reads like the result page: a ปรนัย ข้อ
+          // shows its options once, coloured, in place of the radio list.
+          const reviewFeedback = reviewing ? checked[current.id] : undefined
+          const reviewChoices = current.questions.question_type === 'mcq' ? reviewFeedback?.choices : undefined
+
           return (
             <ExamQuestionFrame
               key={current.id}
@@ -1418,11 +1423,17 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
               aria-label={`ข้อ ${questionIndex + 1} จาก ${answers.length}`}
               aria-busy={checkingId === current.id}
               inert={checkingId === current.id ? true : undefined}
-              answerReadOnly={reviewing}
+              // The coloured options replace the input, so there is nothing
+              // to lock — and inert would hide them from a screen reader.
+              answerReadOnly={reviewing && !reviewChoices}
               tabIndex={-1}
-              className={focusMode ? 'scroll-mt-2' : 'scroll-mt-[calc(var(--exam-toolbar-height,3.25rem)+var(--exam-toolbar-scroll-inset,0px)+0.5rem)]'}
+              className={cn(
+                focusMode ? 'scroll-mt-2' : 'scroll-mt-[calc(var(--exam-toolbar-height,3.25rem)+var(--exam-toolbar-scroll-inset,0px)+0.5rem)]',
+                reviewFeedback && ['border-l-4', reviewTone(reviewFeedback).edge],
+              )}
               header={
                 <>
+                  {reviewFeedback && <ReviewVerdictIcon feedback={reviewFeedback} />}
                   {/* "ข้อ 3 / 5" would be a lie in a streak run: answers.length
                       is only what has been handed out so far, and the งาน's
                       length is not known to anybody yet. */}
@@ -1457,6 +1468,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                         แก้ไขโจทย์
                       </a>
                     )}
+                    {reviewFeedback && <ReviewScoreBadge feedback={reviewFeedback} />}
                     {/* A flag marks a ข้อ to come back to. In a streak run the
                         verdict is already counted and there is no coming back,
                         so the button would only ever mislead. */}
@@ -1521,18 +1533,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
               feedback={
                 <>
                   {/* ดูข้อสอบที่ทำเสร็จแล้ว — every ข้อ arrives already checked */}
-                  {reviewing && checked[current.id] && (
-                    <InstantCheckPanel
-                      feedback={checked[current.id]}
-                      busy={false}
-                      disabled
-                      answered
-                      onCheck={() => {}}
-                      onRetry={() => {}}
-                      allowRetry={false}
-                      review
-                    />
-                  )}
+                  {reviewFeedback && <ReviewAnswerRows feedback={reviewFeedback} />}
                   {/* ตรวจคำตอบข้อนี้ — แบบฝึกหัดเท่านั้น */}
                   {!reviewing && instantCheckOn && isInstantCheckable(current.questions.question_type) && (
                     <InstantCheckPanel
@@ -1560,6 +1561,8 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                   rawValue={localAnswers[current.id] ?? ''}
                   onChange={val => handleAnswerChange(current.id, val)}
                 />
+              ) : reviewChoices ? (
+                <ReviewChoiceList choices={reviewChoices} />
               ) : current.questions.question_type === 'mcq' && current.questions.mcq_options ? (
                 <MCQInput
                   answerId={current.id}
@@ -2258,7 +2261,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
  * threading a `disabled` prop through nine different answer inputs.
  */
 function InstantCheckPanel({
-  feedback, busy, disabled, answered, onCheck, onRetry, allowRetry = true, checkHint, review = false,
+  feedback, busy, disabled, answered, onCheck, onRetry, allowRetry = true, checkHint,
 }: {
   feedback: CheckedFeedback | null
   busy: boolean
@@ -2272,9 +2275,6 @@ function InstantCheckPanel({
   allowRetry?: boolean
   /** Replaces the "แก้แล้วตรวจใหม่ได้ไม่จำกัด" line, which is untrue in a streak. */
   checkHint?: string
-  /** ดูข้อสอบที่ทำเสร็จแล้ว: the paper is handed in, so nothing here invites
-   *  another try. */
-  review?: boolean
 }) {
   if (!feedback) {
     return (
@@ -2296,9 +2296,7 @@ function InstantCheckPanel({
     )
   }
 
-  const tone = feedback.voided
-    ? { border: 'border-border', bg: 'bg-muted/40', text: 'text-muted-foreground', label: 'โมฆะ · ไม่นับคะแนน' }
-    : feedback.verdict === 'correct'
+  const tone = feedback.verdict === 'correct'
     ? { border: 'border-success/30', bg: 'bg-success/10', text: 'text-success', label: 'ถูกต้อง' }
     : feedback.verdict === 'partial'
       ? { border: 'border-warning/30', bg: 'bg-warning/10', text: 'text-warning', label: 'ถูกบางส่วน' }
@@ -2310,16 +2308,14 @@ function InstantCheckPanel({
     <Card padding="lg" className={`space-y-3 border ${tone.border} ${tone.bg}`}>
       <div className="flex items-center gap-2 flex-wrap">
         <span className={`flex items-center gap-1.5 font-bold text-sm ${tone.text}`}>
-          {feedback.voided
-            ? null
-            : feedback.verdict === 'correct'
+          {feedback.verdict === 'correct'
             ? <CheckCircle2 size={18} />
             : feedback.verdict === 'pending'
               ? <Clock size={18} />
               : <XCircle size={18} />}
           {tone.label}
         </span>
-        {feedback.verdict !== 'pending' && !feedback.voided && (
+        {feedback.verdict !== 'pending' && (
           <Badge variant="outline" className="text-xs">
             {feedback.score}/{feedback.maxScore} คะแนน
           </Badge>
@@ -2336,7 +2332,7 @@ function InstantCheckPanel({
       </div>
 
       {feedback.note && (
-        <p className={cn('text-xs', feedback.voided ? 'text-muted-foreground' : 'text-warning')}>{feedback.note}</p>
+        <p className="text-xs text-warning">{feedback.note}</p>
       )}
 
       {feedback.choices && (
@@ -2402,12 +2398,137 @@ function InstantCheckPanel({
         </div>
       )}
 
-      {!review && !feedback.revealed && feedback.verdict !== 'correct' && (
+      {!feedback.revealed && feedback.verdict !== 'correct' && (
         <p className="text-xs text-muted-foreground">
           งานนี้ครูตั้งให้ไม่แสดงเฉลย ลองคิดใหม่แล้วกดตรวจอีกครั้งได้
         </p>
       )}
     </Card>
+  )
+}
+
+// ─── ดูข้อสอบที่ทำเสร็จแล้ว ───────────────────────────────────────────────────
+// A handed-in ข้อ drawn the way its card on the result page draws it
+// (SubmissionAnswerReview in components/student/submission-answer-review.tsx):
+// the verdict and score in the header, a coloured edge, and the เฉลย in the
+// same rows and the same ปรนัย option list — so moving between the two pages
+// never changes how an answer reads. ถูกบางส่วน keeps the navigator's amber.
+
+const REVIEW_CORRECT_TEXT = 'text-[color-mix(in_oklab,var(--success)_60%,var(--foreground))]'
+const REVIEW_WRONG_TEXT = 'text-[color-mix(in_oklab,var(--destructive)_75%,var(--foreground))]'
+
+function reviewTone(feedback: ExamReviewFeedback) {
+  if (feedback.voided) return { edge: 'border-l-border', icon: 'bg-muted text-muted-foreground', label: 'โมฆะ · ไม่นับคะแนน' }
+  if (feedback.verdict === 'correct') return { edge: 'border-l-success', icon: 'bg-success/10 text-success', label: 'ถูกต้อง' }
+  if (feedback.verdict === 'wrong') return { edge: 'border-l-destructive', icon: 'bg-destructive/10 text-destructive', label: 'ยังไม่ถูก' }
+  return {
+    edge: 'border-l-warning',
+    icon: 'bg-warning/10 text-warning',
+    label: feedback.verdict === 'partial' ? 'ถูกบางส่วน' : 'รอครูตรวจ',
+  }
+}
+
+function ReviewVerdictIcon({ feedback }: { feedback: ExamReviewFeedback }) {
+  const tone = reviewTone(feedback)
+  return (
+    <span role="img" aria-label={tone.label} className={cn('flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold', tone.icon)}>
+      {feedback.voided ? '—'
+        : feedback.verdict === 'wrong' ? <XCircle size={14} aria-hidden />
+        : feedback.verdict === 'pending' ? <Clock size={14} aria-hidden />
+        : <CheckCircle2 size={14} aria-hidden />}
+    </span>
+  )
+}
+
+function ReviewScoreBadge({ feedback }: { feedback: ExamReviewFeedback }) {
+  if (feedback.voided) return <Badge variant="secondary" className="text-xs">โมฆะ · ไม่นับคะแนน</Badge>
+  return (
+    <Badge variant="outline" className={cn('text-xs', feedback.verdict === 'pending' && 'border-warning/20 text-warning')}>
+      {feedback.verdict === 'pending' ? `รอผล/${feedback.maxScore}` : `${feedback.score}/${feedback.maxScore}`}
+    </Badge>
+  )
+}
+
+/** The ปรนัย options once, in the order the student read them, in place of
+ *  the radio list: their pick in red unless it is the เฉลย, the เฉลย in green. */
+function ReviewChoiceList({ choices }: { choices: NonNullable<ExamReviewFeedback['choices']> }) {
+  // A picture-only option carries its letter as its text (see MCQInput).
+  const hasText = (choice: (typeof choices)[number]) => choice.text.trim() !== '' && choice.text !== choice.label
+  const picked = choices.find(choice => choice.picked)
+  return (
+    <div className="space-y-2">
+      <p className="flex flex-wrap items-center gap-1.5 text-xs">
+        <span className="font-medium text-muted-foreground">คำตอบของคุณ:</span>
+        <span className="font-semibold text-foreground">
+          {picked ? `${picked.label} · ${hasText(picked) ? picked.text : 'ตัวเลือกรูปภาพ'}` : 'ไม่ได้ตอบข้อนี้'}
+        </span>
+      </p>
+      {choices.map(choice => {
+        const tone = choice.correct
+          ? { wrap: 'border-success bg-success/10', text: REVIEW_CORRECT_TEXT }
+          : choice.picked
+            ? { wrap: 'border-destructive bg-destructive/10', text: REVIEW_WRONG_TEXT }
+            : null
+        return (
+          <div key={choice.label} className={cn('flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2', tone?.wrap ?? 'border-border bg-background')}>
+            <span className={cn('w-5 shrink-0 text-sm font-bold', tone?.text ?? 'text-muted-foreground')}>{choice.label}</span>
+            {choice.imageUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={choice.imageUrl} alt="" loading="lazy" decoding="async" className="max-h-24 w-auto shrink-0 rounded border object-contain" />
+            )}
+            {hasText(choice) && (
+              <span className={cn('min-w-0 flex-1 break-words text-sm', tone ? `font-medium ${tone.text}` : 'text-foreground')}>{choice.text}</span>
+            )}
+            {choice.picked && choice.correct && <span className={cn('text-xs font-semibold', REVIEW_CORRECT_TEXT)}>คำตอบของคุณ</span>}
+            {choice.correct ? (
+              <span className={cn('flex shrink-0 items-center gap-1 text-xs font-semibold', REVIEW_CORRECT_TEXT)}>
+                <CheckCircle2 size={13} aria-hidden /> เฉลย
+              </span>
+            ) : choice.picked && (
+              <span className={cn('flex shrink-0 items-center gap-1 text-xs font-semibold', REVIEW_WRONG_TEXT)}>
+                <XCircle size={13} aria-hidden /> คำตอบของคุณ
+              </span>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/** Under the handed-in answer: why there is no verdict (if so), then
+ *  คำตอบคุณ / เฉลย line by line. A ปรนัย ข้อ already said it all above. */
+function ReviewAnswerRows({ feedback }: { feedback: ExamReviewFeedback }) {
+  const rows = feedback.choices ? [] : feedback.rows
+  const note = feedback.note
+    ?? (feedback.verdict === 'pending' && !feedback.voided ? 'รอครูผู้สอนตรวจสอบและให้คะแนน' : undefined)
+  if (!note && rows.length === 0) return null
+  return (
+    <div className="space-y-2 text-sm">
+      {note && (
+        <p className={cn('text-xs font-medium', feedback.voided ? 'text-muted-foreground' : 'text-warning')}>{note}</p>
+      )}
+      {rows.map((row, i) => (
+        <div key={i} className="space-y-0.5 border-l-2 border-border pl-3">
+          {row.label && <p className="text-xs font-semibold text-muted-foreground">{row.label}</p>}
+          <div className="flex gap-2">
+            <span className="w-24 shrink-0 text-muted-foreground">คำตอบคุณ:</span>
+            <span className={cn('min-w-0 break-words font-medium',
+              row.status === 'pending' ? 'text-warning' : row.status === 'correct' ? REVIEW_CORRECT_TEXT : REVIEW_WRONG_TEXT)}>
+              {row.student} {row.unit && <UnitDisplay html={row.unit} />}
+            </span>
+          </div>
+          {row.correct !== undefined && (
+            <div className="flex gap-2">
+              <span className="w-24 shrink-0 text-muted-foreground">เฉลย:</span>
+              <span className="min-w-0 break-words font-medium">
+                {row.correct} {row.unit && <UnitDisplay html={row.unit} />}
+              </span>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
   )
 }
 
