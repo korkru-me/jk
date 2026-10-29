@@ -106,6 +106,7 @@ import {
   INSTANT_CHECK_SETTING_LABEL,
 } from '@/components/assignments/instant-check-setting-label'
 import { AssignmentSettingToggle } from '@/components/assignments/assignment-setting-toggle'
+import { ExamReviewSetting } from '@/components/assignments/exam-review-setting'
 import { RESULT_VISIBILITY_OPTIONS } from '@/components/assignments/result-visibility-options'
 
 const QuestionPicker = dynamic(
@@ -153,6 +154,7 @@ export type AssignmentCopyPreset = Pick<
   | 'random_question_count'
   | 'show_results'
   | 'show_solutions'
+  | 'allow_exam_review'
   | 'max_attempts'
   | 'score_strategy'
   | 'retry_scope'
@@ -349,6 +351,9 @@ export function CreateAssignmentForm({
   // Off until the teacher ticks it: no งาน opened its เฉลยวิธีทำ to students
   // before this setting existed, and one that does is a choice, not a default.
   const [showSolutions, setShowSolutions] = useState(copySource?.show_solutions ?? initialSettings.show_solutions)
+  // Off until the teacher ticks it, for the same reason. Not part of a ชุดการตั้งค่า
+  // (the preset allowlist is validated in the database), so only a copy carries it.
+  const [allowExamReview, setAllowExamReview] = useState(copySource?.allow_exam_review === true)
   const [maxAttempts, setMaxAttempts] = useState(
     copySource ? (copySource.max_attempts != null ? String(copySource.max_attempts) : '')
       : (initialSettings.max_attempts != null ? String(initialSettings.max_attempts) : ''),
@@ -528,6 +533,7 @@ export function CreateAssignmentForm({
       sharedRandomValues,
       showResults,
       showSolutions,
+      allowExamReview,
       maxAttempts,
       scoreStrategy,
       retryScope,
@@ -563,7 +569,7 @@ export function CreateAssignmentForm({
       title, description, classroomIds, groupTargets, requireWorkImage,
       selectedIds, sections, showSections, randomQuestionCount, questionPointDrafts,
       defaultPointsById, displayMaxScore, duration, shuffleQ, shuffleA,
-      sharedRandomValues, showResults, showSolutions, maxAttempts, scoreStrategy,
+      sharedRandomValues, showResults, showSolutions, allowExamReview, maxAttempts, scoreStrategy,
       retryScope, questionsPerPage, instantCheck, instantCheckAnswerKey,
       calculatorEnabled, scratchpadEnabled, accessCode, accessCodeEnabled,
       proctoringEnabled, fullscreenRequired, blockClipboard, examWatermarkEnabled,
@@ -994,6 +1000,7 @@ export function CreateAssignmentForm({
         random_question_count: selectedRandomCount,
         show_results: showResults,
         show_solutions: showSolutions,
+        allow_exam_review: assignmentType === 'exam' && allowExamReview,
         max_attempts: completionChoice === 'complete' && maxAttempts ? Number(maxAttempts) : null,
         score_strategy: completionChoice === 'complete' ? scoreStrategy : 'best',
         // The wrong-only switch is hidden while a draw is on, so store the
@@ -1806,6 +1813,9 @@ export function CreateAssignmentForm({
                 footer={opt.footer}
               />
             ))}
+            {assignmentType === 'exam' && (
+              <ExamReviewSetting checked={allowExamReview} onCheckedChange={setAllowExamReview} showResults={showResults} />
+            )}
             {randomDrawOn && canRepeat && (
               <p data-assignment-description className="text-xs text-muted-foreground px-1">
                 ตั้งให้สุ่ม {questionsPerAttempt} ข้อจากคลังไว้ที่ขั้นเลือกโจทย์ รอบต่อไปนักเรียนจึงได้ชุดใหม่ทั้งชุด
@@ -2148,6 +2158,9 @@ export function CreateAssignmentForm({
               { label: 'กระดาษทด', value: scratchpadEnabled ? 'เปิด' : 'ปิด' },
               { label: 'แสดงผล', value: SHOW_RESULTS_SUMMARY[showResults] },
               { label: 'เฉลยวิธีทำ', value: showSolutions ? 'ให้ดูเมื่อทำเสร็จ' : 'ไม่ให้ดู' },
+              ...(assignmentType === 'exam'
+                ? [{ label: 'ดูข้อสอบที่ทำแล้ว', value: allowExamReview ? 'ให้ดูพร้อมเฉลยรายข้อ' : 'ไม่ให้ดู' }]
+                : []),
             ]}
           />
         </div>

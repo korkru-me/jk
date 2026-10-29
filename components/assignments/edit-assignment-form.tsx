@@ -51,6 +51,7 @@ import {
   INSTANT_CHECK_SETTING_LABEL,
 } from '@/components/assignments/instant-check-setting-label'
 import { AssignmentSettingToggle } from '@/components/assignments/assignment-setting-toggle'
+import { ExamReviewSetting } from '@/components/assignments/exam-review-setting'
 import {
   RESULT_VISIBILITY_OPTIONS,
 } from '@/components/assignments/result-visibility-options'
@@ -114,6 +115,7 @@ export type EditableAssignment = Pick<
   | 'passing_value'
   | 'show_results'
   | 'show_solutions'
+  | 'allow_exam_review'
   | 'sections'
   | 'show_sections'
   | 'shuffle_questions'
@@ -178,6 +180,7 @@ export function EditAssignmentForm({
   // whether a เฉลยวิธีทำ opens. Ticking it late is the way to hold a ข้อสอบ's
   // เฉลย back until every class has sat it.
   const [showSolutions, setShowSolutions] = useState(a.show_solutions === true)
+  const [allowExamReview, setAllowExamReview] = useState(a.allow_exam_review === true)
   const [showSections, setShowSections] = useState(a.show_sections !== false)
   const [shuffleQuestions, setShuffleQuestions] = useState(a.shuffle_questions === true)
   const [shuffleOptions, setShuffleOptions] = useState(a.shuffle_options === true)
@@ -444,6 +447,9 @@ export function EditAssignmentForm({
         display_max_score: displayMax,
         show_results: showResults,
         show_solutions: showSolutions,
+        // Like เฉลยวิธีทำ, changeable after students have finished: it only
+        // decides whether the read-only review opens.
+        ...(a.type === 'exam' ? { allow_exam_review: allowExamReview } : {}),
         show_sections: showSections,
         proctoring_enabled: proctoringEnabled,
         fullscreen_required: fullscreenRequired,
@@ -1064,6 +1070,10 @@ export function EditAssignmentForm({
                 </p>
               ) : null}
             />
+          )}
+
+          {a.mode === 'online' && a.type === 'exam' && (
+            <ExamReviewSetting checked={allowExamReview} onCheckedChange={setAllowExamReview} showResults={showResults} />
           )}
         </div>
 

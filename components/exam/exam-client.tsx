@@ -12,8 +12,9 @@ import type { StreakEnding } from '@/lib/streak-run'
 // mobile browser would allocate, so it is loaded on demand in handleSubmit.
 import type { GradedAnswer } from '@/lib/assignment-attempt'
 // Type-only for the same reason: buildAnswerFeedback reaches the evaluator too,
-// and only a teacher's previewMode ever runs it in the browser.
-import type { AnswerFeedback } from '@/lib/answer-feedback'
+// and only a teacher's previewMode ever runs it in the browser. A student's
+// review receives its panels finished from the server.
+import type { ExamReviewFeedback } from '@/lib/exam-review-feedback'
 import { isInstantCheckable } from '@/lib/grading'
 import { useAnswerAutosave } from '@/hooks/use-answer-autosave'
 import { useRefreshRandomAnswers } from '@/hooks/use-refresh-random-answers'
@@ -44,6 +45,7 @@ import {
   Eye, EyeOff, Maximize2, Minimize2, CheckCircle2, XCircle, Clock, AlertTriangle,
   Wifi, WifiOff, ShieldAlert, Maximize, MonitorSmartphone, CircleCheck, RotateCcw,
   Pencil, Calculator as CalculatorIcon, NotebookPen, Loader2, Paperclip, Trash2, ListChecks, X,
+  BookOpenCheck, ChevronLeft,
 } from 'lucide-react'
 import { RichText } from '@/components/ui/rich-text'
 import { containsMath } from '@/lib/math/latex'
@@ -178,6 +180,10 @@ export interface ExamConfig {
   // decides what it puts in the response — and only previewMode, which grades
   // its own copy, reads it to make the same decision.
   instantCheckAnswerKey?: boolean
+  /** Teacher preview only: this ข้อสอบ lets students reopen it after ส่งคำตอบ
+   *  (allow_exam_review), so the preview's result screen offers the same
+   *  "ดูข้อสอบที่ทำเสร็จแล้ว" — graded locally like the rest of the preview. */
+  examReview?: boolean
   /** Server-derived assignment rule; the calculator chunk is fetched only after a click. */
   calculatorEnabled: boolean
   /** Server-derived assignment rule; the drawing editor chunk is fetched only after a click. */
@@ -231,7 +237,17 @@ interface Props {
    *  no longer reach everyone — i.e. someone has already started this งาน and
    *  is holding a frozen copy of it. */
   previewEditWarning?: string
+  /** "ดูข้อสอบที่ทำเสร็จแล้ว": the handed-in ข้อสอบ reopened read-only, each ข้อ
+   *  already carrying its ถูก/ผิด panel and เฉลย, built on the server by
+   *  lib/exam-review.ts. Nothing is saved, timed, proctored or submitted, and
+   *  the answers cannot be changed. */
+  review?: { feedback: Record<string, ExamReviewFeedback>; returnHref: string }
 }
+
+type CheckedFeedback = ExamReviewFeedback & { checkCount: number }
+
+/** Stable "nothing to re-roll" for a review, so the hook's effect stays quiet. */
+const NO_REFRESHABLE_ANSWERS: AnswerRow[] = []
 
 // ─── ExamClient ───────────────────────────────────────────────────────────────
 
@@ -288,9 +304,13 @@ function requiredWorkImageCount(a: AnswerRow, config: ExamConfig): number {
   return parts && parts.length > 0 ? parts.length : 1
 }
 
-export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkArtifacts = [], durationMinutes, startedAt, expiresAt, serverNow, config, sections = [], questionsPerPage = 1, streak, previewMode = false, previewReturnHref, previewEditWarning }: Props) {
+export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkArtifacts = [], durationMinutes, startedAt, expiresAt, serverNow, config, sections = [], questionsPerPage = 1, streak, previewMode = false, previewReturnHref, previewEditWarning, review }: Props) {
   const router = useRouter()
   const [expired, setExpired] = useState(false)
+  // A teacher's preview opens the same read-only review from its own result
+  // screen; a student's arrives already reviewing through `review`.
+  const [previewReviewing, setPreviewReviewing] = useState(false)
+  const reviewing = review != null || previewReviewing
   // ── Core state ──────────────────────────────────────────────────────────────
   const {
     localAnswers, localAnswersRef, localMathInputModes, localMathInputModesRef,
@@ -301,7 +321,8 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
     initialAnswers: () => initLocalAnswers(answers),
     initialMathInputModes: () => initMathInputModes(answers),
     initialRandomValues: () => Object.fromEntries(answers.map(answer => [answer.id, answer.random_values ?? {}])),
-    previewMode,
+    // A review keeps answers in React state only, exactly like a preview.
+    previewMode: previewMode || review != null,
   })
   const [workImages, setWorkImages] = useState<Record<string, (string | null)[]>>(
     () => initWorkImages(answers)
@@ -333,7 +354,9 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   // the answer under it changes (see handleAnswerChange), so a panel on screen
   // always describes the answer currently in the box. Nothing here decides a
   // score — the final ส่งคำตอบ re-grades every ข้อ from what was last saved.
-  const [checked, setChecked] = useState<Record<string, AnswerFeedback & { checkCount: number }>>({})
+  const [checked, setChecked] = useState<Record<string, CheckedFeedback>>(() => review
+    ? Object.fromEntries(Object.entries(review.feedback).map(([id, feedback]) => [id, { ...feedback, checkCount: 0 }]))
+    : {})
   const [checkingId, setCheckingId] = useState<string | null>(null)
   const [randomValueOverrides, setRandomValueOverrides] = useState<Record<string, Record<string, number>>>({})
   const [previewCorrectAnswerOverrides, setPreviewCorrectAnswerOverrides] = useState<Record<string, string>>({})
@@ -501,10 +524,10 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   // Every real exam observes tab changes automatically. Exercises and teacher
   // previews never do, regardless of the optional live proctor room setting.
   const { tabSwitchCount, showTabWarning } = useTabSwitchGuard(
-    shouldDetectTabSwitch(config.assignmentType, previewMode),
+    shouldDetectTabSwitch(config.assignmentType, previewMode || reviewing),
   )
   const { status: proctorStatus, activeConnectionCount: proctorActiveConnectionCount } = useExamProctor({
-    enabled: config.proctoringEnabled && !previewMode && !expired,
+    enabled: config.proctoringEnabled && !previewMode && !reviewing && !expired,
     submissionId,
     blockClipboard: config.blockClipboard,
   })
@@ -521,22 +544,25 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   const isOnline = useOnlineStatus({
     onOnline: syncPendingAnswers,
     onOffline: () => {
+      if (reviewing) return
       toast.warning('อินเทอร์เน็ตหลุด — บันทึกในเครื่องแล้ว จะซิงก์อัตโนมัติเมื่อเน็ตกลับมา')
     },
   })
 
   // ── Countdown timer ─────────────────────────────────────────────────────────
-  const secondsLeft = useAttemptClock(expiresAt ?? attemptExpiresAt(startedAt, durationMinutes, null), serverNow,
+  const clockSeconds = useAttemptClock(expiresAt ?? attemptExpiresAt(startedAt, durationMinutes, null), serverNow,
     () => { if (previewMode) void handleSubmit(); else setExpired(true) })
+  // Nothing is timed once the paper is only being read back.
+  const secondsLeft = reviewing ? null : clockSeconds
   useEffect(() => {
     if (expiresAt && serverNow && Date.parse(expiresAt) > Date.parse(serverNow)) setExpired(false)
   }, [expiresAt, serverNow])
   useEffect(() => {
-    if (previewMode || expired) return
+    if (previewMode || review || expired) return
     const refreshClock = () => { if (navigator.onLine && document.visibilityState === 'visible') router.refresh() }
     window.addEventListener('online', refreshClock); document.addEventListener('visibilitychange', refreshClock)
     return () => { window.removeEventListener('online', refreshClock); document.removeEventListener('visibilitychange', refreshClock) }
-  }, [previewMode, expired, router])
+  }, [previewMode, review, expired, router])
 
   // ── Teacher preview: warm the grading module ────────────────────────────────
   // previewMode grades in the browser through gradeAnswer and lays the ตรวจ
@@ -565,6 +591,9 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   // which is worse than no panel. This is also what makes ทำใหม่ work without
   // locking the inputs: change anything and the ข้อ is simply open again.
   const handleAnswerChange = useCallback((answerId: string, value: string) => {
+    // A handed-in paper is read back, not reopened. The inputs are inert, and
+    // this keeps a stray programmatic change from clearing its panel too.
+    if (reviewing) return
     setChecked(prev => {
       if (!(answerId in prev)) return prev
       const next = { ...prev }
@@ -572,7 +601,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
       return next
     })
     setAnswer(answerId, value)
-  }, [setAnswer])
+  }, [reviewing, setAnswer])
 
   // ── "ถูกติดต่อกัน" run ─────────────────────────────────────────────────────
   // Seeded from the server and then moved by what checkAnswer reports, so the
@@ -653,7 +682,9 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
     if (correctAnswer !== undefined) setPreviewCorrectAnswerOverrides(previous => ({ ...previous, [id]: correctAnswer }))
     clearCheck(id)
   }, [clearCheck, replaceAnswerFromServer])
-  const refreshRandom = useRefreshRandomAnswers({ answers, previewMode, ownerId: storageOwnerId, flush: flushQueuedAnswers, onReplace: replaceRandomVariant })
+  // A handed-in attempt has nothing left to re-roll: its numbers are the ones
+  // that were graded, and the server would refuse the request anyway.
+  const refreshRandom = useRefreshRandomAnswers({ answers: review ? NO_REFRESHABLE_ANSWERS : answers, previewMode, ownerId: storageOwnerId, flush: flushQueuedAnswers, onReplace: replaceRandomVariant })
 
   /**
    * ตรวจคำตอบข้อนี้ — the one thing a แบบฝึกหัด does that a ข้อสอบ does not.
@@ -809,9 +840,10 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
     partKey: string,
     mode: MathInputMode,
   ) => {
+    if (reviewing) return
     clearCheck(answerId)
     setMathInputMode(answerId, partKey, mode)
-  }, [clearCheck, setMathInputMode])
+  }, [clearCheck, reviewing, setMathInputMode])
 
   const handleMathFieldActivate = useCallback((
     fieldId: string,
@@ -1141,6 +1173,51 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
     window.location.replace(`/submissions/${submissionId}`)
   }
 
+  /**
+   * Preview only: "ดูข้อสอบที่ทำเสร็จแล้ว" from the preview's result screen.
+   * Builds every panel from the grade handleSubmit just computed — the same
+   * builder the server uses for a student's review, loaded on demand for the
+   * same reason handleCheck loads it.
+   */
+  async function openPreviewReview() {
+    if (!previewResult) return
+    const { buildReviewFeedback } = await import('@/lib/exam-review-feedback')
+    const gradedById = new Map(previewResult.graded.map(graded => [graded.id, graded]))
+    setChecked(Object.fromEntries(answers.map(answer => {
+      const graded = gradedById.get(answer.id)
+      const feedback = buildReviewFeedback({
+        correct_answer: previewCorrectAnswerOverrides[answer.id] ?? answer.correct_answer ?? '',
+        student_answer: localAnswersRef.current[answer.id] ?? null,
+        math_input_modes: localMathInputModesRef.current[answer.id] ?? {},
+        question: {
+          question_type: answer.questions.question_type,
+          answer_unit: answer.questions.answer_unit,
+          answer_parts: answer.questions.answer_parts as AnswerPart[] | null,
+          answer_tolerance: answer.questions.answer_tolerance ?? 0.1,
+          extra_data: answer.questions.extra_data,
+          mcq_options: answer.questions.mcq_options,
+        },
+        isCorrect: graded?.is_correct ?? null,
+        score: graded?.score ?? 0,
+        maxScore: answer.max_score ?? 0,
+      })
+      return [answer.id, { ...feedback, checkCount: 0 }]
+    })))
+    setShowCalculator(false)
+    setShowScratchpad(false)
+    setPreviewReviewing(true)
+    navigateTo(0)
+  }
+
+  /** The way back to the result screen, in each place a review would
+   *  otherwise offer ส่งคำตอบ. */
+  function renderReviewExit(className?: string, size?: 'sm') {
+    const content = <><ChevronLeft aria-hidden="true" />กลับไปหน้าผลสอบ</>
+    return review
+      ? <Button size={size} className={className} render={<a href={review.returnHref} />}>{content}</Button>
+      : <Button type="button" size={size} className={className} onClick={() => setPreviewReviewing(false)}>{content}</Button>
+  }
+
   function findMissingWorkImage(): number | null {
     const artifactSlots = new Set(Object.keys(workArtifacts))
     for (let i = 0; i < answers.length; i++) {
@@ -1210,8 +1287,10 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   const timerUrgent   = secondsLeft !== null && secondsLeft < 300
   const timerDanger   = secondsLeft !== null && secondsLeft < 60
   const showingSolution = previewResult !== null || Object.values(checked).some(feedback => feedback.revealed)
+  // A preview's result screen steps aside while its review is open.
+  const showPreviewResult = previewResult !== null && !previewReviewing
 
-  const renderQuestionNavigationLegend = () => <ExamQuestionNavigationLegend instantCheck={instantCheckOn} />
+  const renderQuestionNavigationLegend = () => <ExamQuestionNavigationLegend instantCheck={instantCheckOn} review={reviewing} />
 
   const renderQuestionNavigation = (touchFriendly = false) => (
     <ExamQuestionNavigation
@@ -1339,6 +1418,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
               aria-label={`ข้อ ${questionIndex + 1} จาก ${answers.length}`}
               aria-busy={checkingId === current.id}
               inert={checkingId === current.id ? true : undefined}
+              answerReadOnly={reviewing}
               tabIndex={-1}
               className={focusMode ? 'scroll-mt-2' : 'scroll-mt-[calc(var(--exam-toolbar-height,3.25rem)+var(--exam-toolbar-scroll-inset,0px)+0.5rem)]'}
               header={
@@ -1380,7 +1460,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                     {/* A flag marks a ข้อ to come back to. In a streak run the
                         verdict is already counted and there is no coming back,
                         so the button would only ever mislead. */}
-                    {!streakOn && (
+                    {!streakOn && !reviewing && (
                       <ExamQuestionFlag flagged={isFlagged} onToggle={() => toggleFlag(current.id)} />
                     )}
                   </div>
@@ -1440,8 +1520,21 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
               sideBySide={hasIllustration && current.questions.question_type === 'mcq'}
               feedback={
                 <>
+                  {/* ดูข้อสอบที่ทำเสร็จแล้ว — every ข้อ arrives already checked */}
+                  {reviewing && checked[current.id] && (
+                    <InstantCheckPanel
+                      feedback={checked[current.id]}
+                      busy={false}
+                      disabled
+                      answered
+                      onCheck={() => {}}
+                      onRetry={() => {}}
+                      allowRetry={false}
+                      review
+                    />
+                  )}
                   {/* ตรวจคำตอบข้อนี้ — แบบฝึกหัดเท่านั้น */}
-                  {instantCheckOn && isInstantCheckable(current.questions.question_type) && (
+                  {!reviewing && instantCheckOn && isInstantCheckable(current.questions.question_type) && (
                     <InstantCheckPanel
                       feedback={checked[current.id] ?? null}
                       busy={checkingId === current.id}
@@ -1551,7 +1644,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                   requiresWorkImage={requiredWorkImageCount(current, config) > 0}
                   workImages={workImages[current.id] ?? []}
                   onWorkImageChange={(pi, url) => handleWorkImageChange(current.id, pi, url)}
-                  scratchpadEnabled={config.scratchpadEnabled}
+                  scratchpadEnabled={config.scratchpadEnabled && !reviewing}
                   workArtifacts={workArtifacts}
                   scratchpadAttachmentStates={scratchpadAttachmentStates}
                   onOpenScratchpad={openScratchpadForPart}
@@ -1639,6 +1732,8 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
             <Button className="flex-1" onClick={() => navigateTo(pageStart + perPage)}>
               ถัดไป →
             </Button>
+          ) : reviewing ? (
+            renderReviewExit('flex-1')
           ) : (
             <Button
               className="flex-1 bg-success hover:bg-success/90 text-success-foreground border-0"
@@ -1682,7 +1777,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                   <div className="h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label="จำนวนข้อที่ตอบแล้ว" aria-valuemin={0} aria-valuemax={answers.length || 1} aria-valuenow={answeredCount}>
                     <div className="h-full rounded-full bg-primary transition-[width] duration-300 motion-reduce:transition-none" style={{ width: `${progress}%` }} />
                   </div>
-                  <div className="flex justify-end text-[10px]"><AutosaveStatus saving={saving} isOnline={isOnline} pendingSync={pendingCount} onRetryPending={syncPendingAnswers} compact /></div>
+                  {!reviewing && <div className="flex justify-end text-[10px]"><AutosaveStatus saving={saving} isOnline={isOnline} pendingSync={pendingCount} onRetryPending={syncPendingAnswers} compact /></div>}
                 </div>
               )}
             </Card>
@@ -1699,9 +1794,11 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
               <div className="shrink-0 border-t px-3 py-2.5">{renderQuestionNavigationLegend()}</div>
               <div className="flex shrink-0 flex-col gap-2 border-t bg-muted/20 p-3">
                 {tabSwitchCount > 0 && <p className="flex items-center gap-1.5 text-[11px] font-semibold text-destructive"><ShieldAlert className="size-3.5 shrink-0" aria-hidden="true" />สลับแท็บ {tabSwitchCount} ครั้ง</p>}
-                <Button size="sm" onClick={openSubmitDialog} disabled={submitting} className="w-full border-0 bg-success text-success-foreground hover:bg-success/90 pointer-coarse:min-h-11">
-                  {submitting ? 'กำลังส่ง...' : 'ส่งคำตอบ ✓'}
-                </Button>
+                {reviewing ? renderReviewExit('w-full pointer-coarse:min-h-11', 'sm') : (
+                  <Button size="sm" onClick={openSubmitDialog} disabled={submitting} className="w-full border-0 bg-success text-success-foreground hover:bg-success/90 pointer-coarse:min-h-11">
+                    {submitting ? 'กำลังส่ง...' : 'ส่งคำตอบ ✓'}
+                  </Button>
+                )}
               </div>
             </Card>
           )}
@@ -1780,18 +1877,19 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
       )}
 
       {/* ── Preview results (previewMode only, after submit) ─────────────────── */}
-      {previewResult && (
+      {showPreviewResult && previewResult && (
         <PreviewResultSummary
           answers={answers}
           graded={previewResult.graded}
           totalScore={previewResult.totalScore}
           totalMax={previewResult.totalMax}
           returnHref={previewReturnHref ?? '/assignments'}
+          onReview={config.examReview ? () => void openPreviewReview() : undefined}
         />
       )}
 
       {/* ── Normal mode ────────────────────────────────────────────────────── */}
-      {!focusMode && !previewResult && (
+      {!focusMode && !showPreviewResult && (
         <div className="flex min-w-0 flex-col gap-2 [--exam-toolbar-height:3.25rem]" data-exam-normal-stage>
           {previewBanner(true)}
           <ExamToolbarDock>
@@ -1801,7 +1899,14 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
               pendingSync={pendingCount}
               onRetryPending={syncPendingAnswers}
               tabSwitchCount={tabSwitchCount}
-              config={config}
+              reviewNotice={reviewing ? (
+                <span className="flex items-center gap-1.5 font-semibold text-foreground">
+                  <BookOpenCheck size={12} className="text-primary" aria-hidden />
+                  <span className="sm:hidden">ข้อสอบที่ส่งแล้ว · ดูอย่างเดียว</span>
+                  <span className="hidden sm:inline">ข้อสอบที่ส่งแล้ว · ดูได้อย่างเดียว แก้คำตอบไม่ได้</span>
+                </span>
+              ) : undefined}
+              config={reviewing ? { ...config, calculatorEnabled: false, scratchpadEnabled: false } : config}
               proctorStatus={proctorStatus}
               proctorActiveConnectionCount={proctorActiveConnectionCount}
               calculatorOpen={showCalculator}
@@ -1821,7 +1926,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
       )}
 
       {/* ── Focus mode: full-screen overlay ────────────────────────────────── */}
-      {focusMode && !previewResult && (
+      {focusMode && !showPreviewResult && (
         <div className="fixed inset-x-0 top-0 z-50 flex h-[var(--app-height,100dvh)] flex-col overflow-hidden bg-background">
           {previewBanner(false)}
           {/* Focus header */}
@@ -1860,7 +1965,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                 >
                   <ListChecks />
                 </Button>
-                {config.scratchpadEnabled && (
+                {config.scratchpadEnabled && !reviewing && (
                   <Button
                     type="button"
                     variant={showScratchpad ? 'secondary' : 'outline'}
@@ -1873,7 +1978,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                     <NotebookPen /> <span className="hidden sm:inline">กระดาษทด</span>
                   </Button>
                 )}
-                {config.calculatorEnabled && (
+                {config.calculatorEnabled && !reviewing && (
                   <Button
                     type="button"
                     variant={showCalculator ? 'secondary' : 'outline'}
@@ -1906,7 +2011,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                 style={{ width: `${progress}%` }}
               />
             </div>
-            {(saving || pendingCount > 0 || !isOnline) && (
+            {!reviewing && (saving || pendingCount > 0 || !isOnline) && (
               <div className="border-t px-3 py-1.5 text-xs sm:px-6">
                 <AutosaveStatus
                   saving={saving}
@@ -1928,7 +2033,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
       {/* Compact screens hide the persistent right navigator. This sheet
           keeps direct access to unanswered and flagged questions without
           squeezing the question itself into a narrow column. */}
-      {showQuestionNavigator && !showFullscreenWarning && !previewResult && (
+      {showQuestionNavigator && !showFullscreenWarning && !showPreviewResult && (
         <div
           className="fixed inset-x-0 top-0 z-[90] flex h-[var(--app-height,100dvh)] items-center justify-center bg-overlay p-3 backdrop-blur-sm"
           role="presentation"
@@ -1976,19 +2081,21 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
             <div className="mt-3">
               {renderQuestionNavigationLegend()}
             </div>
-            <Button
-              type="button"
-              onClick={openSubmitDialog}
-              disabled={submitting}
-              className="mt-4 min-h-10 w-full shrink-0 bg-success text-success-foreground hover:bg-success/90 pointer-coarse:min-h-11"
-            >
-              {submitting ? 'กำลังส่ง...' : 'ส่งคำตอบ ✓'}
-            </Button>
+            {reviewing ? renderReviewExit('mt-4 min-h-10 w-full shrink-0 pointer-coarse:min-h-11') : (
+              <Button
+                type="button"
+                onClick={openSubmitDialog}
+                disabled={submitting}
+                className="mt-4 min-h-10 w-full shrink-0 bg-success text-success-foreground hover:bg-success/90 pointer-coarse:min-h-11"
+              >
+                {submitting ? 'กำลังส่ง...' : 'ส่งคำตอบ ✓'}
+              </Button>
+            )}
           </Card>
         </div>
       )}
 
-      {calculatorLoaded && !previewResult && (
+      {calculatorLoaded && !showPreviewResult && (
         <Suspense fallback={showCalculator ? (
           <Card elevation="xl" className="fixed bottom-3 right-3 z-[80] px-4 py-3 text-sm text-muted-foreground">
             กำลังเปิดเครื่องคิดเลข...
@@ -2005,7 +2112,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
         </Suspense>
       )}
 
-      {scratchpadLoaded && scratchpadScope && !previewResult && (
+      {scratchpadLoaded && scratchpadScope && !showPreviewResult && (
         <Suspense fallback={showScratchpad ? (
           <Card elevation="xl" className="fixed inset-x-2 bottom-2 z-[75] px-4 py-3 text-sm text-muted-foreground lg:inset-x-auto lg:right-4">
             กำลังเปิดกระดาษทด...
@@ -2151,9 +2258,9 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
  * threading a `disabled` prop through nine different answer inputs.
  */
 function InstantCheckPanel({
-  feedback, busy, disabled, answered, onCheck, onRetry, allowRetry = true, checkHint,
+  feedback, busy, disabled, answered, onCheck, onRetry, allowRetry = true, checkHint, review = false,
 }: {
-  feedback: (AnswerFeedback & { checkCount: number }) | null
+  feedback: CheckedFeedback | null
   busy: boolean
   disabled: boolean
   answered: boolean
@@ -2165,6 +2272,9 @@ function InstantCheckPanel({
   allowRetry?: boolean
   /** Replaces the "แก้แล้วตรวจใหม่ได้ไม่จำกัด" line, which is untrue in a streak. */
   checkHint?: string
+  /** ดูข้อสอบที่ทำเสร็จแล้ว: the paper is handed in, so nothing here invites
+   *  another try. */
+  review?: boolean
 }) {
   if (!feedback) {
     return (
@@ -2186,7 +2296,9 @@ function InstantCheckPanel({
     )
   }
 
-  const tone = feedback.verdict === 'correct'
+  const tone = feedback.voided
+    ? { border: 'border-border', bg: 'bg-muted/40', text: 'text-muted-foreground', label: 'โมฆะ · ไม่นับคะแนน' }
+    : feedback.verdict === 'correct'
     ? { border: 'border-success/30', bg: 'bg-success/10', text: 'text-success', label: 'ถูกต้อง' }
     : feedback.verdict === 'partial'
       ? { border: 'border-warning/30', bg: 'bg-warning/10', text: 'text-warning', label: 'ถูกบางส่วน' }
@@ -2198,14 +2310,16 @@ function InstantCheckPanel({
     <Card padding="lg" className={`space-y-3 border ${tone.border} ${tone.bg}`}>
       <div className="flex items-center gap-2 flex-wrap">
         <span className={`flex items-center gap-1.5 font-bold text-sm ${tone.text}`}>
-          {feedback.verdict === 'correct'
+          {feedback.voided
+            ? null
+            : feedback.verdict === 'correct'
             ? <CheckCircle2 size={18} />
             : feedback.verdict === 'pending'
               ? <Clock size={18} />
               : <XCircle size={18} />}
           {tone.label}
         </span>
-        {feedback.verdict !== 'pending' && (
+        {feedback.verdict !== 'pending' && !feedback.voided && (
           <Badge variant="outline" className="text-xs">
             {feedback.score}/{feedback.maxScore} คะแนน
           </Badge>
@@ -2222,7 +2336,7 @@ function InstantCheckPanel({
       </div>
 
       {feedback.note && (
-        <p className="text-xs text-warning">{feedback.note}</p>
+        <p className={cn('text-xs', feedback.voided ? 'text-muted-foreground' : 'text-warning')}>{feedback.note}</p>
       )}
 
       {feedback.choices && (
@@ -2288,7 +2402,7 @@ function InstantCheckPanel({
         </div>
       )}
 
-      {!feedback.revealed && feedback.verdict !== 'correct' && (
+      {!review && !feedback.revealed && feedback.verdict !== 'correct' && (
         <p className="text-xs text-muted-foreground">
           งานนี้ครูตั้งให้ไม่แสดงเฉลย ลองคิดใหม่แล้วกดตรวจอีกครั้งได้
         </p>
@@ -2300,13 +2414,15 @@ function InstantCheckPanel({
 // ─── Preview results (teacher preview only) ────────────────────────────────────
 
 function PreviewResultSummary({
-  answers, graded, totalScore, totalMax, returnHref,
+  answers, graded, totalScore, totalMax, returnHref, onReview,
 }: {
   answers: AnswerRow[]
   graded: GradedAnswer[]
   totalScore: number
   totalMax: number
   returnHref: string
+  /** Present when the ข้อสอบ lets students reopen it after ส่งคำตอบ. */
+  onReview?: () => void
 }) {
   const gradedById = new Map(graded.map(g => [g.id, g]))
   const correctCount = graded.filter(g => g.is_correct === true).length
@@ -2317,7 +2433,12 @@ function PreviewResultSummary({
   return (
     <div className="max-w-2xl mx-auto space-y-4 py-4">
       <SubmissionScoreSummary visible score={totalScore} maxScore={totalMax} percentage={pct} passed={null} threshold={null} counts={{ correct: correctCount, wrong: wrongCount, pending: pendingCount }} submittedAt={null} strategy="ตัวอย่างผลคะแนน · ไม่บันทึกจริง">
-        <Button size="sm" render={<a href={returnHref} />}>กลับไปหน้าชุดข้อสอบ</Button>
+        {onReview && (
+          <Button size="sm" type="button" onClick={onReview}>
+            <BookOpenCheck aria-hidden="true" />ดูข้อสอบที่ทำเสร็จแล้ว
+          </Button>
+        )}
+        <Button size="sm" variant={onReview ? 'outline' : 'default'} render={<a href={returnHref} />}>กลับไปหน้าชุดข้อสอบ</Button>
       </SubmissionScoreSummary>
 
       <div className="space-y-2">
@@ -2422,7 +2543,7 @@ function AutosaveStatus({
 }
 
 function ExamToolbar({
-  saving, isOnline, pendingSync, tabSwitchCount,
+  saving, isOnline, pendingSync, tabSwitchCount, reviewNotice,
   onRetryPending,
   proctorStatus,
   proctorActiveConnectionCount,
@@ -2434,6 +2555,9 @@ function ExamToolbar({
   pendingSync: number
   onRetryPending: () => void
   tabSwitchCount: number
+  /** Shown in place of the autosave status while reviewing a handed-in paper,
+   *  where nothing is being saved. */
+  reviewNotice?: ReactNode
   proctorStatus: 'disabled' | 'connecting' | 'connected' | 'offline'
   proctorActiveConnectionCount: number
   config: ExamConfig
@@ -2452,12 +2576,14 @@ function ExamToolbar({
     <Card edge="none" radius="sm" className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-2 py-1" data-exam-toolbar>
       {/* Status indicators */}
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
-        <AutosaveStatus
-          saving={saving}
-          isOnline={isOnline}
-          pendingSync={pendingSync}
-          onRetryPending={onRetryPending}
-        />
+        {reviewNotice ?? (
+          <AutosaveStatus
+            saving={saving}
+            isOnline={isOnline}
+            pendingSync={pendingSync}
+            onRetryPending={onRetryPending}
+          />
+        )}
         {tabSwitchCount > 0 && (
           <span className="text-destructive flex items-center gap-1">
             <ShieldAlert size={11} /> สลับแท็บ {tabSwitchCount}×
