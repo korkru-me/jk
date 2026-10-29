@@ -1,9 +1,11 @@
 # Feature status
 
-## เมนู “แก้ไขข้อสอบ” และดูตัวอย่างโจทย์ในหน้าแก้ไข — 29 ตุลาคม 2026 (local)
+## เมนู “แก้ไขข้อสอบ” และดูตัวอย่างโจทย์ในหน้าแก้ไข — 29 ตุลาคม 2026 (Staging verified)
 
 - **UI-120** — ปุ่มบน Card สรุปหน้ารายละเอียดงานและเมนู contextual sidebar เปลี่ยนจาก “ตั้งค่าข้อสอบ/แบบฝึกหัด” เป็น “แก้ไขข้อสอบ/แบบฝึกหัด” (ไอคอนดินสอทั้งสองที่) และชื่อแท็บเบราว์เซอร์ของหน้า `/assignments/[id]/edit` เป็น “แก้ไขงานที่มอบหมาย” ส่วนหัว Card “ตั้งค่าข้อสอบ” ภายในหน้ายังเป็นคำเดิม
 - แถว “คะแนนแต่ละข้อ” ในหน้าแก้ไขมีปุ่มรูปตาเหมือนหน้าสร้างงาน กดแล้วเปิดมุมมองนักเรียนของข้อนั้นและกดข้อก่อนหน้า/ถัดไปได้ ปุ่มแสดงเสมอแม้มีนักเรียนเริ่มทำแล้ว โจทย์ที่งานมีอยู่เดิมใช้แถวที่หน้าเซิร์ฟเวอร์อ่านผ่าน `loadAssignmentQuestionsByProvenance` หลัง `canManageAssignment` แล้ว ครูร่วมจึงดูโจทย์ส่วนตัวของเจ้าของงานได้โดยไม่ต้องอ่านคลังกว้างขึ้น ส่วนข้อที่เพิ่งเพิ่มจากหน้าต่างเลือกโจทย์อ่านผ่าน `getQuestionPreviewDetails` ด้วย session และ RLS เดิม · `QuestionPreviewDialog` รับ `loadQuestion` เพิ่ม ค่าเริ่มต้นยังเป็น `getQuestionClientDetail` ผู้ใช้เดิมไม่เปลี่ยน · ไม่มี schema, RLS หรือ server action ใหม่
+- ตรวจ local ใน Chrome ด้วย env Supabase ปลอมบน `/exam-screen-lab/assignment-settings` (ทั้งปกติและ `?started=1`), `/exam-screen-lab/sidebar-navigation` และ `/exam-screen-lab/assignment-detail`: รูปตาครบทุกแถว ป๊อปอัปเปิดตรงข้อที่กด ข้อก่อนหน้า/ถัดไปหยุดที่ปลาย ย้ายลำดับแล้วรูปตายังเปิดข้อที่ถูก ที่ 500px ไม่มี horizontal overflow และไม่มี console error · TypeScript, `lint:tokens` และ production build ผ่าน
+- Hosted Staging: PR #105 (cherry-pick ของ `f7fa2fc` ชนเฉพาะหัว `FEATURE_STATUS.md`) merge เป็น `dc902d8`, Vercel deployment `E8A8FTNjEEbTNcTkwE1Z3VJoARqv` สำเร็จ ตรวจใน Chrome ของเจ้าของ (มี badge `STAGING · ระบบทดสอบ`): รูปตา 3/3 แถว, ข้อ 2 เปิด “ตัวอย่างข้อ 2 จาก 3” พร้อมตัวเลือก ก.–ค., ข้อถัดไป/ก่อนหน้าหยุดที่ข้อ 3 และข้อ 1, เมนูงานขึ้น “แก้ไขข้อสอบ”, ไม่มี horizontal overflow และไม่มี console error ไม่ได้บันทึกข้อมูลใด · ยังไม่ได้ทดสอบกับงานจริง ครูร่วม และข้อที่เพิ่งเพิ่มจากคลังก่อนบันทึก
 
 ## หน้าต่างเลือกโจทย์โหลดเร็วขึ้น — 28 ตุลาคม 2026 (Production released; primary local parity verified)
 
