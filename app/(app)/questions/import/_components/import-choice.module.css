@@ -5,6 +5,23 @@
   flex-direction: column;
   isolation: isolate;
   box-shadow: 0 2px 0 color-mix(in oklab, var(--import-accent) 20%, var(--border));
+  transition: translate 200ms, box-shadow 200ms;
+}
+
+/* Same lift as the classroom cards: rise 2px onto the theme's large shadow. */
+.card:not([data-pending]):hover {
+  translate: 0 -2px;
+  box-shadow: var(--elevation-lg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+  }
+
+  .card:not([data-pending]):hover {
+    translate: none;
+  }
 }
 
 .word {
@@ -28,6 +45,11 @@
   padding: 0.375rem 0.75rem;
   background: color-mix(in oklab, var(--import-accent) 8%, var(--card));
   color: var(--import-ink);
+  transition: background-color 200ms;
+}
+
+.card:not([data-pending]):hover .header {
+  background-color: color-mix(in oklab, var(--import-accent) 14%, var(--card));
 }
 
 .header::before {
@@ -94,6 +116,8 @@
   margin-block-start: auto;
   padding: 0;
   gap: 0.375rem;
+  /* The ghost button's hover fill would light up whenever the card is hovered. */
+  background: transparent;
   color: var(--import-ink);
   font-size: 0.8125rem;
   font-weight: 600;
