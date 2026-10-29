@@ -1,11 +1,11 @@
 'use client'
 
 import { workTypeConfig } from '@/lib/assignment-display'
-import { useState, useTransition } from 'react'
+import { useCallback, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { ListFilter, ChevronUp, ChevronDown, X, Plus, Lock } from 'lucide-react'
+import { ListFilter, ChevronUp, ChevronDown, X, Plus, Lock, Eye } from 'lucide-react'
 import { SolutionReleaseSetting } from '@/components/assignments/solution-release-setting'
 import {
   moveQuestionInSet, moveQuestionToIndex, normalizeSetSections, parseSections, removeQuestionsFromSet,
@@ -39,6 +39,8 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { OrderNumberInput } from '@/components/assignments/order-number-input'
 import { AssignmentAnnouncementEditor } from '@/components/assignments/assignment-announcement-editor'
 import { QuestionPicker } from '@/components/assignments/question-picker'
+import { QuestionPreviewDialog } from '@/components/assignments/question-preview-dialog'
+import { getQuestionPreviewDetails, type QuestionPreviewDetail } from '@/lib/actions/question-previews'
 import type { BankQuestion } from '@/lib/question-bank'
 import { questionExcerpt } from '@/lib/question-display'
 import { SebQuitPasswordSettings } from '@/components/assignments/seb-quit-password-settings'
@@ -70,6 +72,9 @@ const SHARED_RANDOM_VALUES_SETTING_DESCRIPTION =
 interface Props {
   assignment: EditableAssignment
   questions: EditableAssignmentQuestion[]
+  /** Full rows of `questions` for the ดูตัวอย่าง eye, already authorized by
+   *  assignment provenance on the server. */
+  previewQuestions: QuestionPreviewDetail[]
   /** This teacher's whole bank, for the "เพิ่มโจทย์" picker. */
   bank: BankQuestion[]
   /** True once anyone has started an attempt — the question set is then frozen. */
@@ -134,7 +139,9 @@ export type EditableAssignmentQuestion = Pick<Question, 'id' | 'title' | 'questi
   has_random_values: boolean
 }
 
-export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissions, sebQuitPasswordSetup }: Props) {
+export function EditAssignmentForm({
+  assignment: a, questions, previewQuestions, bank, hasSubmissions, sebQuitPasswordSetup,
+}: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const assignmentNoun = a.type === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'
@@ -226,6 +233,21 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
   const orderedQuestions = questionIds.map(
     id => questionsById.get(id) ?? { id, title: 'โจทย์ที่ไม่พบ', question_text: '' }
   )
+
+  // Which row's ดูตัวอย่าง is open; the dialog pages through the rest in order.
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null)
+  // A question the งาน came with is previewed from the row the server already
+  // authorized; one just added from the picker came from this teacher's own
+  // bank, so their session can read it.
+  const loadPreviewQuestion = useCallback(async (id: string): Promise<
+    { data: QuestionPreviewDetail } | { error: string }
+  > => {
+    const known = previewQuestions.find(q => q.id === id)
+    if (known) return { data: known }
+    const result = await getQuestionPreviewDetails([id])
+    if ('error' in result) return result
+    return result.data[0] ? { data: result.data[0] } : { error: 'ไม่พบโจทย์นี้หรือคุณไม่มีสิทธิ์เข้าถึง' }
+  }, [previewQuestions])
   const parsedRandomQuestionCount = Number(randomQuestionCount)
   const randomDrawOn = randomQuestionCount.trim() !== ''
     && Number.isInteger(parsedRandomQuestionCount)
@@ -528,6 +550,14 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
                   <p className="text-xs text-muted-foreground truncate">{questionExcerpt(q.question_text)}</p>
                 </div>
               </div>
+              <IconButton
+                label={`ดูตัวอย่างข้อ ${i + 1}`}
+                size="2xs"
+                className="shrink-0"
+                onClick={() => setPreviewIndex(i)}
+              >
+                <Eye className="w-3.5 h-3.5" />
+              </IconButton>
               <Input
                 type="number"
                 min={0}
@@ -1259,6 +1289,14 @@ export function EditAssignmentForm({ assignment: a, questions, bank, hasSubmissi
         cancelLabel="กลับไปเลือกต่อ"
         variant="destructive"
         onConfirm={discardPickerChanges}
+      />
+
+      <QuestionPreviewDialog
+        ids={questionIds}
+        open={previewIndex !== null}
+        startIndex={previewIndex ?? 0}
+        onOpenChange={open => { if (!open) setPreviewIndex(null) }}
+        loadQuestion={loadPreviewQuestion}
       />
     </form>
   )

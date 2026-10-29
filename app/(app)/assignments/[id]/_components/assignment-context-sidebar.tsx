@@ -186,7 +186,7 @@ export function AssignmentContextNavigation({
           <ClipboardCheck data-icon="inline-start" />
         </SidebarButton>
         <SidebarButton
-          label={`ตั้งค่า${assignmentTypeLabel}`}
+          label={`แก้ไข${assignmentTypeLabel}`}
           size="sm"
           variant={currentSection === 'edit' ? 'navigation' : 'ghost'}
           aria-current={currentSection === 'edit' ? 'page' : undefined}

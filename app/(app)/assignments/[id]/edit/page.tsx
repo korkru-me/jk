@@ -11,6 +11,7 @@ import { assignmentSizeLabel } from '@/lib/assignment-size-label'
 import { EditAssignmentForm } from '@/components/assignments/edit-assignment-form'
 import type { EditableAssignment, EditableAssignmentQuestion } from '@/components/assignments/edit-assignment-form'
 import type { CountableQuestion } from '@/lib/question-parts'
+import type { QuestionPreviewDetail } from '@/lib/actions/question-previews'
 import { readSebQuitPasswordSetupState } from '@/lib/seb-quit-password-service.server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { manageableClassroomIds } from '@/lib/classroom-groups-server'
@@ -21,7 +22,7 @@ import { loadAssignmentQuestionsByProvenance } from '@/lib/assignment-question-a
 import { AssignmentWorkspaceSidebar } from '../_components/assignment-workspace-sidebar'
 import type { AssignmentSidebarSummary } from '../_components/assignment-context-sidebar'
 
-export const metadata = { title: 'ตั้งค่างานที่มอบหมาย — KorKru' }
+export const metadata = { title: 'แก้ไขงานที่มอบหมาย — KorKru' }
 
 /** One assignment question as read here: what the form lists, plus what its
  *  default คะแนน is counted from. */
@@ -87,6 +88,21 @@ export default async function EditAssignmentPage({
   const questions = [...new Set(a.question_ids)]
     .map(id => questionsById.get(id))
     .filter((q): q is NonNullable<typeof q> => !!q)
+  // What the eye on each score row opens. These rows already passed assignment
+  // provenance above, so a co-teacher sees the owner's private questions too —
+  // a bank read through their own session could not.
+  const previewQuestions: QuestionPreviewDetail[] = questionRows.map(q => ({
+    id: q.id,
+    title: q.title,
+    question_text: q.question_text,
+    question_type: q.question_type,
+    is_random: q.is_random,
+    variables: q.variables,
+    answer_parts: q.answer_parts,
+    mcq_options: q.mcq_options,
+    image_urls: q.image_urls,
+    extra_data: q.extra_data,
+  }))
   const uniqueQuestionCount = new Set(a.question_ids).size
   const missingQuestionCount = Math.max(0, uniqueQuestionCount - questions.length)
   const duplicateQuestionCount = Math.max(0, a.question_ids.length - uniqueQuestionCount)
@@ -126,6 +142,7 @@ export default async function EditAssignmentPage({
       <EditAssignmentForm
         assignment={a}
         questions={questions}
+        previewQuestions={previewQuestions}
         bank={bank}
         hasSubmissions={!!startedSubmission}
         sebQuitPasswordSetup={sebQuitPasswordSetup}
