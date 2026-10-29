@@ -56,8 +56,19 @@ export function ExamQuestionNavigation({ items, touchFriendly = false, onNavigat
   )
 }
 
-export function ExamQuestionNavigationLegend({ instantCheck, flagDescription = QUESTION_FLAG_DESCRIPTION }: { instantCheck: boolean; flagDescription?: string }) {
-  const items = [
+export function ExamQuestionNavigationLegend({ instantCheck, review = false, flagDescription = QUESTION_FLAG_DESCRIPTION }: {
+  instantCheck: boolean
+  /** A handed-in paper read back: every ข้อ carries a verdict and nothing can
+   *  still be answered or flagged. */
+  review?: boolean
+  flagDescription?: string
+}) {
+  const items = review ? [
+    { cls: 'border border-primary bg-card ring-2 ring-primary/30', label: 'ข้อที่กำลังแสดง' },
+    { cls: 'bg-success', label: 'ถูก' },
+    { cls: 'border border-destructive/40 bg-destructive/15', label: 'ยังไม่ถูก' },
+    { cls: 'border border-warning/40 bg-warning/20', label: 'ถูกบางส่วน / รอตรวจ' },
+  ] : [
     { cls: 'border border-primary bg-card ring-2 ring-primary/30', label: 'ข้อที่กำลังแสดง' },
     { cls: 'border border-success/40 bg-success/15', label: 'ตอบแล้ว' },
     { cls: 'border border-warning/30 bg-warning/10', label: 'ยังไม่ตอบ' },
@@ -77,9 +88,11 @@ export function ExamQuestionNavigationLegend({ instantCheck, flagDescription = Q
           </div>
         ))}
       </div>
-      <p className="flex items-start gap-1.5 text-[10px] leading-relaxed text-muted-foreground">
-        <Flag className="mt-0.5 size-3 shrink-0 text-flag" aria-hidden="true" />{flagDescription}
-      </p>
+      {!review && (
+        <p className="flex items-start gap-1.5 text-[10px] leading-relaxed text-muted-foreground">
+          <Flag className="mt-0.5 size-3 shrink-0 text-flag" aria-hidden="true" />{flagDescription}
+        </p>
+      )}
     </div>
   )
 }

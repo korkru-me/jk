@@ -11,7 +11,7 @@ export const QUESTION_FLAG_DESCRIPTION = 'ปักธงเพื่อระ�
 
 /** One surface per question; diagrams share a row with answers when useful. */
 export function ExamQuestionFrame({
-  header, stem, illustration, sideBySide = false, feedback, children, className, headerClassName, ...props
+  header, stem, illustration, sideBySide = false, feedback, children, className, headerClassName, answerReadOnly = false, ...props
 }: ComponentProps<'div'> & {
   header: ReactNode
   stem: ReactNode
@@ -19,6 +19,10 @@ export function ExamQuestionFrame({
   sideBySide?: boolean
   feedback?: ReactNode
   headerClassName?: string
+  /** The answer stays on screen as it was handed in but cannot be changed —
+   *  inert covers every input type at once, drag lists and math fields
+   *  included. The feedback below still reads the answer out in words. */
+  answerReadOnly?: boolean
 }) {
   const splitIllustration = sideBySide && Boolean(illustration)
 
@@ -34,7 +38,7 @@ export function ExamQuestionFrame({
       <div className="flex min-w-0 flex-col gap-2 empty:hidden" data-exam-question-stem>{stem}</div>
       <div className={cn('grid min-w-0 items-start gap-2.5', splitIllustration && '@min-[44rem]/exam-question:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]')}>
         {illustration && <div className={cn('flex min-w-0 flex-wrap items-start gap-2', splitIllustration && '[&>div]:w-full [&_img]:h-auto [&_img]:max-h-none [&_img]:w-full')} data-exam-question-illustration>{illustration}</div>}
-        <div className="min-w-0" data-exam-question-answer>{children}</div>
+        <div className="min-w-0" data-exam-question-answer inert={answerReadOnly || undefined}>{children}</div>
       </div>
       {feedback}
     </Card>

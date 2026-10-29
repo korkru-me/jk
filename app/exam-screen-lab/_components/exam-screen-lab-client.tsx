@@ -59,6 +59,8 @@ export function ExamScreenLabClient({
         isWorkImageEnforced: requireWorkImage,
         instantCheck: true,
         instantCheckAnswerKey: true,
+        // The preview's result screen then offers "ดูข้อสอบที่ทำเสร็จแล้ว".
+        examReview: assignmentType === 'exam',
         calculatorEnabled: true,
         scratchpadEnabled: true,
       }}

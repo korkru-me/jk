@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canStudentReviewAnswers, canStudentViewScore } from './result-visibility'
+import { canStudentOpenExamReview, canStudentReviewAnswers, canStudentViewScore } from './result-visibility'
 
 const now = Date.parse('2026-08-24T12:00:00Z')
 
@@ -21,5 +21,17 @@ describe('student result visibility', () => {
   it('never releases scores or answers under never', () => {
     expect(canStudentViewScore('never', null, now)).toBe(false)
     expect(canStudentReviewAnswers('never', null, now)).toBe(false)
+  })
+
+  it('opens the exam review only for a ticked ข้อสอบ once answers are released', () => {
+    const exam = { type: 'exam', allow_exam_review: true, show_results: 'immediate', end_at: null }
+    expect(canStudentOpenExamReview(exam, now)).toBe(true)
+    expect(canStudentOpenExamReview({ ...exam, allow_exam_review: false }, now)).toBe(false)
+    expect(canStudentOpenExamReview({ ...exam, allow_exam_review: null }, now)).toBe(false)
+    expect(canStudentOpenExamReview({ ...exam, type: 'exercise' }, now)).toBe(false)
+    expect(canStudentOpenExamReview({ ...exam, show_results: 'score_only' }, now)).toBe(false)
+    expect(canStudentOpenExamReview({ ...exam, show_results: 'never' }, now)).toBe(false)
+    expect(canStudentOpenExamReview({ ...exam, show_results: 'after_due', end_at: '2026-08-25T12:00:00Z' }, now)).toBe(false)
+    expect(canStudentOpenExamReview({ ...exam, show_results: 'after_due', end_at: '2026-08-23T12:00:00Z' }, now)).toBe(true)
   })
 })

@@ -97,6 +97,7 @@ function assignmentDraftCopyPayload(source: Assignment, classroomId: string, cre
     random_question_count: source.random_question_count ?? null,
     show_results: source.show_results,
     show_solutions: source.show_solutions ?? false,
+    allow_exam_review: source.type === 'exam' && source.allow_exam_review === true,
     max_attempts: source.max_attempts,
     score_strategy: source.score_strategy,
     retry_scope: source.retry_scope ?? 'all',

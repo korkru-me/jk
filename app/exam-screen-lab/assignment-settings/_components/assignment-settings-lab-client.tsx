@@ -102,6 +102,7 @@ function assignmentFixture(type: AssignmentType): EditableAssignment {
     passing_value: null,
     show_results: type === 'exam' ? 'after_due' : 'immediate',
     show_solutions: false,
+    allow_exam_review: false,
     sections: [{ id: 'lab-section', title: 'แรงและการเคลื่อนที่', question_ids: QUESTION_IDS }],
     show_sections: true,
     shuffle_questions: false,
