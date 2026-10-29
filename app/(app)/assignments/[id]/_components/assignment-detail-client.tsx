@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import {
   Users, FileText, Timer, Clock, CheckCircle2, TrendingUp,
   AlertCircle, Activity, LockKeyhole, Smartphone,
-  ClipboardCheck, ChevronDown, ChevronRight, ChevronUp, Globe, Settings2,
+  ClipboardCheck, ChevronDown, ChevronRight, ChevronUp, Globe, Pencil,
 } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { updateAssignmentStatus, deleteAssignment } from '@/lib/actions/assignments'
@@ -64,7 +64,7 @@ export function AssignmentDetailClient({
 
   const statusMeta = STATUS_META[a.status]
   const assignmentTypeLabel = a.type === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'
-  const settingsLabel = `ตั้งค่า${assignmentTypeLabel}`
+  const editLabel = `แก้ไข${assignmentTypeLabel}`
   const pendingIdSet = new Set(pendingSubmissionIds)
   // Counted as hand-ins, not students — the same unit the classroom overview
   // and the "งานที่มอบหมาย" list use, so the three screens never disagree.
@@ -191,7 +191,7 @@ export function AssignmentDetailClient({
           {a.android_exam_mode === 'monitored' && <Badge variant="warning"><Smartphone /> Android ครูอนุมัติรายคน</Badge>}
         </>}
         actions={<Button size="sm" variant="outline" render={<Link href={`/assignments/${a.id}/edit`} />} className="shrink-0 bg-background/70">
-          <Settings2 data-icon="inline-start" /> {settingsLabel}
+          <Pencil data-icon="inline-start" /> {editLabel}
         </Button>}
         details={assignmentDetails}
         summary={a.status !== 'draft' && <AssignmentSubmissionSummary submittedCount={submittedSubs.length} inProgressCount={inProgressSubs.length} totalSubs={submissions.length} avgScore={avgScore} />}

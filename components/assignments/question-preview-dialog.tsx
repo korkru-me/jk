@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { ArrowLeft, ArrowRight } from 'lucide-react'
 import { getQuestionClientDetail } from '@/lib/actions/questions'
+import type { QuestionPreviewDetail } from '@/lib/actions/question-previews'
 import { QuestionPreviewContent } from '@/components/questions/question-preview'
 import { Button } from '@/components/ui/button'
 import {
@@ -20,6 +21,9 @@ interface Props {
   /** Which question to open on — the row the teacher clicked. */
   startIndex?: number
   onOpenChange: (open: boolean) => void
+  /** Where one question's full row comes from; the bank read by default.
+   *  Must be stable across renders (useCallback) — a new function refetches. */
+  loadQuestion?: (id: string) => Promise<{ data: QuestionPreviewDetail } | { error: string }>
 }
 
 /**
@@ -31,9 +35,11 @@ interface Props {
  * full row is fetched per question as it is opened — RLS still decides whether
  * this teacher may read it.
  */
-export function QuestionPreviewDialog({ ids, open, startIndex = 0, onOpenChange }: Props) {
+export function QuestionPreviewDialog({
+  ids, open, startIndex = 0, onOpenChange, loadQuestion = getQuestionClientDetail,
+}: Props) {
   const [index, setIndex] = useState(startIndex)
-  const [detail, setDetail] = useState<Awaited<ReturnType<typeof getQuestionClientDetail>> | null>(null)
+  const [detail, setDetail] = useState<Awaited<ReturnType<NonNullable<Props['loadQuestion']>>> | null>(null)
 
   useEffect(() => {
     if (!open) return
@@ -48,9 +54,9 @@ export function QuestionPreviewDialog({ ids, open, startIndex = 0, onOpenChange 
     if (!open || !currentId) return
     let active = true
     setDetail(null)
-    getQuestionClientDetail(currentId).then(result => { if (active) setDetail(result) })
+    loadQuestion(currentId).then(result => { if (active) setDetail(result) })
     return () => { active = false }
-  }, [open, currentId])
+  }, [open, currentId, loadQuestion])
 
   const question = detail && 'data' in detail ? detail.data : null
   const extraData = question?.extra_data

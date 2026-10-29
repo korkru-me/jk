@@ -17,4 +17,4 @@ When a page creates something that can be adjusted later through a Settings or E
 - Verify both creation and later settings for every relevant type or mode, including responsive layout, keyboard labels, save feedback, and persisted behavior.
 - Update the relevant architecture, design-system, and feature-status documentation when this contract changes.
 
-Example: if a new assignment option is added to “สร้างข้อสอบ”, also decide whether “ตั้งค่าข้อสอบ” must read and edit it; do not stop after adding only the create payload.
+Example: if a new assignment option is added to “สร้างข้อสอบ”, also decide whether “แก้ไขข้อสอบ” must read and edit it; do not stop after adding only the create payload.
