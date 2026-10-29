@@ -34,6 +34,7 @@ const assignment: Assignment & { classrooms: { name: string; description: string
   shared_random_seed: null,
   show_results: 'immediate',
   show_solutions: false,
+  allow_exam_review: false,
   max_attempts: null,
   score_strategy: 'best',
   retry_scope: 'all',

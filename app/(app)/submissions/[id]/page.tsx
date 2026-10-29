@@ -12,13 +12,13 @@ import { SubmissionScoreSummary } from '@/components/student/submission-score-su
 import { SolutionWatermark } from '@/components/student/solution-watermark'
 import { loadStudentSolutionWatermark } from '@/lib/solution-watermark-server'
 import { Button } from '@/components/ui/button'
-import { CheckCircle2, XCircle, ChevronLeft, ChevronRight, RotateCcw, School } from 'lucide-react'
+import { BookOpenCheck, CheckCircle2, XCircle, ChevronLeft, ChevronRight, RotateCcw, School } from 'lucide-react'
 import { computePassed, formatPassingThreshold } from '@/lib/grading'
 import { SCORE_STRATEGY_LABELS, rescaleToDisplayMax, officialSubmissionsByStudent } from '@/lib/scoring'
 import { sortStudents } from '@/lib/student-sort'
 import { ScoreEditor } from '@/components/assignments/score-editor'
 import { Card } from '@/components/ui/card'
-import { canStudentReviewAnswers, canStudentViewScore } from '@/lib/result-visibility'
+import { canStudentOpenExamReview, canStudentReviewAnswers, canStudentViewScore } from '@/lib/result-visibility'
 import { MATH_WORK_BUCKET } from '@/lib/math-work'
 import { shouldOfferSebExit } from '@/lib/seb-exit'
 import { attemptItemHasSolution } from '@/lib/attempt-solutions'
@@ -87,7 +87,7 @@ export default async function SubmissionResultPage({
     .select(`
       id, assignment_id, student_id, status, closed_at, close_reason, missing_work_evidence, total_score, score_adjustment, max_score, attempt_number, submitted_at, secure_browser_verified_at,
       users!submissions_student_id_fkey(full_name),
-      assignments(id, title, show_results, show_solutions, end_at, duration_minutes, passing_type, passing_value, completion_rule, type, status, max_attempts, score_strategy, retry_scope, classroom_id, display_max_score, secure_browser_mode)
+      assignments(id, title, show_results, show_solutions, allow_exam_review, end_at, duration_minutes, passing_type, passing_value, completion_rule, type, status, max_attempts, score_strategy, retry_scope, classroom_id, display_max_score, secure_browser_mode)
     `)
     .eq('id', id)
     .eq('student_id', user.id)
@@ -198,6 +198,9 @@ export default async function SubmissionResultPage({
   // `after_due` withholds answer details only until the deadline passes.
   const canShowScore = isTeacherViewer || canStudentViewScore(assignment.show_results, assignment.end_at)
   const canShowAnswers = isTeacherViewer || canStudentReviewAnswers(assignment.show_results, assignment.end_at)
+  // ดูข้อสอบที่ทำเสร็จแล้ว — the student's own ข้อสอบ, once the teacher allowed
+  // it and the answers above are released. The review route decides again.
+  const canOpenExamReview = isOwnSubmission && canStudentOpenExamReview(assignment)
   const canExitSeb = shouldOfferSebExit({
     isOwnSubmission,
     secureBrowserMode: assignment.secure_browser_mode,
@@ -321,6 +324,9 @@ export default async function SubmissionResultPage({
         submittedAt={submission.submitted_at ? thaiDateTime.format(new Date(submission.submitted_at)) : null}
         strategy={assignment.max_attempts !== 1 ? `การเก็บคะแนน: ${SCORE_STRATEGY_LABELS[assignment.score_strategy as 'best' | 'average' | 'latest']} (จากทั้งหมด ${submission.attempt_number} ครั้งที่ทำ)` : null}
       >
+        {canOpenExamReview && hasSolutionIdentity && <Button size="sm" variant={canRetry ? 'outline' : 'default'} render={<Link href={`/submissions/${id}/review`} />}>
+          <BookOpenCheck aria-hidden="true" />ดูข้อสอบที่ทำเสร็จแล้ว
+        </Button>}
         {solutionsOpen && hasSolutionIdentity && <AttemptSolutionsButton />}
         {canRetry && <Button size="sm" render={<Link href={`/assignments/${submission.assignment_id}/take`} />}>
           <RotateCcw aria-hidden="true" />

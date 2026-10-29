@@ -112,6 +112,9 @@ interface CreateAssignmentData {
   /** เฉลยวิธีทำ opens on the summary page once the student is done with the
    *  งาน (lib/solution-release.ts). Off unless the teacher ticks it. */
   show_solutions?: boolean
+  /** ข้อสอบ only: reopen the submitted exam read-only with a เฉลย under each
+   *  ข้อ (lib/exam-review.ts). Stored false for every แบบฝึกหัด. */
+  allow_exam_review?: boolean
   max_attempts?: number | null
   score_strategy?: ScoreStrategy
   retry_scope?: RetryScope
@@ -423,6 +426,7 @@ export async function createAssignment(data: CreateAssignmentData) {
       random_question_count: randomQuestionCount,
       show_results: showResults,
       show_solutions: data.show_solutions === true,
+      allow_exam_review: isOnlineExam && data.allow_exam_review === true,
       max_attempts: attemptSettings.max_attempts,
       score_strategy: attemptSettings.score_strategy,
       retry_scope: forced?.retry_scope ?? retryScope,
@@ -619,6 +623,10 @@ interface UpdateAssignmentData {
    *  have finished: it only decides whether a เฉลยวิธีทำ opens, never what
    *  anyone scored. */
   show_solutions?: boolean
+  /** Omit to leave it untouched. Like show_solutions it may change after
+   *  students have finished — it decides only whether the read-only review
+   *  opens, never a score. Ignored (stored false) on a แบบฝึกหัด. */
+  allow_exam_review?: boolean
   /** "ตัวเลขชุดเดียวกัน" on or off. Omit to leave it untouched. Refused once
    *  anyone has started, and leaving it on keeps the seed already stored — a
    *  new one would hand the next student different numbers. */
@@ -1026,6 +1034,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
       display_max_score: displayMaxScore,
       show_results: data.show_results,
       ...(data.show_solutions === undefined ? {} : { show_solutions: data.show_solutions === true }),
+      ...(data.allow_exam_review === undefined ? {} : { allow_exam_review: isOnlineExam && data.allow_exam_review === true }),
       ...(sharedRandomChanged
         ? { shared_random_seed: data.shared_random_values ? createSharedRandomSeed() : null }
         : {}),

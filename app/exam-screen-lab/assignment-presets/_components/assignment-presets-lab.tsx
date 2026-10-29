@@ -48,7 +48,7 @@ function copiedAssignment(type: AssignmentType): AssignmentCopyPreset {
     display_max_score: 20, sections: [], show_sections: true,
     start_at: '2026-10-08T02:00:00.000Z', due_at: null, late_bands: [], end_at: '2026-10-10T09:00:00.000Z',
     duration_minutes: 7, type, shared_random_seed: null, random_question_count: null,
-    streak_target: null, streak_question_cap: null, access_code: 'LAB-ONLY',
+    streak_target: null, streak_question_cap: null, access_code: 'LAB-ONLY', allow_exam_review: false,
   }
 }
 

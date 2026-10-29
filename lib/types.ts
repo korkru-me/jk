@@ -863,6 +863,10 @@ export interface Assignment {
    *  their deadline passed, or they used every attempt — with no attempt left
    *  that can still be written to. Decided in lib/solution-release.ts. */
   show_solutions: boolean
+  /** ข้อสอบเท่านั้น: once show_results releases the answers, the student may
+   *  reopen their submitted exam read-only — their own answers with a ถูก/ผิด
+   *  panel and the เฉลย under every ข้อ. Decided in lib/exam-review.ts. */
+  allow_exam_review: boolean
   max_attempts: number | null
   score_strategy: ScoreStrategy
   /** What a retry re-asks. `all` rebuilds the whole attempt (the behavior
