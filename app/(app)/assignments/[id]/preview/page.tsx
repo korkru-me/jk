@@ -185,6 +185,9 @@ export default async function AssignmentPreviewPage({
       && a.instant_check === true
       && (a.type === 'exercise' || a.completion_rule === 'streak'),
     instantCheckAnswerKey: a.instant_check_answer_key === true,
+    // The preview's result screen offers "ดูข้อสอบที่ทำเสร็จแล้ว" exactly when
+    // students will get it — the timing of แสดงผลลัพธ์ does not apply to a teacher.
+    examReview: a.type === 'exam' && a.allow_exam_review === true,
     calculatorEnabled: a.calculator_enabled === true,
     scratchpadEnabled: a.scratchpad_enabled === true,
   }
