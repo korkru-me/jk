@@ -5,16 +5,16 @@ import { FileUp } from 'lucide-react'
 import { toast } from 'sonner'
 import { createFileAssignment, type CreateFileAssignmentInput } from '@/lib/actions/file-assignments'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Card } from '@/components/ui/card'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { RichText } from '@/components/ui/rich-text'
 import { Input } from '@/components/ui/input'
 import { AssignmentAnnouncementEditor } from './assignment-announcement-editor'
 import { QuestionFileUpload } from '@/components/questions/question-file-upload'
+import { ClassroomPicker } from './classroom-picker'
 
 interface Props {
-  classrooms: Array<{ id: string; name: string }>
+  classrooms: Array<{ id: string; name: string; description?: string | null }>
   preselectedClassroomId?: string
   localOnly?: boolean
   initial?: Partial<CreateFileAssignmentInput>
@@ -38,9 +38,18 @@ export function FileAssignmentForm({ classrooms, preselectedClassroomId, localOn
   const [end, setEnd] = useState(local(initial?.end_at))
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const [attachmentsBusy, setAttachmentsBusy] = useState(false)
+  const classroomOptions = classrooms.map(room => ({ ...room, description: room.description ?? null }))
+  const primaryClassroom = classrooms.find(room => room.id === preselectedClassroomId)
+
+  function toggleClassroom(id: string) {
+    if (editing || pending || id === primaryClassroom?.id) return
+    setSelected(current => current.includes(id) ? current.filter(value => value !== id) : [...current, id])
+  }
 
   function submit(status: 'draft' | 'published') {
     setError(null)
+    if (attachmentsBusy) { setError('กรุณารอแนบไฟล์ให้เสร็จก่อนบันทึก'); return }
     if (!title.trim() || !selected.length) { setError('กรุณาระบุชื่องานและเลือกห้องเรียน'); return }
     if (!instructions.replace(/<[^>]*>/g, '').trim() && !attachments.length) { setError('กรุณาเขียนคำสั่งหรือแนบใบงาน'); return }
     if (!Number.isFinite(Number(points)) || Number(points) <= 0) { setError('กรุณาระบุคะแนนเต็มมากกว่า 0'); return }
@@ -56,23 +65,24 @@ export function FileAssignmentForm({ classrooms, preselectedClassroomId, localOn
     <div className="flex flex-wrap items-center justify-between gap-2">
       <div><h1 className="flex items-center gap-2 text-xl font-bold"><FileUp className="size-5 text-primary" />{editing ? 'แก้ไขงานส่งไฟล์' : 'มอบหมายงานส่งไฟล์'}</h1>
         <p className="text-sm text-muted-foreground">เขียนคำสั่งหรือแนบใบงาน นักเรียนส่งคำตอบได้สูงสุด 10 ไฟล์ต่อคน</p></div>
-      <div className="flex gap-2">{!editing && <Button type="button" variant="outline" disabled={pending} onClick={() => submit('draft')}>บันทึกร่าง</Button>}
-        <Button type="submit" disabled={pending}>{pending ? 'กำลังบันทึก…' : editing ? 'บันทึกการแก้ไข' : 'มอบหมายงาน'}</Button></div>
+      <div className="flex gap-2">{!editing && <Button type="button" variant="outline" disabled={pending || attachmentsBusy} onClick={() => submit('draft')}>บันทึกร่าง</Button>}
+        <Button type="submit" disabled={pending || attachmentsBusy}>{pending ? 'กำลังบันทึก…' : editing ? 'บันทึกการแก้ไข' : 'มอบหมายงาน'}</Button></div>
     </div>
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     <Card padding="md"><FieldGroup>
       <Field><FieldLabel htmlFor="file-assignment-title">ชื่องาน</FieldLabel><Input id="file-assignment-title" value={title} onChange={event => setTitle(event.target.value)} maxLength={200} placeholder="เช่น ใบงานเรื่องการเคลื่อนที่" required /></Field>
       <fieldset disabled={contentLocked} className="flex min-w-0 flex-col gap-3"><Field><FieldLabel>คำสั่ง</FieldLabel><>{contentLocked ? <RichText text={instructions} blocks /> : <AssignmentAnnouncementEditor value={instructions} onChange={setInstructions} rows={5} />}</></Field>
-      <Field><FieldLabel>เอกสารหรือรูปประกอบคำสั่ง</FieldLabel><QuestionFileUpload value={attachments} onChange={setAttachments} localOnly={localOnly} maxFiles={10} removeFromStorage={false} /></Field></fieldset>
+      <Field><FieldLabel>เอกสารหรือรูปประกอบคำสั่ง</FieldLabel><QuestionFileUpload value={attachments} onChange={setAttachments} localOnly={localOnly} maxFiles={10} removeFromStorage={false} allowDrop allowDocuments disabled={contentLocked || pending} onUploadingChange={setAttachmentsBusy} /></Field></fieldset>
       {contentLocked && <p className="text-xs text-muted-foreground">เผยแพร่แล้ว คำสั่ง เอกสาร และคะแนนเต็มคงตามงานที่นักเรียนได้รับ</p>}
     </FieldGroup></Card>
     <Card padding="md"><FieldGroup>
-      <Field><FieldLabel>มอบหมายให้</FieldLabel><div className="flex flex-wrap gap-2">
-        {classrooms.map(classroom => <label key={classroom.id} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm">
-          <Checkbox disabled={editing} checked={selected.includes(classroom.id)} onCheckedChange={checked => setSelected(current => checked ? [...current, classroom.id] : current.filter(id => id !== classroom.id))} />{classroom.name}
-        </label>)}
+      <Field><FieldLabel>มอบหมายให้{!primaryClassroom && selected.length > 1 ? ` (${selected.length} ห้อง)` : ''}</FieldLabel>
+        {primaryClassroom && <p className="truncate text-sm font-medium" title={primaryClassroom.name}>{primaryClassroom.name}</p>}
+        <fieldset disabled={editing || pending} className="min-w-0">
+          <ClassroomPicker classrooms={classroomOptions} selectedIds={selected} onToggle={toggleClassroom} primaryClassroomId={primaryClassroom?.id} />
+        </fieldset>
         {!classrooms.length && <p className="text-sm text-muted-foreground">ยังไม่มีห้องเรียนที่มอบหมายงานได้</p>}
-      </div></Field>
+      </Field>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Field><FieldLabel htmlFor="file-assignment-points">คะแนนเต็มทั้งงาน</FieldLabel><Input id="file-assignment-points" disabled={contentLocked} type="number" min="0.01" max="1000000" step="any" value={points} onChange={event => setPoints(event.target.value)} /></Field>
         <Field><FieldLabel htmlFor="file-assignment-start">เปิดรับงาน</FieldLabel><Input id="file-assignment-start" type="datetime-local" value={start} onChange={event => setStart(event.target.value)} /></Field>

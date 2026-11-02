@@ -1,5 +1,9 @@
 # Security และ privacy guardrails
 
+## File instruction document uploads — 2 November 2026 (local)
+
+The explicit file-assignment document mode mirrors the existing classroom document bucket MIME allowlist; it does not widen the question-images bucket or student answer uploader. Create/update accept document URLs only from this project's `classroom-post-files` bucket under `actor/file-assignment-instructions/...`, preserving the legacy question-images path. The actor prefix must match the verified session unless the exact URL is already in an authorized source/assignment. Foreign hosts, other bucket namespaces, encoded traversal and query-bearing references are rejected. Document references render as downloads, PDF bytes retain the bounded viewer validation, and published content refuses drops. No Storage policy, bucket setting, migration or hosted test write was performed; local mocks are not a hosted Storage/RLS certification.
+
 ## Student classroom switcher metadata — 2 November 2026 (local)
 
 The switcher loader is server-only and called only after the classroom route verifies session identity and the current room's student membership. Its admin query is restricted to `classroom_students.student_id` from that verified session, with active/undeleted room filters on every page. Client options allow only room ID, name, description metadata and classroom type; class codes, teacher IDs and student records are excluded. Client navigation is presentation only: destination membership checks remain the access boundary. No new browser grants, RLS policies or migrations are required.

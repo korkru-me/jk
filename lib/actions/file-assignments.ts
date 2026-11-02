@@ -10,7 +10,8 @@ import { canManageAssignment, studentHasAssignment } from '@/lib/auth/assignment
 import { createInlineFileAssignment } from '@/lib/actions/assignments'
 import { startSubmission, submitSubmission } from '@/lib/actions/submissions'
 import { sanitizeRichTextForStorage } from '@/lib/rich-text-sanitize'
-import { parseSubmittedFiles, storagePathFromPublicUrl } from '@/lib/exam-attachment'
+import { parseSubmittedFiles } from '@/lib/exam-attachment'
+import { fileAssignmentInstructionStoragePath } from '@/lib/question-file-selection'
 import { fileAssignmentQuestionOwner, fileAssignmentWithdrawalError, isFileAssignment, MAX_SUBMISSION_FILES, type FileAssignmentView } from '@/lib/file-assignment'
 import { normalizeAssignmentLateSchedule } from '@/lib/late-submission'
 import { fileAssignmentDescription } from '@/lib/file-assignment'
@@ -57,7 +58,7 @@ export async function createFileAssignment(input: CreateFileAssignmentInput) {
     for (const url of source.input.attachment_urls) copiedFiles.add(url)
   }
   if (input.attachment_urls.some(url => {
-    const path = storageOrigin ? storagePathFromPublicUrl(url, 'question-images', storageOrigin) : null
+    const path = storageOrigin ? fileAssignmentInstructionStoragePath(url, storageOrigin) : null
     return !path || (!path.startsWith(`${user.id}/`) && !copiedFiles.has(url))
   })) {
     return { error: 'เอกสารประกอบต้องเป็นไฟล์ที่คุณแนบไว้ในระบบ' }
@@ -128,7 +129,7 @@ export async function updateFileAssignment(assignmentId: string, input: CreateFi
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   const storageOrigin = instructionStorageOrigin()
   if (input.attachment_urls.some(url => {
-    const path = storageOrigin ? storagePathFromPublicUrl(url, 'question-images', storageOrigin) : null
+    const path = storageOrigin ? fileAssignmentInstructionStoragePath(url, storageOrigin) : null
     return !path || (!path.startsWith(`${user.id}/`) && !old.attachment_urls.includes(url))
   })) return { error: 'เอกสารประกอบไม่ถูกต้อง' }
   const admin = createAdminClient()
