@@ -1,5 +1,9 @@
 # Architecture
 
+## Shared instruction PDF preview — 2 November 2026 (local)
+
+Instruction PDFs in direct file assignments, legacy exam file questions and question previews reuse the announcement PDF dialog and fullscreen controls. Separate post/question URL resolvers allow only their respective bucket on the configured Storage origin. The reader still fetches without Storage credentials, rejects redirects, bounds the stream to 10 MB and checks MIME and PDF signature before creating the iframe Blob. Only explicit localOnly callers may preview a selected local Blob; stored blob/data/foreign URLs remain rejected by the production source resolver. The exact existing QA asset exception remains unchanged. File-count overflow is a read-only notice, does not upload the rejected batch or alter saved files, and restores focus to the attach button.
+
 ## Direct file assignments — 2 November 2026 (local)
 
 File assignments reuse the existing exercise/manual-file-review pipeline rather than introducing another attempt or grading engine. Creation allocates one private prompt only while creating its assignment, with reserved `extra_data.file_assignment_id` / `file_assignment_max_score` metadata. The rich-text description carries an invisible versioned assignment-ID marker. Provenance accepts this prompt only for the exact assignment, creator and organization; bank lists, selectors, counters, detail/edit, filing, bulk deletion and export exclude it. Legacy file-upload questions have no reserved metadata and retain their existing behavior. Failed creation performs best-effort cleanup only after confirming that no assignment committed; a lost receipt never deletes committed content.

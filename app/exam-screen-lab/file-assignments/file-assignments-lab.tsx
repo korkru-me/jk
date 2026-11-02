@@ -29,6 +29,14 @@ export function FileAssignmentsLab({ serverNow }: { serverNow: string }) {
     <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
       <p className="text-xs text-muted-foreground">LOCAL · ข้อมูลจำลอง · ไฟล์อยู่ในเครื่อง ไม่บันทึกข้อมูลขึ้นระบบ</p>
       <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="outline" onClick={() => {
+          setExpired(false)
+          setView({ id: ASSIGNMENT, title: 'ใบงานฟิสิกส์ — ตัวอย่างแนบไฟล์', classroomId: CLASSROOM.id,
+            instructions: '<p>อ่านใบงาน PDF แล้วแสดงวิธีทำ แนบคำตอบเป็นรูปภาพหรือ PDF</p>',
+            attachments: ['/exam-screen-lab/grading-workspace/assets/file-0.pdf'], maxScore: 10,
+            status: 'published', startAt: null, dueAt: null, endAt: null, submission: null, withdrawalError: null })
+          setRole('student')
+        }}>เปิดตัวอย่างงานพร้อม PDF</Button>
         {view && <><Button size="sm" variant="outline" onClick={() => setRole('student')}>มุมมองนักเรียน</Button><Button size="sm" variant="outline" onClick={() => setRole('teacher')}>มุมมองครูตรวจงาน</Button>
           <Button size="sm" variant="outline" aria-pressed={expired} onClick={() => setExpired(value => !value)}>{expired ? 'กลับไปก่อนกำหนดส่ง' : 'จำลองพ้นกำหนดส่ง'}</Button></>}
         <Button size="sm" variant="ghost" onClick={() => { setView(null); setExpired(false); setRole('create') }}>สร้างตัวอย่างใหม่</Button>
