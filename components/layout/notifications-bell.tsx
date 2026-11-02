@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Bell, CheckCheck } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -103,16 +104,19 @@ export function NotificationsBell({ initialUnreadCount, actions = DEFAULT_ACTION
           </span>
         )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80 p-0">
-        <div className="flex items-center justify-between px-3 py-2 border-b">
+      <DropdownMenuContent align="end" className="w-80 max-w-[calc(100vw-1rem)] p-0">
+        <div className="flex items-center justify-between gap-2 px-3 py-2 border-b">
           <span className="text-sm font-semibold">การแจ้งเตือน</span>
           {unreadCount > 0 && (
-            <button
+            <Button
+              type="button"
+              variant="primaryOutline"
+              size="sm"
               onClick={handleMarkAllRead}
-              className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
+              className="min-h-[44px] cursor-pointer"
             >
-              <CheckCheck size={12} /> อ่านทั้งหมด
-            </button>
+              <CheckCheck data-icon="inline-start" aria-hidden="true" /> อ่านทั้งหมด
+            </Button>
           )}
         </div>
 

@@ -15,6 +15,8 @@ const buttonVariants = cva(
         default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
         outline:
           "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
+        primaryOutline:
+          "border-primary/50 bg-primary/5 text-[color:color-mix(in_oklab,var(--primary)_75%,var(--foreground))] hover:border-primary/70 hover:bg-primary/15 focus-visible:border-primary focus-visible:ring-primary/25 active:bg-primary/20",
         attentionOutline:
           "border-destructive/35 bg-destructive/5 text-foreground hover:bg-destructive/10 focus-visible:border-destructive/50 focus-visible:ring-destructive/20",
         secondary:
