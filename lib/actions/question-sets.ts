@@ -78,6 +78,12 @@ export async function createQuestionSet(data: QuestionSetData) {
   const orgResult = await resolveOrgId(data.visibility, data.org_id)
   if ('error' in orgResult) return orgResult
 
+  if (data.question_ids.length) {
+    const inline = await supabase.from('questions').select('id').in('id', data.question_ids).not('extra_data->file_assignment_id', 'is', null)
+    if (inline.error) return { error: 'ตรวจสอบโจทย์ไม่สำเร็จ กรุณาลองใหม่' }
+    if (inline.data?.length) return { error: 'คำสั่งของงานส่งไฟล์ไม่สามารถเก็บในแฟ้มโจทย์ได้' }
+  }
+
   const normalized = normalizeSetSections(data.sections ?? [], data.question_ids)
 
   const { data: set, error } = await supabase
@@ -138,6 +144,12 @@ async function writeQuestionSet(id: string, data: QuestionSetData) {
 
   const orgResult = await resolveOrgId(data.visibility, data.org_id)
   if ('error' in orgResult) return orgResult
+
+  if (data.question_ids.length) {
+    const inline = await supabase.from('questions').select('id').in('id', data.question_ids).not('extra_data->file_assignment_id', 'is', null)
+    if (inline.error) return { error: 'ตรวจสอบโจทย์ไม่สำเร็จ กรุณาลองใหม่' }
+    if (inline.data?.length) return { error: 'คำสั่งของงานส่งไฟล์ไม่สามารถเก็บในแฟ้มโจทย์ได้' }
+  }
 
   const normalized = normalizeSetSections(data.sections ?? [], data.question_ids)
 
@@ -209,6 +221,8 @@ export async function addQuestionsToSets(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
+  const inline = await supabase.from('questions').select('id').in('id', questionIds).not('extra_data->file_assignment_id', 'is', null)
+  if (inline.error || inline.data?.length) return { error: 'คำสั่งของงานส่งไฟล์ไม่สามารถเก็บในแฟ้มโจทย์ได้' }
   const result = await fileQuestionsIntoSets(supabase, user.id, setIds, questionIds)
   if ('error' in result) return result
 

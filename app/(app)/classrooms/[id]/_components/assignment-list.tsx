@@ -23,9 +23,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 
 export type { StudentAssignmentRow }
 type StatusFilterKey = 'all' | 'pending' | 'done'
-type TypeFilterKey = 'all' | 'exercise' | 'exam'
+type TypeFilterKey = 'all' | 'exercise' | 'exam' | 'file'
 const TYPE_OPTIONS = [
-  { value: 'all', label: 'ทุกประเภท' }, { value: 'exercise', label: 'แบบฝึกหัด' }, { value: 'exam', label: 'ข้อสอบ' },
+  { value: 'all', label: 'ทุกประเภท' }, { value: 'exercise', label: 'แบบฝึกหัด' }, { value: 'exam', label: 'ข้อสอบ' }, { value: 'file', label: 'งานส่งไฟล์' },
 ] as const
 
 function dueInfo(endAt: string | null, now: number) {
@@ -56,8 +56,8 @@ export function AssignmentList({ assignments, categories, assignmentHrefs, initi
     { key: 'done', label: 'ส่งแล้ว', count: done.length },
   ] as const
   const byStatus = statusFilter === 'pending' ? pending : statusFilter === 'done' ? done : assignments
-  const counts = { all: byStatus.length, exercise: byStatus.filter(a => a.type === 'exercise').length, exam: byStatus.filter(a => a.type === 'exam').length }
-  const visible = typeFilter === 'all' ? byStatus : byStatus.filter(a => a.type === typeFilter)
+  const counts = { all: byStatus.length, exercise: byStatus.filter(a => !a.file_submission && a.type === 'exercise').length, exam: byStatus.filter(a => a.type === 'exam').length, file: byStatus.filter(a => a.file_submission).length }
+  const visible = typeFilter === 'all' ? byStatus : byStatus.filter(a => (a.file_submission ? 'file' : a.type) === typeFilter)
   const sections = orderStudentClassroomWork(visible, assignments, categories)
 
   return (
@@ -74,7 +74,7 @@ export function AssignmentList({ assignments, categories, assignmentHrefs, initi
           ))}
         </ToggleGroup>
         <Select value={typeFilter} onValueChange={value => {
-          if (value === 'all' || value === 'exercise' || value === 'exam') setTypeFilter(value)
+          if (value === 'all' || value === 'exercise' || value === 'exam' || value === 'file') setTypeFilter(value)
         }}>
           <SelectTrigger size="sm" aria-label="กรองประเภทงาน" className="min-w-[9rem] @min-[34rem]:ml-auto">
             <SlidersHorizontal className="size-3.5" aria-hidden="true" />
@@ -123,9 +123,9 @@ function StudentAssignmentCard({ assignment: a, now, href }: { assignment: Stude
   const completed = isCompleted(a)
   const severity = studentWorkSeverity(a.end_at, completed, now)
   const due = dueInfo(a.end_at, now)
-  const type = TYPE_CFG[a.type] ?? TYPE_CFG.exam
+  const type = TYPE_CFG[a.file_submission ? 'file' : a.type] ?? TYPE_CFG.exam
   const passingThreshold = formatPassingThreshold(a.passing_type, a.passing_value)
-  const sizeLabel = assignmentSizeLabel(a)
+  const sizeLabel = a.file_submission ? 'ส่งคำตอบไม่เกิน 10 ไฟล์' : assignmentSizeLabel(a)
   const compactSize = a.completion_rule === 'streak' && a.streak_target
     ? `ถูกติดกัน ${a.streak_target} ข้อ`
     : a.random_question_count ? `สุ่ม ${a.random_question_count} ข้อ` : sizeLabel

@@ -66,6 +66,7 @@ import { ClassroomRecentWork } from '@/components/assignments/classroom-recent-w
 import type { RecentClassroomWorkResult } from '@/lib/classroom-recent-work'
 
 export interface ClassroomAssignmentRow {
+  file_submission?: boolean
   id: string
   title: string
   type: string
@@ -361,7 +362,7 @@ export function ClassroomAssignmentsTab({
         category_id: normalizeAssignmentCategoryId(categoryByAssignment[assignment.id], categories),
       }))
   }, [assignmentOrder, workItems, categories, categoryByAssignment, defaultAssignmentIds])
-  const filtered = rows.filter(assignment => typeFilter === 'all' || assignment.type === typeFilter)
+  const filtered = rows.filter(assignment => typeFilter === 'all' || ('file_submission' in assignment && assignment.file_submission ? 'file' : assignment.type) === typeFilter)
   const layoutBlocked = (practiceLibraries?.items.length ?? 0) > 0 && practiceLibraries?.layoutAvailable === false
   const sections = groupAssignmentsByCategory(filtered, categories, true)
   const assignmentCounts = useMemo(() => {
@@ -519,7 +520,7 @@ export function ClassroomAssignmentsTab({
   const assignmentById = new Map(rows.map(assignment => [assignment.id, assignment]))
   const draggingAssignment = draggingAssignmentId ? assignmentById.get(draggingAssignmentId) ?? null : null
   const draggingTypeCfg = draggingAssignment
-    ? workTypeConfig(draggingAssignment.type)
+    ? workTypeConfig('file_submission' in draggingAssignment && draggingAssignment.file_submission ? 'file' : draggingAssignment.type)
     : TYPE_CFG.exam
   const DraggingTypeIcon = draggingTypeCfg.icon
   const dragTargetName = dragTargetCategoryId === undefined ? null : categoryName(dragTargetCategoryId)
@@ -613,7 +614,7 @@ export function ClassroomAssignmentsTab({
                   >
                   {section.assignments.map(assignment => {
                     const statusCfg = statusConfig(assignment.status)
-                    const typeCfg = workTypeConfig(assignment.type)
+                    const typeCfg = workTypeConfig('file_submission' in assignment && assignment.file_submission ? 'file' : assignment.type)
                     const TypeIcon = typeCfg.icon
                     if (assignment.kind === 'practice') {
                       const practiceStatus = {

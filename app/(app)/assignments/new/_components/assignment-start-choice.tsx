@@ -1,6 +1,6 @@
 import { ExerciseIcon, ExamIcon, PracticeIcon } from '@/lib/assignment-display'
 import Link from 'next/link'
-import { ArrowLeft, Copy, Plus } from 'lucide-react'
+import { ArrowLeft, Copy, Plus, FileUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
@@ -70,6 +70,7 @@ interface AssignmentTypeChoiceProps {
   exerciseHref: string
   examHref: string
   practiceHref?: string
+  fileHref?: string
 }
 
 export function AssignmentTypeChoice({
@@ -77,6 +78,7 @@ export function AssignmentTypeChoice({
   exerciseHref,
   examHref,
   practiceHref,
+  fileHref,
 }: AssignmentTypeChoiceProps) {
   return (
     <div className="flex max-w-3xl flex-col gap-6">
@@ -92,6 +94,11 @@ export function AssignmentTypeChoice({
       </div>
 
       <div className={cn('grid gap-4 md:grid-cols-2', practiceHref && 'lg:grid-cols-3')}>
+        {fileHref && <Card padding="md" className="flex min-w-0 flex-col gap-3">
+          <div className="flex items-start gap-3"><div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><FileUp className="size-5" aria-hidden="true" /></div>
+            <div className="min-w-0"><h2 className="font-semibold">งานส่งไฟล์</h2><p className="mt-1 text-sm text-muted-foreground">เขียนคำสั่ง แนบใบงาน แล้วให้นักเรียนส่งไฟล์คำตอบ</p></div></div>
+          <Button className="mt-auto w-full" render={<Link href={fileHref} />}><FileUp data-icon="inline-start" />สร้างงานส่งไฟล์</Button>
+        </Card>}
         <Card padding="md" className="flex min-w-0 flex-col gap-3">
           <div className="flex items-start gap-3">
             <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-work-exercise/10 text-work-exercise">

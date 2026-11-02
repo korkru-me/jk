@@ -3,6 +3,7 @@ import { completionChoiceFor, findPassingCompletion } from '@/lib/assignment-com
 export interface StudentAssignmentRow {
   id: string
   title: string
+  file_submission?: boolean
   question_ids: string[]
   random_question_count: number | null
   completion_rule?: string | null

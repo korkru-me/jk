@@ -1,3 +1,4 @@
+import { isFileAssignment } from '@/lib/file-assignment'
 import { createClient } from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/auth/server'
 import { fetchBankQuestions, withQuestionPoints } from '@/lib/question-bank'
@@ -178,6 +179,7 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
     if (!preselectedClassroomId || !copySourceRow || !await canManageAssignment(copyParam, user.id)) {
       notFound()
     }
+    if (isFileAssignment(copySourceRow)) redirect(`/assignments/files/new?${new URLSearchParams({ ...(classroomParam ? { classroom: classroomParam } : {}), copy: copyParam })}`)
     copySource = copySourceRow as AssignmentCopyRow
     const [questionResult, { data: sourceLinks }] = await Promise.all([
       loadAssignmentQuestionsByProvenance(copySource),
@@ -341,6 +343,7 @@ export default async function NewAssignmentPage({ searchParams }: Props) {
           backHref={flowHref({})}
           exerciseHref={flowHref({ type: 'exercise' })}
           examHref={flowHref({ type: 'exam' })}
+          fileHref={`/assignments/files/new${preselectedClassroomId ? `?classroom=${encodeURIComponent(preselectedClassroomId)}` : ''}`}
           practiceHref={practiceLibraryEnabled
             ? `/practice/new${preselectedClassroomId
               ? `?${new URLSearchParams({ classroom: preselectedClassroomId })}`
