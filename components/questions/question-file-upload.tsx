@@ -23,6 +23,9 @@ const QUESTION_FILE_MAX_MB = 10
 interface QuestionFileUploadProps {
   value: string[]
   onChange: (urls: string[]) => void
+  localOnly?: boolean
+  maxFiles?: number
+  removeFromStorage?: boolean
 }
 
 function isPdfUrl(url: string) {
@@ -42,13 +45,23 @@ function fileNameFromUrl(url: string) {
 // modeled on QuestionImageUpload, but accepts images AND PDFs (reusing the
 // same `question-images` bucket) and renders a PDF-aware preview instead of
 // always treating the attachment as an <img>.
-export function QuestionFileUpload({ value, onChange }: QuestionFileUploadProps) {
+export function QuestionFileUpload({ value, onChange, localOnly = false, maxFiles, removeFromStorage = true }: QuestionFileUploadProps) {
   const [uploading, setUploading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? [])
     if (files.length === 0) return
+    if (maxFiles && value.length + files.length > maxFiles) {
+      toast.error(`แนบเอกสารประกอบได้ไม่เกิน ${maxFiles} ไฟล์`)
+      e.target.value = ''
+      return
+    }
+    if (localOnly) {
+      onChange([...value, ...files.map(file => URL.createObjectURL(file) + (file.type === 'application/pdf' ? '#local.pdf' : ''))])
+      e.target.value = ''
+      return
+    }
 
     setUploading(true)
     const supabase = await browserSupabase()
@@ -81,6 +94,8 @@ export function QuestionFileUpload({ value, onChange }: QuestionFileUploadProps)
   }
 
   async function removeFile(url: string) {
+    if (localOnly) { URL.revokeObjectURL(url.split('#')[0]); onChange(value.filter(value => value !== url)); return }
+    if (!removeFromStorage) { onChange(value.filter(value => value !== url)); return }
     const supabase = await browserSupabase()
     const match = url.match(/\/object\/public\/question-images\/(.+)/)
     if (match?.[1]) {

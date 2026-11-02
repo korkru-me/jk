@@ -19,7 +19,7 @@ export async function deleteSelectedQuestions(ids: string[]) {
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   const { data, error } = await supabase.from('questions').select('*')
-    .in('id', uniqueIds).eq('created_by', user.id).eq('is_research_snapshot', false)
+    .in('id', uniqueIds).eq('created_by', user.id).eq('is_research_snapshot', false).is('extra_data->file_assignment_id', null)
   if (error) return { error: 'อ่านโจทย์ที่เลือกไม่สำเร็จ กรุณาลองใหม่' }
   const selected = (data ?? []) as Question[]
   if (selected.length !== uniqueIds.length) return { error: 'มีโจทย์ที่ถูกลบแล้วหรือคุณไม่มีสิทธิ์ลบ กรุณาโหลดหน้าใหม่' }
@@ -32,7 +32,7 @@ export async function deleteSelectedQuestions(ids: string[]) {
   let doomed = selected
   if (groupIds.length > 0) {
     const grouped = await fetchAllRows<Question>((from, to) => supabase.from('questions').select('*')
-      .in('group_id', groupIds).eq('created_by', user.id).eq('is_research_snapshot', false)
+      .in('group_id', groupIds).eq('created_by', user.id).eq('is_research_snapshot', false).is('extra_data->file_assignment_id', null)
       .order('id').range(from, to))
     if (grouped.error) return { error: 'อ่านข้อย่อยไม่สำเร็จ ยังไม่ได้ลบโจทย์' }
     doomed = [...new Map([...selected, ...grouped.rows].map(q => [q.id, q])).values()]
@@ -45,7 +45,7 @@ export async function deleteSelectedQuestions(ids: string[]) {
     ...(groupIds.length ? [`group_id.in.(${groupIds.join(',')})`] : []),
   ]
   const removed = await supabase.from('questions').delete()
-    .or(clauses.join(',')).eq('created_by', user.id).eq('is_research_snapshot', false).select('id')
+    .or(clauses.join(',')).eq('created_by', user.id).eq('is_research_snapshot', false).is('extra_data->file_assignment_id', null).select('id')
   if (removed.error) return { error: 'ลบโจทย์ไม่สำเร็จ โจทย์อาจยังถูกใช้งานอยู่ กรุณาลองใหม่' }
   const deletedIds = new Set((removed.data ?? []).map(q => q.id as string))
   await releaseQuestionFiles(supabase, user.id, doomed.filter(q => deletedIds.has(q.id)))

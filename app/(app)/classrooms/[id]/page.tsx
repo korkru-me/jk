@@ -1,5 +1,6 @@
 import { Suspense } from 'react'
 import { notFound, redirect } from 'next/navigation'
+import { isFileAssignment } from '@/lib/file-assignment'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { loadClassroomScoreReview } from '@/lib/classroom-score-review.server'
@@ -156,7 +157,7 @@ export default async function ClassroomDetailPage({
     const { data: assignmentRows } = assignmentIds.length > 0
       ? await admin
           .from('assignments')
-          .select('id, title, question_ids, random_question_count, completion_rule, streak_target, end_at, duration_minutes, type, max_attempts, score_strategy, retry_scope, passing_type, passing_value, display_max_score, show_results')
+          .select('id, title, description, question_ids, random_question_count, completion_rule, streak_target, end_at, duration_minutes, type, max_attempts, score_strategy, retry_scope, passing_type, passing_value, display_max_score, show_results')
           .in('id', assignmentIds)
           .eq('status', 'published')
           .order('end_at', { ascending: true, nullsFirst: false })
@@ -212,6 +213,7 @@ export default async function ClassroomDetailPage({
       .map((a: any) => ({
         id: a.id,
         title: a.title,
+        file_submission: isFileAssignment(a),
         question_ids: a.question_ids ?? [],
         random_question_count: a.random_question_count ?? null,
         completion_rule: a.completion_rule ?? null,
@@ -407,7 +409,7 @@ async function TeacherClassroomContent({
     // restricting a shared assignment to this classroom's current roster.
     const [{ data: assignmentRows }, submissionResult, { data: extensionRows }, { data: pendingAnswerRows }] = await Promise.all([
       admin.from('assignments')
-        .select('id, title, type, mode, status, start_at, end_at, question_ids, random_question_count, completion_rule, streak_target, created_at, passing_type, passing_value, max_attempts, score_strategy, display_max_score, require_work_image')
+        .select('id, title, description, type, mode, status, start_at, end_at, question_ids, random_question_count, completion_rule, streak_target, created_at, passing_type, passing_value, max_attempts, score_strategy, display_max_score, require_work_image')
         .in('id', assignmentIds).order('created_at', { ascending: false }),
       needsProgress && studentIds.length > 0
         ? readWithVoidedScoreMetadata(async includeVoided => {
@@ -455,6 +457,7 @@ async function TeacherClassroomContent({
       : {}
     return {
       assignments: (assignmentRows ?? []).map(assignment => ({
+        file_submission: isFileAssignment(assignment),
         ...assignment,
         display_order: linkByAssignment.get(assignment.id)?.display_order ?? null,
         group_ids: linkByAssignment.get(assignment.id)?.group_ids ?? null,

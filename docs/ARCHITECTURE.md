@@ -1,5 +1,11 @@
 # Architecture
 
+## Direct file assignments — 2 November 2026 (local)
+
+File assignments reuse the existing exercise/manual-file-review pipeline rather than introducing another attempt or grading engine. Creation allocates one private prompt only while creating its assignment, with reserved `extra_data.file_assignment_id` / `file_assignment_max_score` metadata. The rich-text description carries an invisible versioned assignment-ID marker. Provenance accepts this prompt only for the exact assignment, creator and organization; bank lists, selectors, counters, detail/edit, filing, bulk deletion and export exclude it. Legacy file-upload questions have no reserved metadata and retain their existing behavior. Failed creation performs best-effort cleanup only after confirming that no assignment committed; a lost receipt never deletes committed content.
+
+The student GET only reads authorized instructions and their own files. Explicit POST starts the ordinary one-question attempt, signed upload/inspection and autosave stay in place, and the existing finalizer leaves file answers pending human review. Withdrawal preserves answer/file rows and conditionally reopens the same submitted header, bound to the student and exact submission timestamp. Deadline/review checks run server-side; the existing grader locks the header first, so a completed grading update makes withdrawal's submitted-status predicate lose. No new database grants, RLS changes or schema migration. Hosted concurrency/Storage behavior is not claimed from local mocks.
+
 ## Classroom list sidebar switcher — 2 November 2026 (local)
 
 `TeacherViewClient` registers `ClassroomSectionSidebar` through the existing exact-path sidebar context. The extracted `ClassroomSectionNavigation` receives the already-authorized classroom rows in the same order as the cards, renders a non-modal Base UI dropdown with existing metadata/icon/cover helpers, and uses native Next links to the existing classroom routes. No shell-wide fetch, new provider, query, authorization or database contract is introduced. Create/trash fallbacks have no classroom payload and retain the static heading. The existing local classroom-list lab supplies synthetic themed and legacy rows without external calls. A React useId passed to DndContext stabilizes its generated drag-handle accessibility IDs during SSR/hydration.

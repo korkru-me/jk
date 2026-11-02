@@ -1,5 +1,11 @@
 # Data model และ invariants
 
+## Assignment-owned file instructions — 2 November 2026 (local)
+
+No schema change. A direct file assignment remains `assignments.type = exercise`, fixed completion, one attempt, no instant grading/proctoring, and one assignment-owned `file_upload` prompt. Its `extra_data.file_assignment_id` UUID binds it to that assignment; `file_assignment_max_score` and the assignment's existing `question_points` supply the whole-work ceiling. `assignments.description` begins with `<!--korkru:file-assignment:v1:UUID-->` followed by sanitized instructions; the marker is stripped by rich-text rendering and is never shown as product copy. The public FileUploadConfig and legacy Word question format are unchanged.
+
+This backing prompt is storage for one work item's instructions, not a question-bank asset: bank queries require `extra_data->file_assignment_id IS NULL`. Provenance binds every private prompt to the exact assignment/creator/org. Copying creates a new prompt and assignment ID; deleting an authorized assignment removes only its exact owned prompt after confirming the assignment row was deleted. Existing student files stay in `submission_answers.student_answer`; new references cap at ten while historical readers retain their prior bound.
+
 ## Staging history reconciliation — 20 October 2026
 
 The owner-approved Staging-only reconciliation restores the already-applied `20261009142610` source from recorded history without replay, applies the exact committed retention migration `20261015132234` once and records only that applied version. A fresh CLI comparison confirms 165 local/165 remote versions with no difference. Retention purge functions/indexes/jobs are absent while all five evidence-table row counts are unchanged. No notification schema, RLS or Production migration changes were required.

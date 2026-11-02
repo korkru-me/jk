@@ -25,7 +25,7 @@ beforeEach(() => {
     queries.push({ calls })
     const result = responses.shift()!
     const query: Record<string, unknown> = { then: (resolve: (value: Result) => void) => resolve(result) }
-    for (const name of ['select', 'in', 'eq', 'order', 'range', 'delete', 'or']) {
+    for (const name of ['select', 'in', 'eq', 'is', 'order', 'range', 'delete', 'or']) {
       query[name] = (...args: unknown[]) => { calls.push([name, args]); return query }
     }
     return query

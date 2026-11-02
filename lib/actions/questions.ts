@@ -1,5 +1,6 @@
 'use server'
 
+import { fileAssignmentQuestionOwner } from '@/lib/file-assignment'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -95,6 +96,7 @@ export async function getQuestionClientDetail(questionId: string): Promise<
     .select('*, question_categories(name)')
     .eq('id', questionId)
     .eq('is_research_snapshot', false)
+    .is('extra_data->file_assignment_id', null)
     .maybeSingle()
 
   const [{ data: { user } }, { data, error }] = await Promise.all([
@@ -217,6 +219,7 @@ export async function updateQuestion(id: string, data: QuestionFormData) {
     .eq('id', id)
     .maybeSingle()
   if (!existing) return { error: 'ไม่พบโจทย์นี้' }
+  if (fileAssignmentQuestionOwner(existing.extra_data)) return { error: 'กรุณาแก้ไขคำสั่งจากงานที่มอบหมาย' }
   if (existing.is_research_snapshot) return { error: 'สำเนาข้อสอบวิจัยถูกตรึงไว้และแก้ไขไม่ได้' }
 
   const isOwner = existing.created_by === user.id
@@ -355,6 +358,7 @@ export async function updateQuestionTags(id: string, tags: string[]) {
     .eq('id', id)
     .eq('created_by', user.id)
     .eq('is_research_snapshot', false)
+    .is('extra_data->file_assignment_id', null)
     .select('id')
 
   if (error) return { error: error.message }
@@ -378,6 +382,7 @@ export async function deleteQuestion(id: string) {
     .eq('id', id)
     .eq('created_by', user.id)
     .eq('is_research_snapshot', false)
+    .is('extra_data->file_assignment_id', null)
     .maybeSingle()
 
   const { error } = await supabase
@@ -386,6 +391,7 @@ export async function deleteQuestion(id: string) {
     .eq('id', id)
     .eq('created_by', user.id)
     .eq('is_research_snapshot', false)
+    .is('extra_data->file_assignment_id', null)
 
   if (error) return { error: error.message }
 
@@ -408,6 +414,7 @@ export async function getCategories() {
 export async function getAllTags(): Promise<string[]> {
   const supabase = await createClient()
   const { data } = await supabase.from('questions').select('tags').eq('is_research_snapshot', false)
+      .is('extra_data->file_assignment_id', null)
   if (!data) return []
   const tagSet = new Set<string>()
   for (const row of data) {
@@ -467,6 +474,7 @@ export async function searchQuestions(query: string) {
     .select('tags')
     .eq('created_by', user.id)
     .eq('is_research_snapshot', false)
+    .is('extra_data->file_assignment_id', null)
   const tagUniverse = [...new Set((tagRows ?? []).flatMap(row => row.tags ?? []).filter(Boolean))]
 
   let searchQuery = supabase
@@ -474,6 +482,7 @@ export async function searchQuestions(query: string) {
     .select('id, title, answer_formula, variables, answer_unit')
     .eq('created_by', user.id)
     .eq('is_research_snapshot', false)
+    .is('extra_data->file_assignment_id', null)
   for (const clause of questionSearchOrClauses(query, tagUniverse)) {
     searchQuery = searchQuery.or(clause)
   }

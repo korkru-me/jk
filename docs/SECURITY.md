@@ -1,5 +1,11 @@
 # Security และ privacy guardrails
 
+## Direct file-work boundaries — 2 November 2026 (local)
+
+Creation verifies the actor's manage permission for every target classroom before creating private assignment-only instructions. Teacher attachment URLs must use this project's question-images namespace under that actor, or be exact references from a separately authorized copy source. Instructions use the existing rich-text sanitizer. The internal prompt owner marker is not authority by itself: assignment provenance also verifies exact assignment ID, creator and organization; ordinary bank creation cannot borrow an inline prompt.
+
+Student reads/actions authenticate and verify canonical assignment-room/group reach, then project only their own submission/answer/files. The existing signed-upload and stored-object validation remain in place. New file references cap at ten; hand-in requires 1–10 for direct file work, and manual grading remains pending. Withdrawal rejects reviewed/graded, closed, expired and non-submitted work, preserves attachments and uses a student/status/timestamp conditional update so a concurrent completed grade cannot be undone. Local unit mocks and synthetic UI checks do not constitute a hosted Storage/RLS/race certification. No database or policy mutation was performed.
+
 Current release status, 26 October: Auth/recovery and Resend quota code are released. Production SMTP/template, quota flag and signed webhook integration are complete as documented in `SMTP_PRODUCTION_RELEASE_20261020.md` and `RESEND_PRODUCTION_RELEASE_20261020.md`. Historical preparation notes below do not authorize replaying migrations or changing provider settings. Google/account linking and Confirm email remain deferred by the owner.
 
 ## Staging notification verification boundary — 20 October 2026

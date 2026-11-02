@@ -26,6 +26,7 @@ beforeEach(() => {
       select: vi.fn(() => query),
       in: vi.fn((_column: string, value: string[]) => { ids = value; filters.push(value); return query }),
       eq: vi.fn(() => query),
+      is: vi.fn(() => query),
       then: (resolve: (value: unknown) => void) => resolve({ data: rows.filter(q => ids.includes(q.id as string)).reverse(), error: null }),
     }
     return query

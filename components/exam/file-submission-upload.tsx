@@ -12,6 +12,7 @@ import {
 import { downscaleImage } from '@/lib/image-downscale'
 import { uploadErrorMessage } from '@/lib/upload-error'
 import type { SubmittedFile } from '@/lib/types'
+import { MAX_SUBMISSION_FILES } from '@/lib/file-assignment'
 
 // Loaded on demand rather than imported at the top: @supabase/supabase-js is
 // ~220 KB, and a student only needs it at the moment they attach a file. The
@@ -31,6 +32,7 @@ interface FileSubmissionUploadProps {
    * ไฟล์ด้วย สิ่งที่อัปขึ้นไปจึงเป็นไฟล์กำพร้าตั้งแต่วินาทีแรก
    */
   localOnly?: boolean
+  onBusyChange?: (busy: boolean) => void
 }
 
 function isLocalUrl(url: string) {
@@ -52,7 +54,7 @@ interface FailedSubmissionUpload extends SubmissionUploadCandidate<File> {
 // mirrors WorkImageUpload's storage-upload pattern but keeps an array (like
 // the teacher-side QuestionImageUpload) instead of a single slot, and
 // accepts PDFs alongside images.
-export function FileSubmissionUpload({ submissionAnswerId, value, onChange, localOnly }: FileSubmissionUploadProps) {
+export function FileSubmissionUpload({ submissionAnswerId, value, onChange, localOnly, onBusyChange }: FileSubmissionUploadProps) {
   const [uploading, setUploading] = useState(false)
   const [activeUploadId, setActiveUploadId] = useState<string | null>(null)
   const [failedUploads, setFailedUploads] = useState<FailedSubmissionUpload[]>([])
@@ -87,6 +89,11 @@ export function FileSubmissionUpload({ submissionAnswerId, value, onChange, loca
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? [])
     if (files.length === 0) return
+    if (value.length + files.length > MAX_SUBMISSION_FILES) {
+      toast.error(`แนบได้สูงสุด ${MAX_SUBMISSION_FILES} ไฟล์ กรุณารวมเอกสารหลายหน้าเป็น PDF ก่อนแนบ`)
+      e.target.value = ''
+      return
+    }
 
     if (localOnly) {
       onChange([
@@ -102,6 +109,7 @@ export function FileSubmissionUpload({ submissionAnswerId, value, onChange, loca
       return
     }
     setUploading(true)
+    onBusyChange?.(true)
     const uploaded: SubmittedFile[] = []
     try {
       for (const original of files) {
@@ -130,6 +138,7 @@ export function FileSubmissionUpload({ submissionAnswerId, value, onChange, loca
     } finally {
       setActiveUploadId(null)
       setUploading(false)
+      onBusyChange?.(false)
       if (inputRef.current) inputRef.current.value = ''
     }
   }
@@ -137,8 +146,10 @@ export function FileSubmissionUpload({ submissionAnswerId, value, onChange, loca
   async function retryUpload(uploadId: string) {
     const candidate = failedUploads.find(item => item.uploadId === uploadId)
     if (!candidate || !submissionAnswerId || uploading) return
+    if (value.length >= MAX_SUBMISSION_FILES) { toast.error(`แนบได้สูงสุด ${MAX_SUBMISSION_FILES} ไฟล์`); return }
 
     setUploading(true)
+    onBusyChange?.(true)
     setActiveUploadId(uploadId)
     try {
       const file = await uploadCandidate(candidate, true)
@@ -153,6 +164,7 @@ export function FileSubmissionUpload({ submissionAnswerId, value, onChange, loca
     } finally {
       setActiveUploadId(null)
       setUploading(false)
+      onBusyChange?.(false)
     }
   }
 
@@ -187,22 +199,25 @@ export function FileSubmissionUpload({ submissionAnswerId, value, onChange, loca
           aria-label="เลือกไฟล์คำตอบ"
           accept="image/*,application/pdf"
           multiple
+          disabled={uploading}
           className="hidden"
           onChange={handleFileChange}
         />
-        <button
+        <Button
+          variant="outline"
+          size="sm"
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
-          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-all disabled:opacity-50"
+          className="min-h-11"
         >
           {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileUp className="w-3.5 h-3.5" />}
           {uploading ? 'กำลังอัปโหลด...' : 'แนบไฟล์'}
-        </button>
+        </Button>
         <span className="text-[10px] text-muted-foreground">
           {localOnly
-            ? 'รูปภาพหรือ PDF · ตัวอย่าง — ไฟล์อยู่ในเครื่องคุณ ไม่ถูกอัปโหลด'
-            : 'รูปภาพหรือ PDF — สูงสุด 10 MB ต่อไฟล์'}
+            ? `รูปภาพหรือ PDF · ${value.length}/${MAX_SUBMISSION_FILES} ไฟล์ · ตัวอย่างในเครื่อง`
+            : `รูปภาพหรือ PDF · ${value.length}/${MAX_SUBMISSION_FILES} ไฟล์ · สูงสุด 10 MB ต่อไฟล์`}
         </span>
       </div>
 
@@ -270,6 +285,7 @@ export function FileSubmissionUpload({ submissionAnswerId, value, onChange, loca
               <button
                 type="button"
                 onClick={() => removeFile(f.url)}
+                disabled={uploading}
                 className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-destructive text-destructive-foreground opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
                 aria-label={`นำไฟล์ ${f.name} ออก`}
               >

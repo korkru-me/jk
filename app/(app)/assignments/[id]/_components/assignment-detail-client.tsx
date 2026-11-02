@@ -1,5 +1,6 @@
 'use client'
 
+import { isFileAssignment } from '@/lib/file-assignment'
 import { WorkTypeBadge } from '@/components/assignments/work-type'
 import { useCallback, useState, useTransition } from 'react'
 import Link from 'next/link'
@@ -63,7 +64,7 @@ export function AssignmentDetailClient({
   const router = useRouter()
 
   const statusMeta = STATUS_META[a.status]
-  const assignmentTypeLabel = a.type === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'
+  const assignmentTypeLabel = isFileAssignment(a) ? 'งานส่งไฟล์' : a.type === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'
   const editLabel = `แก้ไข${assignmentTypeLabel}`
   const pendingIdSet = new Set(pendingSubmissionIds)
   // Counted as hand-ins, not students — the same unit the classroom overview
@@ -186,7 +187,7 @@ export function AssignmentDetailClient({
           <Badge variant="secondary" className={statusMeta.color}>
             <span aria-hidden="true" className={`size-1.5 rounded-full ${statusMeta.dot}`} />{statusMeta.label}
           </Badge>
-          <WorkTypeBadge type={a.type} />
+          <WorkTypeBadge type={isFileAssignment(a) ? 'file' : a.type} />
           {a.secure_browser_mode === 'seb_required' && <Badge variant="outline" className="border-success/40 bg-success/10 text-success"><LockKeyhole /> Safe Exam Browser</Badge>}
           {a.android_exam_mode === 'monitored' && <Badge variant="warning"><Smartphone /> Android ครูอนุมัติรายคน</Badge>}
         </>}
