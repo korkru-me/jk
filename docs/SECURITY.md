@@ -1,5 +1,9 @@
 # Security และ privacy guardrails
 
+## Student classroom switcher metadata — 2 November 2026 (local)
+
+The switcher loader is server-only and called only after the classroom route verifies session identity and the current room's student membership. Its admin query is restricted to `classroom_students.student_id` from that verified session, with active/undeleted room filters on every page. Client options allow only room ID, name, description metadata and classroom type; class codes, teacher IDs and student records are excluded. Client navigation is presentation only: destination membership checks remain the access boundary. No new browser grants, RLS policies or migrations are required.
+
 ## File instruction preview and count notice — 2 November 2026 (local)
 
 The shared preview now has distinct Storage bucket allowlists for announcements and question instructions. It keeps origin checks, encoded-separator rejection, credential omission, redirect rejection, MIME/signature checks and the bounded 10 MB reader. Raw stored HTML/URLs never enter the iframe; only a validated local PDF Blob does. The explicit localOnly preview path accepts locally selected blob URLs, still validates their bytes, and is not enabled by assignment metadata. Overflow of the ten-file selection limit opens an informational popup before any upload, preserving current references. No schema, grants, RLS, Auth or scoring change. Verification uses synthetic local fixtures and mocked/pure tests, not hosted student data.

@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { StudentClassroomView, type StudentAssignmentRow } from '@/app/(app)/classrooms/[id]/_components/student-classroom-view'
 import { HomeroomStudentView } from '@/app/(app)/classrooms/[id]/_components/homeroom-student-view'
+import { StudentClassroomSidebar } from '@/app/(app)/classrooms/[id]/_components/student-classroom-sidebar'
 import { composeDescription, EMPTY_META } from '@/app/(app)/classrooms/_components/classroom-meta'
 import { ShellClient } from '@/components/layout/shell-client'
 import { Card } from '@/components/ui/card'
@@ -27,6 +28,14 @@ const CATEGORIES: AssignmentCategory[] = [
   { id: 'cat-simple', classroom_id: ROOM.id, name: 'ฟิสิกส์ง่าย', color: 'purple', position: 0 },
   { id: 'cat-group', classroom_id: ROOM.id, name: 'กลุ่มที่ 1', color: 'mint', position: 1 },
 ]
+const HOMEROOM: Classroom = { ...ROOM, id: 'lab-student-homeroom', name: 'ม.4/1', classroom_type: 'homeroom', description: composeDescription({ ...EMPTY_META, cover: 'green', coverPattern: 'social-studies', iconKey: 'school', gradeLevel: 'ม.4/1', academicTerm: '1/2569' }) }
+const MATH: Classroom = { ...ROOM, id: 'lab-student-math', name: 'คณิตศาสตร์เพิ่มเติมสำหรับการเรียนรู้และการประยุกต์ใช้ในชีวิตประจำวัน', description: composeDescription({ ...EMPTY_META, cover: 'blue', iconKey: 'mathematics', gradeLevel: 'ม.4', academicTerm: '1/2569' }) }
+const CLASSROOMS = [HOMEROOM, ROOM, MATH]
+const CLASSROOM_HREFS = {
+  [ROOM.id]: '/exam-screen-lab/student-classroom',
+  [MATH.id]: '/exam-screen-lab/student-classroom?scenario=math',
+  [HOMEROOM.id]: '/exam-screen-lab/student-classroom?scenario=homeroom',
+}
 const BASE: StudentAssignmentRow = {
   id: 'work-overdue', title: 'ทดสอบ 5', question_ids: Array.from({ length: 12 }, (_, i) => `q-${i}`),
   random_question_count: null, completion_rule: 'fixed', end_at: '2026-10-13T16:00:00+07:00', duration_minutes: 50,
@@ -54,7 +63,8 @@ export default async function StudentClassroomLabPage({ searchParams }: { search
   if (!isExamScreenLabEnabled(process.env)) notFound()
   const { scenario, work, complete } = await searchParams
   const classroom = scenario === 'legacy' ? { ...ROOM, description: 'ห้องเรียนเดิมที่ยังไม่ได้เลือกสีปก' }
-    : scenario?.startsWith('homeroom') ? { ...ROOM, name: 'ม.4/1', classroom_type: 'homeroom' as const, description: composeDescription({ ...EMPTY_META, cover: 'green', coverPattern: 'social-studies', gradeLevel: 'ม.4/1', academicTerm: '1/2569' }) }
+    : scenario?.startsWith('homeroom') ? HOMEROOM
+    : scenario === 'math' ? MATH
     : ROOM
   const sampleAssignments = scenario === 'overdue-many' ? [...ASSIGNMENTS, ...Array.from({ length: 9 }, (_, index) => ({
     ...BASE, id: `lab-overdue-${index}`, passing_type: null,
@@ -96,6 +106,7 @@ export default async function StudentClassroomLabPage({ searchParams }: { search
       users: { full_name: 'ครูที่ปรึกษาจำลอง' }, comments: [],
     }))
     return <ShellClient user={USER} initialUnreadCount={0} notificationsEnabled={false}>
+      <StudentClassroomSidebar classroom={classroom} classrooms={CLASSROOMS} backHref="/exam-screen-lab/student-dashboard" classroomHrefs={CLASSROOM_HREFS} />
       <HomeroomStudentView classroom={classroom} teacherName="ครูที่ปรึกษาจำลอง" studentCount={scenario === 'homeroom-empty' ? 1 : classmates.length + 1}
         classmates={scenario === 'homeroom-empty' ? [] : classmates}
         calendarEvents={scenario === 'homeroom-empty' ? [] : [...classroomCalendarEvents(ASSIGNMENTS, ROOM.name).map(event => ({ ...event, href: assignmentHrefs[event.id] })), { id: 'lab-other-subject', title: 'ใบงานคณิตศาสตร์จากอีกห้อง', classroomName: 'คณิตศาสตร์ 1', endAt: '2026-10-15T16:00:00+07:00', done: false, submissionId: null, href: '/exam-screen-lab/student-dashboard' }]}
@@ -105,6 +116,7 @@ export default async function StudentClassroomLabPage({ searchParams }: { search
   }
   return (
     <ShellClient user={USER} initialUnreadCount={0} notificationsEnabled={false}>
+        <StudentClassroomSidebar classroom={classroom} classrooms={scenario === 'single-room' ? [classroom] : CLASSROOMS} backHref="/exam-screen-lab/student-dashboard" classroomHrefs={CLASSROOM_HREFS} />
         {selected && <Card id="preview-work" padding="md" className="flex scroll-mt-20 flex-col gap-2"><h2 className="font-semibold">{selected.title}</h2><p className="text-sm text-muted-foreground">เปิดการ์ดงานแล้ว · รายละเอียดจำลองสำหรับตรวจการกดทั้งกรอบ ไม่มีการเริ่มทำหรือส่งงานจริง</p><Link href={`/exam-screen-lab/student-classroom?complete=${encodeURIComponent(selected.id)}&tab=assignments`} className="text-sm text-primary hover:underline">จำลองทำงานเสร็จ</Link><Link href="/exam-screen-lab/student-classroom" className="text-sm text-primary hover:underline">กลับรายการงาน</Link></Card>}
         <StudentClassroomView classroom={classroom} teacherName="ครูผู้สอนจำลอง" studentCount={3} assignments={assignments} categories={scenario === 'empty' ? [] : CATEGORIES} posts={subjectPosts} practiceLibraries={practiceLibraries} trackSeen={false} assignmentHrefs={assignmentHrefs} initialNow={NOW} previewLabel="ตัวอย่างสำหรับตรวจหน้าตา · ห้องเรียนและงานจำลอง" />
     </ShellClient>
