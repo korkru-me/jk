@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { FileUp, FileText, Loader2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import {
   mergeSubmittedFiles,
   uploadSubmissionCandidate,
@@ -58,7 +59,9 @@ export function FileSubmissionUpload({ submissionAnswerId, value, onChange, loca
   const [uploading, setUploading] = useState(false)
   const [activeUploadId, setActiveUploadId] = useState<string | null>(null)
   const [failedUploads, setFailedUploads] = useState<FailedSubmissionUpload[]>([])
+  const [limitOpen, setLimitOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const attachButtonRef = useRef<HTMLButtonElement>(null)
 
   async function uploadCandidate(candidate: SubmissionUploadCandidate<File>, retry: boolean) {
     if (!submissionAnswerId) throw new Error('ไม่พบคำตอบสำหรับแนบไฟล์ กรุณาโหลดข้อสอบใหม่')
@@ -90,7 +93,7 @@ export function FileSubmissionUpload({ submissionAnswerId, value, onChange, loca
     const files = Array.from(e.target.files ?? [])
     if (files.length === 0) return
     if (value.length + files.length > MAX_SUBMISSION_FILES) {
-      toast.error(`แนบได้สูงสุด ${MAX_SUBMISSION_FILES} ไฟล์ กรุณารวมเอกสารหลายหน้าเป็น PDF ก่อนแนบ`)
+      setLimitOpen(true)
       e.target.value = ''
       return
     }
@@ -146,7 +149,7 @@ export function FileSubmissionUpload({ submissionAnswerId, value, onChange, loca
   async function retryUpload(uploadId: string) {
     const candidate = failedUploads.find(item => item.uploadId === uploadId)
     if (!candidate || !submissionAnswerId || uploading) return
-    if (value.length >= MAX_SUBMISSION_FILES) { toast.error(`แนบได้สูงสุด ${MAX_SUBMISSION_FILES} ไฟล์`); return }
+    if (value.length >= MAX_SUBMISSION_FILES) { setLimitOpen(true); return }
 
     setUploading(true)
     onBusyChange?.(true)
@@ -192,6 +195,15 @@ export function FileSubmissionUpload({ submissionAnswerId, value, onChange, loca
 
   return (
     <div className="space-y-3">
+      <Dialog open={limitOpen} onOpenChange={setLimitOpen}>
+        <DialogContent finalFocus={attachButtonRef}>
+          <DialogTitle>แนบได้สูงสุด {MAX_SUBMISSION_FILES} ไฟล์</DialogTitle>
+          <DialogDescription>
+            หากมีรูปภาพหรือเอกสารมากกว่านี้ แนะนำให้รวมเป็น PDF ไฟล์เดียวก่อนแนบ โดยแต่ละไฟล์ต้องไม่เกิน {SUBMISSION_FILE_MAX_MB} MB ไฟล์ที่แนบไว้แล้วจะยังอยู่ครบ
+          </DialogDescription>
+          <DialogClose render={<Button type="button" className="min-h-11" />}>เข้าใจแล้ว</DialogClose>
+        </DialogContent>
+      </Dialog>
       <div className="flex items-center gap-2 flex-wrap">
         <input
           ref={inputRef}
@@ -204,6 +216,7 @@ export function FileSubmissionUpload({ submissionAnswerId, value, onChange, loca
           onChange={handleFileChange}
         />
         <Button
+          ref={attachButtonRef}
           variant="outline"
           size="sm"
           type="button"

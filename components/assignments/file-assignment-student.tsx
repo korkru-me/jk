@@ -8,6 +8,8 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { RichText } from '@/components/ui/rich-text'
+import { QuestionPdfAttachment } from '@/components/classrooms/post-pdf-preview'
+import { isPdfAttachmentUrl } from '@/lib/post-pdf-preview'
 import { FileSubmissionUpload } from '@/components/exam/file-submission-upload'
 import { saveAnswer } from '@/lib/actions/submissions'
 import { startFileAssignment, submitFileAssignment, withdrawFileAssignment } from '@/lib/actions/file-assignments'
@@ -65,7 +67,9 @@ export function FileAssignmentStudent({ view, localOnly = false, onStart, onSave
     </div>
       {view.dueAt && <p className="mt-2 text-xs text-muted-foreground">กำหนดส่ง {dateTime.format(new Date(view.dueAt))}</p>}
       <div className="mt-3"><RichText text={view.instructions} blocks /></div>
-      {view.attachments.length > 0 && <div className="mt-3 flex flex-wrap gap-2">{view.attachments.map((url, index) => <Button key={url} variant="secondary" className="max-w-full" render={<a href={url} target="_blank" rel="noopener noreferrer" />}><Paperclip data-icon="inline-start" />เอกสารประกอบ {index + 1}</Button>)}</div>}
+      {view.attachments.length > 0 && <div className="mt-3 flex flex-wrap gap-2">{view.attachments.map((url, index) => isPdfAttachmentUrl(url)
+        ? <QuestionPdfAttachment key={url} url={url} localOnly={localOnly} />
+        : <Button key={url} variant="secondary" className="max-w-full" render={<a href={url} target="_blank" rel="noopener noreferrer" />}><Paperclip data-icon="inline-start" />เอกสารประกอบ {index + 1}</Button>)}</div>}
     </Card>
     <Card padding="md"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">งานของคุณ</h2>
       <p role="status" className="text-sm text-muted-foreground">{graded ? 'ครูตรวจแล้ว' : submitted ? 'ส่งแล้ว · รอครูตรวจ' : pending ? 'กำลังบันทึก…' : 'ยังไม่ได้ส่ง'}</p></div>

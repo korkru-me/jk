@@ -116,7 +116,7 @@ function extraDataFor(
       : { answer_mode: 'slots' as const }
   }
   if (source === 'file_upload') {
-    return { attachment_urls: props.attachmentUrls ?? [] }
+    return { attachment_urls: ['/exam-screen-lab/grading-workspace/assets/file-0.pdf', ...(props.attachmentUrls ?? [])] }
   }
   if (source === 'composite') {
     return slug === 'true-false-group' ? TRUE_FALSE_GROUP_CONFIG : props.compositeConfig!

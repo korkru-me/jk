@@ -5,7 +5,7 @@ import { Download, Eye, FileText, LoaderCircle, Maximize2, Minimize2, X } from '
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { formatFileSize, shortenFileName, type PostAttachment } from '@/lib/attachment-display'
-import { postPdfSource, readPostPdf } from '@/lib/post-pdf-preview'
+import { postPdfSource, questionPdfSource, questionAttachmentName, readPostPdf } from '@/lib/post-pdf-preview'
 import { cn } from '@/lib/utils'
 
 function PdfDocument({ source, name }: { source: string | null; name: string }) {
@@ -46,11 +46,12 @@ function PdfDocument({ source, name }: { source: string | null; name: string }) 
   return <p role="status" className="flex items-center gap-2 p-4 text-sm text-muted-foreground"><LoaderCircle aria-hidden="true" className="size-4 animate-spin motion-reduce:animate-none" />กำลังเปิด PDF…</p>
 }
 
-export function PostPdfAttachment({ file }: { file: PostAttachment }) {
+function PdfAttachmentPreview({ file, kind = 'post', localOnly = false }: { file: PostAttachment; kind?: 'post' | 'question'; localOnly?: boolean }) {
   const [open, setOpen] = useState(false)
   const [expanded, setExpanded] = useState(false)
-  const source = postPdfSource(file.url)
-  const downloadHref = source ? `${source}${source.includes('?') ? '&' : '?'}download=${encodeURIComponent(file.name)}` : undefined
+  const source = kind === 'post' ? postPdfSource(file.url)
+    : questionPdfSource(file.url) ?? (localOnly && file.url.startsWith('blob:') ? file.url.split('#')[0] : null)
+  const downloadHref = source ? source.startsWith('blob:') ? source : `${source}${source.includes('?') ? '&' : '?'}download=${encodeURIComponent(file.name)}` : undefined
 
   return <Dialog open={open} onOpenChange={nextOpen => {
     setOpen(nextOpen)
@@ -94,4 +95,13 @@ export function PostPdfAttachment({ file }: { file: PostAttachment }) {
       <div className="flex min-h-0 flex-1 flex-col bg-muted/30">{open && <PdfDocument key={source} source={source} name={file.name} />}</div>
     </DialogContent>
   </Dialog>
+}
+
+export function PostPdfAttachment({ file }: { file: PostAttachment }) {
+  return <PdfAttachmentPreview file={file} />
+}
+
+/** Shared appearance, bounded PDF reader and fullscreen controls with posts. */
+export function QuestionPdfAttachment({ url, localOnly = false }: { url: string; localOnly?: boolean }) {
+  return <PdfAttachmentPreview kind="question" localOnly={localOnly} file={{ url, name: questionAttachmentName(url), mime: 'application/pdf', size: 0 }} />
 }

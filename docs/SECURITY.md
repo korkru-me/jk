@@ -1,5 +1,9 @@
 # Security และ privacy guardrails
 
+## File instruction preview and count notice — 2 November 2026 (local)
+
+The shared preview now has distinct Storage bucket allowlists for announcements and question instructions. It keeps origin checks, encoded-separator rejection, credential omission, redirect rejection, MIME/signature checks and the bounded 10 MB reader. Raw stored HTML/URLs never enter the iframe; only a validated local PDF Blob does. The explicit localOnly preview path accepts locally selected blob URLs, still validates their bytes, and is not enabled by assignment metadata. Overflow of the ten-file selection limit opens an informational popup before any upload, preserving current references. No schema, grants, RLS, Auth or scoring change. Verification uses synthetic local fixtures and mocked/pure tests, not hosted student data.
+
 ## Direct file-work boundaries — 2 November 2026 (local)
 
 Creation verifies the actor's manage permission for every target classroom before creating private assignment-only instructions. Teacher attachment URLs must use this project's question-images namespace under that actor, or be exact references from a separately authorized copy source. Instructions use the existing rich-text sanitizer. The internal prompt owner marker is not authority by itself: assignment provenance also verifies exact assignment ID, creator and organization; ordinary bank creation cannot borrow an inline prompt.

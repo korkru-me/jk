@@ -10,6 +10,8 @@ import { renderRichTextHtml } from '@/lib/rich-text-html'
 import { RichText } from '@/components/ui/rich-text'
 import { Button } from '@/components/ui/button'
 import { WorkImageUpload } from '@/components/exam/work-image-upload'
+import { QuestionPdfAttachment } from '@/components/classrooms/post-pdf-preview'
+import { isPdfAttachmentUrl } from '@/lib/post-pdf-preview'
 import { FileSubmissionUpload } from '@/components/exam/file-submission-upload'
 import { TeacherGradingPreview, type GradingRow } from './teacher-grading-preview'
 import { MatchingDragInput } from '@/components/exam/matching-drag-input'
@@ -40,10 +42,6 @@ import {
 } from '@/components/ui/dialog'
 
 const PART_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ', 'ช', 'ซ', 'ฌ', 'ญ']
-
-function isPdfUrl(url: string) {
-  return /\.pdf(\?|$)/i.test(url)
-}
 
 export type PreviewMath = Pick<typeof import('@/lib/math/evaluator'),
   'randomizeVariables' | 'evaluateFormula' | 'evaluateStudentAnswer'>
@@ -752,12 +750,8 @@ export function QuestionPreviewContent({
       {questionType === 'file_upload' && attachmentUrls.length > 0 && (
         <div className="flex flex-wrap gap-3">
           {attachmentUrls.map((url) => (
-            isPdfUrl(url) ? (
-              <a key={url} href={url} target="_blank" rel="noopener noreferrer"
-                className="w-20 h-20 flex flex-col items-center justify-center gap-1 rounded-lg border border-border bg-muted hover:bg-accent transition-colors">
-                <span className="text-lg">📄</span>
-                <span className="text-[9px] text-muted-foreground">PDF</span>
-              </a>
+            isPdfAttachmentUrl(url) ? (
+              <QuestionPdfAttachment key={url} url={url} localOnly />
             ) : (
               // eslint-disable-next-line @next/next/no-img-element
               <img key={url} src={url} alt="ไฟล์อ้างอิงโจทย์"
@@ -1070,7 +1064,7 @@ export function QuestionPreviewContent({
               เห็นไฟล์จริง ไม่มีอะไรขึ้น storage ให้ต้องตามลบ */}
           <FileSubmissionUpload value={previewFiles} onChange={setPreviewFiles} localOnly />
           <p className="text-xs text-primary bg-primary/10 px-3 py-2 rounded-lg">
-            * ระบบให้คะแนนเต็มอัตโนมัติเมื่อมีการแนบไฟล์อย่างน้อย 1 ไฟล์ — ไม่มีการตรวจเนื้อหาไฟล์
+            * แนบคำตอบได้รวมไม่เกิน 10 ไฟล์ ครูตรวจและให้คะแนนหลังส่งงาน
           </p>
         </div>
       )}
