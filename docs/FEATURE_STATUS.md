@@ -1,5 +1,13 @@
 # Feature status
 
+## ปล่อยปุ่มแจ้งเตือน เมนูวิชานักเรียน และฟอร์มไฟล์ขึ้น Production — 2 พฤศจิกายน 2026
+
+- เจ้าของอนุมัติให้ปล่อยทั้งสามงานจาก local ขึ้นจริงแล้ว: [PR #122](https://github.com/korkru-me/jk/pull/122), merge `8596c2866df021566fba6b0d9c4953aaf1f053a4`, deployment `dpl_GouzZbBiyvv9HQ3yYc2jqmuQszjK` READY บน `www.korkru.com` / `korkru.com` ไม่มี migration หรือแก้ bucket/RLS
+- ผ่าน canonical Staging PR #121/#123 และแก้เวลาในประกาศให้ใช้ Asia/Bangkok จากปัญหา hydration ที่พบระหว่าง QA ตรวจเว็บจริงแบบอ่านอย่างเดียวเห็นพื้นที่ลากไฟล์/ตัวเลือกห้องใหม่และปุ่มอ่านทั้งหมดมีกรอบแล้ว
+- รวมชุดตรวจ candidate 344 files/4,873 tests, Staging 346 files/4,895 tests, TypeScript, token lint และ production build ผ่าน หลังแก้เวลา helper 20 tests/TypeScript/lint/UTC build ผ่านซ้ำ
+- หลัง Production READY เทียบ application/test 21 ไฟล์กับ primary `/Users/korkusonmasaen/Korkru/korkru` บน localhost:3000 ตรงกัน ตรวจเมนูสลับวิชา/แท็บงาน, drawer 390px, ฟอร์มและ receipt หลายห้อง 390px และกระดิ่ง 320px ผ่าน ไม่มีแนวนอนล้น Next MCP compilation/runtime ไม่มี errors และคงไฟล์ local อื่น 195 ไฟล์/branch/index/env ไว้
+- ข้อจำกัด: การอัปโหลดและบันทึกผ่าน Auth/Storage/RLS บน hosted และ E2E ด้วยบัญชีนักเรียน hosted ยังไม่ได้ทดสอบ การลาก/เลือกไฟล์ผ่านข้อมูลสังเคราะห์ใน local แล้ว ดู [หลักฐานการปล่อยและขอบเขตตรวจ](UI_POLISH_RELEASE_20261102.md) ส่วนหัวข้อ local ด้านล่างเป็นบันทึกก่อนอนุมัติปล่อย
+
 ## เวลาในประกาศห้องเรียนตรงกันระหว่าง server/browser — 2 พฤศจิกายน 2026
 
 - Hosted Staging QA ของเมนูนักเรียนพบ hydration mismatch: server UTC แสดง 03:00 แต่ browser กรุงเทพฯ แสดง 10:00 จากประกาศเดียวกัน ปรับ `ClassroomStream` ให้ใช้ `formatThaiDateTime` ที่กำหนด Asia/Bangkok แล้วทั้งหน้าครูและนักเรียน โดยคงรูปแบบวันที่เดิม
