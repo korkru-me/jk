@@ -1,5 +1,14 @@
 # Feature status
 
+## ปุ่มเปิดรายชื่อห้องเรียนจากแถบซ้าย — 2 พฤศจิกายน 2026 (local)
+
+- หัว “ห้องเรียน” บนหน้ารวมห้องเรียนครูเป็นปุ่มลูกศร เปิดรายชื่อทุกห้องที่หน้าโหลดไว้แล้ว รวมโฮมรูม พร้อมสี ไอคอน ชั้น และภาคเรียนตาม metadata เดิม เลือกแล้วไป `/classrooms/:id` และมี “ดูห้องเรียนทั้งหมด” ท้ายเมนู
+- ลำดับตรงกับการ์ด (โฮมรูมก่อนห้องรายวิชาตามลำดับที่ครูจัด) ใช้ข้อมูลและสิทธิ์จาก route เดิม ไม่มี query, server action, migration หรือการเปลี่ยนสิทธิ์เพิ่ม
+- ปิดเมื่อคลิกนอก/Escape ใช้คีย์บอร์ดได้ เปิดเมนูอื่นได้ในคลิกเดียว และปิด drawer เมื่อเลือกลิงก์บนมือถือ กรณีว่างแสดง “ยังไม่มีห้องเรียน”; หน้า create/trash ที่ไม่มีข้อมูลห้องยังใช้หัว section เดิม
+- กำหนด DndContext ID ด้วย useId ให้ accessibility ID ของตัวลากเรียงการ์ดตรงกันระหว่าง SSR กับ hydration
+- ตรวจบน primary localhost:3000 ผ่าน fixture `/exam-screen-lab/classroom-list` ทั้ง desktop และมือถือ 390px รวม empty state, metadata เก่า, href, keyboard, focus return และ dismissal; Next MCP ไม่พบ runtime errors หลังแก้ hydration
+- TypeScript, token lint และ isolated Webpack production build ผ่าน ไม่มีการทดสอบกับข้อมูลจริงหรือ deploy Production; ยังไม่ได้ยืนยันการนำทางด้วยบัญชีจริงบน hosted Staging
+
 ## ให้นักเรียนดูข้อสอบที่ทำแล้ว — 29 ตุลาคม 2026 (migration อยู่บน Staging แล้ว · โค้ดรอ merge PR #111 และทดสอบบน Staging)
 
 - ตามคำสั่งเจ้าของผลิตภัณฑ์ 29 ต.ค. 2026: ติ๊กใหม่ **"ให้นักเรียนดูข้อสอบที่ทำแล้ว"** (`assignments.allow_exam_review`, migration `20261029070949_assignment_exam_review`, default `false`) อยู่ในรายการตั้งค่าของ **ข้อสอบเท่านั้น** ทั้งขั้น "ตั้งค่า" ของหน้าสร้างและหน้าแก้ไข (component เดียวกัน `components/assignments/exam-review-setting.tsx`) — เจ้าของสั่งชัดว่าแบบฝึกหัดไม่ต้องมี เพราะแบบฝึกหัดดูเฉลยทีละข้อระหว่างทำอยู่แล้ว · server เก็บ `false` เสมอเมื่อไม่ใช่ข้อสอบ · แก้ได้ทุกเวลาแม้มีคนส่งแล้ว (ไม่กระทบคะแนน) · การทำสำเนางาน/คัดลอกไปห้องใหม่พาค่านี้ไปด้วย แต่ **ไม่อยู่ใน "ชุดการตั้งค่า"** (preset allowlist ตรวจในฐาน ต้องแก้ validator แยก)

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useTransition, type ComponentProps } from 'react'
+import { useEffect, useId, useMemo, useState, useTransition, type ComponentProps } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -24,6 +24,7 @@ import type { Classroom } from '@/lib/types'
 import { Card } from '@/components/ui/card'
 import { BRAND_MARK_ASPECT_RATIO, BRAND_MARK_URL } from '@/components/brand-mark-data'
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { ClassroomSectionSidebar } from '@/components/layout/classroom-section-navigation'
 
 interface Props {
   classrooms: Classroom[]
@@ -38,6 +39,7 @@ export function TeacherViewClient({
   totalStudents, totalAssignments,
 }: Props) {
   const router = useRouter()
+  const dragContextId = useId()
   const [isSelecting, setIsSelecting] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [orderedSubjects, setOrderedSubjects] = useState(
@@ -53,6 +55,10 @@ export function TeacherViewClient({
   )
 
   const homeroomClassrooms = classrooms.filter(c => c.classroom_type === 'homeroom')
+  const sidebarClassrooms = useMemo(() => [
+    ...classrooms.filter(c => c.classroom_type === 'homeroom'),
+    ...orderedSubjects,
+  ], [classrooms, orderedSubjects])
   useEffect(() => {
     setOrderedSubjects(classrooms.filter(c => c.classroom_type !== 'homeroom'))
   }, [classrooms])
@@ -132,6 +138,7 @@ export function TeacherViewClient({
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
+      <ClassroomSectionSidebar classrooms={sidebarClassrooms} />
       <Card className="@container/classrooms-header border-2 border-primary/20 bg-primary/5" data-classrooms-header>
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-3 p-4 @min-[48rem]/classrooms-header:grid-cols-[minmax(0,1fr)_auto_auto] @min-[48rem]/classrooms-header:gap-x-5 @min-[48rem]/classrooms-header:px-5">
           <div className="flex min-w-0 flex-col gap-2">
@@ -222,7 +229,7 @@ export function TeacherViewClient({
                 <School className="size-3.5" aria-hidden="true" /> ห้องเรียนวิชา
               </div>
             )}
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <DndContext id={dragContextId} sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={orderedSubjects.map(c => c.id)} strategy={rectSortingStrategy}>
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
                   {orderedSubjects.map(c => (
