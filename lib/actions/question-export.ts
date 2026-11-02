@@ -31,7 +31,7 @@ export async function exportQuestions(ids: string[]) {
   // Selection can span pages. Bound each read to avoid PostgREST's row/URL limits.
   for (let start = 0; start < uniqueIds.length; start += 100) {
     const { data, error } = await supabase.from('questions').select('*, question_categories(name)')
-      .in('id', uniqueIds.slice(start, start + 100)).eq('created_by', user.id).eq('is_research_snapshot', false)
+      .in('id', uniqueIds.slice(start, start + 100)).eq('created_by', user.id).eq('is_research_snapshot', false).is('extra_data->file_assignment_id', null)
     if (error) return { error: 'ส่งออกโจทย์ไม่สำเร็จ กรุณาลองใหม่' }
     for (const row of (data ?? []) as QuestionRow[]) byId.set(row.id, row)
   }
@@ -114,7 +114,7 @@ export async function checkImportDuplicates(raw: string): Promise<
       .from('questions')
       .select('title, question_text')
       .eq('created_by', user.id)
-      .eq('is_research_snapshot', false)
+      .eq('is_research_snapshot', false).is('extra_data->file_assignment_id', null)
       .order('id')
       .range(from, to)
   )
@@ -281,7 +281,7 @@ export async function importQuestionsFromFile(
         .from('questions')
         .select('title')
         .eq('created_by', user.id)
-        .eq('is_research_snapshot', false)
+        .eq('is_research_snapshot', false).is('extra_data->file_assignment_id', null)
         .order('id')
         .range(from, to)
       ).then(result => result.rows)

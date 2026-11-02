@@ -37,6 +37,7 @@ import {
 } from '@/lib/late-submission'
 import { sanitizeRichTextForStorage } from '@/lib/rich-text-sanitize'
 import { notifyAssignmentPublished } from '@/lib/assignment-publication-notifications'
+import { fileAssignmentDescription, isFileAssignment } from '@/lib/file-assignment'
 import { ASSIGNMENT_NOTIFICATION_WARNING, ASSIGNMENT_NOTIFICATION_WARNING_PARAM } from '@/lib/assignment-publication-feedback'
 
 async function publicationNotificationWarning(assignmentId: string, actorId: string): Promise<string | undefined> {
@@ -202,6 +203,31 @@ async function resolveGroupTargets(
 }
 
 export async function createAssignment(data: CreateAssignmentData) {
+  return createQuestionAssignment(data)
+}
+
+// The trusted context is constructed only after creating an owned inline file prompt.
+export async function createInlineFileAssignment(data: CreateAssignmentData, assignmentId: string, questionId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+  const { data: question } = await supabase.from('questions').select('id, created_by, question_text, extra_data')
+    .eq('id', questionId).eq('created_by', user.id).maybeSingle()
+  if (!question || question.extra_data?.file_assignment_id !== assignmentId) return { error: 'คำสั่งไม่ตรงกับงานนี้' }
+  const points = question.extra_data?.file_assignment_max_score
+  if (!Number.isFinite(points) || points <= 0 || points > 1_000_000) return { error: 'คะแนนเต็มไม่ถูกต้อง' }
+  return createQuestionAssignment({ ...data, description: question.question_text,
+    question_ids: [questionId], question_points: { [questionId]: points },
+    set_id: undefined, sections: [], display_max_score: null,
+    type: 'exercise', mode: 'online', duration_minutes: null,
+    random_question_count: null, completion_rule: 'fixed', max_attempts: 1,
+    score_strategy: 'latest', retry_scope: 'all', instant_check: false,
+    require_work_image: false, calculator_enabled: false, scratchpad_enabled: false,
+    proctoring_enabled: false, secure_browser_mode: 'browser',
+  }, { assignmentId, questionId })
+}
+
+async function createQuestionAssignment(data: CreateAssignmentData, inline?: { assignmentId: string; questionId: string }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
@@ -266,6 +292,7 @@ export async function createAssignment(data: CreateAssignmentData) {
     created_by: user.id,
     org_id: orgId,
     question_ids: uniqueQuestionIds,
+    ...(inline ? { id: inline.assignmentId } : {}),
   })
   if ('error' in questionResult) return { error: questionResult.error }
   if (questionResult.missingQuestionIds.length > 0) {
@@ -397,11 +424,14 @@ export async function createAssignment(data: CreateAssignmentData) {
   const { data: assignment, error } = await supabase
     .from('assignments')
     .insert({
+      ...(inline ? { id: inline.assignmentId } : {}),
       org_id: orgId,
       classroom_id: data.classroom_ids[0],
       created_by: user.id,
       title: data.title.trim(),
-      description: sanitizeRichTextForStorage(data.description.trim()) || null,
+      description: inline
+        ? fileAssignmentDescription(inline.assignmentId, sanitizeRichTextForStorage(data.description.trim()))
+        : sanitizeRichTextForStorage(data.description.trim()) || null,
       question_ids: questionIds,
       question_points: questionPoints,
       display_max_score: displayMaxScore,
@@ -666,10 +696,11 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   // has also made service-role reads safe for co-teacher submission checks.
   const { data: existing } = await supabase
     .from('assignments')
-    .select('created_by, org_id, question_ids, sections, type, mode, status, start_at, due_at, late_bands, end_at, random_question_count, shared_random_seed, calculator_enabled, scratchpad_enabled, shuffle_questions, shuffle_options, secure_browser_mode, android_exam_mode, completion_rule, passing_type, passing_value, streak_target, streak_question_cap, streak_recycle_pool')
+    .select('id, description, created_by, org_id, question_ids, sections, type, mode, status, start_at, due_at, late_bands, end_at, random_question_count, shared_random_seed, calculator_enabled, scratchpad_enabled, shuffle_questions, shuffle_options, secure_browser_mode, android_exam_mode, completion_rule, passing_type, passing_value, streak_target, streak_question_cap, streak_recycle_pool')
     .eq('id', id)
     .maybeSingle()
   if (!existing) return { error: 'ไม่พบชุดข้อสอบ' }
+  if (isFileAssignment(existing)) return { error: 'กรุณาแก้ไขงานส่งไฟล์จากหน้าของงาน' }
 
   const sendsDueAt = data.due_at !== undefined
   const sendsLateBands = data.late_bands !== undefined
@@ -1073,18 +1104,23 @@ export async function deleteAssignment(id: string) {
   // the teacher back to — there's no more global assignments list page.
   const { data: existing } = await supabase
     .from('assignments')
-    .select('classroom_id')
+    .select('id, classroom_id, description, question_ids')
     .eq('id', id)
     .maybeSingle()
 
+  const canDeleteInline = existing && isFileAssignment(existing) && await canManageAssignment(id, user.id)
+
   // No explicit created_by filter — RLS already restricts this to owner or
   // authorized (admin/manage) co-teacher.
-  const { error } = await supabase
+  const { data: deleted, error } = await supabase
     .from('assignments')
     .delete()
-    .eq('id', id)
+    .eq('id', id).select('id')
 
   if (error) return { error: error.message }
+  if (existing && canDeleteInline && deleted?.some(row => row.id === id)) {
+    await createAdminClient().from('questions').delete().in('id', existing.question_ids).eq('extra_data->>file_assignment_id', id)
+  }
   const classroomId = existing?.classroom_id
   if (classroomId) revalidatePath(`/classrooms/${classroomId}`)
   redirect(classroomId ? `/classrooms/${classroomId}` : '/classrooms')

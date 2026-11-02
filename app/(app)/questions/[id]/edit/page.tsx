@@ -34,6 +34,7 @@ export default async function EditQuestionPage({ params }: EditQuestionPageProps
       .select('*')
       .eq('id', id)
       .eq('is_research_snapshot', false)
+      .is('extra_data->file_assignment_id', null)
       .single(),
     getAllTags(),
     getFormulaPresets(),

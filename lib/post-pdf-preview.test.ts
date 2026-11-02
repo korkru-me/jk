@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { MAX_POST_PDF_BYTES, postPdfSource, readPostPdf } from './post-pdf-preview'
+import { MAX_POST_PDF_BYTES, postPdfSource, questionPdfSource, isPdfAttachmentUrl, questionAttachmentName, readPostPdf } from './post-pdf-preview'
 
 const BASE = 'https://classroom-test.supabase.co'
 const FILE = `${BASE}/storage/v1/object/public/classroom-post-files/teacher/file.pdf`
@@ -41,6 +41,40 @@ describe('announcement PDF source', () => {
     vi.stubGlobal('window', { location: { origin: 'https://staging.korkru.com' } })
     expect(postPdfSource(fixture, BASE)).toBe(fixture)
     expect(postPdfSource('/exam-screen-lab/grading-workspace/assets/file-1.pdf', BASE)).toBeNull()
+  })
+})
+
+describe('assignment instruction PDF source', () => {
+  const file = `${BASE}/storage/v1/object/public/question-images/teacher/worksheet.pdf`
+  it('allows only the question attachment bucket without widening announcement access', () => {
+    expect(questionPdfSource(`${file}?download=old#page=2`, BASE, false)).toBe(file)
+    expect(postPdfSource(file, BASE, false)).toBeNull()
+    expect(questionPdfSource(FILE, BASE, false)).toBeNull()
+  })
+  it.each([
+    file.replace(BASE, 'https://other.example'),
+    file.replace('https://', 'https://teacher:password@'),
+    `${BASE}/storage/v1/object/public/question-images/`,
+    `${BASE}/storage/v1/object/public/question-images/teacher%2Ffile.pdf`,
+    `${BASE}/storage/v1/object/public/question-images/../other/file.pdf`,
+    'blob:https://classroom-test.supabase.co/file.pdf',
+    'data:application/pdf;base64,JVBERi0=',
+  ])('rejects untrusted stored instruction URL: %s', value => {
+    expect(questionPdfSource(value, BASE, false)).toBeNull()
+  })
+  it('keeps the exact same local fixture restriction', () => {
+    const fixture = '/exam-screen-lab/grading-workspace/assets/file-0.pdf'
+    expect(questionPdfSource(fixture, BASE, true)).toBe(fixture)
+    expect(questionPdfSource(fixture, BASE, false)).toBeNull()
+    expect(questionPdfSource(`${fixture}?next=elsewhere`, BASE, true)).toBeNull()
+  })
+  it('handles encoded names and malformed encodings without crashing the work page', () => {
+    expect(questionAttachmentName(`${BASE}/%E0%B9%83%E0%B8%9A%E0%B8%87%E0%B8%B2%E0%B8%99.pdf?download=1#page=2`)).toBe('ใบงาน.pdf')
+    expect(questionAttachmentName(`${BASE}/bad%name.pdf`)).toBe('bad%name.pdf')
+    expect(questionAttachmentName('blob:http://localhost/local#local.pdf')).toBe('เอกสารประกอบ.pdf')
+    expect(isPdfAttachmentUrl(file + '?version=2')).toBe(true)
+    expect(isPdfAttachmentUrl('blob:http://localhost/local#local.pdf')).toBe(true)
+    expect(isPdfAttachmentUrl(file + '.html')).toBe(false)
   })
 })
 
