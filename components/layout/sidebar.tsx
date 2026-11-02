@@ -15,21 +15,19 @@ import {
   LayoutGrid,
   LibraryBig,
   NotebookPen,
-  Plus,
   School,
   Settings,
   ShieldCheck,
-  Trash2,
   UserRound,
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { isClassroomDetailPath, isClassroomSectionPath } from '@/lib/classroom-navigation'
 import { isAssignmentStudentPreviewPath } from '@/lib/assignment-preview-navigation'
-import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { sidebarSearchKey, useSidebarContext } from './sidebar-context'
-import { SidebarDisplayProvider, SidebarLabel, SidebarSectionLabel, useSidebarCompact } from './sidebar-display'
+import { ClassroomSectionNavigation } from './classroom-section-navigation'
+import { SidebarDisplayProvider, SidebarLabel } from './sidebar-display'
 import type { UserRole } from '@/lib/types'
 
 interface NavItem {
@@ -193,61 +191,6 @@ function NavGroupItem({ group, pathname, onNavigate, compactOnDesktop = false }:
           </div>
         </div>
       </div>
-    </div>
-  )
-}
-
-function ClassroomSectionNavigation({ pathname, onNavigate }: {
-  pathname: string
-  onNavigate?: () => void
-}) {
-  const compact = useSidebarCompact()
-  const items = [
-    { href: '/classrooms', label: 'ห้องเรียนทั้งหมด', Icon: LayoutGrid },
-    { href: '/classrooms/new', label: 'สร้างห้องเรียน', Icon: Plus },
-    { href: '/classrooms/trash', label: 'ถังขยะ', Icon: Trash2 },
-  ]
-
-  return (
-    <div className="flex min-w-0 flex-col gap-3">
-      <div className="flex items-start gap-3 px-2 py-1" title="ห้องเรียน">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-          <School aria-hidden="true" className="size-5" />
-        </div>
-        <div className={cn('min-w-0 flex-1', compact && 'md:hidden')}>
-          <p className="font-semibold text-foreground">ห้องเรียน</p>
-          <p className="text-xs text-muted-foreground">จัดการพื้นที่การเรียนรู้</p>
-        </div>
-      </div>
-
-      <Separator />
-
-      <SidebarSectionLabel className="px-2 text-xs font-medium text-muted-foreground">
-        เมนูห้องเรียน
-      </SidebarSectionLabel>
-      <nav aria-label="เมนูจัดการห้องเรียน" className="flex flex-col gap-1">
-        {items.map(({ href, label, Icon }) => {
-          const selected = pathname === href
-          return (
-            <Link
-              key={href}
-              href={href}
-              onClick={onNavigate}
-              aria-current={selected ? 'page' : undefined}
-              title={compact ? label : undefined}
-              className={cn(
-                'flex items-center gap-3 rounded-lg py-2.5 pl-3.5 pr-3 text-sm font-medium transition-colors',
-                selected
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-foreground/70 hover:bg-muted hover:text-foreground',
-              )}
-            >
-              <Icon aria-hidden="true" className="size-4" />
-              <SidebarLabel>{label}</SidebarLabel>
-            </Link>
-          )
-        })}
-      </nav>
     </div>
   )
 }
