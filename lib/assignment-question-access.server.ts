@@ -2,6 +2,7 @@ import 'server-only'
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { Assignment, Question } from '@/lib/types'
+import { fileAssignmentQuestionOwner } from '@/lib/file-assignment'
 
 type AssignmentQuestionRefs = Pick<Assignment, 'created_by' | 'org_id' | 'question_ids'> & {
   /** Present for stored assignments; omitted while validating a normal create. */
@@ -76,7 +77,10 @@ export async function loadAssignmentQuestionsByProvenance(
     && measurement.snapshot_question_ids.length === assignment.question_ids.length
     && measurement.snapshot_question_ids.every((id, index) => id === assignment.question_ids[index])
   const allowedQuestions = ((candidateQuestions ?? []) as Question[]).filter(question => (
-    question.is_research_snapshot
+    fileAssignmentQuestionOwner(question.extra_data)
+      ? fileAssignmentQuestionOwner(question.extra_data) === assignment.id
+        && question.created_by === assignment.created_by && question.org_id === assignment.org_id
+      : question.is_research_snapshot
       ? isExactResearchSnapshot
         && question.research_snapshot_project_id === measurement?.project_id
         && question.created_by === assignment.created_by

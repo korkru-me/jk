@@ -1,6 +1,6 @@
-import { BookOpenCheck, ClipboardPenLine, NotebookPen, type LucideIcon } from 'lucide-react'
+import { BookOpenCheck, ClipboardPenLine, NotebookPen, FileUp, type LucideIcon } from 'lucide-react'
 
-export type WorkType = 'exercise' | 'exam' | 'practice'
+export type WorkType = 'exercise' | 'exam' | 'practice' | 'file'
 export type WorkTypeVariant = 'workExercise' | 'workExam' | 'workPractice'
 
 /** Stable work identity; status and classroom colours have separate meanings. */
@@ -14,6 +14,7 @@ export interface AssignmentTypeMeta {
 }
 
 export const WORK_TYPE_CFG: Record<WorkType, AssignmentTypeMeta> = {
+  file: { label: 'งานส่งไฟล์', bg: 'bg-work-exercise/10', text: 'text-work-exercise', icon: FileUp, variant: 'workExercise', toggle: 'text-work-exercise hover:bg-work-exercise/10 hover:text-work-exercise aria-pressed:bg-work-exercise aria-pressed:text-work-foreground' },
   exercise: {
     label: 'แบบฝึกหัด',
     bg: 'bg-work-exercise/10',

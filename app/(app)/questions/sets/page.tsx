@@ -153,6 +153,7 @@ async function fetchLibraryPage(
       .select('id')
       .eq('created_by', userId)
       .eq('is_research_snapshot', false)
+      .is('extra_data->file_assignment_id', null)
       .or('group_id.is.null,order_in_group.eq.0')
 
     if (searchSpec) {
@@ -349,6 +350,7 @@ export default async function QuestionSetsPage({
     .select('id')
     .eq('created_by', user.id)
     .eq('is_research_snapshot', false)
+    .is('extra_data->file_assignment_id', null)
     .or('group_id.is.null,order_in_group.eq.0')
     .order('created_at', { ascending: false })
     .order('id', { ascending: false })

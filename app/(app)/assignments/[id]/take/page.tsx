@@ -1,4 +1,7 @@
 import { redirect } from 'next/navigation'
+import { isFileAssignment } from '@/lib/file-assignment'
+import { readFileAssignment } from '@/lib/actions/file-assignments'
+import { FileAssignmentStudent } from '@/components/assignments/file-assignment-student'
 import { readSubmissionEntry } from '@/lib/actions/submissions'
 import { ExamClient, type ExamConfig } from '@/components/exam/exam-client'
 import { AccessCodeForm } from '@/components/exam/access-code-form'
@@ -48,6 +51,11 @@ export default async function TakeExamPage({
         androidMonitoredAllowed={result.androidMonitoredAllowed === true}
       />
     )
+  }
+
+  if (result.error || (result.waitingRoom && isFileAssignment({ id, description: result.waitingRoom.description }))) {
+    const file = await readFileAssignment(id)
+    if ('view' in file) return <FileAssignmentStudent key={`${file.view.submission?.id ?? 'new'}:${file.view.submission?.status}`} view={file.view} />
   }
 
   if (result.error) {

@@ -64,14 +64,7 @@ const QUESTION_TYPES = [
     desc: 'ให้นักเรียนเขียนคำตอบอิสระ ครูตรวจและให้คะแนนเอง',
     accent: 'var(--question-type-essay)',
   },
-  {
-    href: '/questions/new/file-upload',
-    type: 'file_upload' as QuestionType,
-    icon: FileUp,
-    title: 'ส่งไฟล์งาน',
-    desc: 'แนบคำสั่ง รูปภาพ หรือ PDF แล้วให้นักเรียนส่งไฟล์คำตอบ',
-    accent: 'var(--question-type-file-upload)',
-  },
+
   {
     href: '/questions/new/classify',
     type: 'classify' as QuestionType,

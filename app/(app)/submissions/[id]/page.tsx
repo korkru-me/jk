@@ -30,6 +30,7 @@ import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
 import {
   AttemptSolutionShortcut, AttemptSolutionsButton, AttemptSolutionsProvider,
 } from '@/components/student/attempt-solutions'
+import { isFileAssignment } from '@/lib/file-assignment'
 import { SolutionLockNotice } from '@/components/student/solution-lock-notice'
 
 // This page renders on the server, which runs in UTC on Vercel: a bare
@@ -87,7 +88,7 @@ export default async function SubmissionResultPage({
     .select(`
       id, assignment_id, student_id, status, closed_at, close_reason, missing_work_evidence, total_score, score_adjustment, max_score, attempt_number, submitted_at, secure_browser_verified_at,
       users!submissions_student_id_fkey(full_name),
-      assignments(id, title, show_results, show_solutions, allow_exam_review, end_at, duration_minutes, passing_type, passing_value, completion_rule, type, status, max_attempts, score_strategy, retry_scope, classroom_id, display_max_score, secure_browser_mode)
+      assignments(id, title, description, show_results, show_solutions, allow_exam_review, end_at, duration_minutes, passing_type, passing_value, completion_rule, type, status, max_attempts, score_strategy, retry_scope, classroom_id, display_max_score, secure_browser_mode)
     `)
     .eq('id', id)
     .eq('student_id', user.id)
@@ -98,6 +99,7 @@ export default async function SubmissionResultPage({
     const ownAssignment = Array.isArray(ownSubmission.assignments)
       ? ownSubmission.assignments[0]
       : ownSubmission.assignments
+    if (ownAssignment?.status === 'published' && isFileAssignment(ownAssignment)) redirect(`/assignments/${ownSubmission.assignment_id}/take`)
     const mayReview = canStudentReviewAnswers(ownAssignment?.show_results, ownAssignment?.end_at)
     const { data: answerSummary } = mayReview
       ? await admin

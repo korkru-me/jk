@@ -204,6 +204,7 @@ export default async function QuestionsPage({
         )
         .eq('created_by', userId)
         .eq('is_research_snapshot', false)
+        .is('extra_data->file_assignment_id', null)
         .or('group_id.is.null,order_in_group.eq.0')
 
       if (searchSpec) {
@@ -435,6 +436,7 @@ export default async function QuestionsPage({
             .from('questions')
             .select(teamSelect, { count: 'exact', head })
             .eq('is_research_snapshot', false)
+            .is('extra_data->file_assignment_id', null)
             .or(unionFilter)
             .or('group_id.is.null,order_in_group.eq.0')
 
@@ -570,6 +572,7 @@ export default async function QuestionsPage({
               .from('questions')
               .select(teamSelect)
               .eq('is_research_snapshot', false)
+              .is('extra_data->file_assignment_id', null)
               .or(ownedByTeam)
               .or('group_id.is.null,order_in_group.eq.0'),
             DEFAULT_QUESTION_SORT,
@@ -585,6 +588,7 @@ export default async function QuestionsPage({
               .from('questions')
               .select(teamSelect)
               .eq('is_research_snapshot', false)
+              .is('extra_data->file_assignment_id', null)
               .in('id', sharedIds.slice(i, i + 500))
               .or('group_id.is.null,order_in_group.eq.0')
             for (const q of (data ?? []) as unknown as QuestionWithCreator[]) byId.set(q.id, q)
@@ -658,6 +662,7 @@ export default async function QuestionsPage({
           .select('id', { count: 'exact', head: true })
           .eq('created_by', userId)
           .eq('is_research_snapshot', false)
+          .is('extra_data->file_assignment_id', null)
           .or('group_id.is.null,order_in_group.eq.0')
           .then(result => result.count ?? 0)
       : Promise.resolve(null),

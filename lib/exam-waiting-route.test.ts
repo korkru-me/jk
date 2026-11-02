@@ -5,6 +5,8 @@ import type { ExamWaitingSummary } from './exam-waiting-room'
 const m = vi.hoisted(() => ({ entry: vi.fn(), draw: vi.fn(), exam: vi.fn(), waiting: vi.fn(), client: vi.fn() }))
 vi.mock('next/navigation', () => ({ redirect: (href: string) => { throw new Error(`redirect:${href}`) } }))
 vi.mock('@/lib/actions/submissions', () => ({ readSubmissionEntry: m.entry, drawNextStreakQuestion: m.draw }))
+vi.mock('@/lib/actions/file-assignments', () => ({ readFileAssignment: vi.fn().mockResolvedValue({ error: 'not a file assignment' }) }))
+vi.mock('@/components/assignments/file-assignment-student', () => ({ FileAssignmentStudent: () => null }))
 vi.mock('@/lib/exam-taking', () => ({ getExamTakingData: m.exam }))
 vi.mock('@/components/exam/exam-waiting-client', () => ({ ExamWaitingClient: m.waiting }))
 vi.mock('@/components/exam/exam-client', () => ({ ExamClient: m.client }))

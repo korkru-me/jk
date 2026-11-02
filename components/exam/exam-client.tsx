@@ -30,6 +30,8 @@ import { ExpiredAttemptStatus } from '@/components/exam/expired-attempt-status'
 import { useOnlineStatus } from '@/hooks/use-online-status'
 import { useExamProctor } from '@/hooks/use-exam-proctor'
 import { WorkImageUpload } from './work-image-upload'
+import { QuestionPdfAttachment } from '@/components/classrooms/post-pdf-preview'
+import { isPdfAttachmentUrl } from '@/lib/post-pdf-preview'
 import { FileSubmissionUpload } from './file-submission-upload'
 import { MatchingDragInput, type MatchingOption } from './matching-drag-input'
 import { MatchingLineInput } from './matching-line-input'
@@ -1514,11 +1516,8 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                     ((current.questions.extra_data as FileUploadConfig | null)?.attachment_urls ?? []).length > 0 && (
                       <div className="flex flex-wrap gap-2">
                         {((current.questions.extra_data as FileUploadConfig).attachment_urls ?? []).map(url => (
-                          /\.pdf(\?|$)/i.test(url) ? (
-                            <a key={url} href={url} target="_blank" rel="noopener noreferrer"
-                              className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl border bg-muted/40 hover:bg-muted transition-colors">
-                              📄 <span className="truncate max-w-[140px]">{decodeURIComponent(url.split('/').pop() ?? 'PDF')}</span>
-                            </a>
+                          isPdfAttachmentUrl(url) ? (
+                            <QuestionPdfAttachment key={url} url={url} localOnly={previewMode} />
                           ) : (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img key={url} src={url} alt="ไฟล์อ้างอิงโจทย์" className="max-h-44 max-w-full rounded-md object-contain sm:max-h-48" />
@@ -3953,7 +3952,7 @@ function FileUploadAnswerInput({ answerId, rawValue, onChange, localOnly }: {
         localOnly={localOnly}
       />
       {files.length === 0 ? (
-        <p className="text-xs text-[color-mix(in_oklab,var(--warning)_60%,var(--foreground))]">ยังไม่ได้แนบไฟล์ — ต้องแนบอย่างน้อย 1 ไฟล์เพื่อรับคะแนนเต็ม</p>
+        <p className="text-xs text-[color-mix(in_oklab,var(--warning)_60%,var(--foreground))]">ยังไม่ได้แนบไฟล์ — แนบอย่างน้อย 1 ไฟล์ก่อนส่ง ครูจะตรวจและให้คะแนน</p>
       ) : (
         <p className="text-xs text-[color-mix(in_oklab,var(--success)_60%,var(--foreground))]">✓ แนบไฟล์แล้ว {files.length} ไฟล์</p>
       )}

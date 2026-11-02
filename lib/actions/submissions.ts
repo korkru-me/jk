@@ -31,6 +31,7 @@ import {
 import { parseMathInputModes } from '@/lib/math/input-mode'
 import { getWritableStudentAnswer } from '@/lib/exam-write-access'
 import { parseSubmittedFiles } from '@/lib/exam-attachment'
+import { submissionFileLimitError } from '@/lib/file-assignment'
 import { validateStoredExamAttachmentUrl } from '@/lib/exam-attachment-access.server'
 import { loadAssignmentQuestionsByProvenance } from '@/lib/assignment-question-access.server'
 import { completionAttemptLimit, findPassingCompletion } from '@/lib/assignment-completion'
@@ -648,9 +649,10 @@ export async function saveAnswer(
   if (writable.question?.question_type === 'file_upload') {
     const files = parseSubmittedFiles(studentAnswer)
     if (!files) return { error: 'รายการไฟล์คำตอบไม่ถูกต้อง กรุณาแนบใหม่' }
-    const previousUrls = new Set(
-      (parseSubmittedFiles(writable.answer.student_answer) ?? []).map(file => file.url),
-    )
+    const previousFiles = parseSubmittedFiles(writable.answer.student_answer) ?? []
+    const fileLimitError = submissionFileLimitError(files, previousFiles)
+    if (fileLimitError) return { error: fileLimitError }
+    const previousUrls = new Set(previousFiles.map(file => file.url))
     for (const file of files) {
       const checked = await validateStoredExamAttachmentUrl(admin, {
         kind: 'submission_file',

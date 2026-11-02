@@ -4,6 +4,7 @@ import { ExerciseIcon, ExamIcon, PracticeIcon } from '@/lib/assignment-display'
 import Link from 'next/link'
 import {
   Copy,
+  FileUp,
   Plus,
 } from 'lucide-react'
 import { assignmentCreationHref, assignmentReuseHref } from '@/lib/assignment-creation'
@@ -96,6 +97,9 @@ export function AssignmentCreationMenu({
           >
             <ExerciseIcon aria-hidden="true" />
             <span>แบบฝึกหัด</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem className="py-2" render={<Link href={`/assignments/files/new?classroom=${encodeURIComponent(classroomId)}`} onNavigate={() => navigate(`/assignments/files/new?classroom=${encodeURIComponent(classroomId)}`)} />}>
+            <FileUp aria-hidden="true" /><span>งานส่งไฟล์</span>
           </DropdownMenuItem>
           {practiceLibrary && (
             <DropdownMenuItem

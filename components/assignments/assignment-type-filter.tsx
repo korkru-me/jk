@@ -4,13 +4,14 @@ import { workTypeConfig } from '@/lib/assignment-display'
 import { WorkTypeIcon } from '@/components/assignments/work-type'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 
-export type AssignmentTypeFilterValue = 'all' | 'exercise' | 'exam' | 'practice'
+export type AssignmentTypeFilterValue = 'all' | 'exercise' | 'exam' | 'practice' | 'file'
 
 const OPTIONS = [
   { value: 'all', label: 'ทั้งหมด' },
   { value: 'exercise', label: 'แบบฝึกหัด' },
   { value: 'exam', label: 'ข้อสอบ' },
   { value: 'practice', label: 'คลังฝึก' },
+  { value: 'file', label: 'งานส่งไฟล์' },
 ] as const
 
 /** One visual and keyboard pattern for assignment-type filters across views. */
@@ -26,7 +27,7 @@ export function AssignmentTypeFilter({ value, onValueChange, counts, includePrac
       onValueChange={values => {
         const next = values.at(-1)
         // Clicking the selected option must not leave an unfiltered/blank state.
-        if (next === 'all' || next === 'exercise' || next === 'exam' || (includePractice && next === 'practice')) onValueChange(next)
+        if (next === 'all' || next === 'exercise' || next === 'exam' || next === 'file' || (includePractice && next === 'practice')) onValueChange(next)
       }}
       aria-label="กรองประเภทงาน"
       variant="primary"

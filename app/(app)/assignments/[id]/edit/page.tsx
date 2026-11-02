@@ -1,3 +1,4 @@
+import { isFileAssignment } from '@/lib/file-assignment'
 import { WorkTypeBadge } from '@/components/assignments/work-type'
 import { createClient } from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/auth/server'
@@ -52,6 +53,7 @@ export default async function EditAssignmentPage({
   if (!user) redirect('/login')
 
   if (!assignment) notFound()
+  if (isFileAssignment(assignment)) redirect(`/assignments/${id}/files/edit`)
   const a = assignment as EditableAssignment
   if (!await canManageAssignment(id, user.id)) notFound()
   const admin = createAdminClient()

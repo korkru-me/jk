@@ -2,18 +2,40 @@ import { POST_FILE_PREFIX } from '@/lib/attachment-display'
 
 export const MAX_POST_PDF_BYTES = 10 * 1024 * 1024
 
-/** Preview only this project's announcement files, or one local QA document. */
-export function postPdfSource(value: string, storageBaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL, allowLocalFixture = process.env.NODE_ENV !== 'production' || (typeof window !== 'undefined' && window.location.origin === 'https://staging.korkru.com')): string | null {
+const allowFixture = () => process.env.NODE_ENV !== 'production' || (typeof window !== 'undefined' && window.location.origin === 'https://staging.korkru.com')
+
+/** Each caller has its own bucket allowlist; stored HTML never enters a viewer. */
+function storagePdfSource(value: string, prefix: string, storageBaseUrl: string | undefined, allowLocalFixture: boolean): string | null {
   if (allowLocalFixture && value === '/exam-screen-lab/grading-workspace/assets/file-0.pdf') return value
   try {
     const url = new URL(value)
     const storage = new URL(storageBaseUrl ?? '')
     if (!['https:', 'http:'].includes(url.protocol) || url.origin !== storage.origin || url.username || url.password) return null
-    if (!url.pathname.startsWith(POST_FILE_PREFIX) || url.pathname.length === POST_FILE_PREFIX.length || /%2e|%2f|%5c/i.test(url.pathname)) return null
+    if (!url.pathname.startsWith(prefix) || url.pathname.length === prefix.length || /%2e|%2f|%5c/i.test(url.pathname)) return null
     url.searchParams.delete('download')
     url.hash = ''
     return url.href
   } catch { return null }
+}
+
+/** Preview only this project's announcement files, or one local QA document. */
+export function postPdfSource(value: string, storageBaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL, allowLocalFixture = allowFixture()): string | null {
+  return storagePdfSource(value, POST_FILE_PREFIX, storageBaseUrl, allowLocalFixture)
+}
+
+/** Assignment instructions use the existing question attachment bucket. */
+export function questionPdfSource(value: string, storageBaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL, allowLocalFixture = allowFixture()): string | null {
+  return storagePdfSource(value, '/storage/v1/object/public/question-images/', storageBaseUrl, allowLocalFixture)
+}
+
+export function isPdfAttachmentUrl(url: string): boolean {
+  return /\.pdf(?:[?#]|$)/i.test(url)
+}
+
+export function questionAttachmentName(url: string): string {
+  if (url.startsWith('blob:')) return 'เอกสารประกอบ.pdf'
+  const name = url.split(/[?#]/)[0].split('/').pop() || 'เอกสารประกอบ.pdf'
+  try { return decodeURIComponent(name) } catch { return name }
 }
 
 /** A download response becomes a typed PDF Blob only after bounded validation. */
