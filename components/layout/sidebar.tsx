@@ -226,14 +226,14 @@ export function Sidebar({
   const { contextualSidebar, pendingSidebar, clearPendingSidebar } = useSidebarContext()
   const usesTeacherNavigation = role === 'teacher' || role === 'admin'
   const usesClassroomSidebar = !previewNavigationOnly
-    && usesTeacherNavigation
-    && isClassroomSectionPath(pathname)
+    && ((usesTeacherNavigation && isClassroomSectionPath(pathname))
+      || (role === 'student' && isClassroomDetailPath(pathname)))
   const pendingMatches = pendingSidebar?.pathname === pathname && pendingSidebar.search === search
   const sidebarEntry = pendingMatches ? pendingSidebar.entry : contextualSidebar
   const contextualMatches = sidebarEntry?.pathname === pathname
     && (pathname !== '/assignments/new' || sidebarEntry.classroomId === searchParams.get('classroom'))
   const contextualContent = !previewNavigationOnly
-    && usesTeacherNavigation
+    && (usesTeacherNavigation || (role === 'student' && sidebarEntry?.classroomId !== undefined))
     && (pendingMatches || contextualMatches)
     ? sidebarEntry?.render(onClose)
     : null
@@ -299,7 +299,7 @@ export function Sidebar({
               <SidebarLabel>กลับหน้าหลัก</SidebarLabel>
             </Link>
             {contextualContent ?? (isClassroomDetailPath(pathname) ? <div className="flex flex-col gap-3" role="status" aria-label="กำลังเปิดห้องเรียน">
-              <Link href="/classrooms" onClick={onClose} className="flex items-center gap-2 px-3.5 py-2 text-sm text-muted-foreground"><ChevronLeft className="size-4" aria-hidden="true" />ห้องเรียนทั้งหมด</Link>
+              <Link href={usesTeacherNavigation ? '/classrooms' : '/dashboard'} onClick={onClose} className="flex items-center gap-2 px-3.5 py-2 text-sm text-muted-foreground"><ChevronLeft className="size-4" aria-hidden="true" />ห้องเรียนทั้งหมด</Link>
               <p className="px-3.5 text-xs text-muted-foreground">กำลังเปิดห้องเรียน…</p>
               <Skeleton className="h-16 w-full rounded-lg" /><Skeleton className="h-8 w-4/5" /><Skeleton className="h-8 w-3/4" />
             </div> : <ClassroomSectionNavigation pathname={pathname} onNavigate={onClose} />)}

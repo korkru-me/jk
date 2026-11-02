@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { formatThaiDateTime } from '@/lib/thai-time'
 import {
   createClassroomPost, updateClassroomPost, togglePinClassroomPost, deleteClassroomPost,
   addComment, getReusableAnnouncements, markPostsSeen, type ReusableAnnouncement,
@@ -66,7 +67,7 @@ interface Props {
 }
 
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })
+  return formatThaiDateTime(iso)
 }
 
 function reusableAnnouncementLabel(post: ReusableAnnouncement): string {

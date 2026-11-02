@@ -42,6 +42,7 @@ interface ClassroomContextSidebarProps {
   navigationItems: readonly ClassroomNavigationItem[]
   activeItem?: ClassroomNavigationKey
   assignmentCreationActive?: boolean
+  showAssignmentCreation?: boolean
   studentCount?: number
   onNavigate: (item: ClassroomNavigationKey) => void
   onSwitchClassroom?: (classroomId: string) => void
@@ -56,6 +57,7 @@ export function ClassroomContextNavigation({
   navigationItems,
   activeItem,
   assignmentCreationActive = false,
+  showAssignmentCreation = true,
   studentCount,
   onNavigate,
   onSwitchClassroom,
@@ -124,7 +126,7 @@ export function ClassroomContextNavigation({
                     type="button"
                     variant="outline"
                     size="icon-sm"
-                    className={cn('shrink-0 transition-colors', compact && 'md:hidden')}
+                    className={cn('min-h-[44px] min-w-[44px] shrink-0 cursor-pointer transition-colors', compact && 'md:hidden')}
                     aria-label="สลับไปห้องเรียนอื่น"
                     title="สลับไปห้องเรียนอื่น"
                   />
@@ -132,7 +134,7 @@ export function ClassroomContextNavigation({
               >
                 <ChevronsUpDown />
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-64">
+              <DropdownMenuContent align="end" className="w-64 min-w-0 max-w-[calc(100vw-2rem)]">
                 <DropdownMenuGroup>
                   <DropdownMenuLabel>ไปห้องเรียนอื่น</DropdownMenuLabel>
                   {otherClassrooms.map(option => {
@@ -145,7 +147,8 @@ export function ClassroomContextNavigation({
                     return (
                       <DropdownMenuItem
                         key={option.id}
-                        className="py-2"
+                        title={option.name}
+                        className="min-h-[44px] py-2"
                         onClick={() => {
                           onSwitchClassroom?.(option.id)
                           onClose?.()
@@ -211,7 +214,7 @@ export function ClassroomContextNavigation({
                 <Icon data-icon="inline-start" />
               </SidebarButton>
 
-              {item.key === 'assignments' && (
+              {showAssignmentCreation && item.key === 'assignments' && (
                 <AssignmentCreationMenu
                   classroomId={classroom.id}
                   label="มอบหมายงาน"

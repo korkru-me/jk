@@ -155,4 +155,15 @@ describe('file assignment creation boundaries (mocked services)', () => {
     expect(await createFileAssignment({ ...input, attachment_urls: ['https://elsewhere.invalid/file.pdf'] })).toHaveProperty('error')
     expect(db.queries.every(query => !query.calls.some(([name]) => name === 'insert'))).toBe(true)
   })
+  it('accepts owner-scoped instruction documents and refuses another uploader or a post file', async () => {
+    const own = `https://project.supabase.co/storage/v1/object/public/classroom-post-files/${STUDENT}/file-assignment-instructions/upload/worksheet.docx`
+    database()
+    m.inline.mockResolvedValueOnce({ success: true })
+    expect(await createFileAssignment({ ...input, attachment_urls: [own] })).toEqual({ success: true })
+    for (const url of [own.replace(STUDENT, ROOM), own.replace('/file-assignment-instructions/upload/', '/')]) {
+      const db = database()
+      expect(await createFileAssignment({ ...input, attachment_urls: [url] })).toHaveProperty('error')
+      expect(db.queries.every(query => !query.calls.some(([name]) => name === 'insert'))).toBe(true)
+    }
+  })
 })

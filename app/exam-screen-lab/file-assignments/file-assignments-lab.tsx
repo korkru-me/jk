@@ -9,16 +9,23 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Field, FieldLabel } from '@/components/ui/field'
+import { composeDescription, EMPTY_META } from '@/app/(app)/classrooms/_components/classroom-meta'
 
-const CLASSROOM = { id: '10000000-0000-4000-8000-000000000001', name: 'ฟิสิกส์ ม.4/1 (ตัวอย่าง)' }
+const CLASSROOM = { id: '10000000-0000-4000-8000-000000000001', name: 'ฟิสิกส์ ม.4/1 (ตัวอย่าง)', description: composeDescription({ ...EMPTY_META, cover: 'orange', iconKey: 'physics', gradeLevel: 'ม.4/1', academicTerm: '2/2569' }) }
+const CLASSROOMS = [CLASSROOM, ...Array.from({ length: 7 }, (_, index) => ({
+  id: `10000000-0000-4000-8000-00000000000${index + 2}`,
+  name: `ฟิสิกส์ ม.4/${index + 2} (ตัวอย่าง)`,
+  description: composeDescription({ ...EMPTY_META, cover: 'blue', iconKey: 'physics', gradeLevel: `ม.4/${index + 2}`, academicTerm: '2/2569' }),
+}))]
 const ASSIGNMENT = '20000000-0000-4000-8000-000000000001'
 
 /** Every callback is in-memory; neither auth nor Storage is contacted. */
-export function FileAssignmentsLab({ serverNow }: { serverNow: string }) {
+export function FileAssignmentsLab({ serverNow, mode = 'context' }: { serverNow: string; mode?: 'context' | 'global' | 'locked' }) {
   const [view, setView] = useState<FileAssignmentView | null>(null)
   const [role, setRole] = useState<'create' | 'teacher' | 'student'>('create')
   const [score, setScore] = useState('10')
   const [expired, setExpired] = useState(false)
+  const [recipientIds, setRecipientIds] = useState<string[]>([])
   const current = view ? { ...view, withdrawalError: view.submission ? fileAssignmentWithdrawalError({
     assignmentStatus: view.status, submissionStatus: view.submission.status,
     dueAt: expired ? '2020-01-01T00:00:00Z' : view.dueAt, endAt: view.endAt,
@@ -42,7 +49,12 @@ export function FileAssignmentsLab({ serverNow }: { serverNow: string }) {
         <Button size="sm" variant="ghost" onClick={() => { setView(null); setExpired(false); setRole('create') }}>สร้างตัวอย่างใหม่</Button>
       </div>
     </div>
-    {role === 'create' ? <FileAssignmentForm classrooms={[CLASSROOM]} preselectedClassroomId={CLASSROOM.id} localOnly onCreate={async input => {
+    {role !== 'create' && <p role="status" className="mb-2 text-sm" data-local-file-recipients>มอบหมายตัวอย่างให้: {CLASSROOMS.filter(room => recipientIds.includes(room.id)).map(room => room.name).join(', ')}</p>}
+    {role === 'create' ? <FileAssignmentForm classrooms={CLASSROOMS} preselectedClassroomId={mode === 'global' ? undefined : CLASSROOM.id} localOnly
+      editing={mode === 'locked'} contentLocked={mode === 'locked'}
+      initial={mode === 'locked' ? { title: 'งานเผยแพร่แล้ว (ตัวอย่าง)', instructions: '<p>คำสั่งที่นักเรียนได้รับแล้ว</p>', classroom_ids: [CLASSROOM.id], status: 'published' } : undefined}
+      onCreate={async input => {
+      setRecipientIds(input.classroom_ids)
       setView({ id: ASSIGNMENT, title: input.title, classroomId: CLASSROOM.id, instructions: input.instructions,
         attachments: input.attachment_urls, maxScore: input.max_score, status: input.status,
         startAt: input.start_at, dueAt: input.due_at, endAt: input.end_at,

@@ -1,5 +1,13 @@
 # Architecture
 
+## File instruction documents and recipient picker — 2 November 2026 (local)
+
+`QuestionFileUpload` shares one guarded file handler between the picker and the optional drop surface; direct file assignments opt into document formats and report upload busy state to the form. Existing image downscaling remains before size validation. Images/PDF retain their bucket; Office/text/ZIP use the existing owner-scoped classroom document bucket under `file-assignment-instructions`, with a narrow URL parser reused by create/update actions. `InstructionAttachment` renders PDF previews, images, or native download links in teacher previews and the student view. The file form composes the exercise wizard's `ClassroomPicker`; recipient payload and server classroom authorization stay on the existing whole-class file-work path. Removing an instruction reference preserves its object for published/copy references; the question-images sweeper does not manage the document namespace.
+
+## Student classroom sidebar — 2 November 2026 (local)
+
+After the classroom route verifies the session and exact student membership, `loadStudentClassroomNavigation` reads the student's active, undeleted enrolled rooms with pagination and returns an explicit metadata DTO. Both student subject and homeroom branches mount `StudentClassroomSidebar`, which registers the shared classroom header/navigation with the shell context. Subject navigation uses the existing `tab` query parameter and native History API, keeping content tabs and sidebar selection synchronized. The shared navigation defaults to teacher creation controls; the student wrapper explicitly disables them. Switching rooms navigates normally so the destination route authorizes access again.
+
 ## Shared instruction PDF preview — 2 November 2026 (local)
 
 Instruction PDFs in direct file assignments, legacy exam file questions and question previews reuse the announcement PDF dialog and fullscreen controls. Separate post/question URL resolvers allow only their respective bucket on the configured Storage origin. The reader still fetches without Storage credentials, rejects redirects, bounds the stream to 10 MB and checks MIME and PDF signature before creating the iframe Blob. Only explicit localOnly callers may preview a selected local Blob; stored blob/data/foreign URLs remain rejected by the production source resolver. The exact existing QA asset exception remains unchanged. File-count overflow is a read-only notice, does not upload the rejected batch or alter saved files, and restores focus to the attach button.
