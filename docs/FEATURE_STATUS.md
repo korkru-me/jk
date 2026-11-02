@@ -1,5 +1,10 @@
 # Feature status
 
+## เวลาในประกาศห้องเรียนตรงกันระหว่าง server/browser — 2 พฤศจิกายน 2026
+
+- Hosted Staging QA ของเมนูนักเรียนพบ hydration mismatch: server UTC แสดง 03:00 แต่ browser กรุงเทพฯ แสดง 10:00 จากประกาศเดียวกัน ปรับ `ClassroomStream` ให้ใช้ `formatThaiDateTime` ที่กำหนด Asia/Bangkok แล้วทั้งหน้าครูและนักเรียน โดยคงรูปแบบวันที่เดิม
+- ใช้ helper เดิมที่มี unit cases สลับ process timezone ระหว่าง UTC และ America/Los_Angeles; ตรวจ SSR/browser ใน dev ที่ TZ=UTC เพิ่มก่อนปล่อยรุ่นรวม ไม่มี migration
+
 ## ลากไฟล์ประกอบคำสั่งและเลือกห้องเหมือนแบบฝึกหัด — 2 พฤศจิกายน 2026 (local)
 
 - งานส่งไฟล์มีพื้นที่ลากวางพร้อมสีตอบรับ และยังใช้ปุ่มแนบไฟล์ได้ ทั้งสองทางใช้ตัวประมวลผลเดียวกัน รองรับรูป PNG/JPG/WEBP/GIF, PDF, Word, Excel, PowerPoint, TXT, CSV และ ZIP รวมไม่เกิน 10 ไฟล์ ไฟล์ละ 10 MB หลังย่อรูป ปฏิเสธชุดที่เกินก่อนอัปโหลดและเก็บรายการเดิมไว้ครบ
