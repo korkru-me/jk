@@ -10,8 +10,7 @@ import { renderRichTextHtml } from '@/lib/rich-text-html'
 import { RichText } from '@/components/ui/rich-text'
 import { Button } from '@/components/ui/button'
 import { WorkImageUpload } from '@/components/exam/work-image-upload'
-import { QuestionPdfAttachment } from '@/components/classrooms/post-pdf-preview'
-import { isPdfAttachmentUrl } from '@/lib/post-pdf-preview'
+import { InstructionAttachment } from '@/components/assignments/instruction-attachment'
 import { FileSubmissionUpload } from '@/components/exam/file-submission-upload'
 import { TeacherGradingPreview, type GradingRow } from './teacher-grading-preview'
 import { MatchingDragInput } from '@/components/exam/matching-drag-input'
@@ -749,15 +748,7 @@ export function QuestionPreviewContent({
       {/* File-upload reference attachments */}
       {questionType === 'file_upload' && attachmentUrls.length > 0 && (
         <div className="flex flex-wrap gap-3">
-          {attachmentUrls.map((url) => (
-            isPdfAttachmentUrl(url) ? (
-              <QuestionPdfAttachment key={url} url={url} localOnly />
-            ) : (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img key={url} src={url} alt="ไฟล์อ้างอิงโจทย์"
-                className="max-h-32 rounded-lg border border-border object-contain" />
-            )
-          ))}
+          {attachmentUrls.map(url => <InstructionAttachment key={url} url={url} localOnly />)}
         </div>
       )}
 

@@ -10,6 +10,8 @@ import { ClassroomDetailClient } from './_components/classroom-detail-client'
 import { ClassroomEntryLoading } from './_components/classroom-entry-loading'
 import { StudentClassroomView, type StudentAssignmentRow } from './_components/student-classroom-view'
 import { HomeroomStudentView } from './_components/homeroom-student-view'
+import { StudentClassroomSidebar } from './_components/student-classroom-sidebar'
+import { loadStudentClassroomNavigation } from '@/lib/student-classroom-navigation.server'
 import { getClassroomPosts, getPostSeenByPost } from '@/lib/actions/classroom-posts'
 import { getClassroomAnnouncementAcknowledgementStatus } from '@/lib/actions/classroom-announcement-acknowledgements'
 import { isAnnouncementAcknowledgementEnabled } from '@/lib/classroom-announcement-acknowledgements'
@@ -86,6 +88,7 @@ export default async function ClassroomDetailPage({
         classmateResult,
         posts,
         calendarEvents,
+        switchableClassrooms,
       ] = await Promise.all([
         admin.from('users').select('full_name').eq('id', c.teacher_id).single(),
         admin.from('classroom_students').select('id', { count: 'exact', head: true }).eq('classroom_id', id),
@@ -95,6 +98,7 @@ export default async function ClassroomDetailPage({
           .returns<{ student_id: string; users: HomeroomClassmateUser }[]>()),
         getClassroomPosts(id),
         loadStudentLearningCalendar(admin, authUser.id),
+        loadStudentClassroomNavigation(admin, authUser.id),
       ])
       if (classmateResult.error) throw new Error('โหลดรายชื่อเพื่อนร่วมห้องไม่สำเร็จ')
       // Membership was verified above. Read only numbers for this room's peers;
@@ -107,14 +111,17 @@ export default async function ClassroomDetailPage({
       const classmates = buildHomeroomClassmates(classmateResult.rows.map(row => row.users), numbers.rows, authUser.id)
 
       return (
-        <HomeroomStudentView
-          classroom={c}
-          teacherName={teacherProfile?.full_name ?? 'ครูที่ปรึกษา'}
-          studentCount={studentCount ?? 0}
-          classmates={classmates}
-          calendarEvents={calendarEvents}
-          posts={posts}
-        />
+        <>
+          <StudentClassroomSidebar classroom={c} classrooms={switchableClassrooms} />
+          <HomeroomStudentView
+            classroom={c}
+            teacherName={teacherProfile?.full_name ?? 'ครูที่ปรึกษา'}
+            studentCount={studentCount ?? 0}
+            classmates={classmates}
+            calendarEvents={calendarEvents}
+            posts={posts}
+          />
+        </>
       )
     }
 
@@ -126,6 +133,7 @@ export default async function ClassroomDetailPage({
       posts,
       { data: myGroup },
       practiceLibraries,
+      switchableClassrooms,
     ] = await Promise.all([
       admin.from('users').select('full_name').eq('id', c.teacher_id).single(),
       admin.from('classroom_students').select('id', { count: 'exact', head: true }).eq('classroom_id', id),
@@ -141,6 +149,7 @@ export default async function ClassroomDetailPage({
       showPracticeLibraries
         ? loadClassroomPracticeLibraries(supabase, id, 'student_member')
         : Promise.resolve(null),
+      loadStudentClassroomNavigation(admin, authUser.id),
     ])
     const assignmentIds = Array.from(new Set((links ?? []).map((l: any) => l.assignment_id)))
     const categoryByAssignment = new Map(
@@ -236,15 +245,18 @@ export default async function ClassroomDetailPage({
       }))
 
     return (
-      <StudentClassroomView
-        classroom={c}
-        teacherName={teacherProfile?.full_name ?? 'ครูผู้สอน'}
-        studentCount={studentCount ?? 0}
-        assignments={assignments}
-        categories={(assignmentCategoryRows ?? []) as AssignmentCategory[]}
-        posts={posts}
-        practiceLibraries={practiceLibraries}
-      />
+      <>
+        <StudentClassroomSidebar classroom={c} classrooms={switchableClassrooms} />
+        <StudentClassroomView
+          classroom={c}
+          teacherName={teacherProfile?.full_name ?? 'ครูผู้สอน'}
+          studentCount={studentCount ?? 0}
+          assignments={assignments}
+          categories={(assignmentCategoryRows ?? []) as AssignmentCategory[]}
+          posts={posts}
+          practiceLibraries={practiceLibraries}
+        />
+      </>
     )
   }
 
