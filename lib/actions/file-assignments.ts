@@ -12,9 +12,7 @@ import { startSubmission, submitSubmission } from '@/lib/actions/submissions'
 import { sanitizeRichTextForStorage } from '@/lib/rich-text-sanitize'
 import { parseSubmittedFiles } from '@/lib/exam-attachment'
 import { fileAssignmentInstructionStoragePath } from '@/lib/question-file-selection'
-import { fileAssignmentQuestionOwner, fileAssignmentWithdrawalError, isFileAssignment, MAX_SUBMISSION_FILES, type FileAssignmentView } from '@/lib/file-assignment'
-import { normalizeAssignmentLateSchedule } from '@/lib/late-submission'
-import { fileAssignmentDescription } from '@/lib/file-assignment'
+import { fileAssignmentDescription, fileAssignmentQuestionOwner, fileAssignmentWithdrawalError, isFileAssignment, MAX_SUBMISSION_FILES, normalizeFileAssignmentLateSchedule, type FileAssignmentView } from '@/lib/file-assignment'
 
 function instructionStorageOrigin(): string | null {
   try { return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').origin } catch { return null }
@@ -26,9 +24,7 @@ export interface CreateFileAssignmentInput {
   instructions: string
   attachment_urls: string[]
   max_score: number
-  start_at: string | null
   due_at: string | null
-  end_at: string | null
   status: 'draft' | 'published'
   copy_source_assignment_id?: string
 }
@@ -47,8 +43,10 @@ export async function createFileAssignment(input: CreateFileAssignmentInput) {
   if (classroomIds.some(id => !allowed.has(id))) return { error: 'คุณไม่มีสิทธิ์มอบหมายงานให้ห้องเรียนที่เลือก' }
   const orgId = await getMyOrgId()
   if (!orgId) return { error: 'ไม่พบข้อมูลสถาบัน' }
+  if (input.due_at != null && typeof input.due_at !== 'string') return { error: 'กำหนดส่งไม่ถูกต้อง' }
+  const schedule = normalizeFileAssignmentLateSchedule(input.due_at ?? null)
+  if ('error' in schedule) return schedule
   const instructions = sanitizeRichTextForStorage(input.instructions)
-  if (!instructions.replace(/<[^>]*>/g, '').trim() && !input.attachment_urls?.length) return { error: 'กรุณาเขียนคำสั่งหรือแนบใบงาน' }
   if (!Array.isArray(input.attachment_urls) || input.attachment_urls.length > 10) return { error: 'แนบเอกสารประกอบได้ไม่เกิน 10 ไฟล์' }
   const storageOrigin = instructionStorageOrigin()
   const copiedFiles = new Set<string>()
@@ -76,7 +74,7 @@ export async function createFileAssignment(input: CreateFileAssignmentInput) {
     return await createInlineFileAssignment({
       classroom_ids: classroomIds, title: input.title, description: instructions,
       question_ids: [question.id], question_points: { [question.id]: input.max_score },
-      start_at: input.start_at, due_at: input.due_at, end_at: input.end_at,
+      start_at: null, due_at: schedule.value.dueAt, late_bands: schedule.value.bands, end_at: null,
       duration_minutes: null, mode: 'online', type: 'exercise', status: input.status,
       max_attempts: 1, score_strategy: 'latest', instant_check: false,
       calculator_enabled: false, scratchpad_enabled: false,
@@ -106,10 +104,11 @@ export async function readFileAssignmentEditor(assignmentId: string) {
     classroom_ids: (links.data ?? []).map(row => row.classroom_id), title: assignment.title,
     instructions: question.question_text, attachment_urls: question.extra_data?.attachment_urls ?? [],
     max_score: assignment.question_points?.[question.id] ?? question.extra_data?.file_assignment_max_score ?? 10,
-    start_at: assignment.start_at, due_at: assignment.due_at, end_at: assignment.end_at,
+    due_at: assignment.due_at,
     status: assignment.status === 'draft' ? 'draft' : 'published',
   }
-  return { input, questionId: question.id, contentLocked: assignment.status !== 'draft' }
+  return { input, questionId: question.id, contentLocked: assignment.status !== 'draft',
+    startAt: assignment.start_at, endAt: assignment.end_at }
 }
 
 export async function updateFileAssignment(assignmentId: string, input: CreateFileAssignmentInput) {
@@ -122,8 +121,16 @@ export async function updateFileAssignment(assignmentId: string, input: CreateFi
   const instructions = sanitizeRichTextForStorage(input.instructions)
   const contentChanged = instructions !== old.instructions || input.max_score !== old.max_score || JSON.stringify(input.attachment_urls) !== JSON.stringify(old.attachment_urls)
   if (existing.contentLocked && contentChanged) return { error: 'งานที่เผยแพร่แล้วแก้ได้เฉพาะชื่อและกำหนดการ เพื่อรักษาไฟล์และคะแนนที่นักเรียนได้รับ' }
-  const schedule = normalizeAssignmentLateSchedule({ dueAt: input.due_at, endAt: input.end_at, startAt: input.start_at, bands: [] })
-  if ('error' in schedule) return schedule
+  if (input.due_at != null && typeof input.due_at !== 'string') return { error: 'กำหนดส่งไม่ถูกต้อง' }
+  const dueAt = input.due_at ?? null
+  const dueUnchanged = dueAt === old.due_at
+    || (dueAt != null && old.due_at != null && Date.parse(dueAt) === Date.parse(old.due_at))
+  const schedule = dueUnchanged ? null : normalizeFileAssignmentLateSchedule(
+    dueAt,
+    existing.contentLocked ? existing.startAt : null,
+    existing.contentLocked ? existing.endAt : null,
+  )
+  if (schedule && 'error' in schedule) return schedule
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
@@ -139,8 +146,13 @@ export async function updateFileAssignment(assignmentId: string, input: CreateFi
     if (question.error) return { error: 'บันทึกคำสั่งไม่สำเร็จ กรุณาลองใหม่' }
   }
   const saved = await supabase.from('assignments').update({ title: input.title.trim(), description: fileAssignmentDescription(assignmentId, instructions),
-    question_points: { [existing.questionId]: input.max_score }, start_at: input.start_at, due_at: schedule.value.dueAt,
-    end_at: input.end_at, late_bands: schedule.value.bands }).eq('id', assignmentId)
+    question_points: { [existing.questionId]: input.max_score },
+    ...(!existing.contentLocked ? { start_at: null, end_at: null } : {}),
+    ...(schedule ? { due_at: schedule.value.dueAt, late_bands: schedule.value.bands } : {}),
+  }).eq('id', assignmentId)
+  if (saved.error?.message.includes('assignment late-submission schedule is locked')) {
+    return { error: 'เปลี่ยนกำหนดส่งไม่ได้ เพราะมีนักเรียนเริ่มทำงานแล้ว' }
+  }
   if (saved.error) return { error: 'บันทึกงานไม่สำเร็จ กรุณาลองใหม่' }
   revalidatePath(`/assignments/${assignmentId}`)
   revalidatePath(`/assignments/${assignmentId}/take`)

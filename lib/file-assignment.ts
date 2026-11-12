@@ -1,3 +1,4 @@
+import { normalizeAssignmentLateSchedule } from './late-submission'
 import type { SubmittedFile } from '@/lib/types'
 
 export const FILE_ASSIGNMENT_LABEL = 'งานส่งไฟล์'
@@ -16,6 +17,19 @@ export interface FileAssignmentView {
   submission: { id: string; answerId: string; status: string; files: SubmittedFile[]; score: number | null; submittedAt: string | null } | null
   withdrawalError: string | null
 }
+export function normalizeFileAssignmentLateSchedule(
+  dueAt: string | null,
+  startAt: string | null = null,
+  endAt: string | null = null,
+) {
+  return normalizeAssignmentLateSchedule({
+    dueAt,
+    startAt,
+    endAt,
+    bands: dueAt ? [{ starts_at: dueAt, label: 'ส่งช้า', color: 'orange' }] : [],
+  }, { requireClose: false })
+}
+
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'
 const MARKER = new RegExp(`^<!--korkru:file-assignment:v1:(${UUID})-->`, 'i')
 

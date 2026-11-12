@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { PGlite } from '@electric-sql/pglite'
 import { beforeEach, describe, expect, it } from 'vitest'
+import { normalizeFileAssignmentLateSchedule } from './file-assignment'
 
 const migrationSql = readFileSync(
   new URL('../supabase/migrations/20261007145225_assignment_late_submission_bands.sql', import.meta.url),
@@ -68,6 +69,15 @@ describe('assignment late-submission migration', () => {
     await expect(db.query(
       'UPDATE public.assignments SET due_at = $2, late_bands = $3::jsonb WHERE id = $1',
       [ASSIGNMENT_ID, DUE, JSON.stringify(repeatedColours)],
+    )).resolves.toBeDefined()
+  })
+
+  it('accepts the automatic file assignment band with no opening or hard close', async () => {
+    const schedule = normalizeFileAssignmentLateSchedule(DUE)
+    if ('error' in schedule) throw new Error(schedule.error)
+    await expect(db.query(
+      'UPDATE public.assignments SET end_at = NULL, due_at = $2, late_bands = $3::jsonb WHERE id = $1',
+      [ASSIGNMENT_ID, schedule.value.dueAt, JSON.stringify(schedule.value.bands)],
     )).resolves.toBeDefined()
   })
 
