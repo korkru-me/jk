@@ -418,7 +418,7 @@ async function createQuestionAssignment(data: CreateAssignmentData, inline?: { a
     endAt: data.end_at,
     startAt: data.start_at,
     bands: data.late_bands,
-  })
+  }, { requireClose: !inline })
   if ('error' in lateSchedule) return { error: lateSchedule.error }
 
   const { data: assignment, error } = await supabase

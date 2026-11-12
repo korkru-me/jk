@@ -28,7 +28,7 @@ export default async function NewFileAssignmentPage({ searchParams }: { searchPa
   const classrooms = [...new Map([...(owned.data ?? []), ...(coRooms.data ?? [])].map(row => [row.id, row as Classroom])).values()]
   const copied = copy ? await readFileAssignmentEditor(copy) : null
   if (copied && 'error' in copied) notFound()
-  const initial = copied && 'input' in copied ? { ...copied.input, title: `${copied.input.title} (สำเนา)`, status: 'draft' as const, start_at: null, due_at: null, end_at: null, copy_source_assignment_id: copy } : undefined
+  const initial = copied && 'input' in copied ? { ...copied.input, title: `${copied.input.title} (สำเนา)`, status: 'draft' as const, due_at: null, copy_source_assignment_id: copy } : undefined
   const selected = classrooms.find(row => row.id === classroom)
   return <div className="flex min-w-0 flex-col gap-3">
     {selected ? <AssignmentClassroomSidebar classroom={selected} switchableClassrooms={classrooms} studentCount={0} isOwner={selected.teacher_id === user.id} /> : <ClearPendingSidebar />}

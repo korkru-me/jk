@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/card'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { RichText } from '@/components/ui/rich-text'
 import { Input } from '@/components/ui/input'
+import { thaiLocalDateTimeToIso, toThaiLocalDateTimeInput } from '@/lib/thai-time'
 import { AssignmentAnnouncementEditor } from './assignment-announcement-editor'
 import { QuestionFileUpload } from '@/components/questions/question-file-upload'
 import { ClassroomPicker } from './classroom-picker'
@@ -23,19 +24,14 @@ interface Props {
   onCreate?: (input: CreateFileAssignmentInput) => Promise<{ error?: string; success?: boolean } | void>
 }
 
-function local(value?: string | null) { return value ? new Date(Date.parse(value) + 7 * 60 * 60 * 1000).toISOString().slice(0, 16) : '' }
-
-function iso(value: string) { return value ? new Date(value).toISOString() : null }
-
 export function FileAssignmentForm({ classrooms, preselectedClassroomId, localOnly = false, onCreate = createFileAssignment, initial, editing = false, contentLocked = false }: Props) {
   const [title, setTitle] = useState(initial?.title ?? '')
   const [instructions, setInstructions] = useState(initial?.instructions ?? '')
   const [attachments, setAttachments] = useState<string[]>(initial?.attachment_urls ?? [])
   const [points, setPoints] = useState(String(initial?.max_score ?? 10))
   const [selected, setSelected] = useState<string[]>(preselectedClassroomId ? [preselectedClassroomId] : initial?.classroom_ids ?? [])
-  const [start, setStart] = useState(local(initial?.start_at))
-  const [due, setDue] = useState(local(initial?.due_at))
-  const [end, setEnd] = useState(local(initial?.end_at))
+  const initialDue = toThaiLocalDateTimeInput(initial?.due_at)
+  const [due, setDue] = useState(initialDue)
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [attachmentsBusy, setAttachmentsBusy] = useState(false)
@@ -50,12 +46,18 @@ export function FileAssignmentForm({ classrooms, preselectedClassroomId, localOn
   function submit(status: 'draft' | 'published') {
     setError(null)
     if (attachmentsBusy) { setError('กรุณารอแนบไฟล์ให้เสร็จก่อนบันทึก'); return }
-    if (!title.trim() || !selected.length) { setError('กรุณาระบุชื่องานและเลือกห้องเรียน'); return }
-    if (!instructions.replace(/<[^>]*>/g, '').trim() && !attachments.length) { setError('กรุณาเขียนคำสั่งหรือแนบใบงาน'); return }
-    if (!Number.isFinite(Number(points)) || Number(points) <= 0) { setError('กรุณาระบุคะแนนเต็มมากกว่า 0'); return }
+    if (!title.trim()) { setError('กรุณาระบุชื่องาน'); return }
+    if (!selected.length) { setError('กรุณาเลือกห้องเรียน'); return }
+    const maxScore = Number(points)
+    if (!Number.isFinite(maxScore) || maxScore <= 0 || maxScore > 1_000_000) {
+      setError('คะแนนเต็มต้องมากกว่า 0 และไม่เกิน 1,000,000')
+      return
+    }
+    const dueAt = editing && due === initialDue ? initial?.due_at ?? null : thaiLocalDateTimeToIso(due)
+    if (due && !dueAt) { setError('กรุณาระบุวันและเวลากำหนดส่งให้ถูกต้อง'); return }
     startTransition(async () => {
       const result = await onCreate({ classroom_ids: selected, title, instructions, attachment_urls: attachments,
-        copy_source_assignment_id: initial?.copy_source_assignment_id, max_score: Number(points), start_at: iso(start), due_at: iso(due), end_at: iso(end || due), status })
+        copy_source_assignment_id: initial?.copy_source_assignment_id, max_score: maxScore, due_at: dueAt, status })
       if (result?.error) setError(result.error)
       else if (localOnly) toast.success(status === 'draft' ? 'บันทึกร่างตัวอย่างแล้ว' : 'มอบหมายงานตัวอย่างแล้ว')
     })
@@ -70,24 +72,22 @@ export function FileAssignmentForm({ classrooms, preselectedClassroomId, localOn
     </div>
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     <Card padding="md"><FieldGroup>
-      <Field><FieldLabel htmlFor="file-assignment-title">ชื่องาน</FieldLabel><Input id="file-assignment-title" value={title} onChange={event => setTitle(event.target.value)} maxLength={200} placeholder="เช่น ใบงานเรื่องการเคลื่อนที่" required /></Field>
-      <fieldset disabled={contentLocked} className="flex min-w-0 flex-col gap-3"><Field><FieldLabel>คำสั่ง</FieldLabel><>{contentLocked ? <RichText text={instructions} blocks /> : <AssignmentAnnouncementEditor value={instructions} onChange={setInstructions} rows={5} />}</></Field>
+      <Field><FieldLabel htmlFor="file-assignment-title">ชื่องาน <span aria-hidden="true" className="text-destructive">*</span></FieldLabel><Input id="file-assignment-title" value={title} onChange={event => setTitle(event.target.value)} maxLength={200} placeholder="เช่น ใบงานเรื่องการเคลื่อนที่" required /></Field>
+      <fieldset disabled={contentLocked} className="flex min-w-0 flex-col gap-3"><Field><FieldLabel>คำสั่ง (ไม่บังคับ)</FieldLabel><>{contentLocked ? <RichText text={instructions} blocks /> : <AssignmentAnnouncementEditor value={instructions} onChange={setInstructions} rows={5} />}</></Field>
       <Field><FieldLabel>เอกสารหรือรูปประกอบคำสั่ง</FieldLabel><QuestionFileUpload value={attachments} onChange={setAttachments} localOnly={localOnly} maxFiles={10} removeFromStorage={false} allowDrop allowDocuments disabled={contentLocked || pending} onUploadingChange={setAttachmentsBusy} /></Field></fieldset>
       {contentLocked && <p className="text-xs text-muted-foreground">เผยแพร่แล้ว คำสั่ง เอกสาร และคะแนนเต็มคงตามงานที่นักเรียนได้รับ</p>}
     </FieldGroup></Card>
     <Card padding="md"><FieldGroup>
-      <Field><FieldLabel>มอบหมายให้{!primaryClassroom && selected.length > 1 ? ` (${selected.length} ห้อง)` : ''}</FieldLabel>
+      <Field><FieldLabel>มอบหมายให้{!primaryClassroom && selected.length > 1 ? ` (${selected.length} ห้อง)` : ''} <span className="text-destructive">*</span></FieldLabel>
         {primaryClassroom && <p className="truncate text-sm font-medium" title={primaryClassroom.name}>{primaryClassroom.name}</p>}
         <fieldset disabled={editing || pending} className="min-w-0">
           <ClassroomPicker classrooms={classroomOptions} selectedIds={selected} onToggle={toggleClassroom} primaryClassroomId={primaryClassroom?.id} />
         </fieldset>
         {!classrooms.length && <p className="text-sm text-muted-foreground">ยังไม่มีห้องเรียนที่มอบหมายงานได้</p>}
       </Field>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Field><FieldLabel htmlFor="file-assignment-points">คะแนนเต็มทั้งงาน</FieldLabel><Input id="file-assignment-points" disabled={contentLocked} type="number" min="0.01" max="1000000" step="any" value={points} onChange={event => setPoints(event.target.value)} /></Field>
-        <Field><FieldLabel htmlFor="file-assignment-start">เปิดรับงาน</FieldLabel><Input id="file-assignment-start" type="datetime-local" value={start} onChange={event => setStart(event.target.value)} /></Field>
-        <Field><FieldLabel htmlFor="file-assignment-due">กำหนดส่ง</FieldLabel><Input id="file-assignment-due" type="datetime-local" value={due} onChange={event => setDue(event.target.value)} /></Field>
-        <Field><FieldLabel htmlFor="file-assignment-end">ปิดรับงาน</FieldLabel><Input id="file-assignment-end" type="datetime-local" value={end} onChange={event => setEnd(event.target.value)} /></Field>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field><FieldLabel htmlFor="file-assignment-points">คะแนนเต็มทั้งงาน <span aria-hidden="true" className="text-destructive">*</span></FieldLabel><Input id="file-assignment-points" disabled={contentLocked} required type="number" min="0.01" max="1000000" step="any" value={points} onChange={event => setPoints(event.target.value)} /></Field>
+        <Field><FieldLabel htmlFor="file-assignment-due">กำหนดส่ง (เวลาไทย)</FieldLabel><Input id="file-assignment-due" type="datetime-local" value={due} onChange={event => setDue(event.target.value)} /></Field>
       </div>
       <p className="text-xs text-muted-foreground">ครูตรวจและให้คะแนนรวมทั้งงาน นักเรียนถอนส่งมาแก้ไขได้ก่อนกำหนดส่งและก่อนครูตรวจ</p>
     </FieldGroup></Card>
