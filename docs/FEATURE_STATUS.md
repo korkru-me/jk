@@ -1,8 +1,13 @@
 # Feature status
 
-## ฟอร์มงานส่งไฟล์ — 12 พฤศจิกายน 2026 (local)
+## ฟอร์มงานส่งไฟล์ขึ้น Production — 12 พฤศจิกายน 2026
 
 ฟอร์มสร้างและแก้ไขงานส่งไฟล์แสดงเฉพาะกำหนดส่ง (เวลาไทย) ในส่วนวันที่ เว้นคำสั่ง เอกสาร และกำหนดส่งได้ ช่องชื่องาน ห้องเรียน และคะแนนเต็มมีเครื่องหมาย `*` งานใหม่เปิดรับเมื่อเผยแพร่ และเมื่อเลยกำหนดระบบจัดเป็น “ส่งช้า” สีส้มโดยอัตโนมัติ ครูยังปิดรับได้จากหน้าจัดการงาน
+
+- Staging [PR #124](https://github.com/korkru-me/jk/pull/124) merge `9946a210ffcb07d6e594901a0fd531d58052428c`, Vercel READY และหน้า staging.korkru.com แสดง badge กับ source revision ตรงกัน ตรวจฟอร์มข้อมูลจำลองว่าชื่องานว่างถูกปฏิเสธและมอบหมายได้เมื่อเว้นคำสั่ง/ไฟล์แนบพร้อมกำหนดส่ง 10:05 ซึ่งแสดงตรงกันในมุมมองนักเรียน
+- Production [PR #125](https://github.com/korkru-me/jk/pull/125) merge `6fb65f17164fafda325b20616d6d0edf7d1afe2f`, [Vercel READY](https://vercel.com/korkru-mes-projects/jk/8DT7gStfLo7VnDe8jGrh2AbWJGR8) บน www.korkru.com ตรวจหน้ามอบหมายจริงของครูแบบอ่านอย่างเดียว เหลือกำหนดส่งและแสดงคำสั่งเป็นช่องไม่บังคับ
+- TypeScript, token lint, production build และ 4,878 tests ผ่าน รวมทดสอบ SQL constraint ว่ารับช่วงสีที่ระบบสร้างพร้อมเวลาเปิดและปิดว่างได้ ไม่มี migration
+- Primary `/Users/korkusonmasaen/Korkru/korkru` ที่ localhost:3000 มีไฟล์แอปและทดสอบทั้ง 8 ตรงกับ Production merge ฟอร์มตัวอย่างแสดงผลบนเดสก์ท็อปและ 390px บันทึกร่างตัวอย่างได้โดยเว้นคำสั่ง และ Next MCP ไม่พบ compilation issues ทดสอบ hosted ด้วยข้อมูลจำลองและตรวจเว็บจริงแบบอ่านอย่างเดียว โดยยังไม่ได้ทำ authenticated database save roundtrip บน hosted
 
 ## เวลาในประกาศห้องเรียนตรงกันระหว่าง server/browser — 2 พฤศจิกายน 2026
 
