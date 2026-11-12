@@ -57,7 +57,7 @@ export function FileAssignmentsLab({ serverNow, mode = 'context' }: { serverNow:
       setRecipientIds(input.classroom_ids)
       setView({ id: ASSIGNMENT, title: input.title, classroomId: CLASSROOM.id, instructions: input.instructions,
         attachments: input.attachment_urls, maxScore: input.max_score, status: input.status,
-        startAt: input.start_at, dueAt: input.due_at, endAt: input.end_at,
+        startAt: null, dueAt: input.due_at, endAt: null,
         submission: null, withdrawalError: null })
       setScore(String(input.max_score))
       setRole('student')

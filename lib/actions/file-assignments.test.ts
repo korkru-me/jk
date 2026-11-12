@@ -13,7 +13,7 @@ vi.mock('@/lib/actions/submissions', () => ({ startSubmission: m.start, submitSu
 vi.mock('@/lib/actions/org', () => ({ getMyOrgId: m.org }))
 vi.mock('@/lib/classroom-groups-server', () => ({ manageableClassroomIds: m.rooms }))
 
-import { createFileAssignment, readFileAssignment, submitFileAssignment, withdrawFileAssignment } from './file-assignments'
+import { createFileAssignment, readFileAssignment, submitFileAssignment, updateFileAssignment, withdrawFileAssignment } from './file-assignments'
 
 const ID = '10000000-0000-4000-8000-000000000001'
 const QUESTION = '20000000-0000-4000-8000-000000000001'
@@ -38,7 +38,7 @@ function database() {
     for (const method of ['select', 'eq', 'neq', 'in', 'order', 'limit', 'insert', 'update', 'delete']) {
       query[method] = (...args: unknown[]) => { calls.push([method, args]); return query }
     }
-    const result = () => ({ data: rows[table] ?? null, error: null, count })
+    const result = () => ({ data: table === 'assignment_classrooms' ? [{ classroom_id: ROOM }] : rows[table] ?? null, error: null, count })
     query.single = vi.fn(async () => result())
     query.maybeSingle = vi.fn(async () => result())
     query.then = (resolve: (value: ReturnType<typeof result>) => unknown) => Promise.resolve(result()).then(resolve)
@@ -124,7 +124,23 @@ describe('file assignment withdrawal (mocked services)', () => {
 })
 
 describe('file assignment creation boundaries (mocked services)', () => {
-  const input = { classroom_ids: [ROOM], title: 'ใบงาน', instructions: '<p>ทำทุกข้อ</p>', attachment_urls: [], max_score: 10, start_at: null, due_at: null, end_at: null, status: 'draft' as const }
+  const input = { classroom_ids: [ROOM], title: 'ใบงาน', instructions: '<p>ทำทุกข้อ</p>', attachment_urls: [], max_score: 10, due_at: null, status: 'draft' as const }
+  it.each(['draft', 'published'] as const)('accepts blank instructions and adds one orange late band for %s work', async status => {
+    database()
+    m.inline.mockResolvedValueOnce({ success: true })
+    expect(await createFileAssignment({ ...input, instructions: '', due_at: '2026-11-20T10:05:00+07:00', status })).toEqual({ success: true })
+    expect(m.inline).toHaveBeenCalledWith(expect.objectContaining({
+      description: '', start_at: null, end_at: null, due_at: '2026-11-20T03:05:00.000Z',
+      late_bands: [expect.objectContaining({ starts_at: '2026-11-20T03:05:00.000Z', label: 'ส่งช้า', color: 'orange' })],
+    }), expect.any(String), QUESTION)
+  })
+
+  it('rejects a blank title before creating a prompt', async () => {
+    const db = database()
+    expect(await createFileAssignment({ ...input, title: '   ' })).toHaveProperty('error')
+    expect(db.queries).toHaveLength(0)
+  })
+
   it('does not create private content for a classroom the actor cannot manage', async () => {
     const db = database()
     m.rooms.mockResolvedValue(new Set())
@@ -165,5 +181,18 @@ describe('file assignment creation boundaries (mocked services)', () => {
       expect(await createFileAssignment({ ...input, attachment_urls: [url] })).toHaveProperty('error')
       expect(db.queries.every(query => !query.calls.some(([name]) => name === 'insert'))).toBe(true)
     }
+  })
+})
+
+describe('file assignment due date edits (mocked services)', () => {
+  const edit = { classroom_ids: [ROOM], title: 'ใบงานใหม่', instructions: '<p>คำสั่ง</p>', attachment_urls: [], max_score: 10, status: 'published' as const }
+
+  it('keeps an existing published schedule when only the title changes', async () => {
+    const db = database()
+    await updateFileAssignment(ID, { ...edit, due_at: '2099-01-01T07:00:00+07:00' })
+    const update = db.queries.find(query => query.table === 'assignments' && query.calls.some(([name]) => name === 'update'))
+    const payload = update?.calls.find(([name]) => name === 'update')?.[1][0]
+    expect(payload).toHaveProperty('title', edit.title)
+    for (const key of ['start_at', 'due_at', 'end_at', 'late_bands']) expect(payload).not.toHaveProperty(key)
   })
 })
