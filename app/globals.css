@@ -398,6 +398,15 @@
   }
 }
 
+/* Scroll room for the active answer when the math keypad covers the end of the page. */
+[data-math-keypad-scroll-space]::after {
+  content: '';
+  display: block;
+  flex: none;
+  block-size: var(--math-keypad-scroll-space, 0px);
+  pointer-events: none;
+}
+
 /*
  * A phone in landscape has plenty of width but very little usable height,
  * especially while Safari's tab and address bars are visible. Keep every
@@ -410,7 +419,7 @@
   }
 
   [data-math-keypad-panel] {
-    max-height: 58%;
+    max-height: min(58%, var(--math-keypad-available-height, 100%));
     gap: 0.25rem;
     padding: 0.5rem;
     padding-bottom: max(0.5rem, env(safe-area-inset-bottom)) !important;
