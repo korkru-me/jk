@@ -82,6 +82,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { NativeSelect } from '@/components/ui/native-select'
 import { ExamWatermark } from './exam-watermark'
 import { SolutionWatermark } from '@/components/student/solution-watermark'
+import { QuestionResultGrid } from '@/components/student/question-result-grid'
 import { SubmissionScoreSummary } from '@/components/student/submission-score-summary'
 import type { SolutionWatermarkData } from '@/lib/solution-watermark'
 import { MathAnswerField } from './math-answer-field'
@@ -1181,7 +1182,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
    * builder the server uses for a student's review, loaded on demand for the
    * same reason handleCheck loads it.
    */
-  async function openPreviewReview() {
+  async function openPreviewReview(questionIndex = 0) {
     if (!previewResult) return
     const { buildReviewFeedback } = await import('@/lib/exam-review-feedback')
     const gradedById = new Map(previewResult.graded.map(graded => [graded.id, graded]))
@@ -1208,7 +1209,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
     setShowCalculator(false)
     setShowScratchpad(false)
     setPreviewReviewing(true)
-    navigateTo(0)
+    navigateTo(questionIndex)
   }
 
   /** The way back to the result screen, in each place a review would
@@ -1886,7 +1887,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
           totalScore={previewResult.totalScore}
           totalMax={previewResult.totalMax}
           returnHref={previewReturnHref ?? '/assignments'}
-          onReview={config.examReview ? () => void openPreviewReview() : undefined}
+          onReview={config.examReview ? index => void openPreviewReview(index) : undefined}
         />
       )}
 
@@ -2542,7 +2543,7 @@ function PreviewResultSummary({
   totalMax: number
   returnHref: string
   /** Present when the ข้อสอบ lets students reopen it after ส่งคำตอบ. */
-  onReview?: () => void
+  onReview?: (questionIndex: number) => void
 }) {
   const gradedById = new Map(graded.map(g => [g.id, g]))
   const correctCount = graded.filter(g => g.is_correct === true).length
@@ -2551,47 +2552,35 @@ function PreviewResultSummary({
   const pct = totalMax > 0 ? Math.round((totalScore / totalMax) * 100) : 0
 
   return (
-    <div className="max-w-2xl mx-auto space-y-4 py-4">
+    <div className="mx-auto w-full min-w-0 max-w-2xl space-y-4 py-4">
       <SubmissionScoreSummary visible score={totalScore} maxScore={totalMax} percentage={pct} passed={null} threshold={null} counts={{ correct: correctCount, wrong: wrongCount, pending: pendingCount }} submittedAt={null} strategy="ตัวอย่างผลคะแนน · ไม่บันทึกจริง">
         {onReview && (
-          <Button size="sm" type="button" onClick={onReview}>
+          <Button size="sm" type="button" onClick={() => onReview(0)}>
             <BookOpenCheck aria-hidden="true" />ดูข้อสอบที่ทำเสร็จแล้ว
           </Button>
         )}
         <Button size="sm" variant={onReview ? 'outline' : 'default'} render={<a href={returnHref} />}>กลับไปหน้าชุดข้อสอบ</Button>
       </SubmissionScoreSummary>
 
-      <div className="space-y-2">
-        <h2 className="font-semibold text-sm px-1">ตรวจเฉลยทีละข้อ</h2>
-        {answers.map((a, i) => {
-          const g = gradedById.get(a.id)
-          const isCorrect = g?.is_correct ?? null
-          return (
-            <div
-              key={a.id}
-              className={`bg-card border-l-4 rounded-xl p-4 flex items-start gap-3 ${
-                isCorrect === null ? 'border-l-amber-400'
-                : isCorrect ? 'border-l-green-500'
-                : 'border-l-red-400'
-              }`}
-            >
-              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 ${
-                isCorrect === null ? 'bg-warning/10 text-warning'
-                : isCorrect ? 'bg-success/10 text-success'
-                : 'bg-destructive/10 text-destructive'
-              }`}>
-                {isCorrect === null ? '⏳' : isCorrect ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">ข้อ {i + 1}{a.questions.title ? ` — ${a.questions.title}` : ''}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {isCorrect === null ? 'ต้องให้ครูตรวจเอง' : `${g?.score ?? 0}/${a.max_score ?? 0} คะแนน`}
+      <QuestionResultGrid items={answers.map((answer, index) => {
+        const grade = gradedById.get(answer.id)
+        const verdict = grade?.is_correct ?? null
+        return {
+          id: answer.id,
+          outcome: verdict === null ? 'pending' : verdict ? 'correct' : 'wrong',
+          detail: (
+            <Card padding="sm" className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-sm font-medium break-words">ข้อ {index + 1}{answer.questions.title ? ` · ${answer.questions.title}` : ''}</p>
+                <p className="text-xs text-muted-foreground">
+                  {verdict === null ? 'รอครูตรวจ' : `${grade?.score ?? 0}/${answer.max_score ?? 0} คะแนน`}
                 </p>
               </div>
-            </div>
-          )
-        })}
-      </div>
+              {onReview && <Button type="button" variant="outline" className="min-h-11" onClick={() => onReview(index)}>ดูเฉลยข้อนี้</Button>}
+            </Card>
+          ),
+        }
+      })} />
     </div>
   )
 }
