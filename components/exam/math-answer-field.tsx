@@ -169,6 +169,8 @@ export function MathAnswerField({
     if (!active || !input || !panel) return
 
     const scroller = findAnswerScroller(input)
+    const scrollElement = scroller ?? document.scrollingElement
+    if (!scrollElement) return
     const scrollContent = scroller ?? document.body
     const scrollSpace = '--math-keypad-scroll-space'
     const dock = input.closest('[data-exam-normal-stage]')?.querySelector('[data-exam-toolbar-dock]')
@@ -200,10 +202,14 @@ export function MathAnswerField({
         scrollContent.style.setProperty(scrollSpace, `${reserve}px`)
         if (!overlaps) return
 
-        const coveredBy = input.getBoundingClientRect().bottom - targetBottom
+        const coveredBy = Math.ceil(input.getBoundingClientRect().bottom - targetBottom)
         if (coveredBy <= 0) return
-        if (scroller) scroller.scrollTop += Math.ceil(coveredBy)
-        else window.scrollBy(0, Math.ceil(coveredBy))
+        const target = scrollElement.scrollTop + coveredBy
+        const maxScroll = scrollElement.scrollHeight - scrollElement.clientHeight
+        // A fixed-height wrapper can let its question overflow past the
+        // start of the scroll tail. Add any distance the browser would clamp.
+        if (target > maxScroll) scrollContent.style.setProperty(scrollSpace, `${reserve + target - maxScroll}px`)
+        scrollElement.scrollTop = target
       })
     }
 
