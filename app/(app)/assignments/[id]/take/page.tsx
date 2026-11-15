@@ -3,6 +3,7 @@ import { isFileAssignment } from '@/lib/file-assignment'
 import { readFileAssignment } from '@/lib/actions/file-assignments'
 import { FileAssignmentStudent } from '@/components/assignments/file-assignment-student'
 import { readSubmissionEntry } from '@/lib/actions/submissions'
+import { readAssignmentClassroomCover } from '@/lib/assignment-classroom-appearance.server'
 import { ExamClient, type ExamConfig } from '@/components/exam/exam-client'
 import { AccessCodeForm } from '@/components/exam/access-code-form'
 import { parseSections } from '@/lib/question-set-sections'
@@ -82,7 +83,10 @@ export default async function TakeExamPage({
     return <ExamWaitingClient key={`${id}:${result.waitingRoom.previousSubmissionId ?? 'new'}`}
       assignmentId={id} summary={result.waitingRoom} sebChallenge={sebChallenge} />
   }
-  const exam = await getExamTakingData(submissionId)
+  const [exam, classroomCover] = await Promise.all([
+    getExamTakingData(submissionId),
+    readAssignmentClassroomCover(id),
+  ])
   if (!exam) redirect(`/assignments/${id}/take`)
   if (result.waitingRoom) {
     // A slow safe-data read may cross the timer/deadline boundary. Do not
@@ -141,6 +145,8 @@ export default async function TakeExamPage({
   return (
     <div className="h-full flex flex-col">
       <ExamClient
+        classroomCover={classroomCover}
+        assignmentTitle={result.waitingRoom.title}
         submissionId={submissionId}
         storageOwnerId={submission.student_id}
         answers={answers}

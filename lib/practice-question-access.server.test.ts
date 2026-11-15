@@ -1,3 +1,4 @@
+import { composeDescription, EMPTY_META } from '@/app/(app)/classrooms/_components/classroom-meta'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { loadPracticeLibraryLocalSnapshot, loadPracticeLibrarySearch } from './practice-question-access.server'
 
@@ -28,7 +29,7 @@ beforeEach(() => {
       maybeSingle: async () => ({ error: null, data: table === 'practice_libraries'
         ? { id: libraryId, org_id: 'org', classroom_id: classroomId, title: 'ฝึก', description: null, status: 'published', reveal_answer_key: false, access_code: 'code', calculator_enabled: true, scratchpad_enabled: true, shuffle_options: false }
         : table === 'users' ? { id: actorId, role, status: 'active' }
-        : table === 'classrooms' ? { id: classroomId, org_id: 'org', status: 'active', classroom_type: 'subject' }
+        : table === 'classrooms' ? { id: classroomId, org_id: 'org', status: 'active', classroom_type: 'subject', description: composeDescription({ ...EMPTY_META, cover: 'sky', description: 'ไม่จำเป็นต่อธีม' }) }
         : { student_id: actorId } }),
       in: async (_column: string, ids: string[]) => ({ error: null, data: ids.map(id => ({ id, question_text: '<p>โจทย์</p>', difficulty: 'medium', subject: 'ฟิสิกส์', solution_text: 'private solution', solution_image_urls: [] })) }),
     }
@@ -49,6 +50,8 @@ it('authorizes once per snapshot while every bounded RPC remains actor/library-s
   if (result.status !== 'ready') return
   expect(result.items).toHaveLength(143)
   expect(result.library.requiresAccessCode).toBe(true)
+  expect(result.library.classroomCover).toBe('sky')
+  expect(JSON.stringify(result.library)).not.toContain('ไม่จำเป็นต่อธีม')
   expect(result.items.every(item => item.excerpt === 'โจทย์' && item.hasSolution === false)).toBe(true)
   expect(JSON.stringify(result)).not.toMatch(/private solution|solution_text|access_code/)
   expect(mocks.from.mock.calls.map(([table]) => table).filter(table => table !== 'questions')).toEqual(['practice_libraries', 'users', 'classrooms', 'classroom_students'])

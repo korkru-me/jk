@@ -29,9 +29,10 @@ export function writePracticeExerciseSettings(storage: Pick<Storage, 'getItem' |
   return next
 }
 
-export function defaultPracticeExerciseSettings(exerciseId: string): PracticeExerciseSettings {
+export function defaultPracticeExerciseSettings(exerciseId: string, classroomCover?: string): PracticeExerciseSettings {
   const seed = [...exerciseId].reduce((sum, char) => sum + char.charCodeAt(0), 0)
-  return { questionsPerPage: 1, theme: PRACTICE_EXERCISE_THEMES[seed % PRACTICE_EXERCISE_THEMES.length] }
+  const roomTheme = PRACTICE_EXERCISE_THEMES.find(theme => theme === classroomCover)
+  return { questionsPerPage: 1, theme: roomTheme ?? PRACTICE_EXERCISE_THEMES[seed % PRACTICE_EXERCISE_THEMES.length] }
 }
 
 export function randomPracticeExerciseTheme(random = Math.random): PracticeExerciseSettings['theme'] {

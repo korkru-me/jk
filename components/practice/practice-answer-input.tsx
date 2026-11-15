@@ -188,6 +188,8 @@ function McqInput({ question, value, onChange, disabled }: PracticeAnswerInputPr
         return (
           <label
             key={`${option.index ?? index}-${option.text ?? ''}`}
+            data-study-choice
+            data-study-selected={value === answer ? true : undefined}
             className={`flex min-h-[44px] cursor-pointer items-center gap-3 rounded-xl border px-3 py-2 text-sm transition-colors ${
               value === answer ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted/50'
             }`}

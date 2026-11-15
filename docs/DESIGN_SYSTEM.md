@@ -180,6 +180,10 @@ Signup uses compact icon ToggleGroup roles, one explicit terms/privacy acknowled
 
 `SignInMethodsSection` ใช้ Card กระชับร่วมครู/นักเรียน แสดงอีเมลและสถานะ Google จาก identities ที่ server ตรวจ ไม่อนุมานว่ามีรหัสผ่าน สถานะ conflict/unknown ต้องบอกว่ายังยืนยันไม่ได้ เชื่อม Google โดยขยายช่องรหัสปัจจุบันก่อนโหลด GIS และให้ยกเลิก/ยืนยันใหม่เมื่อหมดอายุ ไม่มี One Tap/auto-login แถว “อีเมลและรหัสผ่าน” ใช้ “ตั้งหรือเปลี่ยนรหัสผ่าน” พร้อม conditional delivery/cooldown Native controls อย่างน้อย 44px; ปุ่ม GIS `large` ทางการอาจประมาณ 40px เป็นข้อยกเว้นของ provider ไม่ยืด iframe หรืออ้างว่า wrapper 44px ทำให้ปุ่ม Google สูง 44px
 
+## สีห้องเรียนในหน้าทำงานและคลังโจทย์ — 15 พฤศจิกายน 2026
+
+ใช้ขอบและพื้นหัวข้อสีอ่อนบนการ์ดพื้นปกติ ปุ่มตรวจและตัวเลือกที่เลือกใช้สีเดียวกับห้องโดยยังมี radio หรือข้อความบอกสถานะ แถบปักธงและสถานะตรวจรักษาสีสื่อความหมาย คลังโจทย์ใช้แถบขอบด้านเริ่มต้นและหัวข้อโทนอ่อน คลังรวมที่ไม่มีบริบทห้องใช้สีหลัก KorKru แบบฝึกหัดส่วนตัวให้สีที่บันทึกไว้มีลำดับเหนือสีห้อง
+
 ## Compact student classroom work cards — 15 October 2026
 
 Student exercise, exam and practice cards now share three compact rows: a two-line title area, a single metadata line and a status/result line. Remove the large left icon tile and repeated inline icons; use px-3/py-2 with gap-1. Keep the type badge, count, duration (or attempt count when untimed), submission/deadline status and permitted score visible. Shorten deadline/retry wording; long titles and secondary metadata may ellipsize, with complete assignment details available on hover/keyboard focus and in the accessible link name. The whole card remains the navigation target. Completed assignments retain the green surface and circled check; overdue assignments retain the red motion-safe pulsing alert; practice cards do not acquire submission status. The three-row sizing follows text/spacing tokens rather than a fixed pixel card height. At the current theme sizing, all 17 fixture cards measured 117.3px at 320/390/1440px with expanded/collapsed desktop navigation, replacing approximately 132–176px assignment cards. Group headers, teacher work cards and calendar layout are outside this change.

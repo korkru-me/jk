@@ -2,6 +2,9 @@
   --classroom-ink: color-mix(in oklab, var(--classroom-accent) 60%, var(--foreground));
   --classroom-edge: color-mix(in oklab, var(--classroom-accent) 25%, var(--border));
   --classroom-wash: color-mix(in oklab, var(--classroom-accent) 6%, var(--card));
+  --study-outline: color-mix(in oklab, var(--classroom-accent) 42%, var(--border));
+  --study-fill: color-mix(in oklab, var(--classroom-accent) 12%, var(--card));
+  --study-rail: color-mix(in oklab, var(--classroom-accent) 75%, var(--foreground));
 }
 
 /* Opt-in surfaces keep assignment/category/status colours independent. */
@@ -60,4 +63,78 @@
   border-color: var(--classroom-edge);
   background-color: var(--classroom-wash);
   --muted-foreground: color-mix(in oklab, var(--foreground) 75%, var(--card));
+}
+
+/* Learning screens opt in without recoloring verdicts, flags or global navigation. */
+.scope[data-study-canvas],
+.scope [data-study-canvas] {
+  background-color: var(--classroom-wash);
+}
+
+.scope [data-study-question]:not([data-study-reviewed]),
+.scope [data-study-toolbar] {
+  border-color: var(--study-outline);
+}
+
+.scope [data-study-question-header],
+.scope [data-study-title] {
+  background-color: var(--study-fill);
+  border-color: var(--classroom-edge);
+  color: var(--classroom-ink);
+}
+
+.scope [data-study-title] {
+  position: relative;
+  isolation: isolate;
+}
+
+.scope [data-study-title]::after {
+  position: absolute;
+  z-index: -1;
+  inset-block: 0;
+  inset-inline-end: 0;
+  width: 5rem;
+  border-radius: inherit;
+  background-image: linear-gradient(to bottom, var(--study-outline) 1px, transparent 1px),
+    linear-gradient(to right, var(--study-outline) 1px, transparent 1px);
+  background-size: 0.75rem 0.75rem;
+  mask-image: linear-gradient(to right, transparent, black);
+  opacity: 0.4;
+  pointer-events: none;
+  content: '';
+}
+
+.scope [data-study-number] {
+  border-color: var(--study-outline);
+  background-color: var(--card);
+  color: var(--classroom-ink);
+}
+
+.scope [data-study-tools] > [data-slot='button'],
+.scope [data-study-search] {
+  border-color: var(--classroom-edge);
+}
+
+.scope [data-study-tools] > [aria-pressed='true'],
+.scope [data-study-selected='true'] {
+  border-color: var(--study-rail);
+  background-color: var(--study-fill);
+  color: var(--classroom-ink);
+}
+
+.scope [data-study-choice] input {
+  accent-color: var(--study-rail);
+}
+
+.scope [data-study-list-card] {
+  border-inline-start: 3px solid var(--study-rail);
+}
+
+.scope [data-study-list-card] :is([data-study-list-title], [data-study-open]) {
+  color: var(--classroom-ink);
+}
+
+.scope [data-study-list-card] [data-study-open] {
+  border-color: var(--classroom-edge);
+  background-color: var(--study-fill);
 }

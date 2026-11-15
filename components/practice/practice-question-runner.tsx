@@ -56,8 +56,6 @@ interface PracticeQuestionRunnerProps {
   onProgress?: (questionId: string, answered: boolean, verdict?: PracticeFeedback['verdict']) => void
   onReload?: () => void
   checkAction?: PracticeRunAnswerAction
-  frameClassName?: string
-  frameHeaderClassName?: string
   calculatorResult?: { questionId: string; value: string; nonce: number }
 }
 
@@ -207,8 +205,6 @@ export function PracticeQuestionRunner({
   onProgress,
   onReload,
   checkAction = checkPracticeAnswer,
-  frameClassName,
-  frameHeaderClassName,
   calculatorResult,
 }: PracticeQuestionRunnerProps) {
   const router = useRouter()
@@ -311,7 +307,7 @@ export function PracticeQuestionRunner({
 
   return (
     <div className={embedded ? "flex min-w-0 flex-col gap-2" : "flex w-full flex-col gap-3"}>
-      {!embedded && <header className="flex min-h-[64px] items-center gap-3">
+      {!embedded && <header className="flex min-h-11 items-center gap-2 rounded-xl border px-2 py-1" data-study-title>
         <Button
           variant="ghost"
           size="icon"
@@ -324,7 +320,7 @@ export function PracticeQuestionRunner({
         <div className="min-w-0 flex-1">
           <p className="truncate text-xs text-muted-foreground">{libraryTitle}</p>
           <div className="flex min-w-0 items-center gap-2">
-            <h1 className="min-w-0 flex-1 truncate text-lg font-semibold text-foreground">{question.questions.title}</h1>
+            <h1 className="min-w-0 flex-1 truncate text-lg font-semibold">{question.questions.title}</h1>
           </div>
         </div>
       </header>}
@@ -362,9 +358,9 @@ export function PracticeQuestionRunner({
         </div>
       )}
 
-      <ExamQuestionFrame className={frameClassName} headerClassName={frameHeaderClassName}
+      <ExamQuestionFrame
         header={<>
-          {questionNumber !== undefined && <Badge variant="outline">ข้อ {questionNumber}</Badge>}
+          {questionNumber !== undefined && <Badge variant="outline" data-study-number>ข้อ {questionNumber}</Badge>}
           <h2 title={question.questions.title} className="line-clamp-2 min-w-0 flex-1 text-sm font-semibold">{question.questions.title}</h2>
           {onToggleFlag && <ExamQuestionFlag flagged={flagged} onToggle={onToggleFlag} description={PRACTICE_FLAG_DESCRIPTION} />}
         </>}
@@ -377,7 +373,7 @@ export function PracticeQuestionRunner({
           <PracticeAnswerInput question={question} value={answer} onChange={changeAnswer} mathInputModes={mathInputModes} onMathInputModeChange={changeMathInputMode} disabled={pending} />
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" size="sm" onClick={() => void check()} disabled={pending || refreshRequired} className="pointer-coarse:min-h-11">
+            <Button type="button" size="sm" onClick={() => void check()} disabled={pending || refreshRequired} data-classroom-action className="pointer-coarse:min-h-11">
               {checking ? <LoaderCircle className="animate-spin" data-icon="inline-start" aria-hidden="true" /> : <CheckCircle2 data-icon="inline-start" aria-hidden="true" />}
               {checking ? 'กำลังตรวจ…' : 'ตรวจคำตอบ'}
             </Button>

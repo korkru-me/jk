@@ -276,6 +276,7 @@ export function MathAnswerField({
             variant={mode === option ? 'secondary' : 'outline'}
             size="xs"
             aria-pressed={mode === option}
+            data-study-selected={mode === option ? true : undefined}
             disabled={disabled}
             onClick={() => {
               onActivate()

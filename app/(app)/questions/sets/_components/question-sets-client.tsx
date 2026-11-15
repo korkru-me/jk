@@ -22,6 +22,7 @@ import type {
   QuestionSetSummary,
   QuestionSetSummaryWithCreator,
 } from '../page'
+import { ClassroomTheme } from '@/components/classrooms/classroom-theme'
 import { Card } from '@/components/ui/card'
 import { QuestionSetCard } from '@/components/questions/question-set-card'
 
@@ -126,19 +127,19 @@ export function QuestionSetsClient({
   }
 
   return (
-    <div className="flex max-w-[1200px] flex-col gap-4">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
+    <ClassroomTheme className="flex min-w-0 max-w-[1200px] flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2" data-study-title>
         <div className="min-w-0">
-          <h1 className="text-xl font-bold text-foreground">คลังแฟ้มโจทย์</h1>
+          <h1 className="text-xl font-bold">คลังแฟ้มโจทย์</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{totalCount} แฟ้มโจทย์ — รวมโจทย์ไว้เป็นแฟ้มเพื่อใช้ซ้ำ</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <ImportQuestionsButton
             label="นำเข้าไฟล์ KorKru"
             className="gap-2"
             onImported={() => router.refresh()}
           />
-          <Button render={<Link href="/questions/sets/new" />} className="shadow-sm">
+          <Button render={<Link href="/questions/sets/new" />} className="pointer-coarse:min-h-11" data-classroom-action>
             <Plus data-icon="inline-start" /> สร้างแฟ้มโจทย์ใหม่
           </Button>
         </div>
@@ -244,7 +245,7 @@ export function QuestionSetsClient({
       {/* A teacher with no แฟ้ม at all still needs to see the คลัง waiting to be
           filed — that is exactly the state the empty card above describes. */}
       {totalCount === 0 && libraryPanel}
-    </div>
+    </ClassroomTheme>
   )
 }
 

@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import { isExamScreenLabEnabled } from '@/lib/exam-screen-lab-access'
+import { ClassroomTheme } from '@/components/classrooms/classroom-theme'
 import { LibraryPanel } from '@/app/(app)/questions/sets/_components/library-panel'
 import { DEFAULT_QUESTION_SORT } from '@/lib/question-sort'
 import type { UnfiledQuestion } from '@/app/(app)/questions/sets/page'
@@ -16,9 +17,11 @@ export default function QuestionLibraryBulkLab() {
     group_id: null, order_in_group: null, question_categories: null,
   }))
   return <main className="p-3">
-    <h1 className="text-lg font-semibold">ห้องทดลองปุ่มจัดการโจทย์ · ข้อมูลสังเคราะห์</h1>
-    <LibraryPanel library={{ questions, groups: [], groupCounts: { tag: 0, title: 0, content: 0 }, total: 4, page: 1 }}
-      scope={{ kind: 'all' }} search="" match="all" sort={DEFAULT_QUESTION_SORT} perPage={24}
-      unfiledTotal={4} ownQuestionTotal={4} sets={[]} setMemberships={{}} allTags={[]} subQuestionCounts={{}} />
+    <ClassroomTheme>
+      <h1 className="text-lg font-semibold">ห้องทดลองปุ่มจัดการโจทย์ · ข้อมูลสังเคราะห์</h1>
+      <LibraryPanel library={{ questions, groups: [], groupCounts: { tag: 0, title: 0, content: 0 }, total: 4, page: 1 }}
+        scope={{ kind: 'all' }} search="" match="all" sort={DEFAULT_QUESTION_SORT} perPage={24}
+        unfiledTotal={4} ownQuestionTotal={4} sets={[]} setMemberships={{}} allTags={[]} subQuestionCounts={{}} />
+    </ClassroomTheme>
   </main>
 }

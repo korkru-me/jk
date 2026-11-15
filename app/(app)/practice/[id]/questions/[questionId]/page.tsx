@@ -46,6 +46,7 @@ export default async function StudentPracticeQuestionPage({
       key={prepared.variantReceipt}
       libraryId={id}
       libraryTitle={access.library.title}
+      classroomCover={access.library.classroomCover}
       initial={prepared}
       returnHref={returnHref}
       storageOwnerId={user.id}
