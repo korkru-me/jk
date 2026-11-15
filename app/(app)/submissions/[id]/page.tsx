@@ -3,11 +3,12 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getAuthUser } from '@/lib/auth/server'
 import { canManageAssignment } from '@/lib/auth/assignment-access'
 import { notFound, redirect } from 'next/navigation'
-import { Suspense } from 'react'
+import { Fragment, Suspense } from 'react'
 import { ExpiredAttemptStatus } from '@/components/exam/expired-attempt-status'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { SubmissionAnswerReview, QuestionText } from '@/components/student/submission-answer-review'
+import { QuestionResultGrid, type QuestionResultItem } from '@/components/student/question-result-grid'
 import { SubmissionScoreSummary } from '@/components/student/submission-score-summary'
 import { SolutionWatermark } from '@/components/student/solution-watermark'
 import { loadStudentSolutionWatermark } from '@/lib/solution-watermark-server'
@@ -455,133 +456,134 @@ async function SubmissionAnswerDetails({
     row.signedUrl ? [[row.path, row.signedUrl] as const] : []
   )))
 
+  const items = sortedAnswers.map((a, i): QuestionResultItem => {
+    const q = a.questions
+    const isCorrect = a.max_score === 0 ? null : a.is_correct
+    const isPendingManual = isPendingTeacherReview(a)
+    const outcome = a.max_score === 0 ? 'voided' : isPendingManual ? 'pending' : isCorrect ? 'correct' : 'wrong'
 
-  return (
-    <>
-      <div className="space-y-3">
-        <h2 className="font-semibold flex items-center gap-2">
-          <span>📋</span> ตรวจเฉลยทีละข้อ
-        </h2>
-        {sortedAnswers.map((a: any, i: number) => {
-          const q = a.questions
-          const isCorrect = a.max_score === 0 ? null : a.is_correct
-          const isPendingManual = isPendingTeacherReview(a)
-
-          return (
-            <div
-              key={a.id}
-              className={`bg-card border-l-4 rounded-2xl overflow-hidden ${
+    return {
+      id: a.id,
+      outcome,
+      detail: (
+        <div
+          className={`bg-card border-l-4 rounded-2xl overflow-hidden ${
+            isPendingManual
+              ? 'border-l-amber-400'
+              : isCorrect === true
+              ? 'border-l-green-500'
+              : isCorrect === false
+              ? 'border-l-red-400'
+              : 'border-l-border'
+          }`}
+        >
+          <div className="p-5">
+            <div className="flex items-start gap-3 mb-3">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
                 isPendingManual
-                  ? 'border-l-amber-400'
+                  ? 'bg-warning/10 text-warning'
                   : isCorrect === true
-                  ? 'border-l-green-500'
+                  ? 'bg-success/10 text-success'
                   : isCorrect === false
-                  ? 'border-l-red-400'
-                  : 'border-l-border'
-              }`}
-            >
-              <div className="p-5">
-                <div className="flex items-start gap-3 mb-3">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
-                    isPendingManual
-                      ? 'bg-warning/10 text-warning'
-                      : isCorrect === true
-                      ? 'bg-success/10 text-success'
-                      : isCorrect === false
-                      ? 'bg-destructive/10 text-destructive'
-                      : 'bg-muted text-muted-foreground'
-                  }`}>
-                    {a.max_score === 0 ? '—' : isPendingManual ? '⏳' : isCorrect === true
-                      ? <CheckCircle2 size={16} />
-                      : isCorrect === false
-                      ? <XCircle size={16} />
-                      : '?'}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-semibold text-sm">ข้อ {i + 1}</p>
-                      {q.title && <p className="text-xs text-muted-foreground truncate">{q.title}</p>}
-                      {a.carried_over && (
-                        <Badge variant="outline" className="text-xs">ยกมาจากครั้งก่อน</Badge>
-                      )}
-                      {/* แบบฝึกหัด ที่เปิดให้ตรวจทีละข้อ: คะแนนคิดจากคำตอบสุดท้าย
-                          เสมอ ตัวเลขนี้จึงเป็นสิ่งเดียวที่แยก "ถูกตั้งแต่แรก"
-                          ออกจาก "ตรวจแล้วแก้อีกหลายรอบ" */}
-                      {a.check_count > 1 && (
-                        <Badge variant="outline" className="text-xs">
-                          ตรวจก่อนส่ง {a.check_count} ครั้ง
-                        </Badge>
-                      )}
-                      <div className="ml-auto shrink-0">
-                        {a.max_score === 0 ? <Badge variant="secondary">โมฆะ · ไม่นับคะแนน</Badge> : isTeacherViewer ? (
-                          <ScoreEditor submissionAnswerId={a.id} score={a.score} maxScore={a.max_score} />
-                        ) : (
-                          <Badge variant="outline" className={`text-xs ${
-                            isPendingManual ? 'border-warning/20 text-warning' : ''
-                          }`}>
-                            {isPendingManual ? `รอผล/${a.max_score}` : `${a.score}/${a.max_score}`}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                    <QuestionText
-                      text={substituteVars(q.question_text, a.random_values)}
-                      className="text-sm text-muted-foreground mt-1"
-                    />
-                  </div>
-                </div>
-
-                {Object.keys(a.random_values as Record<string, number>).length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mb-3 pl-11">
-                    {Object.entries(a.random_values as Record<string, number>).map(([k, v]) => (
-                      <span key={k} className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded font-mono">
-                        {k} = {v}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                <div className="pl-11">
-                  {a.max_score === 0 ? <p className="text-sm text-muted-foreground">ข้อนี้เป็นโมฆะ ตัดคะแนนและคะแนนเต็มออกจากผลรวมแล้ว คำตอบเดิมยังเก็บไว้</p> : <SubmissionAnswerReview
-                    studentAnswer={a.student_answer}
-                    correctAnswer={a.correct_answer}
-                    isCorrect={isCorrect}
-                    answerParts={q.answer_parts ?? null}
-                    answerUnit={q.answer_unit}
-                    questionType={q.question_type}
-                    extraData={q.extra_data}
-                    mcqOptions={
-                      // For matching, option_order shuffled only the choices the
-                      // student picked from — the pairs themselves must stay in
-                      // authored order so pair i lines up with answer i.
-                      q.question_type === 'matching'
-                        ? q.mcq_options
-                        : reorderOptions(q.mcq_options, a.option_order)
-                    }
-                    workImages={a.work_images ?? null}
-                  />}
-                  <SubmittedWorkArtifacts
-                    artifacts={(a.student_work_artifacts ?? []).map((artifact: any) => ({
-                      id: artifact.id as string,
-                      partKey: artifact.part_key as string,
-                      sourceType: artifact.source_type as string,
-                      previewUrl: signedArtifactUrls.get(artifact.preview_path as string) ?? null,
-                    }))}
-                  />
-                  {solutionIds.has(a.id) && (
-                    <div className="mt-3">
-                      <AttemptSolutionShortcut answerId={a.id} number={i + 1} />
-                    </div>
+                  ? 'bg-destructive/10 text-destructive'
+                  : 'bg-muted text-muted-foreground'
+              }`}>
+                {a.max_score === 0 ? '—' : isPendingManual ? '⏳' : isCorrect === true
+                  ? <CheckCircle2 size={16} />
+                  : isCorrect === false
+                  ? <XCircle size={16} />
+                  : '?'}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-semibold text-sm">ข้อ {i + 1}</p>
+                  {q.title && <p className="text-xs text-muted-foreground truncate">{q.title}</p>}
+                  {a.carried_over && (
+                    <Badge variant="outline" className="text-xs">ยกมาจากครั้งก่อน</Badge>
                   )}
+                  {/* แบบฝึกหัด ที่เปิดให้ตรวจทีละข้อ: คะแนนคิดจากคำตอบสุดท้าย
+                      เสมอ ตัวเลขนี้จึงเป็นสิ่งเดียวที่แยก "ถูกตั้งแต่แรก"
+                      ออกจาก "ตรวจแล้วแก้อีกหลายรอบ" */}
+                  {a.check_count > 1 && (
+                    <Badge variant="outline" className="text-xs">
+                      ตรวจก่อนส่ง {a.check_count} ครั้ง
+                    </Badge>
+                  )}
+                  <div className="ml-auto shrink-0">
+                    {a.max_score === 0 ? <Badge variant="secondary">โมฆะ · ไม่นับคะแนน</Badge> : isTeacherViewer ? (
+                      <ScoreEditor submissionAnswerId={a.id} score={a.score} maxScore={a.max_score} />
+                    ) : (
+                      <Badge variant="outline" className={`text-xs ${
+                        isPendingManual ? 'border-warning/20 text-warning' : ''
+                      }`}>
+                        {isPendingManual ? `รอผล/${a.max_score}` : `${a.score}/${a.max_score}`}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
+                <QuestionText
+                  text={substituteVars(q.question_text, a.random_values)}
+                  className="text-sm text-muted-foreground mt-1"
+                />
               </div>
             </div>
-          )
-        })}
-      </div>
 
+            {Object.keys(a.random_values as Record<string, number>).length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-3 pl-11">
+                {Object.entries(a.random_values as Record<string, number>).map(([k, v]) => (
+                  <span key={k} className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded font-mono">
+                    {k} = {v}
+                  </span>
+                ))}
+              </div>
+            )}
 
-    </>
+            <div className="pl-11">
+              {a.max_score === 0 ? <p className="text-sm text-muted-foreground">ข้อนี้เป็นโมฆะ ตัดคะแนนและคะแนนเต็มออกจากผลรวมแล้ว คำตอบเดิมยังเก็บไว้</p> : <SubmissionAnswerReview
+                studentAnswer={a.student_answer}
+                correctAnswer={a.correct_answer}
+                isCorrect={isCorrect}
+                answerParts={q.answer_parts ?? null}
+                answerUnit={q.answer_unit}
+                questionType={q.question_type}
+                extraData={q.extra_data}
+                mcqOptions={
+                  // For matching, option_order shuffled only the choices the
+                  // student picked from — the pairs themselves must stay in
+                  // authored order so pair i lines up with answer i.
+                  q.question_type === 'matching'
+                    ? q.mcq_options
+                    : reorderOptions(q.mcq_options, a.option_order)
+                }
+                workImages={a.work_images ?? null}
+              />}
+              <SubmittedWorkArtifacts
+                artifacts={(a.student_work_artifacts ?? []).map((artifact: any) => ({
+                  id: artifact.id as string,
+                  partKey: artifact.part_key as string,
+                  sourceType: artifact.source_type as string,
+                  previewUrl: signedArtifactUrls.get(artifact.preview_path as string) ?? null,
+                }))}
+              />
+              {solutionIds.has(a.id) && (
+                <div className="mt-3">
+                  <AttemptSolutionShortcut answerId={a.id} number={i + 1} />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ),
+    }
+  })
+
+  if (!isTeacherViewer) return <QuestionResultGrid items={items} />
+
+  return (
+    <div className="space-y-3">
+      <h2 className="flex items-center gap-2 font-semibold"><span>📋</span> ตรวจเฉลยทีละข้อ</h2>
+      {items.map(item => <Fragment key={item.id}>{item.detail}</Fragment>)}
+    </div>
   )
 }
 
