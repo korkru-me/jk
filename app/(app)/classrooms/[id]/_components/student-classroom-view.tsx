@@ -1,3 +1,7 @@
+import Link from 'next/link'
+import { UsersRound } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { groupWorkHref } from '@/lib/classroom-group-work'
 import { ClassroomTheme } from '@/components/classrooms/classroom-theme'
 import { parseDescription } from '../../_components/classroom-meta'
 import { ClassroomStream } from './classroom-stream'
@@ -37,7 +41,12 @@ export function StudentClassroomView({ classroom, teacherName, studentCount, ass
       <StudentClassroomTabs assignments={assignments} categories={categories} classroomDescription={classroom.description}
         classroomName={classroom.name} assignmentHrefs={assignmentHrefs}
         initialNow={initialNow ?? new Date().toISOString()} liveTime={initialNow === undefined}
-        header={<StudentClassroomHeader key="header" classroom={classroom} teacherName={teacherName} studentCount={studentCount} />}
+        header={<div key="header" className="flex flex-col gap-2">
+          <StudentClassroomHeader classroom={classroom} teacherName={teacherName} studentCount={studentCount} />
+          {!assignmentHrefs && classroom.status === 'active' && classroom.classroom_type === 'subject' &&
+            <Button size="sm" variant="outline" nativeButton={false} className="w-fit pointer-coarse:min-h-11"
+              render={<Link href={groupWorkHref(classroom.id)} />}><UsersRound data-icon="inline-start" />งานกลุ่มและงานเดี่ยว</Button>}
+        </div>}
         calendar={<AssignmentCalendar key="calendar" events={calendarEvents} initialNow={initialNow} scopeLabel={classroom.name} />}
         practiceLibraries={practiceLibraries ? <ClassroomPracticeLibraries key="practice" result={practiceLibraries} studentView classroomDescription={classroom.description} /> : null}
         announcements={posts.length > 0 ? (
