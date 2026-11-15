@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, ChevronUp, Delete, Keyboard, X } from 'lucide-react'
+import { Check, ChevronDown, ChevronUp, Delete, Keyboard } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -92,6 +92,18 @@ export interface MathAnswerFieldProps {
   inputClassName?: string
 }
 
+function findAnswerScroller(input: HTMLInputElement) {
+  let candidate: HTMLElement | null = null
+  for (let parent = input.parentElement; parent; parent = parent.parentElement) {
+    const { overflowY } = getComputedStyle(parent)
+    if (overflowY === 'hidden' || overflowY === 'clip') break
+    if (!/^(auto|scroll|overlay)$/.test(overflowY)) continue
+    if (parent.scrollHeight > parent.clientHeight) return parent
+    candidate = parent
+  }
+  return candidate
+}
+
 /** Numeric answer field with a cursor-aware, touch-friendly math keypad. */
 export function MathAnswerField({
   value,
@@ -127,6 +139,9 @@ export function MathAnswerField({
       const target = event.target
       if (!(target instanceof Node)) return
       if (rootRef.current?.contains(target) || panelRef.current?.contains(target)) return
+      // Let the new field take over before releasing the scroll space; running
+      // cleanup on pointerdown can move that field out from under the tap.
+      if (target instanceof Element && target.closest('[data-math-answer-field] :is(input, button:not(:disabled))')) return
 
       // An outside interaction should keep its own focus. The explicit close
       // button and Escape return focus to the keypad toggle, but doing that
@@ -149,46 +164,65 @@ export function MathAnswerField({
   }, [active, closeKeypad])
 
   useEffect(() => {
-    if (!active) return
+    const input = inputRef.current
+    const panel = panelRef.current
+    if (!active || !input || !panel) return
+
+    const scroller = findAnswerScroller(input)
+    const scrollContent = scroller ?? document.body
+    const scrollSpace = '--math-keypad-scroll-space'
+    const dock = input.closest('[data-exam-normal-stage]')?.querySelector('[data-exam-toolbar-dock]')
+    const stickyDock = dock && scroller?.contains(dock) ? dock : null
+    const gap = 12
     let frame = 0
+    scrollContent.setAttribute('data-math-keypad-scroll-space', '')
+
     const revealInput = () => {
       cancelAnimationFrame(frame)
       frame = requestAnimationFrame(() => {
-        const input = inputRef.current
-        const panel = panelRef.current
-        if (!input || !panel) return
         const inputBounds = input.getBoundingClientRect()
+        const scrollBounds = scroller?.getBoundingClientRect()
+        const scrollTop = Math.max(0, scrollBounds?.top ?? 0)
+        const stickyHeight = stickyDock && scroller
+          ? stickyDock.getBoundingClientRect().height + (Number.parseFloat(getComputedStyle(scroller).paddingTop) || 0)
+          : 0
+        // Leave room for the whole answer between the sticky exam tools and
+        // the keypad, even when a phone is rotated into a short viewport.
+        const available = panel.getBoundingClientRect().bottom - scrollTop - stickyHeight - inputBounds.height - 2 * gap
+        panel.style.setProperty('--math-keypad-available-height', `${Math.max(96, Math.floor(available))}px`)
         const panelBounds = panel.getBoundingClientRect()
-        const coveredBy = inputBounds.bottom - panelBounds.top + 12
-        if (coveredBy <= 0) return
+        const overlaps = inputBounds.left < panelBounds.right && inputBounds.right > panelBounds.left
+        const scrollBottom = Math.min(scrollBounds?.bottom ?? Infinity, window.innerHeight)
+        const targetBottom = Math.min(scrollBottom, panelBounds.top) - gap
+        // Reserve a scroll tail even after the last answer. Without it the
+        // browser clamps scrollTop at the end of the page, under the keypad.
+        const reserve = overlaps ? Math.max(0, Math.ceil(scrollBottom - targetBottom)) : 0
+        scrollContent.style.setProperty(scrollSpace, `${reserve}px`)
+        if (!overlaps) return
 
-        // The keypad is a fixed bottom sheet, so the browser does not account
-        // for it when revealing the focused field. Move the nearest real
-        // scroller by exactly the covered distance, keeping the answer above
-        // the sheet without needlessly jumping the whole question.
-        let scroller = input.parentElement
-        while (scroller) {
-          const overflowY = getComputedStyle(scroller).overflowY
-          if (/auto|scroll|overlay/.test(overflowY) && scroller.scrollHeight > scroller.clientHeight) break
-          scroller = scroller.parentElement
-        }
-        if (scroller) scroller.scrollTop += coveredBy
-        else input.scrollIntoView({ block: 'start', inline: 'nearest' })
+        const coveredBy = input.getBoundingClientRect().bottom - targetBottom
+        if (coveredBy <= 0) return
+        if (scroller) scroller.scrollTop += Math.ceil(coveredBy)
+        else window.scrollBy(0, Math.ceil(coveredBy))
       })
     }
 
     revealInput()
-    const panelResizeObserver = typeof ResizeObserver === 'undefined'
-      ? null
-      : new ResizeObserver(revealInput)
-    if (panelRef.current) panelResizeObserver?.observe(panelRef.current)
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(revealInput)
+    observer?.observe(panel)
+    if (scroller) observer?.observe(scroller)
+    if (stickyDock) observer?.observe(stickyDock)
+    const viewport = window.visualViewport
     window.addEventListener('resize', revealInput)
-    window.visualViewport?.addEventListener('resize', revealInput)
+    viewport?.addEventListener('resize', revealInput)
     return () => {
       cancelAnimationFrame(frame)
-      panelResizeObserver?.disconnect()
+      observer?.disconnect()
       window.removeEventListener('resize', revealInput)
-      window.visualViewport?.removeEventListener('resize', revealInput)
+      viewport?.removeEventListener('resize', revealInput)
+      panel.style.removeProperty('--math-keypad-available-height')
+      scrollContent.style.removeProperty(scrollSpace)
+      scrollContent.removeAttribute('data-math-keypad-scroll-space')
     }
   }, [active])
 
@@ -214,11 +248,11 @@ export function MathAnswerField({
 
   const focusInput = () => {
     onActivate()
-    requestAnimationFrame(() => inputRef.current?.focus())
+    requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }))
   }
 
   return (
-    <span ref={rootRef} className={cn('inline-flex min-w-0 flex-col gap-1.5 align-middle', className)}>
+    <span ref={rootRef} data-math-answer-field className={cn('inline-flex min-w-0 flex-col gap-1.5 align-middle', className)}>
       <span className="flex min-w-0 items-center gap-1.5">
         <Input
           ref={inputRef}
@@ -239,6 +273,12 @@ export function MathAnswerField({
           onFocus={() => {
             caret.remember()
             onActivate()
+          }}
+          onKeyDown={event => {
+            if (!active || event.key !== 'Enter' || event.nativeEvent.isComposing) return
+            event.preventDefault()
+            event.stopPropagation()
+            closeKeypad()
           }}
           onChange={event => {
             onChange(event.target.value)
@@ -300,86 +340,87 @@ export function MathAnswerField({
             role="group"
             aria-label="แป้นคณิตศาสตร์"
             padding="sm"
-            className="pointer-events-auto flex max-h-[70%] w-full max-w-2xl flex-col gap-2 overflow-y-auto overscroll-contain shadow-xl"
+            className="pointer-events-auto flex max-h-[min(70%,var(--math-keypad-available-height,100%))] w-full max-w-2xl flex-col gap-2 overflow-hidden shadow-xl pointer-coarse:max-h-[min(60%,var(--math-keypad-available-height,100%))]"
             style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
             {...caret.keypadProps}
           >
-          <div
-            data-math-keypad-toolbar
-            className="grid grid-cols-[1fr_auto] items-center gap-x-2 gap-y-2"
-          >
-            <div data-math-keypad-title>
-              <p className="text-sm font-semibold">แป้นคณิตศาสตร์</p>
-              <p data-math-keypad-subtitle className="text-[11px] text-muted-foreground">ใส่ที่ตำแหน่งเคอร์เซอร์ · กด Esc เพื่อปิด</p>
-            </div>
-            <Button
-              data-math-keypad-close
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="pointer-coarse:size-11"
-              onClick={closeKeypad}
-              aria-label="ปิดแป้นคณิตศาสตร์"
+            <div
+              data-math-keypad-toolbar
+              className="grid shrink-0 grid-cols-[1fr_auto] items-center gap-x-2 gap-y-2"
             >
-              <X />
-            </Button>
-
-            <div data-math-keypad-controls className="col-span-2 flex items-center gap-1">
-              <span className="mr-1 text-[11px] text-muted-foreground">หน่วยมุม</span>
-              {(['deg', 'rad'] as const).map(option => (
-                <Button
-                  key={option}
-                  type="button"
-                  variant={mode === option ? 'secondary' : 'outline'}
-                  size="xs"
-                  aria-pressed={mode === option}
-                  disabled={disabled}
-                  onClick={() => onModeChange(option)}
-                  className={cn('pointer-coarse:min-h-11', mode === option && 'border-primary bg-primary/10 text-primary')}
-                >
-                  {option.toUpperCase()}
-                </Button>
-              ))}
-              <Button type="button" variant="ghost" size="sm" disabled={disabled} className="ml-auto pointer-coarse:min-h-11" onClick={() => setAdvanced(show => !show)}>
-                {advanced ? <ChevronUp /> : <ChevronDown />}
-                ขั้นสูง
-              </Button>
-            </div>
-          </div>
-
-          <div data-math-keypad-core className="grid grid-cols-6 gap-1.5">
-            {CORE_KEYS.flatMap((row, rowIndex) => row.map((mathKey, keyIndex) => (
+              <div data-math-keypad-title>
+                <p className="text-sm font-semibold">แป้นคณิตศาสตร์</p>
+                <p data-math-keypad-subtitle className="text-[11px] text-muted-foreground pointer-coarse:hidden">ใส่ที่ตำแหน่งเคอร์เซอร์ · กด Esc เพื่อปิด</p>
+              </div>
               <Button
-                key={`${mathKey.label}-${rowIndex}-${keyIndex}`}
+                data-math-keypad-close
                 type="button"
-                variant="outline"
-                className="h-9 min-w-0 px-1 font-mono pointer-coarse:h-11"
-                aria-label={mathKey.ariaLabel ?? mathKey.label}
-                disabled={disabled}
-                onClick={() => runAction(mathKey.action)}
+                size="sm"
+                className="gap-1.5 whitespace-nowrap pointer-coarse:min-h-11"
+                onClick={closeKeypad}
               >
-                {mathKey.action.kind === 'backspace' ? <Delete /> : mathKey.label}
+                <Check aria-hidden />
+                พิมพ์เสร็จ
               </Button>
-            )))}
-          </div>
 
-          {advanced && (
-            <div data-math-keypad-advanced className="grid grid-cols-6 gap-1.5 border-t border-border pt-2">
-              {ADVANCED_KEYS.map((mathKey, index) => (
-                <Button
-                  key={`${mathKey.label}-${index}`}
-                  type="button"
-                  variant="secondary"
-                  className="h-9 min-w-0 px-1 font-mono text-xs pointer-coarse:h-11"
-                  aria-label={mathKey.ariaLabel ?? mathKey.label}
-                  disabled={disabled}
-                  onClick={() => runAction(mathKey.action)}
-                >
-                  {mathKey.label}
+              <div data-math-keypad-controls className="col-span-2 flex items-center gap-1">
+                <span className="mr-1 text-[11px] text-muted-foreground">หน่วยมุม</span>
+                {(['deg', 'rad'] as const).map(option => (
+                  <Button
+                    key={option}
+                    type="button"
+                    variant={mode === option ? 'secondary' : 'outline'}
+                    size="xs"
+                    aria-pressed={mode === option}
+                    disabled={disabled}
+                    onClick={() => onModeChange(option)}
+                    className={cn('pointer-coarse:min-h-11', mode === option && 'border-primary bg-primary/10 text-primary')}
+                  >
+                    {option.toUpperCase()}
+                  </Button>
+                ))}
+                <Button type="button" variant="ghost" size="sm" disabled={disabled} className="ml-auto pointer-coarse:min-h-11" onClick={() => setAdvanced(show => !show)}>
+                  {advanced ? <ChevronUp /> : <ChevronDown />}
+                  ขั้นสูง
                 </Button>
-              ))}
+              </div>
             </div>
-          )}
+
+            <div className="min-h-0 overflow-y-auto overscroll-contain">
+              <div data-math-keypad-core className="grid grid-cols-6 gap-1.5">
+                {CORE_KEYS.flatMap((row, rowIndex) => row.map((mathKey, keyIndex) => (
+                  <Button
+                    key={`${mathKey.label}-${rowIndex}-${keyIndex}`}
+                    type="button"
+                    variant="outline"
+                    className="h-9 min-w-0 px-1 font-mono pointer-coarse:h-11"
+                    aria-label={mathKey.ariaLabel ?? mathKey.label}
+                    disabled={disabled}
+                    onClick={() => runAction(mathKey.action)}
+                  >
+                    {mathKey.action.kind === 'backspace' ? <Delete /> : mathKey.label}
+                  </Button>
+                )))}
+              </div>
+
+              {advanced && (
+                <div data-math-keypad-advanced className="mt-2 grid grid-cols-6 gap-1.5 border-t border-border pt-2">
+                  {ADVANCED_KEYS.map((mathKey, index) => (
+                    <Button
+                      key={`${mathKey.label}-${index}`}
+                      type="button"
+                      variant="secondary"
+                      className="h-9 min-w-0 px-1 font-mono text-xs pointer-coarse:h-11"
+                      aria-label={mathKey.ariaLabel ?? mathKey.label}
+                      disabled={disabled}
+                      onClick={() => runAction(mathKey.action)}
+                    >
+                      {mathKey.label}
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </div>
           </Card>
         </div>
       ), document.body)}
