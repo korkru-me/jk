@@ -1298,9 +1298,9 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
 
   const renderQuestionNavigationLegend = () => <ExamQuestionNavigationLegend instantCheck={instantCheckOn} review={reviewing} />
 
-  const renderQuestionNavigation = (touchFriendly = false) => (
+  const renderQuestionNavigation = (inDialog = false) => (
     <ExamQuestionNavigation
-      touchFriendly={touchFriendly}
+      compact={inDialog}
       items={answers.map((answer, index) => ({
         current: index >= pageStart && index < pageStart + perPage,
         answered: hasAnswered(answer.id),
@@ -1309,7 +1309,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
       }))}
       onNavigate={index => {
         navigateTo(index)
-        if (touchFriendly) setShowQuestionNavigator(false)
+        if (inDialog) setShowQuestionNavigator(false)
       }}
     />
   )
@@ -2045,12 +2045,12 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
           squeezing the question itself into a narrow column. */}
       {showQuestionNavigator && !showFullscreenWarning && !showPreviewResult && (
         <div
-          className="fixed inset-x-0 top-0 z-[90] flex h-[var(--app-height,100dvh)] items-center justify-center bg-overlay p-3 backdrop-blur-sm"
+          className="fixed inset-x-0 top-0 z-[90] flex h-[var(--app-height,100dvh)] items-center justify-center bg-overlay p-2 backdrop-blur-sm"
           role="presentation"
         >
           <Card
             ref={questionNavigatorDialogRef}
-            padding="lg"
+            padding="sm"
             elevation="xl"
             role="dialog"
             aria-modal="true"
@@ -2058,7 +2058,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
             className="flex max-h-[calc(var(--app-height,100dvh)-1.5rem)] w-full max-w-sm flex-col overflow-hidden"
             style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
           >
-            <div className="mb-3 flex shrink-0 items-center gap-3">
+            <div className="mb-2 flex shrink-0 items-center gap-2">
               <div className="min-w-0 flex-1">
                 <h2 id="mobile-question-navigator-title" className="font-bold">ดูทุกข้อ</h2>
                 <p className="text-xs text-muted-foreground">ตอบแล้ว {answeredCount}/{answers.length} ข้อ</p>
@@ -2085,18 +2085,18 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                 <X />
               </Button>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-xl border border-border p-3">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-xl border border-border p-1">
               {renderQuestionNavigation(true)}
             </div>
-            <div className="mt-3">
+            <div className="mt-2">
               {renderQuestionNavigationLegend()}
             </div>
-            {reviewing ? renderReviewExit('mt-4 min-h-10 w-full shrink-0 pointer-coarse:min-h-11') : (
+            {reviewing ? renderReviewExit('mt-2 min-h-10 w-full shrink-0 pointer-coarse:min-h-11') : (
               <Button
                 type="button"
                 onClick={openSubmitDialog}
                 disabled={submitting}
-                className="mt-4 min-h-10 w-full shrink-0 bg-success text-success-foreground hover:bg-success/90 pointer-coarse:min-h-11"
+                className="mt-2 min-h-10 w-full shrink-0 bg-success text-success-foreground hover:bg-success/90 pointer-coarse:min-h-11"
               >
                 {submitting ? 'กำลังส่ง...' : 'ส่งคำตอบ ✓'}
               </Button>

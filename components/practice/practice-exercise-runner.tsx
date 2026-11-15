@@ -212,7 +212,7 @@ export function PracticeExerciseRunner({ library, exerciseId, storageOwnerId, ex
   const submitButton = <Button size="sm" onClick={() => setSubmitOpen(true)} disabled={submitting} className="w-full bg-success text-success-foreground hover:bg-success/90 pointer-coarse:min-h-11">
     {submitting ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <CheckCircle2 aria-hidden="true" />}{submitting ? 'กำลังส่ง…' : 'ส่งคำตอบ'}
   </Button>
-  const renderNavigation = () => <>
+  const renderNavigation = (compact = false) => <>
     <Card padding="sm" radius="md" className="flex shrink-0 flex-col gap-2">
       <div className="flex items-center justify-between gap-2 text-xs"><span>ตอบแล้ว {summary.answered}/{ids.length} ข้อ</span><span>หน้า {page.page}/{page.totalPages}</span></div>
       <Progress value={ids.length ? summary.answered / ids.length * 100 : 0} aria-label="จำนวนข้อที่ตอบแล้ว" />
@@ -223,8 +223,8 @@ export function PracticeExerciseRunner({ library, exerciseId, storageOwnerId, ex
         <h2 className="flex items-center gap-1.5 text-xs font-semibold"><ListChecks className="size-3.5 text-primary" aria-hidden="true" />นำทางข้อ</h2>
         <span className="text-[10px] text-muted-foreground">{flags.size ? `ปักธง ${flags.size}` : `${ids.length} ข้อ`}</span>
       </div>
-      <div className="min-h-0 max-h-48 overflow-y-auto overscroll-contain p-3 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring lg:max-h-none" tabIndex={0} role="region" aria-label="เลือกข้อที่ต้องการทำ">
-        <ExamQuestionNavigation items={navigation} onNavigate={navigate} />
+      <div className="min-h-0 max-h-48 overflow-y-auto overscroll-contain outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring lg:max-h-none lg:p-3" tabIndex={0} role="region" aria-label="เลือกข้อที่ต้องการทำ">
+        <ExamQuestionNavigation compact={compact} items={navigation} onNavigate={navigate} />
       </div>
       <div className="shrink-0 border-t px-3 py-2.5"><ExamQuestionNavigationLegend instantCheck flagDescription={PRACTICE_FLAG_DESCRIPTION} /></div>
       <div className="shrink-0 border-t bg-muted/20 p-3">{submitButton}</div>
@@ -252,7 +252,7 @@ export function PracticeExerciseRunner({ library, exerciseId, storageOwnerId, ex
     </ExamToolbarDock>
     {toolError && <p role="alert" className="text-sm text-destructive">{toolError}</p>}
     {submitError && <p role="alert" className="text-sm text-destructive">{submitError}</p>}
-    <CollapsibleContent ref={mobileNavigationRef} className="flex flex-col gap-2 lg:hidden">{renderNavigation()}</CollapsibleContent>
+    <CollapsibleContent ref={mobileNavigationRef} className="flex flex-col gap-2 lg:hidden">{renderNavigation(true)}</CollapsibleContent>
     <div className="grid min-w-0 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_15rem]">
       <div className="flex min-w-0 flex-col gap-3" inert={submitting ? true : undefined}>
         {/* Keep loaded panels mounted: changing page preserves in-memory answers and math modes. */}
