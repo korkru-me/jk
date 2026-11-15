@@ -213,9 +213,15 @@ export function MathAnswerField({
         if (scrollDown === 0 && scrollUp === 0) return
         const target = Math.max(0, scrollElement.scrollTop + (scrollDown || -scrollUp))
         const maxScroll = scrollElement.scrollHeight - scrollElement.clientHeight
-        // A fixed-height wrapper can let its question overflow past the
-        // start of the scroll tail. Add any distance the browser would clamp.
-        if (target > maxScroll) scrollContent.style.setProperty(scrollSpace, `${reserve + target - maxScroll}px`)
+        if (target > maxScroll) {
+          // A fixed-height wrapper can leave its overflowing question below
+          // the start of the scroll tail. Grow the tail beyond that content,
+          // then remove any surplus using the actual measured scroll range.
+          const expandedReserve = target + scrollElement.clientHeight
+          scrollContent.style.setProperty(scrollSpace, `${expandedReserve}px`)
+          const surplus = Math.max(0, scrollElement.scrollHeight - scrollElement.clientHeight - target)
+          scrollContent.style.setProperty(scrollSpace, `${Math.max(reserve, expandedReserve - surplus)}px`)
+        }
         scrollElement.scrollTop = target
       })
     }
@@ -269,7 +275,7 @@ export function MathAnswerField({
   }
 
   return (
-    <span ref={rootRef} data-math-answer-field className={cn('inline-flex min-w-0 flex-col gap-1.5 align-middle', className)}>
+    <span ref={rootRef} data-math-answer-field className={cn('inline-flex min-w-0 flex-col align-middle', className)}>
       <span className="flex min-w-0 items-center gap-1.5">
         <Input
           ref={inputRef}
@@ -325,28 +331,6 @@ export function MathAnswerField({
         </Button>
       </span>
 
-      <span className="flex items-center gap-1 text-[11px] text-muted-foreground" role="group" aria-label="หน่วยมุม">
-        <span className="mr-0.5">มุม</span>
-        {(['deg', 'rad'] as const).map(option => (
-          <Button
-            key={option}
-            type="button"
-            variant={mode === option ? 'secondary' : 'outline'}
-            size="xs"
-            aria-pressed={mode === option}
-            data-study-selected={mode === option ? true : undefined}
-            disabled={disabled}
-            onClick={() => {
-              onActivate()
-              onModeChange(option)
-            }}
-            className={cn('pointer-coarse:min-h-11', mode === option && 'border-primary bg-primary/10 text-primary')}
-          >
-            {option.toUpperCase()}
-          </Button>
-        ))}
-      </span>
-
       {active && typeof document !== 'undefined' && createPortal((
         <div
           data-math-keypad-overlay
@@ -365,7 +349,7 @@ export function MathAnswerField({
           >
             <div
               data-math-keypad-toolbar
-              className="grid shrink-0 grid-cols-[1fr_auto] items-center gap-x-2 gap-y-2"
+              className="grid shrink-0 grid-cols-[1fr_auto] items-center gap-2"
             >
               <div data-math-keypad-title className="min-w-0">
                 <p className="text-sm font-semibold pointer-coarse:text-[11px]">แป้นคณิตศาสตร์</p>
@@ -386,32 +370,48 @@ export function MathAnswerField({
               <Button
                 data-math-keypad-close
                 type="button"
-                size="sm"
-                className="gap-1.5 whitespace-nowrap pointer-coarse:min-h-11"
+                size="xs"
                 onClick={closeKeypad}
               >
-                <Check aria-hidden />
+                <Check data-icon="inline-start" aria-hidden />
                 พิมพ์เสร็จ
               </Button>
 
-              <div data-math-keypad-controls className="col-span-2 flex items-center gap-1">
-                <span className="mr-1 text-[11px] text-muted-foreground">หน่วยมุม</span>
-                {(['deg', 'rad'] as const).map(option => (
-                  <Button
-                    key={option}
-                    type="button"
-                    variant={mode === option ? 'secondary' : 'outline'}
-                    size="xs"
-                    aria-pressed={mode === option}
-                    disabled={disabled}
-                    onClick={() => onModeChange(option)}
-                    className={cn('pointer-coarse:min-h-11', mode === option && 'border-primary bg-primary/10 text-primary')}
-                  >
-                    {option.toUpperCase()}
-                  </Button>
-                ))}
-                <Button type="button" variant="ghost" size="sm" disabled={disabled} className="ml-auto pointer-coarse:min-h-11" onClick={() => setAdvanced(show => !show)}>
-                  {advanced ? <ChevronUp /> : <ChevronDown />}
+              <div data-math-keypad-controls className="col-span-2 flex items-center gap-2">
+                <div role="group" aria-label="หน่วยมุม" className="flex items-center gap-2">
+                  <span className="text-[11px] text-muted-foreground">หน่วยมุม</span>
+                  {(['deg', 'rad'] as const).map(option => (
+                    <Button
+                      key={option}
+                      type="button"
+                      variant={mode === option ? 'primaryOutline' : 'outline'}
+                      size="xs"
+                      aria-pressed={mode === option}
+                      disabled={disabled}
+                      onClick={() => {
+                        onModeChange(option)
+                        revealInputRef.current?.()
+                      }}
+                      className="pointer-coarse:min-w-9"
+                    >
+                      {option.toUpperCase()}
+                    </Button>
+                  ))}
+                </div>
+                <Button
+                  type="button"
+                  variant={advanced ? 'primaryOutline' : 'outline'}
+                  size="xs"
+                  aria-expanded={advanced}
+                  aria-controls={advanced ? `${panelId}-advanced` : undefined}
+                  disabled={disabled}
+                  className="ml-auto"
+                  onClick={() => {
+                    setAdvanced(show => !show)
+                    revealInputRef.current?.()
+                  }}
+                >
+                  {advanced ? <ChevronUp data-icon="inline-start" aria-hidden /> : <ChevronDown data-icon="inline-start" aria-hidden />}
                   ขั้นสูง
                 </Button>
               </div>
@@ -435,7 +435,7 @@ export function MathAnswerField({
               </div>
 
               {advanced && (
-                <div data-math-keypad-advanced className="mt-2 grid grid-cols-6 gap-1.5 border-t border-border pt-2">
+                <div id={`${panelId}-advanced`} data-math-keypad-advanced className="mt-2 grid grid-cols-6 gap-1.5 border-t border-border pt-2">
                   {ADVANCED_KEYS.map((mathKey, index) => (
                     <Button
                       key={`${mathKey.label}-${index}`}
