@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Calculator, CheckCircle2, ChevronLeft, ChevronRight, ListChecks, LoaderCircle, Maximize, Minimize, PenLine } from 'lucide-react'
-import { COVER_PRESETS } from '@/app/(app)/classrooms/_components/classroom-meta'
+import { ClassroomTheme } from '@/components/classrooms/classroom-theme'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -44,7 +44,7 @@ export function PracticeExerciseRunner({ library, exerciseId, storageOwnerId, ex
   checkAction?: PracticeRunAnswerAction
 }) {
   const [exercise, setExercise] = useState(serverExercise)
-  const [settings, setSettings] = useState(defaultPracticeExerciseSettings(exerciseId))
+  const [settings, setSettings] = useState(defaultPracticeExerciseSettings(exerciseId, library.classroomCover))
   const [ready, setReady] = useState(false)
   const [fatalError, setFatalError] = useState('')
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -81,7 +81,7 @@ export function PracticeExerciseRunner({ library, exerciseId, storageOwnerId, ex
   useEffect(() => {
     try {
       const saved = readPracticeExerciseSettings(localStorage, storageOwnerId, library.id)
-      setSettings(saved[exerciseId] ?? defaultPracticeExerciseSettings(exerciseId))
+      setSettings(saved[exerciseId] ?? defaultPracticeExerciseSettings(exerciseId, library.classroomCover))
       if (localReview) {
         const raw: unknown = JSON.parse(localStorage.getItem(`korkru:practice-local-review:${storageOwnerId}:${library.id}`) || '{"exercises":[],"pinnedQuestionIds":[]}')
         const stored = practiceLocalReviewSchema.parse(raw)
@@ -91,7 +91,7 @@ export function PracticeExerciseRunner({ library, exerciseId, storageOwnerId, ex
       }
       setReady(true)
     } catch { setFatalError('ยังอ่านแบบฝึกหัดในเบราว์เซอร์ไม่ได้ กรุณากลับไปคลังฝึกแล้วลองอีกครั้ง') }
-  }, [exerciseId, library.id, storageOwnerId, localReview, localItems])
+  }, [exerciseId, library.classroomCover, library.id, storageOwnerId, localReview, localItems])
 
   const ids = exercise?.questionIds ?? []
   const page = practiceExercisePage(ids, currentIndex, settings.questionsPerPage)
@@ -179,7 +179,6 @@ export function PracticeExerciseRunner({ library, exerciseId, storageOwnerId, ex
     current: index >= page.start && index < page.start + page.ids.length,
     answered: states[id]?.answered ?? false, flagged: flags.has(id), verdict: states[id]?.verdict,
   }))
-  const preset = COVER_PRESETS.find(color => color.id === settings.theme) ?? COVER_PRESETS[0]
   async function submitAnswers() {
     if (submittingRef.current) return
     submittingRef.current = true
@@ -234,16 +233,16 @@ export function PracticeExerciseRunner({ library, exerciseId, storageOwnerId, ex
   if (fatalError || (ready && !exercise)) return <Card padding="sm"><p role="alert" className="text-sm text-destructive">{fatalError || 'ไม่พบแบบฝึกหัดนี้'}</p><Button variant="link" size="sm" render={<Link href={returnHref} />}>กลับไปคลังฝึก</Button></Card>
   if (!ready || !exercise) return <p role="status" className="text-sm text-muted-foreground">กำลังเปิดแบบฝึกหัด…</p>
 
-  return <div ref={rootRef} data-exam-normal-stage data-practice-exercise-stage className={cn('flex min-w-0 w-full flex-col gap-3 bg-background', focused && 'fixed inset-0 z-40 overflow-y-auto p-3')}>
+  return <ClassroomTheme ref={rootRef} cover={settings.theme} data-exam-normal-stage data-practice-exercise-stage data-study-canvas className={cn('flex min-w-0 w-full flex-col gap-3 bg-background', focused && 'fixed inset-0 z-40 overflow-y-auto p-3')}>
     {completed && <div ref={summaryRef} tabIndex={-1} className="outline-none"><PracticeExerciseSummary title={exercise.title} ids={ids} questionTitles={exercise.questionTitles} states={summaryStates} returnHref={returnHref} onReview={navigate} /></div>}
     <Collapsible open={mobileNavigationOpen} onOpenChange={setMobileNavigationOpen} className={cn('flex min-w-0 flex-col gap-3', completed && 'hidden')}>
     <ExamToolbarDock>
-      <Card padding="sm" radius="md" className="flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-center">
-        <div className="flex min-w-0 items-center gap-2 sm:flex-1">
-        <Button variant="ghost" size="icon-sm" render={<Link href={returnHref} />} aria-label="กลับไปคลังฝึก"><ArrowLeft aria-hidden="true" /></Button>
+      <Card padding="sm" radius="md" className="flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-center" data-study-toolbar>
+        <div className="flex min-w-0 items-center gap-2 rounded-lg px-1 py-0.5 sm:flex-1" data-study-title>
+        <Button variant="ghost" size="icon-sm" className="pointer-coarse:size-11" render={<Link href={returnHref} />} aria-label="กลับไปคลังฝึก"><ArrowLeft aria-hidden="true" /></Button>
         <div className="min-w-0 flex-1"><p className="truncate text-xs text-muted-foreground">{library.title}</p><h1 className="truncate text-base font-semibold">{exercise.title}</h1></div>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5" data-study-tools>
         <CollapsibleTrigger ref={mobileNavigationTriggerRef} render={<Button variant="outline" size="sm" aria-label="นำทางข้อ" title="นำทางข้อ" className="size-7 px-0 lg:hidden pointer-coarse:size-11" />}><ListChecks aria-hidden="true" /></CollapsibleTrigger>
         <Button variant="outline" size="sm" aria-label={focused ? 'ออกจากโฟกัส' : 'โหมดโฟกัส'} title={focused ? 'ออกจากโฟกัส' : 'โหมดโฟกัส'} className="size-7 px-0 sm:w-auto sm:px-2.5 pointer-coarse:size-11 sm:pointer-coarse:w-auto" onClick={() => void toggleFocus()}>{focused ? <Minimize aria-hidden="true" /> : <Maximize aria-hidden="true" />}<span className="hidden sm:inline">{focused ? 'ออกจากโฟกัส' : 'โหมดโฟกัส'}</span></Button>
         {calculatorEnabled && <Button variant="outline" size="sm" aria-label="เครื่องคิดเลข" title="เครื่องคิดเลข" className="size-7 px-0 sm:w-auto sm:px-2.5 pointer-coarse:size-11 sm:pointer-coarse:w-auto" onClick={() => { setCalculatorLoaded(true); setCalculatorOpen(true) }}><Calculator aria-hidden="true" /><span className="hidden sm:inline">เครื่องคิดเลข</span></Button>}
@@ -265,8 +264,7 @@ export function PracticeExerciseRunner({ library, exerciseId, storageOwnerId, ex
             {loaded ? <PracticeQuestionRunner key={loaded.variantReceipt} ref={handle => { if (handle) questionHandles.current[id] = handle; else delete questionHandles.current[id] }} disabled={submitting} libraryId={library.id} libraryTitle={library.title} question={loaded.question} variantReceipt={loaded.variantReceipt} changesOnRefresh={loaded.changesOnRefresh}
               storageOwnerId={storageOwnerId} returnHref={returnHref} calculatorEnabled={false} scratchpadEnabled={false} embedded questionNumber={index + 1} flagged={flags.has(id)}
               onToggleFlag={() => setFlags(previous => { const next = new Set(previous); if (next.has(id)) next.delete(id); else next.add(id); return next })}
-              onProgress={onProgress} onReload={() => reloadQuestion(id)} checkAction={checkAction} calculatorResult={calculatorResult} frameClassName={cn(preset.surface, 'border bg-card')}
-              frameHeaderClassName={cn(preset.surface, preset.text, 'rounded-lg border px-2 py-1')}
+              onProgress={onProgress} onReload={() => reloadQuestion(id)} checkAction={checkAction} calculatorResult={calculatorResult}
             /> : <Card padding="sm"><p role={errors[id] ? 'alert' : 'status'} className="flex items-center gap-2 text-sm text-muted-foreground">{errors[id] || <><LoaderCircle className="size-4 animate-spin" aria-hidden="true" />กำลังเปิดข้อ {index + 1}…</>}</p>{errors[id] && <Button size="sm" variant="outline" onClick={() => reloadQuestion(id)}>ลองอีกครั้ง</Button>}</Card>}
           </div>
         })}
@@ -301,5 +299,5 @@ export function PracticeExerciseRunner({ library, exerciseId, storageOwnerId, ex
     {scratchpadLoaded && scratchpadEnabled && <Suspense fallback={<p role="status">กำลังเปิดกระดาษทด…</p>}><Scratchpad key={activeId} open={scratchpadOpen} scope={{ ownerId: storageOwnerId, submissionId: `practice:${library.id}`, answerId: activeId, partKey: 'practice' }}
       targetLabel={`ข้อ ${currentIndex + 1}`} persistenceEnabled artifactPartKey="practice" artifact={null} loadAttachedNonce={0} previewMode={false} attachmentEnabled={false}
       fingerInputMode={fingerInputMode} onFingerInputModeChange={setFingerInputMode} onAttachmentSaved={() => {}} onAttachmentStateChange={() => {}} onClose={() => setScratchpadOpen(false)} /></Suspense>}
-  </div>
+  </ClassroomTheme>
 }
