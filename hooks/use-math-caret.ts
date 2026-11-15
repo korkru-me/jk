@@ -74,7 +74,7 @@ export function useMathCaret(inputRef: RefObject<HTMLInputElement | null>): Math
     requestAnimationFrame(() => {
       const current = inputRef.current
       if (!current) return
-      current.focus()
+      current.focus({ preventScroll: true })
       const range = clampMathCaret(current.value.length, cursor, cursor)
       current.setSelectionRange(range.start, range.end)
     })
