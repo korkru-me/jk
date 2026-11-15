@@ -9,6 +9,7 @@ import {
   Plus, LayoutList, Grid3x3, Search, X, SlidersHorizontal, Tag, BookOpen, Layers, Users, Edit2, Eye, FileUp,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ClassroomTheme } from '@/components/classrooms/classroom-theme'
 import { QuestionSearchForm } from '@/components/questions/question-search-form'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
@@ -268,12 +269,12 @@ export function QuestionBankClient({
   const filteredTeam = teamQuestions
 
   return (
-    <div className="space-y-4">
+    <ClassroomTheme className="min-w-0 space-y-4">
 
         {/* Header */}
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-bold text-foreground">คลังโจทย์ของฉัน</h1>
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2" data-study-title>
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold">คลังโจทย์ของฉัน</h1>
             <p className="text-sm text-muted-foreground mt-0.5">
               {/* With a filter on, the count has to describe the list actually
                   shown — otherwise it reads as the whole bank while the page
@@ -307,7 +308,7 @@ export function QuestionBankClient({
               </Button>
             </Link>
             <Link href="/questions/new">
-              <Button size="sm" className="gap-1.5 shadow-sm">
+              <Button size="sm" className="gap-1.5 pointer-coarse:min-h-11" data-classroom-action>
                 <Plus className="w-3.5 h-3.5" /> สร้างโจทย์
               </Button>
             </Link>
@@ -742,7 +743,7 @@ export function QuestionBankClient({
 
         />
       )}
-    </div>
+    </ClassroomTheme>
   )
 }
 
@@ -812,7 +813,7 @@ function TeamQuestionCard({ question: q, showTeamName, currentUserId, subQuestio
   const canEdit = isOwner || q.team_edit_allowed
 
   return (
-    <Card edge="ring" padding="md" className="hover:ring-primary/30 transition-all">
+    <Card edge="ring" padding="md" className="hover:ring-primary/30 transition-all" data-study-list-card>
       <div className="flex items-center gap-1.5 flex-wrap mb-2">
         {isGroup && (
           <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">📚 หลายขั้นตอน</span>
@@ -849,6 +850,7 @@ function TeamQuestionCard({ question: q, showTeamName, currentUserId, subQuestio
 
       <button
         onClick={onPreview}
+        data-study-list-title
         className="text-sm font-semibold text-foreground hover:text-primary transition-colors text-left line-clamp-1 w-full"
       >
         {q.title}

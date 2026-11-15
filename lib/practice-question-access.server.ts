@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { parseDescription } from '@/app/(app)/classrooms/_components/classroom-meta'
 import { createAdminClient } from '@/lib/supabase/admin'
 import {
   GET_PRACTICE_QUESTION_FOR_STUDENT_RPC,
@@ -36,6 +37,7 @@ export const PRACTICE_STORAGE = Object.freeze({
 export interface StudentPracticeLibrary {
   id: string
   classroomId: string
+  classroomCover?: string
   title: string
   description: string | null
   revealAnswerKey: boolean
@@ -151,7 +153,7 @@ async function readStudentLibraryAccess(
       .maybeSingle(),
     admin
       .from('classrooms')
-      .select('id, org_id, status, classroom_type')
+      .select('id, org_id, status, classroom_type, description')
       .eq('id', row.classroom_id)
       .maybeSingle(),
     admin
@@ -175,11 +177,13 @@ async function readStudentLibraryAccess(
     return { status: 'forbidden' }
   }
 
+  const classroomCover = parseDescription(classroomResult.data.description ?? null).cover
   return {
     status: 'ready',
     library: Object.freeze({
       id: row.id,
       classroomId: row.classroom_id,
+      ...(classroomCover ? { classroomCover } : {}),
       title: row.title,
       description: row.description,
       revealAnswerKey: row.reveal_answer_key === true,

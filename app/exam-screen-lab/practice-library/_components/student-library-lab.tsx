@@ -30,7 +30,7 @@ const example: PracticeExercise = {
   attemptedCount: 1, revision: 1, questionTitles: Object.fromEntries(items.slice(0, 2).map(item => [item.id, item.title])),
 }
 
-const labLibrary = { id: '00000000-0000-4000-8300-000000000001', classroomId: '00000000-0000-4000-8300-000000000002', title: 'ทดสอบคลังฝึกนะ', description: null, revealAnswerKey: true, requiresAccessCode: false, calculatorEnabled: true, scratchpadEnabled: true, shuffleOptions: true }
+const labLibrary = { id: '00000000-0000-4000-8300-000000000001', classroomId: '00000000-0000-4000-8300-000000000002', classroomCover: 'sky', title: 'ทดสอบคลังฝึกนะ', description: null, revealAnswerKey: true, requiresAccessCode: false, calculatorEnabled: true, scratchpadEnabled: true, shuffleOptions: true }
 const randomLabKeys = new Map<string, string>()
 const labQuestionLoader: PracticeRunQuestionLoader = async (_libraryId, questionId) => {
   const item = runItems.find(item => item.id === questionId)
@@ -115,7 +115,7 @@ export function StudentLibraryLab({ localReview = false }: { localReview?: boole
   const visible = active ? [...filtered].sort((a, b) => active.questionIds.indexOf(a.id) - active.questionIds.indexOf(b.id)).map((item, position) => ({ ...item, position })) : filtered
   const preview = items.find(item => item.id === params.get('preview'))
   const exerciseHrefBuilder = (_libraryId: string, exerciseId: string) => `/exam-screen-lab/practice-library?view=${localReview ? 'local-run' : 'run'}&exercise=${exerciseId}${withShell ? '&shell=student' : ''}`
-  if (params.get('view') === 'single-run') return singleQuestion ? <PracticeSingleQuestionRunner initial={singleQuestion} libraryId={labLibrary.id} libraryTitle={labLibrary.title}
+  if (params.get('view') === 'single-run') return singleQuestion ? <PracticeSingleQuestionRunner initial={singleQuestion} libraryId={labLibrary.id} libraryTitle={labLibrary.title} classroomCover={labLibrary.classroomCover}
     storageOwnerId="synthetic-lab" returnHref="/exam-screen-lab/practice-library?view=student" questionLoader={questionLoader} checkAction={checkAnswer} /> : <p role="status">กำลังเปิดโจทย์จำลอง…</p>
   if (params.get('view') === 'run' || params.get('view') === 'local-run' || preview) {
     if (!ready) return <p role="status">กำลังเปิดแบบฝึกหัด…</p>
@@ -128,7 +128,7 @@ export function StudentLibraryLab({ localReview = false }: { localReview?: boole
       questionLoader={questionLoader} checkAction={checkAnswer} />
   }
   if (localReview) return <PracticeLocalLibraryView
-    library={{ id: '00000000-0000-4000-8300-000000000001', classroomId: '00000000-0000-4000-8300-000000000002', title: 'ทดสอบคลังฝึกนะ', description: null, revealAnswerKey: true, requiresAccessCode: false, calculatorEnabled: true, scratchpadEnabled: true, shuffleOptions: true }}
+    library={labLibrary}
     items={items} matchingIds={items.filter(item => practiceSearchTerms(state.q).every(term => `${item.title} ${item.excerpt}`.toLowerCase().includes(term.toLowerCase()))
       && state.tags.every(tag => item.tags.some(value => value.trim().toLowerCase() === tag.trim().toLowerCase()))).map(item => item.id)}
     state={state} storageOwnerId="synthetic-local-review"
@@ -136,7 +136,7 @@ export function StudentLibraryLab({ localReview = false }: { localReview?: boole
     solutionLoader={async () => ({ data: { title: items[0].title, parts: [{ id: ids[0], label: null, excerpt: null, text: '<p>ใช้ความสัมพันธ์ แรงดล = การเปลี่ยนแปลงโมเมนตัม</p>', files: [] }] } })}
   />
   return <PracticeLibraryView
-    library={{ id: '00000000-0000-4000-8300-000000000001', classroomId: '00000000-0000-4000-8300-000000000002', title: 'ทดสอบคลังฝึกนะ', description: null, revealAnswerKey: true, requiresAccessCode: false, calculatorEnabled: true, scratchpadEnabled: true, shuffleOptions: true }}
+    library={labLibrary}
     items={visible} total={visible.length} totalPages={1} state={state}
     storageOwnerId="synthetic-lab" exercises={exercises} exercisesReady={ready} pinsReady={ready} pinnedQuestionIds={pins}
     libraryHrefBuilder={libraryHrefBuilder} questionHrefBuilder={questionHrefBuilder} exerciseHrefBuilder={exerciseHrefBuilder} searchHiddenFields={searchHiddenFields}

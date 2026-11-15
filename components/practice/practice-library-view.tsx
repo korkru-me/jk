@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { ClassroomTheme } from '@/components/classrooms/classroom-theme'
 import { Card } from '@/components/ui/card'
 import {
   Empty,
@@ -208,14 +209,14 @@ export function PracticeLibraryView({
     updateSelection(Object.fromEntries(group.questionIds.map(id => [id, group.questionTitles[id] ?? 'โจทย์ในแบบฝึกหัด'])))
     setEditing(group)
     setTitle(group.title)
-    const settings = exerciseSettings[group.id] ?? defaultPracticeExerciseSettings(group.id)
+    const settings = exerciseSettings[group.id] ?? defaultPracticeExerciseSettings(group.id, library.classroomCover)
     setQuestionsPerPage(settings.questionsPerPage)
     setTheme(settings.theme)
     setNaming(true)
     rememberEdit(group, group.title)
   }
   async function cancelEdit() {
-    const originalSettings = editing ? exerciseSettings[editing.id] ?? defaultPracticeExerciseSettings(editing.id) : null
+    const originalSettings = editing ? exerciseSettings[editing.id] ?? defaultPracticeExerciseSettings(editing.id, library.classroomCover) : null
     const changed = editing && (title.trim() !== editing.title || JSON.stringify(selectedIds) !== JSON.stringify(editing.questionIds)
       || questionsPerPage !== originalSettings?.questionsPerPage || theme !== originalSettings?.theme)
     if (changed && !await confirm({ title: 'ยกเลิกการแก้ไข?', description: 'ชื่อ รายการโจทย์ และการตั้งค่าที่เปลี่ยนไว้จะไม่ถูกบันทึก แบบฝึกหัดเดิมและประวัติการตอบยังอยู่', confirmLabel: 'ยกเลิกการแก้ไข', cancelLabel: 'แก้ไขต่อ' })) return
@@ -233,7 +234,7 @@ export function PracticeLibraryView({
           ? await updateExerciseAction({ ...payload, expectedRevision: editing.revision })
           : await createExerciseAction(payload)
         if (!result.ok) { setError(result.error); setConflict('conflict' in result && result.conflict === true); return }
-        const savedTheme = theme || randomPracticeExerciseTheme()
+        const savedTheme = theme || library.classroomCover || randomPracticeExerciseTheme()
         try {
           setExerciseSettings(writePracticeExerciseSettings(localStorage, storageOwnerId, library.id, id, { questionsPerPage, theme: savedTheme as PracticeExerciseSettings['theme'] }))
         } catch {
@@ -284,8 +285,8 @@ export function PracticeLibraryView({
   const tagLimitReached = state.tags.length >= PRACTICE_MAX_TAGS || state.ignoredTagCount > 0
 
   return (
-    <div className="@container flex min-w-0 w-full flex-col gap-2">
-      <header className="flex min-h-7 items-center gap-2">
+    <ClassroomTheme cover={library.classroomCover} className="@container flex min-w-0 w-full flex-col gap-2">
+      <header className="flex min-h-7 items-center gap-2 rounded-xl border px-2 py-1" data-study-title>
         <Button
           variant="ghost"
           size="icon-sm"
@@ -297,7 +298,7 @@ export function PracticeLibraryView({
         </Button>
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-2">
-            <h1 className="min-w-0 flex-1 truncate text-xl font-semibold text-foreground">{library.title}</h1>
+            <h1 className="min-w-0 flex-1 truncate text-xl font-semibold">{library.title}</h1>
             <WorkTypeBadge type="practice" />
           </div>
           {library.description && (
@@ -326,7 +327,7 @@ export function PracticeLibraryView({
         {!exercisesReady && <Alert><AlertDescription>ยังโหลดแบบฝึกหัดไม่ได้ กรุณาลองโหลดหน้าอีกครั้ง</AlertDescription></Alert>}
         {exercises.length > 0 && <div className="grid gap-2 @min-[32rem]:grid-cols-2 @min-[44rem]:grid-cols-3">
           {exercises.filter(exercise => !deletedIds.has(exercise.id)).map(exercise => <PracticeExerciseCard key={exercise.id} exercise={exercise}
-            settings={exerciseSettings[exercise.id] ?? defaultPracticeExerciseSettings(exercise.id)}
+            settings={exerciseSettings[exercise.id] ?? defaultPracticeExerciseSettings(exercise.id, library.classroomCover)}
             disabled={pending || !exercisesReady}
             onDelete={() => { void deleteExercise(exercise) }}
             onEdit={() => { namingTriggerRef.current = document.activeElement as HTMLElement; void beginEdit(exercise) }}
@@ -356,8 +357,8 @@ export function PracticeLibraryView({
               {Object.entries(searchHiddenFields).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
               {state.reviewOnly && <input type="hidden" name="review" value="1" />}
               {state.tags.map(tag => <input key={tag} type="hidden" name="tag" value={tag} />)}
-              <Input key={state.q} name="q" defaultValue={state.q} enterKeyHint="search" placeholder="ค้นหาชื่อหรือเนื้อหาโจทย์" aria-label="ค้นหาชื่อหรือเนื้อหาโจทย์" className="min-w-0 flex-1" />
-              <Button type="submit" size="sm" className="shrink-0 pointer-coarse:min-h-11" aria-label="ค้นหาโจทย์">
+              <Input key={state.q} name="q" defaultValue={state.q} enterKeyHint="search" placeholder="ค้นหาชื่อหรือเนื้อหาโจทย์" aria-label="ค้นหาชื่อหรือเนื้อหาโจทย์" data-study-search className="min-w-0 flex-1" />
+              <Button type="submit" size="sm" className="shrink-0 pointer-coarse:min-h-11" data-classroom-action aria-label="ค้นหาโจทย์">
                 <Search data-icon="inline-start" aria-hidden="true" /><span className="hidden sm:inline">ค้นหา</span>
               </Button>
             </Form>
@@ -576,6 +577,6 @@ export function PracticeLibraryView({
           </Button>
         </nav>
       )}
-    </div>
+    </ClassroomTheme>
   )
 }

@@ -11,14 +11,13 @@ export const QUESTION_FLAG_DESCRIPTION = 'ปักธงเพื่อระ�
 
 /** One surface per question; diagrams share a row with answers when useful. */
 export function ExamQuestionFrame({
-  header, stem, illustration, sideBySide = false, feedback, children, className, headerClassName, answerReadOnly = false, ...props
+  header, stem, illustration, sideBySide = false, feedback, children, className, answerReadOnly = false, ...props
 }: ComponentProps<'div'> & {
   header: ReactNode
   stem: ReactNode
   illustration?: ReactNode
   sideBySide?: boolean
   feedback?: ReactNode
-  headerClassName?: string
   /** The answer stays on screen as it was handed in but cannot be changed —
    *  inert covers every input type at once, drag lists and math fields
    *  included. The feedback below still reads the answer out in words. */
@@ -32,9 +31,10 @@ export function ExamQuestionFrame({
       padding="sm"
       {...props}
       data-exam-question-card
+      data-study-question
       className={cn('@container/exam-question flex flex-col gap-2.5 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 sm:p-4', className)}
     >
-      <div className={cn('flex flex-wrap items-center gap-1.5', headerClassName)} data-exam-question-header>{header}</div>
+      <div className="flex min-w-0 flex-wrap items-center gap-1.5 rounded-lg border border-transparent px-2 py-1" data-exam-question-header data-study-question-header>{header}</div>
       <div className="flex min-w-0 flex-col gap-2 empty:hidden" data-exam-question-stem>{stem}</div>
       <div className={cn('grid min-w-0 items-start gap-2.5', splitIllustration && '@min-[44rem]/exam-question:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]')}>
         {illustration && <div className={cn('flex min-w-0 flex-wrap items-start gap-2', splitIllustration && '[&>div]:w-full [&_img]:h-auto [&_img]:max-h-none [&_img]:w-full')} data-exam-question-illustration>{illustration}</div>}
@@ -51,10 +51,10 @@ export function ExamQuestionFlag({ flagged, onToggle, description = QUESTION_FLA
       <TooltipTrigger
         render={<Button type="button" variant="outline" size="xs" aria-pressed={flagged} onClick={onToggle} />}
         aria-label={flagged ? 'ยกเลิกธงสำหรับทบทวน' : 'ปักธงสำหรับทบทวน'}
-        className={cn('min-h-8 rounded-md pointer-coarse:min-h-11', flagged && 'border-flag/40 bg-flag/10')}
+        className={cn('min-h-8 rounded-md max-[359px]:min-w-8 pointer-coarse:min-h-11 pointer-coarse:max-[359px]:min-w-11', flagged && 'border-flag/40 bg-flag/10')}
       >
         <Flag data-icon="inline-start" className={cn('text-flag', flagged && 'fill-flag')} />
-        {flagged ? 'ยกเลิกธง' : 'ปักธง'}
+        <span className="max-[359px]:sr-only">{flagged ? 'ยกเลิกธง' : 'ปักธง'}</span>
       </TooltipTrigger>
       <TooltipContent>{description}</TooltipContent>
     </Tooltip>

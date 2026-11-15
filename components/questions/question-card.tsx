@@ -217,6 +217,7 @@ export function QuestionCard({
   return (
     <Card
       edge="ring"
+      data-study-list-card={!pickerContext && !isFlagged ? true : undefined}
       onClick={pickerContext ? event => {
         if (isQuestionCardSelectionClick(event)) pickerContext.onSelect()
       } : undefined}
@@ -320,6 +321,7 @@ export function QuestionCard({
             <button
               type="button"
               onClick={pickerContext ? pickerContext.onSelect : onPreview}
+              data-study-list-title
               aria-pressed={pickerContext?.selected}
               className="text-sm font-semibold text-foreground hover:text-primary transition-colors text-left line-clamp-1 w-full"
             >

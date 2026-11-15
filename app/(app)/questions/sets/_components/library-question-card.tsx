@@ -56,6 +56,7 @@ export function LibraryQuestionCard({
   return (
     <Card
       edge="ring"
+      data-study-list-card={selected ? undefined : true}
       className={cn(
         'group transition-all hover:shadow-sm',
         selected ? 'ring-primary/50' : 'hover:ring-primary/30',
@@ -101,6 +102,7 @@ export function LibraryQuestionCard({
 
           <button
             onClick={onPreview}
+            data-study-list-title
             className="text-sm font-semibold text-foreground hover:text-primary transition-colors text-left line-clamp-1 w-full"
           >
             {q.title}
@@ -109,7 +111,7 @@ export function LibraryQuestionCard({
         </div>
 
         <div className="flex flex-col items-end gap-1.5 shrink-0">
-          <Button onClick={onPreview} size="sm" className="bg-primary/10 text-primary hover:bg-primary/20">
+          <Button onClick={onPreview} size="sm" variant="outline" data-study-open className="pointer-coarse:min-h-11">
             <Eye /> ดูตัวอย่าง
           </Button>
           <Button onClick={onFile} size="sm" variant="outline" disabled={disabled} className="gap-1.5">
