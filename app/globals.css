@@ -399,6 +399,10 @@
 }
 
 /* Scroll room for the active answer when the math keypad covers the end of the page. */
+[data-math-keypad-scroll-space] {
+  overflow-anchor: none;
+}
+
 [data-math-keypad-scroll-space]::after {
   content: '';
   display: block;
@@ -438,6 +442,10 @@
   [data-math-keypad-title] {
     order: 1;
     flex: none;
+  }
+
+  [data-math-keypad-answer] {
+    width: clamp(6rem, 20vw, 12rem);
   }
 
   [data-math-keypad-subtitle] {

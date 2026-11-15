@@ -124,6 +124,7 @@ export function MathAnswerField({
   const inputRef = useRef<HTMLInputElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const toggleButtonRef = useRef<HTMLButtonElement>(null)
+  const revealInputRef = useRef<(() => void) | null>(null)
   const caret = useMathCaret(inputRef)
   const panelId = useId()
   const [advanced, setAdvanced] = useState(false)
@@ -175,6 +176,7 @@ export function MathAnswerField({
     const scrollSpace = '--math-keypad-scroll-space'
     const dock = input.closest('[data-exam-normal-stage]')?.querySelector('[data-exam-toolbar-dock]')
     const stickyDock = dock && scroller?.contains(dock) ? dock : null
+    const viewport = window.visualViewport
     const gap = 12
     let frame = 0
     scrollContent.setAttribute('data-math-keypad-scroll-space', '')
@@ -184,7 +186,8 @@ export function MathAnswerField({
       frame = requestAnimationFrame(() => {
         const inputBounds = input.getBoundingClientRect()
         const scrollBounds = scroller?.getBoundingClientRect()
-        const scrollTop = Math.max(0, scrollBounds?.top ?? 0)
+        const viewportTop = viewport?.offsetTop ?? 0
+        const scrollTop = Math.max(viewportTop, scrollBounds?.top ?? viewportTop)
         const stickyHeight = stickyDock && scroller
           ? stickyDock.getBoundingClientRect().height + (Number.parseFloat(getComputedStyle(scroller).paddingTop) || 0)
           : 0
@@ -194,7 +197,8 @@ export function MathAnswerField({
         panel.style.setProperty('--math-keypad-available-height', `${Math.max(96, Math.floor(available))}px`)
         const panelBounds = panel.getBoundingClientRect()
         const overlaps = inputBounds.left < panelBounds.right && inputBounds.right > panelBounds.left
-        const scrollBottom = Math.min(scrollBounds?.bottom ?? Infinity, window.innerHeight)
+        const viewportBottom = viewportTop + (viewport?.height ?? window.innerHeight)
+        const scrollBottom = Math.min(scrollBounds?.bottom ?? Infinity, viewportBottom)
         const targetBottom = Math.min(scrollBottom, panelBounds.top) - gap
         // Reserve a scroll tail even after the last answer. Without it the
         // browser clamps scrollTop at the end of the page, under the keypad.
@@ -202,9 +206,12 @@ export function MathAnswerField({
         scrollContent.style.setProperty(scrollSpace, `${reserve}px`)
         if (!overlaps) return
 
-        const coveredBy = Math.ceil(input.getBoundingClientRect().bottom - targetBottom)
-        if (coveredBy <= 0) return
-        const target = scrollElement.scrollTop + coveredBy
+        const bounds = input.getBoundingClientRect()
+        const targetTop = scrollTop + stickyHeight + gap
+        const scrollDown = Math.max(0, Math.ceil(bounds.bottom - targetBottom))
+        const scrollUp = Math.max(0, Math.ceil(targetTop - bounds.top))
+        if (scrollDown === 0 && scrollUp === 0) return
+        const target = Math.max(0, scrollElement.scrollTop + (scrollDown || -scrollUp))
         const maxScroll = scrollElement.scrollHeight - scrollElement.clientHeight
         // A fixed-height wrapper can let its question overflow past the
         // start of the scroll tail. Add any distance the browser would clamp.
@@ -213,19 +220,22 @@ export function MathAnswerField({
       })
     }
 
+    revealInputRef.current = revealInput
     revealInput()
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(revealInput)
     observer?.observe(panel)
     if (scroller) observer?.observe(scroller)
     if (stickyDock) observer?.observe(stickyDock)
-    const viewport = window.visualViewport
     window.addEventListener('resize', revealInput)
     viewport?.addEventListener('resize', revealInput)
+    viewport?.addEventListener('scroll', revealInput)
     return () => {
+      revealInputRef.current = null
       cancelAnimationFrame(frame)
       observer?.disconnect()
       window.removeEventListener('resize', revealInput)
       viewport?.removeEventListener('resize', revealInput)
+      viewport?.removeEventListener('scroll', revealInput)
       panel.style.removeProperty('--math-keypad-available-height')
       scrollContent.style.removeProperty(scrollSpace)
       scrollContent.removeAttribute('data-math-keypad-scroll-space')
@@ -235,6 +245,7 @@ export function MathAnswerField({
   const apply = (edit: MathInputEditResult) => {
     onChange(edit.value)
     caret.restore(edit.cursor)
+    revealInputRef.current?.()
   }
 
   const runAction = (action: KeyAction) => {
@@ -289,6 +300,7 @@ export function MathAnswerField({
           onChange={event => {
             onChange(event.target.value)
             caret.remember()
+            revealInputRef.current?.()
           }}
           className={cn('min-w-[9rem]', inputClassName)}
         />
@@ -355,8 +367,20 @@ export function MathAnswerField({
               data-math-keypad-toolbar
               className="grid shrink-0 grid-cols-[1fr_auto] items-center gap-x-2 gap-y-2"
             >
-              <div data-math-keypad-title>
-                <p className="text-sm font-semibold">แป้นคณิตศาสตร์</p>
+              <div data-math-keypad-title className="min-w-0">
+                <p className="text-sm font-semibold pointer-coarse:text-[11px]">แป้นคณิตศาสตร์</p>
+                <div
+                  data-math-keypad-answer
+                  aria-hidden="true"
+                  dir="ltr"
+                  className="hidden h-6 items-center justify-end overflow-hidden rounded-md border border-border bg-muted/40 px-1.5 pointer-coarse:flex"
+                >
+                  {value ? (
+                    <span className="shrink-0 whitespace-pre font-mono text-sm font-medium">{value}</span>
+                  ) : (
+                    <span className="mr-auto text-xs text-muted-foreground">คำตอบ</span>
+                  )}
+                </div>
                 <p data-math-keypad-subtitle className="text-[11px] text-muted-foreground pointer-coarse:hidden">ใส่ที่ตำแหน่งเคอร์เซอร์ · กด Esc เพื่อปิด</p>
               </div>
               <Button

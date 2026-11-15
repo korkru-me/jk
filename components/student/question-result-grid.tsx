@@ -44,7 +44,7 @@ export function QuestionResultGrid({ items }: { items: QuestionResultItem[] }) {
 
   return (
     <section aria-labelledby={headingId} className="min-w-0 space-y-2" data-question-result-grid>
-      <h2 id={headingId} className="text-sm font-semibold">ตรวจเฉลยทีละข้อ</h2>
+      <h2 id={headingId} className="text-sm font-semibold">ผลการตอบแต่ละข้อ</h2>
       <ul role="list" className="flex flex-wrap gap-1.5">
         {items.map(({ id, outcome }, index) => {
           const { icon: Icon, label, tone } = outcomes[outcome]
