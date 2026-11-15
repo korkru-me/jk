@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const m = vi.hoisted(() => ({ user: vi.fn(), assignment: vi.fn(), access: vi.fn(),
   admin: vi.fn(), started: vi.fn(), questions: vi.fn(), build: vi.fn(), waiting: vi.fn(), exam: vi.fn() }))
+vi.mock('@/lib/assignment-classroom-appearance.server', () => ({ readAssignmentClassroomCover: vi.fn().mockResolvedValue('sky') }))
 vi.mock('next/navigation', () => ({ redirect: (href: string) => { throw new Error(`redirect:${href}`) },
   notFound: () => { throw new Error('not-found') } }))
 vi.mock('@/lib/auth/server', () => ({ getAuthUser: m.user }))

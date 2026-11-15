@@ -43,6 +43,8 @@ export function ExamScreenLabClient({
 
   const exam = (
     <ExamClient
+      classroomCover="sky"
+      assignmentTitle="กลศาสตร์ 2"
       submissionId={submissionId}
       storageOwnerId="qa-synthetic-student"
       answers={fixture.answers}

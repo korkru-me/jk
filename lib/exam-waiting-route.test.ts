@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ExamWaitingSummary } from './exam-waiting-room'
 
 const m = vi.hoisted(() => ({ entry: vi.fn(), draw: vi.fn(), exam: vi.fn(), waiting: vi.fn(), client: vi.fn() }))
+vi.mock('@/lib/assignment-classroom-appearance.server', () => ({ readAssignmentClassroomCover: vi.fn().mockResolvedValue('sky') }))
 vi.mock('next/navigation', () => ({ redirect: (href: string) => { throw new Error(`redirect:${href}`) } }))
 vi.mock('@/lib/actions/submissions', () => ({ readSubmissionEntry: m.entry, drawNextStreakQuestion: m.draw }))
 vi.mock('@/lib/actions/file-assignments', () => ({ readFileAssignment: vi.fn().mockResolvedValue({ error: 'not a file assignment' }) }))
@@ -46,10 +47,11 @@ describe.each(['exam', 'exercise'] as const)('ordinary %s page composition (mock
     expect(m.exam).not.toHaveBeenCalled(); expect(m.draw).not.toHaveBeenCalled()
   })
   it('only an exact active receipt gets safe question data and the original start time', async () => {
-    const rendered = await page(receipt) as ReactElement<{ children: ReactElement<{ startedAt: string }> }>
+    const rendered = await page(receipt) as ReactElement<{ children: ReactElement<{ startedAt: string; classroomCover: string }> }>
     expect(m.exam).toHaveBeenCalledExactlyOnceWith(receipt)
     expect(rendered.props.children.type).toBe(m.client)
     expect(rendered.props.children.props.startedAt).toBe(waiting.startedAt)
+    expect(rendered.props.children.props.classroomCover).toBe('sky')
     expect(m.draw).not.toHaveBeenCalled()
   })
   it('expired/blocked state never loads questions even with the formerly valid URL', async () => {

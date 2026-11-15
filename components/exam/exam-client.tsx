@@ -75,6 +75,7 @@ import type {
 } from '@/lib/exam-safe'
 import { Card } from '@/components/ui/card'
 import { ExamToolbarDock } from './exam-toolbar-dock'
+import { ClassroomTheme } from '@/components/classrooms/classroom-theme'
 import { ExamQuestionFrame, ExamQuestionFlag } from './exam-question-frame'
 import { ExamQuestionNavigation, ExamQuestionNavigationLegend } from './exam-question-navigation'
 import { FieldSet, FieldLegend } from '@/components/ui/field'
@@ -240,6 +241,8 @@ interface Props {
    *  no longer reach everyone — i.e. someone has already started this งาน and
    *  is holding a frozen copy of it. */
   previewEditWarning?: string
+  classroomCover?: string
+  assignmentTitle?: string
   /** "ดูข้อสอบที่ทำเสร็จแล้ว": the handed-in ข้อสอบ reopened read-only, each ข้อ
    *  already carrying its ถูก/ผิด panel and เฉลย, built on the server by
    *  lib/exam-review.ts. Nothing is saved, timed, proctored or submitted, and
@@ -307,7 +310,7 @@ function requiredWorkImageCount(a: AnswerRow, config: ExamConfig): number {
   return parts && parts.length > 0 ? parts.length : 1
 }
 
-export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkArtifacts = [], durationMinutes, startedAt, expiresAt, serverNow, config, sections = [], questionsPerPage = 1, streak, previewMode = false, previewReturnHref, previewEditWarning, review }: Props) {
+export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkArtifacts = [], durationMinutes, startedAt, expiresAt, serverNow, config, sections = [], questionsPerPage = 1, streak, previewMode = false, previewReturnHref, previewEditWarning, review, classroomCover, assignmentTitle }: Props) {
   const router = useRouter()
   const [expired, setExpired] = useState(false)
   // A teacher's preview opens the same read-only review from its own result
@@ -1428,6 +1431,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
               inert={checkingId === current.id ? true : undefined}
               // The coloured options replace the input, so there is nothing
               // to lock — and inert would hide them from a screen reader.
+              data-study-reviewed={reviewFeedback ? '' : undefined}
               answerReadOnly={reviewing && !reviewChoices}
               tabIndex={-1}
               className={cn(
@@ -1436,25 +1440,27 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
               )}
               header={
                 <>
-                  {reviewFeedback && <ReviewVerdictIcon feedback={reviewFeedback} />}
-                  {/* "ข้อ 3 / 5" would be a lie in a streak run: answers.length
-                      is only what has been handed out so far, and the งาน's
-                      length is not known to anybody yet. */}
-                  <Badge variant="outline" className="font-mono text-xs">
-                    {streakOn ? `ข้อที่ ${questionIndex + 1}` : `ข้อ ${questionIndex + 1} / ${answers.length}`}
-                  </Badge>
-                  {sectionOwner.get(current.question_id)?.title && (
-                    <Badge variant="outline" className="text-xs">{sectionOwner.get(current.question_id)!.title}</Badge>
-                  )}
-                  {current.questions.question_type === 'mcq' && (
-                    <Badge variant="outline" className="text-xs">ปรนัย</Badge>
-                  )}
-                  {isFlagged && (
-                    <Badge className="text-xs bg-flag/15 text-flag dark:text-flag border-flag/30">
-                      🚩 ปักธงไว้
+                  <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+                    {reviewFeedback && <ReviewVerdictIcon feedback={reviewFeedback} />}
+                    {/* "ข้อ 3 / 5" would be a lie in a streak run: answers.length
+                        is only what has been handed out so far, and the งาน's
+                        length is not known to anybody yet. */}
+                    <Badge variant="outline" className="font-mono text-xs" data-study-number>
+                      {streakOn ? `ข้อที่ ${questionIndex + 1}` : `ข้อ ${questionIndex + 1} / ${answers.length}`}
                     </Badge>
-                  )}
-                  <div className="ml-auto flex items-center gap-2">
+                    {sectionOwner.get(current.question_id)?.title && (
+                      <Badge variant="outline" className="max-w-full overflow-hidden text-xs"><span className="truncate">{sectionOwner.get(current.question_id)!.title}</span></Badge>
+                    )}
+                    {current.questions.question_type === 'mcq' && (
+                      <Badge variant="outline" className="text-xs">ปรนัย</Badge>
+                    )}
+                    {isFlagged && (
+                      <Badge className="hidden text-xs bg-flag/15 text-flag dark:text-flag border-flag/30 min-[400px]:inline-flex">
+                        🚩 ปักธงไว้
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2">
                     {/* Teacher-only, and the reason the preview is worth opening
                         at all: a typo in a โจทย์ is easiest to see in the layout
                         the student gets. Opens in a new tab so the preview — and
@@ -1816,7 +1822,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   if (expired && !previewMode) return <ExpiredAttemptStatus submissionId={submissionId} onTimeChanged={() => router.refresh()} />
 
   return (
-    <>
+    <ClassroomTheme cover={classroomCover} className="contents">
       {(refreshRandom.busy || refreshRandom.error) && <Card padding="sm" className="mb-2 flex flex-wrap items-center gap-2">
         <p role={refreshRandom.error ? 'alert' : 'status'} className={cn('text-sm', refreshRandom.error ? 'text-destructive' : 'text-muted-foreground')}>{refreshRandom.error || 'กำลังสุ่มชุดตัวเลขใหม่…'}</p>
         {refreshRandom.error && <Button size="sm" variant="outline" onClick={refreshRandom.retry}>ลองอีกครั้ง</Button>}
@@ -1893,10 +1899,11 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
 
       {/* ── Normal mode ────────────────────────────────────────────────────── */}
       {!focusMode && !showPreviewResult && (
-        <div className="flex min-w-0 flex-col gap-2 [--exam-toolbar-height:3.25rem]" data-exam-normal-stage>
+        <div className="flex min-w-0 flex-col gap-2 [--exam-toolbar-height:3.25rem]" data-exam-normal-stage data-study-canvas>
           {previewBanner(true)}
           <ExamToolbarDock>
             <ExamToolbar
+              title={assignmentTitle}
               saving={saving}
               isOnline={isOnline}
               pendingSync={pendingCount}
@@ -1930,7 +1937,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
 
       {/* ── Focus mode: full-screen overlay ────────────────────────────────── */}
       {focusMode && !showPreviewResult && (
-        <div className="fixed inset-x-0 top-0 z-50 flex h-[var(--app-height,100dvh)] flex-col overflow-hidden bg-background">
+        <div className="fixed inset-x-0 top-0 z-50 flex h-[var(--app-height,100dvh)] flex-col overflow-hidden bg-background" data-study-canvas>
           {previewBanner(false)}
           {/* Focus header */}
           <div className="shrink-0 border-b bg-card">
@@ -2242,7 +2249,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
         </div>
       )}
       </div>
-    </>
+    </ClassroomTheme>
   )
 }
 
@@ -2282,7 +2289,8 @@ function InstantCheckPanel({
         <Button
           onClick={onCheck}
           disabled={busy || disabled || !answered}
-          className="bg-success hover:bg-success/90 text-success-foreground border-0"
+          data-classroom-action
+          className="bg-success hover:bg-success/90 text-success-foreground border-0 pointer-coarse:min-h-11"
         >
           <CircleCheck size={16} />
           {busy ? 'กำลังตรวจ...' : 'ตรวจคำตอบข้อนี้'}
@@ -2652,7 +2660,7 @@ function AutosaveStatus({
 }
 
 function ExamToolbar({
-  saving, isOnline, pendingSync, tabSwitchCount, reviewNotice,
+  title, saving, isOnline, pendingSync, tabSwitchCount, reviewNotice,
   onRetryPending,
   proctorStatus,
   proctorActiveConnectionCount,
@@ -2675,6 +2683,7 @@ function ExamToolbar({
   scratchpadOpen: boolean
   onToggleScratchpad: () => void
   onFocusMode: () => void
+  title?: string
   timeLabel: string | null
   timerUrgent: boolean
   timerDanger: boolean
@@ -2682,7 +2691,8 @@ function ExamToolbar({
   focusModeButtonRef: RefObject<HTMLButtonElement | null>
 }) {
   return (
-    <Card edge="none" radius="sm" className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-2 py-1" data-exam-toolbar>
+    <Card edge="none" radius="sm" className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-2 py-1" data-exam-toolbar data-study-toolbar>
+      {title && <h1 className="min-w-0 basis-full truncate rounded-md px-2 py-1 text-sm font-semibold" data-study-title title={title}>{title}</h1>}
       {/* Status indicators */}
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
         {reviewNotice ?? (
@@ -2729,7 +2739,7 @@ function ExamToolbar({
         )}
       </div>
 
-      <div className="ml-auto flex shrink-0 items-center gap-1 rounded-lg bg-muted/40 p-0.5">
+      <div className="ml-auto flex shrink-0 items-center gap-1 rounded-lg bg-muted/40 p-0.5" data-study-tools>
         <Button
           type="button"
           variant="outline"
@@ -2814,6 +2824,8 @@ function MCQInput({
         return (
           <div
             key={i}
+            data-study-choice
+            data-study-selected={isSelected && !isEliminated ? true : undefined}
             className={`flex items-center gap-1 rounded-md border transition-colors ${
               isEliminated
                 ? 'opacity-35 border-dashed border-border'

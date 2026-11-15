@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Target, Check, Bookmark, BookmarkCheck } from 'lucide-react'
+import { ArrowRight, Check, Bookmark, BookmarkCheck } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -23,7 +23,7 @@ export function PracticeQuestionCard({ item, href, selected, onSelect, selection
 }) {
   const difficulty = item.difficulty ? DIFF_META[item.difficulty] : undefined
   return (
-    <Card edge="ring" radius="md" padding="none" onClick={event => {
+    <Card edge="ring" radius="md" padding="none" data-study-list-card={pinned || selected ? undefined : true} onClick={event => {
       if (!selectionDisabled && isQuestionCardSelectionClick(event)) onSelect(!selected)
     }} className={cn('@container h-full px-3 py-2 transition-shadow hover:shadow-sm', !selectionDisabled && 'cursor-pointer hover:ring-primary/30', pinned && 'shadow-[0_0_0.8rem_color-mix(in_oklab,var(--destructive)_18%,transparent)]', pinned && !selected && 'ring-destructive/25', selected && QUESTION_CARD_SELECTION_CLASSES.add)}>
       <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-2 @sm:grid-cols-[auto_minmax(0,1fr)_auto]">
@@ -44,7 +44,7 @@ export function PracticeQuestionCard({ item, href, selected, onSelect, selection
                 {item.attemptCount > 0 ? `ตอบแล้ว ${item.attemptCount} ครั้ง` : 'ยังไม่เคยตอบ'}
               </span>
             </div>
-            <Button type="button" variant="ghost" disabled={selectionDisabled} aria-pressed={selected} onClick={() => onSelect(!selected)} title={item.title} className="h-auto justify-start whitespace-normal p-0 text-left font-semibold hover:bg-transparent hover:text-primary">
+            <Button type="button" variant="ghost" disabled={selectionDisabled} aria-pressed={selected} onClick={() => onSelect(!selected)} data-study-list-title title={item.title} className="h-auto justify-start whitespace-normal p-0 text-left font-semibold hover:bg-transparent hover:text-primary">
               <span className="line-clamp-2 @lg:line-clamp-1">{item.title}</span>
             </Button>
             {item.excerpt && <p className="line-clamp-2 text-xs text-muted-foreground @lg:line-clamp-1">{item.excerpt}</p>}
@@ -56,9 +56,9 @@ export function PracticeQuestionCard({ item, href, selected, onSelect, selection
               {pinned ? <BookmarkCheck data-icon="inline-start" aria-hidden="true" /> : <Bookmark data-icon="inline-start" aria-hidden="true" />}
             </Button>
             {item.hasSolution && <SolutionButton questionId={item.id} questionTitle={item.title} hasSolution canAttach={false} confirmDismissal />}
-            <Button variant="navigation" size="sm" className="pointer-coarse:min-h-11"
+            <Button variant="outline" size="sm" className="pointer-coarse:min-h-11" data-study-open
               render={<Link href={href} />}>
-              <Target data-icon="inline-start" aria-hidden="true" />ฝึกทำ
+              ฝึกทำ<ArrowRight data-icon="inline-end" aria-hidden="true" />
             </Button>
           </div>
       </div>

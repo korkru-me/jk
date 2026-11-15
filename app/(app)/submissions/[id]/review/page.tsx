@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation'
 import { getAuthUser } from '@/lib/auth/server'
 import { getExamReviewData } from '@/lib/exam-review'
 import { parseSections } from '@/lib/question-set-sections'
+import { readAssignmentClassroomCover } from '@/lib/assignment-classroom-appearance.server'
 import { ExamClient, type ExamConfig } from '@/components/exam/exam-client'
 import { Card } from '@/components/ui/card'
 
@@ -46,9 +47,12 @@ export default async function ExamReviewPage({
     scratchpadEnabled: false,
   }
 
+  const classroomCover = await readAssignmentClassroomCover(data.assignment.id)
   return (
     <div className="h-full flex flex-col">
       <ExamClient
+        classroomCover={classroomCover}
+        assignmentTitle={data.assignment.title}
         submissionId={data.submissionId}
         storageOwnerId={data.studentId}
         answers={data.answers}
