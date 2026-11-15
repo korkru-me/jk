@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/auth/server'
 import { notFound, redirect } from 'next/navigation'
+import { readAssignmentClassroomCover } from '@/lib/assignment-classroom-appearance.server'
 import { ExamClient } from '@/components/exam/exam-client'
 import { buildSolutionWatermark } from '@/lib/solution-watermark'
 import { buildAssignmentAttempt } from '@/lib/assignment-attempt'
@@ -78,7 +79,7 @@ export default async function AssignmentPreviewPage({
   // The โจทย์ themselves, and whether anyone has started this งาน — the second
   // decides only what the banner says, so it must never block the preview.
   const admin = createAdminClient()
-  const [questionResult, { data: startedSubmission }] = await Promise.all([
+  const [questionResult, { data: startedSubmission }, classroomCover] = await Promise.all([
     loadAssignmentQuestionsByProvenance(a),
     admin
       .from('submissions')
@@ -86,6 +87,7 @@ export default async function AssignmentPreviewPage({
       .eq('assignment_id', id)
       .limit(1)
       .maybeSingle(),
+    readAssignmentClassroomCover(id, a.classroom_id),
   ])
 
   if ('error' in questionResult) throw new Error(questionResult.error)
@@ -211,6 +213,8 @@ export default async function AssignmentPreviewPage({
   return (
     <div className="h-full flex flex-col">
       <ExamClient
+        classroomCover={classroomCover}
+        assignmentTitle={a.title}
         submissionId={`preview-${id}`}
         storageOwnerId={user.id}
         answers={previewAnswers as any}

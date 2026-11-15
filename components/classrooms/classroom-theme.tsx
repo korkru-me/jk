@@ -10,7 +10,7 @@ const ACCENTS: Record<string, string> = {
   red: 'var(--tint-3)', purple: 'var(--primary)', slate: 'var(--muted-foreground)',
 }
 
-export function ClassroomTheme({ cover, className, style, ...props }: ComponentProps<'div'> & { cover: string }) {
+export function ClassroomTheme({ cover = '', className, style, ...props }: ComponentProps<'div'> & { cover?: string }) {
   const theme = Object.hasOwn(ACCENTS, cover) ? cover : 'default'
   return <div
     {...props}

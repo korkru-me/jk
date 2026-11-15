@@ -23,13 +23,15 @@ function answerTone(item: ExamNavigationItem) {
     : 'border-warning/30 bg-warning/10 text-foreground hover:bg-warning/20'
 }
 
-export function ExamQuestionNavigation({ items, touchFriendly = false, onNavigate }: {
+export function ExamQuestionNavigation({ items, compact = false, onNavigate }: {
   items: ExamNavigationItem[]
-  touchFriendly?: boolean
+  compact?: boolean
   onNavigate: (index: number) => void
 }) {
   return (
-    <div className="grid grid-cols-5 gap-2 p-0.5 pointer-coarse:grid-cols-4">
+    <div className={cn('grid', compact
+      ? 'grid-cols-[repeat(auto-fill,44px)] justify-center gap-[7px] p-1'
+      : 'grid-cols-5 gap-2 p-0.5 pointer-coarse:grid-cols-4')}>
       {items.map((item, index) => (
         <Button
           key={index}
@@ -42,10 +44,11 @@ export function ExamQuestionNavigation({ items, touchFriendly = false, onNavigat
           data-exam-navigation-item
           data-answer-state={item.verdict ?? (item.answered ? 'answered' : 'unanswered')}
           className={cn(
-            'relative aspect-square h-auto w-full rounded-[6px] border font-semibold tabular-nums transition-colors motion-reduce:transition-none',
-            touchFriendly ? 'min-h-11 text-sm' : 'text-xs pointer-coarse:min-h-11',
+            'relative rounded-[6px] border text-xs font-semibold tabular-nums transition-colors motion-reduce:transition-none',
+            compact ? 'size-[44px]' : 'aspect-square h-auto w-full pointer-coarse:min-h-11',
             answerTone(item),
             item.current && currentEdge,
+            item.current && compact && 'ring-offset-1',
           )}
         >
           {index + 1}
