@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { isExamScreenLabEnabled } from '@/lib/exam-screen-lab-access'
 import { ShellClient } from '@/components/layout/shell-client'
+import { QuestionResultGrid } from '@/components/student/question-result-grid'
 import { SubmissionScoreSummary } from '@/components/student/submission-score-summary'
 import { SubmissionAnswerReview, QuestionText } from '@/components/student/submission-answer-review'
 import { SolutionWatermark } from '@/components/student/solution-watermark'
@@ -36,11 +37,17 @@ export default async function SubmissionResultLab({searchParams}:{searchParams:P
       <SubmissionScoreSummary visible={!hidden} score={1} maxScore={CASES.length} percentage={Math.round(100/CASES.length)} passed={false} threshold="50%" counts={hidden?null:{correct:1,wrong:CASES.length-2,pending:1}} submittedAt="14 ต.ค. 2569 14:07" strategy={null}>
         <Button size="sm" variant="outline" render={<Link href="/exam-screen-lab/student-dashboard"/>}>กลับไปห้องเรียน</Button>
       </SubmissionScoreSummary>
-      {!hidden&&<section className="space-y-3"><h2 className="font-semibold">ตรวจเฉลยทีละข้อ</h2>{CASES.map((item,i)=><Card key={i} padding="md" className="space-y-3" data-review-question>
-        <h3 className="text-sm font-semibold">ข้อ {i+1} · {item.title}</h3>
-        <QuestionText text={item.type==='mcq'?'นักเรียนเลือกตัวเลือกใดจากโจทย์การเคลื่อนที่แบบหมุน?':'หาขนาดของแรงที่ทำให้วัตถุเคลื่อนที่'} className="text-sm text-muted-foreground"/>
-        <SubmissionAnswerReview studentAnswer={item.answer} correctAnswer={item.type==='mcq'?'MCQ:4':item.type==='true_false'?'TF:["true","true"]':item.type==='ordering'?'ORDER:["first","second"]':item.type==='essay'?null:'10'} isCorrect={item.correct} answerParts={null} answerUnit={item.type==='written'?'N':null} questionType={item.type} extraData={item.type==='ordering'?{items:[{id:'first',text:'เริ่มต้น'},{id:'second',text:'ถัดไป'}]}:undefined} mcqOptions={item.type==='mcq'?OPTIONS:null}/>
-      </Card>)}</section>}
+      {!hidden && <QuestionResultGrid items={CASES.map((item, i) => ({
+        id: String(i),
+        outcome: item.correct === null ? 'pending' : item.correct ? 'correct' : 'wrong',
+        detail: (
+          <Card padding="md" className="space-y-3" data-review-question>
+            <h3 className="text-sm font-semibold">ข้อ {i+1} · {item.title}</h3>
+            <QuestionText text={item.type==='mcq'?'นักเรียนเลือกตัวเลือกใดจากโจทย์การเคลื่อนที่แบบหมุน?':'หาขนาดของแรงที่ทำให้วัตถุเคลื่อนที่'} className="text-sm text-muted-foreground"/>
+            <SubmissionAnswerReview studentAnswer={item.answer} correctAnswer={item.type==='mcq'?'MCQ:4':item.type==='true_false'?'TF:["true","true"]':item.type==='ordering'?'ORDER:["first","second"]':item.type==='essay'?null:'10'} isCorrect={item.correct} answerParts={null} answerUnit={item.type==='written'?'N':null} questionType={item.type} extraData={item.type==='ordering'?{items:[{id:'first',text:'เริ่มต้น'},{id:'second',text:'ถัดไป'}]}:undefined} mcqOptions={item.type==='mcq'?OPTIONS:null}/>
+          </Card>
+        ),
+      }))} />}
     </div>
   </ShellClient>
 }
