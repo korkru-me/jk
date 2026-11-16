@@ -1,4 +1,4 @@
-# งานกลุ่มและงานเดี่ยวในห้องเรียน — ผ่าน Staging; ยังไม่ปล่อย Production
+# งานกลุ่มและงานเดี่ยวในห้องเรียน — เผยแพร่ Production แล้ว
 
 ## ขอบเขต
 
@@ -40,3 +40,9 @@ Bucket `classroom-group-work` เป็น private อ่านด้วย sess
 ## อนุมัติปล่อยเฉพาะงานกลุ่ม — 16 พฤศจิกายน 2569
 
 เจ้าของอนุมัติให้ลงเฉพาะ `20261115142622_classroom_group_work.sql` บน Production และห้ามแตะ migration SEB 12 รายการ วิธีปล่อยใช้ workdir ชั่วคราวที่มีไฟล์จาก Git สำหรับทุกเลขในประวัติฐาน Production เดิมและไฟล์งานกลุ่มอีกหนึ่งไฟล์เท่านั้น; ตรวจ dry run แล้วแสดง pending เพียงเลขนั้น ไม่ใช้การ replay, repair หรือแก้ชุด migration ใน repo. SHA-256 ของ SQL ตรงกับไฟล์ที่ผ่าน Staging: `b41b052df7d43aba7b665dc7e8db7dc07d086bfc9e2104459dce7ec8d87f9d28`. บรรทัดที่เปลี่ยนและไฟล์ใหม่ของแอปตรงกับ Staging ที่ผ่านทดสอบ ส่วนงานอื่นยึดฐาน master.
+
+## ผลการปล่อย Production — 16 พฤศจิกายน 2569
+
+- Supabase CLI ลงเฉพาะ `20261115142622_classroom_group_work.sql` ตามผล dry run ก่อนปล่อย ประวัติจาก 153 เป็น 154 รายการโดยเพิ่มเวอร์ชันนี้รายการเดียว ส่วน SEB ทั้ง 12 รายการยังคงรอลง ตรวจแล้วพบ 5 ตารางที่เปิด RLS, 5 RPC ของงานกลุ่ม และ bucket ส่วนตัวที่รองรับไฟล์ขนาดสูงสุด 10 MB
+- Vercel แสดง Production READY สำหรับ `dpl_43U5LJYcNYP66tjjutT2CZBhhWLR` ตรงกับ GitHub status ของ commit `2d58e3f5bfd8322e617c17134325ff6185d6c14b` บน `master` ทั้ง `www.korkru.com` และ `korkru.com` ชี้ไปยัง deployment นี้ หน้าเข้าสู่ระบบตอบ 200 และ route `/classrooms/[id]/group-work` พากลับไปหน้าเข้าสู่ระบบเมื่อยังไม่มี session การตรวจเว็บจริงใช้คำขอแบบอ่านอย่างเดียว [PR #135](https://github.com/korkru-me/jk/pull/135)
+- ซิงก์โค้ดรุ่นที่ปล่อยไปยัง checkout หลักที่ localhost:3000 โดยรักษาการแก้ค้างเดิม Next MCP คอมไพล์ route งานกลุ่มโดยไม่มี issues ตรวจ token lint และ SQL 4 กรณีผ่าน ใน Chrome ครูกรอกคะแนนครั้งเดียว สมาชิกสมมติทั้งสี่คนเห็น 18/20 และหน้าแสดงผลพอดีกับจอ 390px ลบข้อมูลจำลองสำหรับทดสอบหน้าเว็บหลังตรวจ
