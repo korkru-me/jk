@@ -31,7 +31,7 @@ import {
 import { parseMathInputModes } from '@/lib/math/input-mode'
 import { getWritableStudentAnswer } from '@/lib/exam-write-access'
 import { parseSubmittedFiles } from '@/lib/exam-attachment'
-import { submissionFileLimitError } from '@/lib/file-assignment'
+import { parseFileAssignmentResponse, serializeFileAssignmentResponse, submissionFileLimitError } from '@/lib/file-assignment'
 import { validateStoredExamAttachmentUrl } from '@/lib/exam-attachment-access.server'
 import { loadAssignmentQuestionsByProvenance } from '@/lib/assignment-question-access.server'
 import { completionAttemptLimit, findPassingCompletion } from '@/lib/assignment-completion'
@@ -647,9 +647,14 @@ export async function saveAnswer(
 
   let persistedAnswer = studentAnswer
   if (writable.question?.question_type === 'file_upload') {
-    const files = parseSubmittedFiles(studentAnswer)
+    const isFileWork = writable.question.file_assignment_id === writable.submission.assignment_id
+    const response = isFileWork ? parseFileAssignmentResponse(studentAnswer) : null
+    if (isFileWork && !response) return { error: 'คำตอบไม่ถูกต้อง กรุณาตรวจข้อความ ลิงก์ และไฟล์ที่แนบ' }
+    const files = response?.files ?? parseSubmittedFiles(studentAnswer)
     if (!files) return { error: 'รายการไฟล์คำตอบไม่ถูกต้อง กรุณาแนบใหม่' }
-    const previousFiles = parseSubmittedFiles(writable.answer.student_answer) ?? []
+    const previousFiles = (isFileWork
+      ? parseFileAssignmentResponse(writable.answer.student_answer)?.files
+      : parseSubmittedFiles(writable.answer.student_answer)) ?? []
     const fileLimitError = submissionFileLimitError(files, previousFiles)
     if (fileLimitError) return { error: fileLimitError }
     const previousUrls = new Set(previousFiles.map(file => file.url))
@@ -665,7 +670,7 @@ export async function saveAnswer(
       })
       if ('error' in checked) return checked
     }
-    persistedAnswer = JSON.stringify(files)
+    persistedAnswer = response ? serializeFileAssignmentResponse(response) : JSON.stringify(files)
   }
 
   const { error, count } = await admin

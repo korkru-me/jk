@@ -66,7 +66,7 @@ export function FileAssignmentForm({ classrooms, preselectedClassroomId, localOn
   return <form onSubmit={event => { event.preventDefault(); submit(editing ? initial?.status ?? 'draft' : 'published') }} className="flex min-w-0 flex-col gap-3">
     <div className="flex flex-wrap items-center justify-between gap-2">
       <div><h1 className="flex items-center gap-2 text-xl font-bold"><FileUp className="size-5 text-primary" />{editing ? 'แก้ไขงานส่งไฟล์' : 'มอบหมายงานส่งไฟล์'}</h1>
-        <p className="text-sm text-muted-foreground">เขียนคำสั่งหรือแนบใบงาน นักเรียนส่งคำตอบได้สูงสุด 10 ไฟล์ต่อคน</p></div>
+        <p className="text-sm text-muted-foreground">นักเรียนส่งเป็นข้อความ ลิงก์ ไฟล์ PDF หรือรูปภาพได้ จะใช้หลายแบบในงานชิ้นเดียวก็ได้</p></div>
       <div className="flex gap-2">{!editing && <Button type="button" variant="outline" disabled={pending || attachmentsBusy} onClick={() => submit('draft')}>บันทึกร่าง</Button>}
         <Button type="submit" disabled={pending || attachmentsBusy}>{pending ? 'กำลังบันทึก…' : editing ? 'บันทึกการแก้ไข' : 'มอบหมายงาน'}</Button></div>
     </div>

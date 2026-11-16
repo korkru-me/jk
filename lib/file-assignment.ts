@@ -1,8 +1,63 @@
 import { normalizeAssignmentLateSchedule } from './late-submission'
+import { parseSubmittedFiles } from '@/lib/exam-attachment'
 import type { SubmittedFile } from '@/lib/types'
 
 export const FILE_ASSIGNMENT_LABEL = 'งานส่งไฟล์'
 export const MAX_SUBMISSION_FILES = 10
+export const MAX_FILE_ASSIGNMENT_TEXT_LENGTH = 20_000
+export const MAX_FILE_ASSIGNMENT_LINK_LENGTH = 2_000
+
+export interface FileAssignmentResponse {
+  text: string
+  link: string
+  files: SubmittedFile[]
+}
+
+export const EMPTY_FILE_ASSIGNMENT_RESPONSE: FileAssignmentResponse = { text: '', link: '', files: [] }
+
+export function normalizeFileAssignmentLink(value: string): string | null {
+  const link = value.trim()
+  if (link.length > MAX_FILE_ASSIGNMENT_LINK_LENGTH || !/^https?:\/\//i.test(link) || /[\s\\\u0000-\u001f\u007f]/u.test(link)) return null
+  try {
+    const url = new URL(link)
+    return url.hostname && !url.username && !url.password && url.href.length <= MAX_FILE_ASSIGNMENT_LINK_LENGTH ? url.href : null
+  } catch {
+    return null
+  }
+}
+
+/** The previous array-only format remains valid for drafts and graded work. */
+export function parseFileAssignmentResponse(value: string | null | undefined): FileAssignmentResponse | null {
+  let parsed: unknown
+  try { parsed = value ? JSON.parse(value) : [] } catch { return null }
+  if (Array.isArray(parsed)) {
+    const files = parseSubmittedFiles(parsed)
+    return files ? { ...EMPTY_FILE_ASSIGNMENT_RESPONSE, files } : null
+  }
+  if (!parsed || typeof parsed !== 'object') return null
+  const { version, text, link, files: rawFiles } = parsed as Record<string, unknown>
+  if (version !== 1 || typeof text !== 'string' || text.length > MAX_FILE_ASSIGNMENT_TEXT_LENGTH || typeof link !== 'string') return null
+  const normalizedLink = link.trim() ? normalizeFileAssignmentLink(link) : ''
+  const files = Array.isArray(rawFiles) ? parseSubmittedFiles(rawFiles) : null
+  if (normalizedLink === null || !files) return null
+  return { text: text.trim(), link: normalizedLink, files }
+}
+
+export function serializeFileAssignmentResponse({ text, link, files }: FileAssignmentResponse): string {
+  return JSON.stringify(text || link ? { version: 1, text, link, files } : files)
+}
+
+export function hasFileAssignmentResponse(response: FileAssignmentResponse): boolean {
+  return Boolean(response.text.trim() || response.link.trim() || response.files.length)
+}
+
+export function fileAssignmentSubmitError(response: FileAssignmentResponse | null): string | null {
+  if (!response) return 'อ่านคำตอบไม่สำเร็จ กรุณาลองบันทึกใหม่'
+  if (response.files.length > MAX_SUBMISSION_FILES) return `แนบไฟล์ PDF และรูปได้รวมกันไม่เกิน ${MAX_SUBMISSION_FILES} ไฟล์`
+  if (!hasFileAssignmentResponse(response)) return 'กรุณาพิมพ์คำตอบ ใส่ลิงก์ หรือแนบไฟล์อย่างน้อยหนึ่งอย่าง'
+  return null
+}
+
 export interface FileAssignmentView {
   id: string
   title: string
@@ -14,7 +69,7 @@ export interface FileAssignmentView {
   dueAt: string | null
   endAt: string | null
   status: string
-  submission: { id: string; answerId: string; status: string; files: SubmittedFile[]; score: number | null; submittedAt: string | null } | null
+  submission: { id: string; answerId: string; status: string; response: FileAssignmentResponse; score: number | null; submittedAt: string | null } | null
   withdrawalError: string | null
 }
 export function normalizeFileAssignmentLateSchedule(

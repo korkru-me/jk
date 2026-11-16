@@ -1,6 +1,7 @@
 import type { GradingAnswer } from '@/lib/grading-workspace'
 import type { ClassifyConfig, CompositeConfig, ImageLabelConfig, MatchingPair, OrderingConfig, Question, TrueFalseConfig } from '@/lib/types'
 import { parseSubmittedFiles } from '@/lib/exam-attachment'
+import { fileAssignmentQuestionOwner, hasFileAssignmentResponse, parseFileAssignmentResponse } from '@/lib/file-assignment'
 import { choiceLabel } from '@/lib/submission-choice-review'
 import { QuestionText, SubmissionAnswerReview } from '@/components/student/submission-answer-review'
 import { Badge } from '@/components/ui/badge'
@@ -8,6 +9,7 @@ import { Card } from '@/components/ui/card'
 import { gradingAssetUrl as displayUrl } from './grading-asset-url'
 import { GradingPdfPreview } from './grading-pdf-preview'
 import { GradingEssayHighlight } from './grading-keywords'
+import { FileAssignmentTextAndLink } from './file-assignment-text-and-link'
 
 function ImagePreview({ url, label }: { url: string; label: string }) {
   const safe = displayUrl(url)
@@ -82,14 +84,20 @@ export function GradingQuestionContent({ question, answer }: { question: Questio
 }
 
 export function GradingAnswerContent({ question, answer, showQuestionVariant = true, workLabel = 'วิธีทำที่แนบ' }: { question: Question; answer: GradingAnswer; showQuestionVariant?: boolean; workLabel?: string }) {
-  const files = question.question_type === 'file_upload' ? parseSubmittedFiles(answer.studentAnswer) : null
+  const isFileWork = question.question_type === 'file_upload' && Boolean(fileAssignmentQuestionOwner(answer.gradingConfig?.extra_data ?? question.extra_data))
+  const response = isFileWork ? parseFileAssignmentResponse(answer.studentAnswer) : null
+  const files = question.question_type === 'file_upload' ? response?.files ?? parseSubmittedFiles(answer.studentAnswer) : null
+  const hasFileWork = response ? hasFileAssignmentResponse(response) : Boolean(files?.length)
   const options = question.question_type === 'matching' ? question.mcq_options : answer.optionOrder?.length && question.mcq_options ? answer.optionOrder.map(index => question.mcq_options?.[index]).filter((option): option is NonNullable<typeof option> => !!option) : question.mcq_options
   const safeOptions = options?.map(option => ({ ...option, image_url: displayUrl(option.image_url) ?? undefined, ...('left_image' in option ? { left_image: displayUrl(option.left_image as string) ?? undefined } : {}) })) ?? null
   const artifacts = answer.workArtifacts ?? []
   const workImages = answer.workImages.filter((url): url is string => !!url)
   return <div className="flex min-w-0 flex-col gap-2">
     {Object.keys(answer.randomValues).length > 0 && <div className="flex flex-col gap-1"><div className="flex flex-wrap gap-1">{Object.entries(answer.randomValues).map(([name, value]) => <Badge key={name} variant="secondary">{name} = {value}</Badge>)}</div>{showQuestionVariant && <QuestionText text={substitute(question.question_text, answer.randomValues)} className="text-xs text-muted-foreground" />}</div>}
-    {question.question_type === 'file_upload' ? files?.length ? <div className="grid min-w-0 gap-3">{files.map((file, index) => <FilePreview key={`${file.url}-${index}`} url={file.url} name={file.name} pdf={file.type === 'application/pdf'} />)}</div> : <p className="text-sm text-muted-foreground">{files === null && answer.studentAnswer ? 'ไม่สามารถอ่านรายการไฟล์ที่ส่งได้' : 'ไม่ได้ส่งไฟล์งาน'}</p> : <div className="min-w-0 [&>div]:mt-0 [&_p]:break-words">
+    {question.question_type === 'file_upload' ? hasFileWork ? <div className="grid min-w-0 gap-3">
+      {response && <FileAssignmentTextAndLink response={response} />}
+      {files?.map(file => <FilePreview key={file.url} url={file.url} name={file.name} pdf={file.type === 'application/pdf'} />)}
+    </div> : <p className="text-sm text-muted-foreground">{files === null && answer.studentAnswer ? 'ไม่สามารถอ่านคำตอบที่ส่งได้' : isFileWork ? 'ไม่ได้ส่งคำตอบ' : 'ไม่ได้ส่งไฟล์งาน'}</p> : <div className="min-w-0 [&>div]:mt-0 [&_p]:break-words">
       <SubmissionAnswerReview studentAnswer={answer.studentAnswer} correctAnswer={answer.correctAnswer} isCorrect={answer.isCorrect} answerParts={answer.gradingConfig?.answer_parts ?? question.answer_parts} answerUnit={question.answer_unit} questionType={question.question_type} extraData={(answer.gradingConfig?.extra_data ?? question.extra_data) as Record<string, unknown>} mcqOptions={safeOptions} workImages={null} renderEssayAnswer={question.question_type === 'essay' ? text => <GradingEssayHighlight text={text} /> : undefined} />
     </div>}
     {(workImages.length > 0 || artifacts.length > 0) && <section aria-label={workLabel} className="flex min-w-0 flex-col gap-2"><p className="text-xs font-medium text-muted-foreground">วิธีทำที่แนบ</p><div className="grid min-w-0 gap-3">{workImages.map((url, index) => <ImagePreview key={`${url}-${index}`} url={url} label={`ภาพวิธีทำ ${index + 1}`} />)}{artifacts.map(artifact => artifact.previewUrl ? <ImagePreview key={artifact.id} url={artifact.previewUrl} label={`${artifact.partKey.startsWith('part:') ? `ข้อย่อย ${Number(artifact.partKey.slice(5)) + 1} · ` : ''}${artifact.sourceType === 'scratchpad' ? 'กระดาษทดที่แนบ' : 'ภาพวิธีทำ'}`} /> : <Card key={artifact.id} radius="sm" padding="sm"><p className="text-xs text-muted-foreground">เปิดภาพวิธีทำไม่สำเร็จ กรุณาลองโหลดหน้าใหม่</p></Card>)}</div></section>}

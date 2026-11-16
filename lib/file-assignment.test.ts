@@ -1,9 +1,32 @@
 import { describe, expect, it } from 'vitest'
-import { fileAssignmentDescription, fileAssignmentQuestionOwner, fileAssignmentWithdrawalError, isFileAssignment, submissionFileLimitError } from './file-assignment'
+import { EMPTY_FILE_ASSIGNMENT_RESPONSE, fileAssignmentDescription, fileAssignmentQuestionOwner, fileAssignmentSubmitError, fileAssignmentWithdrawalError, isFileAssignment, parseFileAssignmentResponse, serializeFileAssignmentResponse, submissionFileLimitError } from './file-assignment'
 import { sanitizeRichTextForStorage } from './rich-text-sanitize'
 
 const ID = '11111111-1111-4111-8111-111111111111'
 const files = (count: number) => Array.from({ length: count }, (_, index) => ({ url: `https://test.invalid/${index}.pdf`, name: `${index}.pdf`, type: 'application/pdf' }))
+
+describe('direct file assignment responses', () => {
+  it('reads file-only work in its original shape and round-trips mixed work', () => {
+    const existing = { ...EMPTY_FILE_ASSIGNMENT_RESPONSE, files: files(1) }
+    expect(parseFileAssignmentResponse(JSON.stringify(files(1)))).toEqual(existing)
+    expect(serializeFileAssignmentResponse(existing)).toBe(JSON.stringify(files(1)))
+    const mixed = { ...existing, text: 'คำตอบบรรทัดแรก\nและบรรทัดสอง', link: 'https://example.org/work?id=1#answer' }
+    expect(parseFileAssignmentResponse(serializeFileAssignmentResponse(mixed))).toEqual(mixed)
+  })
+
+  it.each(['javascript:alert(1)', 'data:text/html,foo', '//example.org', 'https://user:pw@example.org/', 'https://exa\nmple.org'])('rejects unsafe or incomplete links %s', link => {
+    const answer = serializeFileAssignmentResponse({ ...EMPTY_FILE_ASSIGNMENT_RESPONSE, link })
+    expect(parseFileAssignmentResponse(answer)).toBeNull()
+  })
+
+  it('rejects empty or oversized work while still reading historical file lists', () => {
+    expect(fileAssignmentSubmitError(parseFileAssignmentResponse('[]'))).not.toBeNull()
+    expect(fileAssignmentSubmitError({ ...EMPTY_FILE_ASSIGNMENT_RESPONSE, text: '  \n  ' })).not.toBeNull()
+    const old = parseFileAssignmentResponse(JSON.stringify(files(11)))
+    expect(old?.files).toHaveLength(11)
+    expect(fileAssignmentSubmitError(old)).toContain('10 ไฟล์')
+  })
+})
 describe('assignment-owned file instructions', () => {
   it('binds the hidden marker and private prompt to one exact assignment', () => {
     const description = fileAssignmentDescription(ID, '<p>ทำใบงานให้ครบ</p>')

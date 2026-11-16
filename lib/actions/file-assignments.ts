@@ -10,9 +10,8 @@ import { canManageAssignment, studentHasAssignment } from '@/lib/auth/assignment
 import { createInlineFileAssignment } from '@/lib/actions/assignments'
 import { startSubmission, submitSubmission } from '@/lib/actions/submissions'
 import { sanitizeRichTextForStorage } from '@/lib/rich-text-sanitize'
-import { parseSubmittedFiles } from '@/lib/exam-attachment'
 import { fileAssignmentInstructionStoragePath } from '@/lib/question-file-selection'
-import { fileAssignmentDescription, fileAssignmentQuestionOwner, fileAssignmentWithdrawalError, isFileAssignment, MAX_SUBMISSION_FILES, normalizeFileAssignmentLateSchedule, type FileAssignmentView } from '@/lib/file-assignment'
+import { fileAssignmentDescription, fileAssignmentQuestionOwner, fileAssignmentSubmitError, fileAssignmentWithdrawalError, isFileAssignment, normalizeFileAssignmentLateSchedule, parseFileAssignmentResponse, type FileAssignmentView } from '@/lib/file-assignment'
 
 function instructionStorageOrigin(): string | null {
   try { return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').origin } catch { return null }
@@ -186,17 +185,17 @@ export async function readFileAssignment(assignmentId: string): Promise<{ view: 
   if (error) return { error: 'โหลดงานที่ส่งไม่สำเร็จ กรุณาลองใหม่' }
   const answerResult = submission ? await admin.from('submission_answers').select('id, student_answer, is_correct, answer_reviewed_at, work_reviewed_at')
     .eq('submission_id', submission.id).eq('question_id', question.id).single() : null
-  if (answerResult?.error) return { error: 'โหลดไฟล์คำตอบไม่สำเร็จ กรุณาลองใหม่' }
+  if (answerResult?.error) return { error: 'โหลดคำตอบไม่สำเร็จ กรุณาลองใหม่' }
   const answer = answerResult?.data
-  const files = parseSubmittedFiles(answer?.student_answer ?? '')
-  if (!files) return { error: 'อ่านรายการไฟล์ไม่สำเร็จ กรุณาแจ้งครูผู้สอน' }
+  const response = parseFileAssignmentResponse(answer?.student_answer)
+  if (!response) return { error: 'อ่านคำตอบไม่สำเร็จ กรุณาแจ้งครูผู้สอน' }
   return { view: {
     id: assignment.id, title: assignment.title, classroomId: assignment.classroom_id,
     instructions: question.question_text, attachments: question.extra_data?.attachment_urls ?? [],
     maxScore: question.extra_data?.file_assignment_max_score ?? 10,
     startAt: assignment.start_at, dueAt: assignment.due_at, endAt: assignment.end_at, status: assignment.status,
     submission: submission && answer ? { id: submission.id, answerId: answer.id, status: submission.status,
-      files, score: submission.status === 'graded' ? submission.total_score : null, submittedAt: submission.submitted_at } : null,
+      response, score: submission.status === 'graded' ? submission.total_score : null, submittedAt: submission.submitted_at } : null,
     withdrawalError: submission ? fileAssignmentWithdrawalError({ assignmentStatus: assignment.status,
       submissionStatus: submission.status, dueAt: assignment.due_at, endAt: assignment.end_at,
       reviewed: !answer || answer.is_correct !== null || Boolean(answer.answer_reviewed_at || answer.work_reviewed_at) }) : null,
@@ -218,10 +217,11 @@ export async function submitFileAssignment(assignmentId: string, submissionId: s
   const { data: submission } = await access.admin.from('submissions').select('id, status')
     .eq('id', submissionId).eq('assignment_id', assignmentId).eq('student_id', access.user.id).maybeSingle()
   if (!submission || submission.status !== 'in_progress') return { error: 'งานนี้ไม่อยู่ในสถานะที่ส่งได้' }
-  const { data: answer } = await access.admin.from('submission_answers').select('student_answer')
+  const { data: answer, error } = await access.admin.from('submission_answers').select('student_answer')
     .eq('submission_id', submissionId).eq('question_id', access.question.id).single()
-  const files = parseSubmittedFiles(answer?.student_answer)
-  if (!files?.length || files.length > MAX_SUBMISSION_FILES) return { error: `กรุณาแนบคำตอบตั้งแต่ 1 ถึง ${MAX_SUBMISSION_FILES} ไฟล์` }
+  if (error || !answer) return { error: 'โหลดคำตอบไม่สำเร็จ กรุณาลองใหม่' }
+  const responseError = fileAssignmentSubmitError(parseFileAssignmentResponse(answer.student_answer))
+  if (responseError) return { error: responseError }
   const result = await submitSubmission(submissionId)
   revalidatePath(`/assignments/${assignmentId}/take`)
   revalidatePath(`/classrooms/${access.assignment.classroom_id}`)

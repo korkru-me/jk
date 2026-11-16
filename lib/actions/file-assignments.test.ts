@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fileAssignmentDescription } from '@/lib/file-assignment'
+import { fileAssignmentDescription, serializeFileAssignmentResponse } from '@/lib/file-assignment'
+import { gradeAndFinalizeSubmission } from '@/lib/submission-finalization.server'
 
 const m = vi.hoisted(() => ({ client: vi.fn(), admin: vi.fn(), access: vi.fn(), manage: vi.fn(), inline: vi.fn(), start: vi.fn(), submit: vi.fn(), org: vi.fn(), rooms: vi.fn() }))
 vi.mock('server-only', () => ({}))
@@ -78,7 +79,7 @@ describe('file assignment access and submission (mocked services)', () => {
   it('returns only this student’s file references and withholds an ungraded provisional score', async () => {
     const db = database()
     const result = await readFileAssignment(ID)
-    expect(result).toMatchObject({ view: { title: 'ใบงาน', submission: { files: files(1), score: null } } })
+    expect(result).toMatchObject({ view: { title: 'ใบงาน', submission: { response: { files: files(1) }, score: null } } })
     expect(db.queries.find(query => query.table === 'submissions')?.calls).toContainEqual(['eq', ['student_id', STUDENT]])
     expect(JSON.stringify(result)).not.toContain('access_code')
   })
@@ -95,6 +96,61 @@ describe('file assignment access and submission (mocked services)', () => {
     db.rows.submission_answers!.student_answer = JSON.stringify(files(10))
     expect(await submitFileAssignment(ID, SUBMISSION)).toEqual({ success: true })
     expect(m.submit).toHaveBeenCalledExactlyOnceWith(SUBMISSION)
+  })
+  it.each([
+    { text: 'คำตอบของนักเรียน', link: '', files: [] },
+    { text: '', link: 'https://example.invalid/work', files: [] },
+    { text: 'ดูวิธีทำประกอบ', link: 'https://example.invalid/work', files: files(1) },
+  ])('loads and submits a valid response including when there are no uploaded files', async response => {
+    const db = database()
+    db.rows.submissions!.status = 'in_progress'
+    db.rows.submission_answers!.student_answer = serializeFileAssignmentResponse(response)
+    expect(await readFileAssignment(ID)).toMatchObject({ view: { submission: { response, score: null } } })
+    expect(await submitFileAssignment(ID, SUBMISSION)).toEqual({ success: true })
+    expect(m.submit).toHaveBeenCalledExactlyOnceWith(SUBMISSION)
+  })
+  it('rejects an unsafe link even with other valid content', async () => {
+    const db = database()
+    db.rows.submissions!.status = 'in_progress'
+    db.rows.submission_answers!.student_answer = serializeFileAssignmentResponse({
+      text: 'คำตอบ', link: 'javascript:alert(1)', files: files(1),
+    })
+    expect(await submitFileAssignment(ID, SUBMISSION)).toHaveProperty('error')
+    expect(m.submit).not.toHaveBeenCalled()
+  })
+})
+
+describe('shared submission finalization', () => {
+  const response = serializeFileAssignmentResponse({ text: 'วิธีทำ', link: '', files: [] })
+
+  it.each([
+    { owner: ID, studentAnswer: response, accepted: true },
+    { owner: ID, studentAnswer: '[]', accepted: false },
+    { owner: ROOM, studentAnswer: response, accepted: false },
+    { owner: null, studentAnswer: response, accepted: false },
+  ])('accepts written content only when it belongs to this file assignment ($owner, $accepted)', async ({ owner, studentAnswer, accepted }) => {
+    const header = { assignment_id: ID, status: 'in_progress', answer_revision: 3 }
+    const answer = { id: 'answer', student_answer: studentAnswer, questions: { question_type: 'file_upload', extra_data: { file_assignment_id: owner } } }
+    const submissionQuery = {
+      eq: () => submissionQuery,
+      maybeSingle: async () => ({ data: header }),
+    }
+    const admin = {
+      from: (table: string) => ({
+        select: () => table === 'submissions' ? submissionQuery : { eq: async () => ({ data: [answer] }) },
+      }),
+      rpc: vi.fn().mockResolvedValue({ data: { completed: true, total_score: 0 } }),
+    }
+    const result = await gradeAndFinalizeSubmission(admin as never, SUBMISSION, STUDENT, { enforceSecureBrowser: true, enforceWorkImage: true })
+    if (accepted) {
+      expect(result).toEqual({ success: true, totalScore: 0 })
+      expect(admin.rpc).toHaveBeenCalledExactlyOnceWith('claim_submission_close', expect.objectContaining({
+        p_student_id: STUDENT, p_submission_id: SUBMISSION, p_expected_revision: 3,
+      }))
+    } else {
+      expect(result).toHaveProperty('error')
+      expect(admin.rpc).not.toHaveBeenCalled()
+    }
   })
 })
 

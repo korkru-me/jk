@@ -1,5 +1,5 @@
 import 'server-only'
-import { fileAssignmentQuestionOwner, MAX_SUBMISSION_FILES } from '@/lib/file-assignment'
+import { fileAssignmentQuestionOwner, fileAssignmentSubmitError, parseFileAssignmentResponse } from '@/lib/file-assignment'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getExamAccessSession } from '@/lib/exam-access-session'
 import { gradeAnswer } from '@/lib/assignment-attempt'
@@ -73,9 +73,14 @@ export async function gradeAndFinalizeSubmission(
   const attachmentChecks: Array<() => ReturnType<typeof validateStoredExamAttachmentUrl>> = []
   for (const answer of (!automatic && opts.enforceSecureBrowser ? gradable : []) as any[]) {
     if (answer.questions?.question_type === 'file_upload') {
-      const files = parseSubmittedFiles(answer.student_answer)
+      const isFileWork = fileAssignmentQuestionOwner(answer.questions.extra_data) === submission.assignment_id
+      const response = isFileWork ? parseFileAssignmentResponse(answer.student_answer) : null
+      if (isFileWork) {
+        const error = fileAssignmentSubmitError(response)
+        if (error) return { error }
+      }
+      const files = response?.files ?? parseSubmittedFiles(answer.student_answer)
       if (!files) return { error: 'รายการไฟล์คำตอบไม่ถูกต้อง กรุณาแนบใหม่' }
-      if (fileAssignmentQuestionOwner(answer.questions?.extra_data) && (!files.length || files.length > MAX_SUBMISSION_FILES)) return { error: `กรุณาแนบคำตอบตั้งแต่ 1 ถึง ${MAX_SUBMISSION_FILES} ไฟล์` }
       for (const file of files) {
         attachmentChecks.push(() => validateStoredExamAttachmentUrl(admin, {
           kind: 'submission_file',

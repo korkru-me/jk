@@ -15,6 +15,7 @@ import {
   type ExamAttachmentKind,
 } from '@/lib/exam-attachment'
 import { inspectStoredExamAttachment } from '@/lib/exam-attachment-storage.server'
+import { parseFileAssignmentResponse } from '@/lib/file-assignment'
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -218,9 +219,14 @@ export async function deleteExamAttachment(input: {
     submissionAnswerId: writable.answer.id,
   })
   const legacyPath = isLegacyStudentAttachmentPath(path, user.id)
+  const submissionFiles = kind === 'submission_file' && legacyPath && !currentPath
+    ? writable.question?.file_assignment_id === writable.submission.assignment_id
+      ? parseFileAssignmentResponse(writable.answer.student_answer)?.files
+      : parseSubmittedFiles(writable.answer.student_answer)
+    : null
   const currentlyReferenced = kind === 'work_image'
     ? (Array.isArray(writable.answer.work_images) ? writable.answer.work_images : []).includes(input.url)
-    : (parseSubmittedFiles(writable.answer.student_answer) ?? []).some(file => file.url === input.url)
+    : submissionFiles?.some(file => file.url === input.url)
   if (!currentPath && !(legacyPath && currentlyReferenced)) return { error: 'ไม่มีสิทธิ์ลบไฟล์นี้' }
 
   const removed = await admin.storage.from(definition.bucket).remove([path])
