@@ -344,6 +344,7 @@ Vercel รันโค้ดฝั่ง server ด้วยเขตเวล�
 - Supabase Auth ดูแล session
 - บัญชีครูและนักเรียนใช้ email/password เป็นตัวตนหลักเดียวกันทั่วระบบ; classroom code ใช้สร้าง membership ไม่ใช่ login identifier
 - email/password signup ส่ง `role` และ `survey_role` ที่ผ่าน server validation เข้า auth metadata แล้ว database trigger สร้าง `public.users` กับ personal organization ใน transaction เดียว
+- นักเรียนส่งระดับชั้น ห้อง รหัสนักเรียน และเลขที่ตั้งแต่สมัครด้วยอีเมล โดย trigger เพิ่มข้อมูลลง `student_profiles` ใน transaction เดียวกัน สำหรับ Google ขั้นตั้งค่าบัญชีเขียนข้อมูลการศึกษาและยืนยันประเภทบัญชีผ่าน RPC ที่เรียกได้เฉพาะ service role หลังตรวจ session ของบัญชีนั้น
 - OAuth account ที่ยังไม่มี `survey_role` ต้องผ่าน `/complete-profile`; Server Action ตรวจ exact authenticated user และยอมกำหนด `teacher|student` ได้เฉพาะครั้งแรก ส่วน protected layout ปฏิเสธ profile ที่ยังไม่สมบูรณ์
 - หน้า login แสดง Google และ email/password ใช้ shared `loginSchema`, inline errors และสถานะกำลังส่งร่วมกัน รหัสผ่านสำหรับ login ตรวจเพียงไม่ว่างเพื่อรองรับบัญชีเดิม; ปุ่ม Magic Link ถูกถอดจาก UI แต่ backend `sendMagicLink` และ callback เดิมยังอยู่ โดยตั้ง `shouldCreateUser: false` และตอบโดยไม่เปิดเผยว่ามีบัญชีหรือไม่
 - password recovery กลับผ่าน `/auth/callback?next=/reset-password&recovery_nonce=…` ตรวจ same-browser intent/recipient/expected ID ร่วมกับ PKCE ก่อนออก grant และเปลี่ยน credential
