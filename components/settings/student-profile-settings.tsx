@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type { StudentProfile, StudentGuardian, NamePrefix } from '@/lib/types'
 import { buildFullName } from '@/lib/utils'
+import { GRADE_LEVELS, SECTION_NUMBERS } from '@/lib/student-education'
 import { Card } from '@/components/ui/card'
 import { NativeSelect } from '@/components/ui/native-select'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
@@ -22,8 +23,6 @@ import {
   User, GraduationCap, Phone, Eye, Plus, X,
 } from 'lucide-react'
 
-const GRADE_LEVELS = ['ม.1', 'ม.2', 'ม.3', 'ม.4', 'ม.5', 'ม.6', 'อื่นๆ']
-const SECTION_NUMBERS = Array.from({ length: 15 }, (_, i) => i + 1)
 const MAX_GUARDIANS = 3
 const NAME_PREFIXES: NamePrefix[] = ['เด็กหญิง', 'เด็กชาย', 'นาย', 'นางสาว']
 

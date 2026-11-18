@@ -16,12 +16,15 @@ import { AccountRoleField, PolicyAcknowledgmentField } from '@/components/auth/a
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group'
+import { StudentEducationFields } from '@/components/auth/student-education-fields'
+import { STUDENT_EDUCATION_FIELDS } from '@/lib/student-education'
 import { Separator } from '@/components/ui/separator'
 
 const SIGNUP_FIELDS = [
   { name: 'role', label: 'เลือกครูหรือนักเรียน' },
   { name: 'accept_terms', label: 'ข้อกำหนดและนโยบายความเป็นส่วนตัว' },
   { name: 'full_name', label: 'ชื่อที่ใช้แสดง' },
+  ...STUDENT_EDUCATION_FIELDS,
   { name: 'email', label: 'อีเมล' },
   { name: 'password', label: 'รหัสผ่าน' },
   { name: 'confirm_password', label: 'ยืนยันรหัสผ่าน' },
@@ -74,6 +77,9 @@ export function SignupForm() {
   const confirmPassword = watch('confirm_password')
   const fullName = watch('full_name')
   const email = watch('email')
+  const [gradeLevel, sectionNumber, studentCode, classNumber] = watch([
+    'grade_level', 'section_number', 'student_code', 'class_number',
+  ])
   const busy = loading || googleLoading
   const invalidFields = validationMethod === null ? [] : SIGNUP_FIELDS.filter(({ name }) =>
     !!errors[name] && (validationMethod === 'email' || name === 'role' || name === 'accept_terms'))
@@ -84,7 +90,7 @@ export function SignupForm() {
     if (validationMethod === 'email') void trigger()
     else if (validationMethod === 'google') void trigger(['role', 'accept_terms'])
     else if (touchedFields.confirm_password) void trigger('confirm_password')
-  }, [selectedRole, acceptedTerms, fullName, email, password, confirmPassword, touchedFields.confirm_password, validationMethod, trigger])
+  }, [selectedRole, acceptedTerms, fullName, email, password, confirmPassword, gradeLevel, sectionNumber, studentCode, classNumber, touchedFields.confirm_password, validationMethod, trigger])
 
   useEffect(() => {
     if (!fieldToFocus || !form.current) return
@@ -115,6 +121,11 @@ export function SignupForm() {
     setLoading(true)
     setSubmitError(null)
     const formData = new FormData()
+    if (values.role === 'student') {
+      for (const { name } of STUDENT_EDUCATION_FIELDS) {
+        formData.set(name, values[name] ?? '')
+      }
+    }
     formData.set('role', values.role)
     formData.set('full_name', values.full_name)
     formData.set('email', values.email)
@@ -210,6 +221,10 @@ export function SignupForm() {
           <FieldDescription id="signup-name-help">ครูและสมาชิกห้องเรียนที่เกี่ยวข้องจะเห็นชื่อนี้</FieldDescription>
           <FieldError id="signup-name-error" errors={[errors.full_name]} />
         </Field>
+
+        {selectedRole === 'student' && (
+          <StudentEducationFields register={registerField} errors={errors} disabled={busy} />
+        )}
 
         <Field data-invalid={!!errors.email} className="gap-1">
           <FieldLabel htmlFor="email">อีเมล</FieldLabel>
