@@ -7,6 +7,7 @@ import { isAuthRetryableFetchError } from '@supabase/supabase-js'
 import { reserveAuthEmail } from '@/lib/auth/email-request-limit.server'
 import { rememberSignupEmail } from '@/lib/auth/signup-email.server'
 import { POLICY_VERSION } from '@/lib/legal'
+import { STUDENT_EDUCATION_FIELDS, studentEducationSchema } from '@/lib/student-education'
 import { clearRecoveryGrant, hasRecoveryGrant } from '@/lib/auth/recovery-grant.server'
 import { clearRecoveryIntent, issueRecoveryIntent } from '@/lib/auth/recovery-intent.server'
 import {
@@ -17,6 +18,10 @@ import {
   signupSchema,
   type AccountRole,
 } from '@/lib/auth/validation'
+
+function signupEducationFields(formData: FormData) {
+  return Object.fromEntries(STUDENT_EDUCATION_FIELDS.map(({ name }) => [name, formData.get(name) ?? undefined]))
+}
 
 function validationMessage(issues: { message: string }[]) {
   return issues[0]?.message ?? 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบแล้วลองใหม่'
@@ -106,6 +111,7 @@ export async function register(formData: FormData) {
   const supabase = await createClient()
 
   const parsed = signupSchema.safeParse({
+    ...signupEducationFields(formData),
     role: formData.get('role'),
     full_name: formData.get('full_name'),
     email: formData.get('email'),
@@ -116,6 +122,7 @@ export async function register(formData: FormData) {
   if (!parsed.success) return { error: validationMessage(parsed.error.issues) }
 
   const { email, password, full_name, role } = parsed.data
+  const education = role === 'student' ? studentEducationSchema.parse(parsed.data) : null
   const instructor_type = role === 'teacher' ? 'teacher' : null
   const callbackUrl = emailCallbackUrl('signup')
   if (!callbackUrl) return { error: 'ระบบสมัครสมาชิกยังไม่พร้อมใช้งาน กรุณาติดต่อผู้ดูแล KorKru' }
@@ -132,6 +139,7 @@ export async function register(formData: FormData) {
         role,
         instructor_type,
         survey_role: role,
+        ...(education && { signup_student_education: education }),
         terms_version: POLICY_VERSION,
         privacy_version: POLICY_VERSION,
         terms_acknowledged_at: new Date().toISOString(),
@@ -266,6 +274,7 @@ export async function resendSignupConfirmation(email: string) {
 
 export async function completeProfile(formData: FormData) {
   const parsed = completeProfileSchema.safeParse({
+    ...signupEducationFields(formData),
     role: formData.get('role'),
     full_name: formData.get('full_name'),
     accept_terms: formData.get('accept_terms') === 'true',
@@ -288,6 +297,7 @@ export async function completeProfile(formData: FormData) {
   if (profile.role === 'admin' || profile.survey_role) return { success: true }
 
   const { role, full_name } = parsed.data
+  const education = role === 'student' ? studentEducationSchema.parse(parsed.data) : null
   // Do not mark onboarding complete when the acknowledgement write failed:
   // the protected layout uses survey_role to decide whether to show this step.
   const { error: acknowledgementError } = await supabase.auth.updateUser({
@@ -300,21 +310,14 @@ export async function completeProfile(formData: FormData) {
   })
   if (acknowledgementError) return { error: 'ยังบันทึกการรับทราบข้อกำหนดไม่ได้ กรุณาลองใหม่' }
 
-  const { data: updated, error } = await admin
-    .from('users')
-    .update({
-      full_name,
-      role,
-      survey_role: role,
-      instructor_type: role === 'teacher' ? 'teacher' : null,
-    })
-    .eq('id', user.id)
-    .is('survey_role', null)
-    .select('id')
-    .maybeSingle()
+  const { error } = await admin.rpc('complete_account_onboarding', {
+    p_user_id: user.id,
+    p_full_name: full_name,
+    p_role: role,
+    p_education: education,
+  })
 
   if (error) return { error: 'ไม่สามารถบันทึกข้อมูลบัญชีได้ กรุณาลองใหม่' }
-  if (!updated) return { success: true }
 
   return { success: true }
 }

@@ -6,6 +6,13 @@ import {
   signupSchema,
 } from './validation'
 
+const studentEducation = {
+  grade_level: 'ม.4',
+  section_number: '3',
+  student_code: '00541',
+  class_number: '13',
+}
+
 describe('authentication input validation', () => {
   it('normalizes email while keeping the chosen account role', () => {
     const result = signupSchema.parse({
@@ -38,6 +45,7 @@ describe('authentication input validation', () => {
     }).success).toBe(false)
 
     expect(signupSchema.safeParse({
+      ...studentEducation,
       role: 'student',
       full_name: 'สมชาย ใจดี',
       email: 'student@example.com',
@@ -49,6 +57,7 @@ describe('authentication input validation', () => {
 
   it('uses the same role and name rules for OAuth profile completion', () => {
     expect(completeProfileSchema.safeParse({
+      ...studentEducation,
       role: 'student',
       full_name: 'นักเรียนทดลอง',
       accept_terms: true,
@@ -74,12 +83,33 @@ describe('authentication input validation', () => {
   })
 
   it('requires explicit acknowledgement on email and Google profile signup', () => {
-    const emailSignup = { role: 'student', full_name: 'นักเรียนทดสอบ', email: 'student@example.com', password: 'password1', confirm_password: 'password1' }
+    const emailSignup = { ...studentEducation, role: 'student', full_name: 'นักเรียนทดสอบ', email: 'student@example.com', password: 'password1', confirm_password: 'password1' }
     for (const accept_terms of [undefined, false, 'true', 1]) {
       expect(signupSchema.safeParse({ ...emailSignup, accept_terms }).success).toBe(false)
-      expect(completeProfileSchema.safeParse({ role: 'student', full_name: 'นักเรียนทดสอบ', accept_terms }).success).toBe(false)
+      expect(completeProfileSchema.safeParse({ ...studentEducation, role: 'student', full_name: 'นักเรียนทดสอบ', accept_terms }).success).toBe(false)
     }
     expect(signupSchema.safeParse({ ...emailSignup, accept_terms: true }).success).toBe(true)
+  })
+
+  it('requires all four education fields for students on both signup paths', () => {
+    const account = {
+      full_name: 'นักเรียนทดสอบ', role: 'student', accept_terms: true,
+      email: 'student@example.com', password: 'Password1', confirm_password: 'Password1',
+    }
+    const invalidFields = {
+      grade_level: 'ม.7', section_number: '16', student_code: '  ', class_number: '32768',
+    }
+    for (const schema of [signupSchema, completeProfileSchema]) {
+      expect(schema.safeParse({ ...account, ...studentEducation }).success).toBe(true)
+      expect(schema.safeParse({ ...account, role: 'teacher' }).success).toBe(true)
+      for (const fields of [{}, invalidFields]) {
+        const result = schema.safeParse({ ...account, ...fields })
+        expect(result.success).toBe(false)
+        if (!result.success) {
+          expect(result.error.issues.map(({ path }) => path[0])).toEqual(Object.keys(studentEducation))
+        }
+      }
+    }
   })
 
   it('rejects malformed email addresses', () => {
@@ -87,7 +117,7 @@ describe('authentication input validation', () => {
   })
 
   it('requires exact password confirmation without trimming or changing case', () => {
-    const base = { role: 'student', full_name: 'นักเรียนทดสอบ', email: 'student@example.com', password: 'Password1', accept_terms: true }
+    const base = { ...studentEducation, role: 'student', full_name: 'นักเรียนทดสอบ', email: 'student@example.com', password: 'Password1', accept_terms: true }
     for (const confirm_password of [undefined, null, '', 'password1', 'Password1 ', 'different1']) {
       const result = signupSchema.safeParse({ ...base, confirm_password })
       expect(result.success).toBe(false)
