@@ -13,6 +13,8 @@ import { AccountRoleField, PolicyAcknowledgmentField } from '@/components/auth/a
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { StudentEducationFields } from '@/components/auth/student-education-fields'
+import { STUDENT_EDUCATION_FIELDS } from '@/lib/student-education'
 import { Input } from '@/components/ui/input'
 
 type Props = { defaultName: string; defaultRole?: AccountRole }
@@ -39,6 +41,11 @@ export function CompleteProfileForm({ defaultName, defaultRole }: Props) {
     setLoading(true)
     setSubmitError(null)
     const formData = new FormData()
+    if (values.role === 'student') {
+      for (const { name } of STUDENT_EDUCATION_FIELDS) {
+        formData.set(name, values[name] ?? '')
+      }
+    }
     formData.set('role', values.role)
     formData.set('full_name', values.full_name)
     formData.set('accept_terms', String(values.accept_terms))
@@ -78,6 +85,9 @@ export function CompleteProfileForm({ defaultName, defaultRole }: Props) {
           <FieldDescription id="profile-name-help">ชื่อนี้จะแสดงต่อครูและสมาชิกห้องเรียนที่เกี่ยวข้อง</FieldDescription>
           <FieldError id="profile-name-error" errors={[errors.full_name]} />
         </Field>
+        {selectedRole === 'student' && (
+          <StudentEducationFields register={register} errors={errors} disabled={loading} />
+        )}
         <PolicyAcknowledgmentField id="accept_terms" checked={acceptedTerms === true} onChange={(checked) => setValue('accept_terms', checked, { shouldValidate: true })} error={errors.accept_terms?.message} disabled={loading} />
         {submitError && <Alert variant="destructive"><AlertDescription>{submitError}</AlertDescription></Alert>}
         <Button type="submit" className="min-h-[44px] w-full" disabled={loading}>

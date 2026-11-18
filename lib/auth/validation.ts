@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { studentEducationSchema } from '@/lib/student-education'
 
 export const ACCOUNT_ROLES = ['teacher', 'student'] as const
 export type AccountRole = (typeof ACCOUNT_ROLES)[number]
@@ -25,7 +26,28 @@ export const displayNameSchema = z
   .min(2, 'กรุณากรอกชื่อที่ใช้แสดงอย่างน้อย 2 ตัวอักษร')
   .max(160, 'ชื่อที่ใช้แสดงต้องไม่เกิน 160 ตัวอักษร')
 
+const studentEducationFormFields = {
+  grade_level: z.string().optional(),
+  section_number: z.string().optional(),
+  student_code: z.string().optional(),
+  class_number: z.string().optional(),
+}
+
+function validateStudentEducation(
+  values: { role: AccountRole } & Partial<Record<keyof typeof studentEducationFormFields, string>>,
+  context: z.RefinementCtx,
+) {
+  if (values.role !== 'student') return
+  const result = studentEducationSchema.safeParse(values)
+  if (!result.success) {
+    for (const { path, message } of result.error.issues) {
+      context.addIssue({ code: 'custom', path, message })
+    }
+  }
+}
+
 export const signupSchema = z.object({
+  ...studentEducationFormFields,
   role: accountRoleSchema,
   full_name: displayNameSchema,
   email: emailSchema,
@@ -34,7 +56,7 @@ export const signupSchema = z.object({
   accept_terms: z.boolean().refine((value) => value === true, {
     message: 'กรุณายอมรับข้อกำหนดและรับทราบนโยบายความเป็นส่วนตัว',
   }),
-}).refine((values) => values.password === values.confirm_password, {
+}).superRefine(validateStudentEducation).refine((values) => values.password === values.confirm_password, {
   path: ['confirm_password'],
   message: 'รหัสผ่านไม่ตรงกัน',
 })
@@ -45,12 +67,13 @@ export const loginSchema = z.object({
 })
 
 export const completeProfileSchema = z.object({
+  ...studentEducationFormFields,
   role: accountRoleSchema,
   full_name: displayNameSchema,
   accept_terms: z.boolean().refine((value) => value === true, {
     message: 'กรุณายอมรับข้อกำหนดและรับทราบนโยบายความเป็นส่วนตัว',
   }),
-})
+}).superRefine(validateStudentEducation)
 
 export const resetPasswordSchema = z
   .object({

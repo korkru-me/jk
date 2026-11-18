@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   signUp: vi.fn(), resend: vi.fn(), resetPasswordForEmail: vi.fn(), signInWithOtp: vi.fn(), signInWithOAuth: vi.fn(),
   reserve: vi.fn(), remember: vi.fn(),
-  getUser: vi.fn(), getSession: vi.fn(), updateUser: vi.fn(), signOut: vi.fn(), profileRead: vi.fn(), profileUpdate: vi.fn(),
+  getUser: vi.fn(), getSession: vi.fn(), updateUser: vi.fn(), signOut: vi.fn(), profileRead: vi.fn(), completeOnboarding: vi.fn(),
   hasGrant: vi.fn(), clearGrant: vi.fn(),
   issueIntent: vi.fn(), clearIntent: vi.fn(),
   redirect: vi.fn(), redirectSignal: new Error('synthetic redirect signal'),
@@ -15,8 +15,7 @@ vi.mock('next/navigation', async (importOriginal) => ({
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn(async () => ({ auth: mocks })) }))
 vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: vi.fn(() => ({ from: () => ({
   select: () => ({ eq: () => ({ maybeSingle: mocks.profileRead }) }),
-  update: mocks.profileUpdate,
-}) })) }))
+}), rpc: mocks.completeOnboarding })) }))
 vi.mock('@/lib/auth/email-request-limit.server', () => ({ reserveAuthEmail: mocks.reserve }))
 vi.mock('@/lib/auth/signup-email.server', () => ({ rememberSignupEmail: mocks.remember }))
 vi.mock('@/lib/auth/recovery-grant.server', () => ({ hasRecoveryGrant: mocks.hasGrant, clearRecoveryGrant: mocks.clearGrant }))
@@ -26,7 +25,7 @@ import { RedirectType } from 'next/navigation'
 
 function signup(accept = true) {
   const form = new FormData()
-  Object.entries({ role: 'student', full_name: 'นักเรียนทดสอบ', email: 'Student@Example.COM', password: 'password1', confirm_password: 'password1', accept_terms: String(accept) }).forEach(([key, value]) => form.set(key, value))
+  Object.entries({ role: 'student', full_name: 'นักเรียนทดสอบ', email: 'Student@Example.COM', password: 'password1', confirm_password: 'password1', accept_terms: String(accept), grade_level: 'ม.4', section_number: '3', student_code: ' 00541 ', class_number: '13' }).forEach(([key, value]) => form.set(key, value))
   return form
 }
 function resetForm() {
@@ -63,7 +62,9 @@ describe('public email actions', () => {
     expect(mocks.signUp.mock.calls[0][0]).toMatchObject({
       email: 'student@example.com',
       options: { emailRedirectTo: 'https://fixture.invalid/auth/callback?flow=signup', data: {
-        role: 'student', terms_version: '2026-10-17', privacy_version: '2026-10-17', terms_acknowledged_at: expect.any(String),
+        role: 'student',
+        signup_student_education: { grade_level: 'ม.4', section_number: 3, student_code: '00541', class_number: 13 },
+        terms_version: '2026-10-17', privacy_version: '2026-10-17', terms_acknowledged_at: expect.any(String),
       } },
     })
     expect(mocks.remember).toHaveBeenCalledWith('student@example.com')
@@ -149,7 +150,25 @@ describe('public email actions', () => {
     mocks.profileRead.mockResolvedValue({ data: { id: 'verified-user', role: 'student', survey_role: null }, error: null })
     mocks.updateUser.mockResolvedValue({ error: { code: 'unexpected_failure' } })
     expect(await completeProfile(signup())).toHaveProperty('error')
-    expect(mocks.profileUpdate).not.toHaveBeenCalled()
+    expect(mocks.completeOnboarding).not.toHaveBeenCalled()
+  })
+
+  it('passes student education and the verified account ID to Google profile completion', async () => {
+    mocks.getUser.mockResolvedValue({ data: { user: { id: 'verified-user' } } })
+    mocks.profileRead.mockResolvedValue({ data: { id: 'verified-user', role: 'student', survey_role: null }, error: null })
+    mocks.updateUser.mockResolvedValue({ error: null })
+    mocks.completeOnboarding.mockResolvedValue({ error: null })
+    const form = signup()
+    form.set('student_id', 'another-user')
+    form.set('school_name', 'untrusted input')
+
+    expect(await completeProfile(form)).toEqual({ success: true })
+    expect(mocks.completeOnboarding).toHaveBeenCalledWith('complete_account_onboarding', {
+      p_user_id: 'verified-user',
+      p_full_name: 'นักเรียนทดสอบ',
+      p_role: 'student',
+      p_education: { grade_level: 'ม.4', section_number: 3, student_code: '00541', class_number: 13 },
+    })
   })
 
   it('does not let an existing login alone reset the password', async () => {
