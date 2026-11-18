@@ -13,21 +13,20 @@ import { signupSchema, type SignupInput } from '@/lib/auth/validation'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { AccountRoleField, PolicyAcknowledgmentField } from '@/components/auth/account-fields'
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group'
 import { StudentEducationFields } from '@/components/auth/student-education-fields'
 import { STUDENT_EDUCATION_FIELDS } from '@/lib/student-education'
-import { Separator } from '@/components/ui/separator'
 
 const SIGNUP_FIELDS = [
   { name: 'role', label: 'เลือกครูหรือนักเรียน' },
   { name: 'accept_terms', label: 'ข้อกำหนดและนโยบายความเป็นส่วนตัว' },
-  { name: 'full_name', label: 'ชื่อที่ใช้แสดง' },
-  ...STUDENT_EDUCATION_FIELDS,
   { name: 'email', label: 'อีเมล' },
   { name: 'password', label: 'รหัสผ่าน' },
   { name: 'confirm_password', label: 'ยืนยันรหัสผ่าน' },
+  { name: 'full_name', label: 'ชื่อที่ใช้แสดง' },
+  ...STUDENT_EDUCATION_FIELDS,
 ] as const satisfies ReadonlyArray<{ name: keyof SignupInput; label: string }>
 
 type SignupField = (typeof SIGNUP_FIELDS)[number]['name']
@@ -199,33 +198,8 @@ export function SignupForm() {
         </Button>
       </FieldGroup>
 
-      <div className="flex items-center gap-3" aria-hidden>
-        <Separator className="flex-1" />
-        <span className="shrink-0 text-xs text-muted-foreground">หรือสมัครด้วยอีเมล</span>
-        <Separator className="flex-1" />
-      </div>
-
-      <FieldGroup className="gap-2">
-        <Field data-invalid={!!errors.full_name} className="gap-1">
-          <FieldLabel htmlFor="full_name">ชื่อที่ใช้แสดง</FieldLabel>
-          <Input
-            id="full_name"
-            placeholder={selectedRole === 'teacher' ? 'เช่น ครูสมชาย ใจดี' : 'เช่น สมชาย ใจดี'}
-            autoComplete="name"
-            aria-invalid={!!errors.full_name}
-            aria-describedby={errors.full_name ? 'signup-name-error' : 'signup-name-help'}
-            disabled={busy}
-            className="min-h-[44px]"
-            {...registerField('full_name')}
-          />
-          <FieldDescription id="signup-name-help">ครูและสมาชิกห้องเรียนที่เกี่ยวข้องจะเห็นชื่อนี้</FieldDescription>
-          <FieldError id="signup-name-error" errors={[errors.full_name]} />
-        </Field>
-
-        {selectedRole === 'student' && (
-          <StudentEducationFields register={registerField} errors={errors} disabled={busy} />
-        )}
-
+      <FieldSet className="min-w-0 gap-2 rounded-xl border border-border px-3 pb-3">
+        <FieldLegend variant="label" className="px-1 font-semibold">บัญชีอีเมล</FieldLegend>
         <Field data-invalid={!!errors.email} className="gap-1">
           <FieldLabel htmlFor="email">อีเมล</FieldLabel>
           <Input
@@ -306,7 +280,32 @@ export function SignupForm() {
           </InputGroup>
           <FieldError id="signup-confirm-password-error" errors={[errors.confirm_password]} />
         </Field>
-      </FieldGroup>
+      </FieldSet>
+
+      <FieldSet className="min-w-0 gap-2 rounded-xl border border-border px-3 pb-3">
+        <FieldLegend variant="label" className="px-1 font-semibold">
+          {selectedRole === 'student' ? 'ข้อมูลนักเรียน' : 'ข้อมูลผู้สมัคร'}
+        </FieldLegend>
+        <Field data-invalid={!!errors.full_name} className="gap-1">
+          <FieldLabel htmlFor="full_name">ชื่อที่ใช้แสดง</FieldLabel>
+          <Input
+            id="full_name"
+            placeholder={selectedRole === 'teacher' ? 'เช่น ครูสมชาย ใจดี' : 'เช่น สมชาย ใจดี'}
+            autoComplete="name"
+            aria-invalid={!!errors.full_name}
+            aria-describedby={errors.full_name ? 'signup-name-error' : 'signup-name-help'}
+            disabled={busy}
+            className="min-h-[44px]"
+            {...registerField('full_name')}
+          />
+          <FieldDescription id="signup-name-help">ครูและสมาชิกห้องเรียนที่เกี่ยวข้องจะเห็นชื่อนี้</FieldDescription>
+          <FieldError id="signup-name-error" errors={[errors.full_name]} />
+        </Field>
+
+        {selectedRole === 'student' && (
+          <StudentEducationFields register={registerField} errors={errors} disabled={busy} />
+        )}
+      </FieldSet>
 
       {submitError && <Alert variant="destructive"><AlertDescription>{submitError}</AlertDescription></Alert>}
 

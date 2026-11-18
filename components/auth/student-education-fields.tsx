@@ -18,9 +18,9 @@ export function StudentEducationFields({ register, errors, disabled }: {
   disabled: boolean
 }) {
   return (
-    <fieldset className="min-w-0 space-y-1">
+    <fieldset className="@container/education min-w-0 space-y-1">
       <legend className="text-sm font-semibold">ข้อมูลการศึกษา</legend>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 gap-2 @min-[16rem]/education:grid-cols-2">
         {STUDENT_EDUCATION_FIELDS.map(({ name, label }) => {
           const error = errors[name]
           const errorId = `${name}-error`
