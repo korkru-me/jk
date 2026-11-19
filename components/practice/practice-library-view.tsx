@@ -291,8 +291,8 @@ export function PracticeLibraryView({
           variant="ghost"
           size="icon-sm"
           className="pointer-coarse:size-11"
-          render={<Link href={`/practice/${library.id}`} />}
-          aria-label="กลับไปหน้ารอเข้าคลังฝึก"
+          render={<Link href={`/classrooms/${library.classroomId}`} />}
+          aria-label="กลับไปห้องเรียน"
         >
           <ArrowLeft aria-hidden="true" />
         </Button>
