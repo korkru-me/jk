@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic'
 export default async function ExamScreenLabPage({
   searchParams,
 }: {
-  searchParams: Promise<{ perPage?: string | string[]; streak?: string | string[]; at?: string | string[]; timed?: string | string[]; type?: string | string[]; shell?: string | string[]; watermark?: string | string[]; random?: string }>
+  searchParams: Promise<{ perPage?: string | string[]; streak?: string | string[]; at?: string | string[]; timed?: string | string[]; type?: string | string[]; shell?: string | string[]; watermark?: string | string[]; random?: string; fullscreen?: string }>
 }) {
   if (!isExamScreenLabEnabled(process.env)) notFound()
 
@@ -54,6 +54,9 @@ export default async function ExamScreenLabPage({
       shell={params.shell === '1'}
       optionalWatermark={params.watermark !== 'off'}
       requireWorkImage={params.random !== '1'}
+      // ?fullscreen=1 turns the teacher's บังคับเต็มจอ on, so a tablet can be
+      // checked for whether it can still type an answer under it.
+      fullscreenEnforced={params.fullscreen === '1'}
     />
   )
 }
