@@ -1,7 +1,7 @@
 import { StudentLibraryLab } from './_components/student-library-lab'
 import { notFound } from 'next/navigation'
 import { PracticeLibraryForm } from '@/app/(app)/practice/_components/practice-library-form'
-import { PracticeWaitingRoom } from '@/components/practice/practice-waiting-room'
+import { PracticeAccessCodeForm } from '@/components/practice/practice-access-code-form'
 import { isExamScreenLabEnabled } from '@/lib/exam-screen-lab-access'
 import { ShellClient } from '@/components/layout/shell-client'
 import type { BankQuestion } from '@/lib/question-bank'
@@ -77,7 +77,7 @@ export default async function PracticeLibraryLabPage({ searchParams }: {
   if (!isExamScreenLabEnabled(process.env)) notFound()
   const { view, shell } = await searchParams
 
-  if (view === 'student' || view === 'local-student' || view === 'run' || view === 'local-run' || view === 'single-run' || view === 'loading') {
+  if (view === 'waiting' || view === 'student' || view === 'local-student' || view === 'run' || view === 'local-run' || view === 'single-run' || view === 'loading') {
     const content = view === 'loading' ? <PracticeLoading /> : <StudentLibraryLab localReview={view === 'local-student' || view === 'local-run'} />
     if (shell === 'student') return <ShellClient
       user={{ id: '00000000-0000-4000-8300-000000000099', email: 'student@example.invalid', full_name: 'นักเรียนตัวอย่าง', role: 'student' }}
@@ -86,34 +86,15 @@ export default async function PracticeLibraryLabPage({ searchParams }: {
     return <main className="p-4 sm:p-6">{content}</main>
   }
 
-  if (view === 'waiting'  || view === 'waiting-locked') {
+  if (view === 'waiting-locked') {
     async function previewUnlock() {
       'use server'
     }
-    const locked = view === 'waiting-locked'
     return (
       <main className="mx-auto w-full max-w-6xl p-4 sm:p-6">
-        <p className="mb-4 text-xs text-muted-foreground">
-          ห้องทดลองหน้ารอคลังฝึก · ข้อมูลจำลอง · ไม่มีการอ่านหรือบันทึกฐานข้อมูล
-        </p>
-        <PracticeWaitingRoom
-          library={{
-            id: '00000000-0000-4000-8300-000000000001',
-            classroomId: '00000000-0000-4000-8300-000000000002',
-            title: 'สอวน. ค่าย 1 · ไฟฟ้าและกลศาสตร์',
-            description: '<p>เลือกหัวข้อที่อยากฝึก แล้วลองทำซ้ำได้ตามต้องการ</p>',
-            revealAnswerKey: false,
-            requiresAccessCode: locked,
-            calculatorEnabled: false,
-            scratchpadEnabled: true,
-            shuffleOptions: true,
-          }}
-          questionCount={128}
-          enterHref="/exam-screen-lab/practice-library?view=waiting"
-          returnHref="/exam-screen-lab/practice-library"
-          locked={locked}
-          unlockAction={locked ? previewUnlock : undefined}
-        />
+        <p className="mb-4 text-xs text-muted-foreground">ตัวอย่างฟอร์มรหัสเข้าคลังฝึก</p>
+        <PracticeAccessCodeForm title="สอวน. ค่าย 1 · ไฟฟ้าและกลศาสตร์"
+          returnHref="/exam-screen-lab/practice-library?view=student" unlockAction={previewUnlock} />
       </main>
     )
   }

@@ -1,3 +1,4 @@
+import { withSubmissionReviewStatus } from '@/lib/classroom-score-review.server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { homeroomAssignmentScope } from '@/lib/homeroom-assignment-scope'
 import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
@@ -22,6 +23,7 @@ export interface HomeroomSubmissionRow {
   assignment_id: string
   student_id: string
   status: string
+  pendingReview?: boolean
   total_score: number | null
   max_score: number
   submitted_at: string | null
@@ -107,7 +109,7 @@ export async function getHomeroomAggregate(
 
   const displayMaxByAssignment = new Map((assignmentRows ?? []).map((a: any) => [a.id as string, a.display_max_score as number | null]))
   const submissions = rescaleToDisplayMax(
-    await withVoidedScoreMetadata(admin, (submissionRows ?? []) as HomeroomSubmissionRow[]),
+    await withVoidedScoreMetadata(admin, await withSubmissionReviewStatus(admin, (submissionRows ?? []) as HomeroomSubmissionRow[])),
     row => displayMaxByAssignment.get(row.assignment_id) ?? null
   )
 

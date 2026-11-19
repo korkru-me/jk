@@ -253,9 +253,11 @@ async function submissionEntry(
       const limit = completionAttemptLimit(assignment)
       completedSubmissionId = passed?.id ?? (limit && existing.attempt_number >= limit ? existing.id : null)
     }
-    const blockedReason = assignment.start_at && new Date(assignment.start_at) > new Date()
-      ? `ยังไม่ถึงเวลาเปิด${assignment.type === 'exercise' ? 'แบบฝึกหัด' : 'สอบ'} กรุณาโหลดหน้านี้ใหม่เมื่อถึงเวลา`
-      : !expired && effectiveEndAt && new Date(effectiveEndAt) < new Date()
+    const serverNow = new Date()
+    const opensLater = assignment.start_at && new Date(assignment.start_at) > serverNow
+    const blockedReason = opensLater
+      ? `ยังไม่ถึงเวลาเปิด${assignment.type === 'exercise' ? 'แบบฝึกหัด' : 'สอบ'}`
+      : !expired && effectiveEndAt && new Date(effectiveEndAt) < serverNow
         ? 'หมดเวลาส่งแล้ว กรุณาติดต่อครูผู้สอน'
         : null
     const summary: ExamWaitingSummary = {
@@ -267,6 +269,7 @@ async function submissionEntry(
       questionCount: assignment.completion_rule === 'streak' ? null
         : assignment.random_question_count ?? assignment.question_ids?.length ?? 0,
       endAt: effectiveEndAt ?? null,
+      ...(opensLater && assignment.type === 'exam' ? { opensAt: assignment.start_at } : {}),
       accessMode: examAccess?.mode ?? 'browser',
       requiresAccessCode: Boolean(assignment.access_code) && existing?.status !== 'in_progress' && !completedSubmissionId,
       previousSubmissionId: existing?.id ?? null,
@@ -276,7 +279,7 @@ async function submissionEntry(
       expired: Boolean(expired),
       startedAt: existing?.status === 'in_progress' ? existing.started_at : null,
       expiresAt,
-      serverNow: new Date().toISOString(),
+      serverNow: serverNow.toISOString(),
       closeReason: existing?.close_reason ?? null,
       blockedReason,
     }

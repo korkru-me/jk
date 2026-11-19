@@ -49,23 +49,26 @@ const assignments: ClassroomAssignmentRow[] = Array.from({ length: 7 }, (_, inde
 }))
 
 const submissions = [
-  { id: id(3, 1), assignment_id: assignments[0].id, student_id: students[0].id, status: 'submitted', total_score: 9, max_score: 9, submitted_at: '2026-09-30T01:00:00.000Z', attempt_number: 1 },
-  { id: id(3, 2), assignment_id: assignments[1].id, student_id: students[1].id, status: 'submitted', total_score: 10, max_score: 11, submitted_at: '2026-09-30T01:00:00.000Z', attempt_number: 1 },
-  { id: id(3, 3), assignment_id: assignments[3].id, student_id: students[0].id, status: 'submitted', total_score: 4, max_score: 9, submitted_at: '2026-09-30T01:00:00.000Z', attempt_number: 1 },
-  { id: id(3, 4), assignment_id: assignments[4].id, student_id: students[1].id, status: 'submitted', total_score: 9, max_score: 11, submitted_at: '2026-09-30T01:00:00.000Z', attempt_number: 1 },
-  { id: id(3, 5), assignment_id: assignments[3].id, student_id: students[1].id, status: 'submitted', total_score: 0, max_score: 9, submitted_at: '2026-09-30T01:00:00.000Z', attempt_number: 1 },
+  { id: id(3, 1), assignment_id: assignments[0].id, student_id: students[0].id, status: 'graded', total_score: 9, max_score: 9, submitted_at: '2026-09-30T01:00:00.000Z', attempt_number: 1 },
+  { id: id(3, 2), assignment_id: assignments[1].id, student_id: students[1].id, status: 'graded', total_score: 10, max_score: 11, submitted_at: '2026-09-30T01:00:00.000Z', attempt_number: 1 },
+  { id: id(3, 3), assignment_id: assignments[3].id, student_id: students[0].id, status: 'submitted', pendingReview: true, total_score: 4, max_score: 9, submitted_at: '2026-09-30T01:00:00.000Z', attempt_number: 1 },
+  { id: id(3, 4), assignment_id: assignments[4].id, student_id: students[1].id, status: 'graded', total_score: 9, max_score: 11, submitted_at: '2026-09-30T01:00:00.000Z', attempt_number: 1 },
+  { id: id(3, 5), assignment_id: assignments[3].id, student_id: students[1].id, status: 'submitted', pendingReview: true, total_score: 0, max_score: 9, submitted_at: '2026-09-30T01:00:00.000Z', attempt_number: 1 },
   { id: id(3, 6), assignment_id: assignments[3].id, student_id: students[2].id, status: 'in_progress', total_score: null, max_score: 9, submitted_at: null, attempt_number: 1 },
   { id: id(3, 7), assignment_id: assignments[1].id, student_id: students[2].id, status: 'graded', total_score: 0, max_score: 11, submitted_at: '2026-09-30T01:00:00.000Z', attempt_number: 1 },
 ]
 
-const studentAssignments: StudentAssignmentRow[] = assignments.map(assignment => ({
+const studentAssignments: StudentAssignmentRow[] = assignments.map((assignment, index) => ({
   ...assignment,
   duration_minutes: null,
   retry_scope: 'all',
   show_results: 'immediate',
-  attempts_used: 0,
+  attempts_used: index < 2 ? 1 : 0,
   has_in_progress: false,
-  submission: null,
+  submission: index < 2 ? {
+    id: id(3, index + 10), status: 'submitted', pendingReview: index === 0,
+    total_score: 0, max_score: 10,
+  } : null,
 }))
 
 export function ScoresMatrixLabClient() {
@@ -126,7 +129,7 @@ export function ScoresMatrixLabClient() {
             students={showManyStudents ? manyStudents : students}
             assignments={labAssignments}
             categories={[]}
-            submissions={submissions}
+            submissions={submissions.map(row => reviewed && row.status === 'submitted' ? { ...row, status: 'graded', pendingReview: false } : row)}
             extensions={[]}
             extensionActions={extensionActions}
             pendingReviewByStudent={reviewed ? {} : { [assignments[3].id]: { [students[0].id]: true, [students[1].id]: true } }}

@@ -3,7 +3,7 @@
 import { WorkTypeIcon } from '@/components/assignments/work-type'
 import { workTypeConfig } from '@/lib/assignment-display'
 import { useEffect, useId, useMemo, useRef, useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
+import { useAssignmentDraftNavigation } from '@/components/assignments/use-assignment-draft-navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { toast } from 'sonner'
@@ -84,6 +84,7 @@ import {
 import { ClassroomPicker } from '@/components/assignments/classroom-picker'
 import { AssignmentReviewSummary } from '@/components/assignments/assignment-review-summary'
 import {
+  AssignmentDurationField,
   LateSubmissionScheduleFields,
   type LateBandDraft,
 } from '@/components/assignments/late-submission-schedule-fields'
@@ -141,7 +142,6 @@ export type AssignmentCopyPreset = Pick<
   | 'question_points'
   | 'display_max_score'
   | 'sections'
-  | 'show_sections'
   | 'start_at'
   | 'due_at'
   | 'late_bands'
@@ -213,7 +213,6 @@ export function CreateAssignmentForm({
   presetActions,
   actions,
 }: Props) {
-  const router = useRouter()
   const questionOrderDndId = useId()
   const questionOrderSensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
@@ -274,7 +273,6 @@ export function CreateAssignmentForm({
   const [sections, setSections] = useState<QuestionSetSection[]>(
     parseSections(copySource?.sections ?? preselectedSet?.sections)
   )
-  const [showSections, setShowSections] = useState(copySource?.show_sections ?? initialSettings.show_question_sections)
   const [search, setSearch] = useState('')
   const [diffFilter, setDiffFilter] = useState('all')
   const questionPickerRef = useRef<HTMLDivElement>(null)
@@ -442,7 +440,7 @@ export function CreateAssignmentForm({
     passing_value: passingEnabled ? optionalNumber(passingValue) : null,
     random_question_count: optionalNumber(randomQuestionCount),
     display_max_score: optionalNumber(displayMaxScore),
-    show_question_sections: showSections, require_work_image: requireWorkImage,
+    show_question_sections: false, require_work_image: requireWorkImage,
   }
 
   function applyPreset(settings: AssignmentPresetSettings) {
@@ -481,7 +479,6 @@ export function CreateAssignmentForm({
       ? String(settings.passing_value) : settings.passing_type === 'score' ? '7' : '70')
     setRandomQuestionCount(numberDraft(settings.random_question_count))
     setDisplayMaxScore(numberDraft(settings.display_max_score))
-    setShowSections(settings.show_question_sections)
     setRequireWorkImage(settings.require_work_image)
     // Passwords are never part of a preset. A previously typed SEB exit password
     // remains this draft's value; a new job always starts with fresh blank fields.
@@ -520,7 +517,6 @@ export function CreateAssignmentForm({
       requireWorkImage,
       selectedIds,
       sections: filterSectionsToQuestions(sections, selectedIds),
-      showSections,
       randomQuestionCount,
       questionPoints: selectedIds.map(id => [
         id,
@@ -567,7 +563,7 @@ export function CreateAssignmentForm({
     }),
     [
       title, description, classroomIds, groupTargets, requireWorkImage,
-      selectedIds, sections, showSections, randomQuestionCount, questionPointDrafts,
+      selectedIds, sections, randomQuestionCount, questionPointDrafts,
       defaultPointsById, displayMaxScore, duration, shuffleQ, shuffleA,
       sharedRandomValues, showResults, showSolutions, allowExamReview, maxAttempts, scoreStrategy,
       retryScope, questionsPerPage, instantCheck, instantCheckAnswerKey,
@@ -581,19 +577,7 @@ export function CreateAssignmentForm({
   const initialDraftFingerprintRef = useRef(draftFingerprint)
   const hasUnsavedAssignmentChanges = draftFingerprint !== initialDraftFingerprintRef.current
 
-  useEffect(() => {
-    if (!hasUnsavedAssignmentChanges) return
-
-    function warnBeforeLeaving(event: BeforeUnloadEvent) {
-      event.preventDefault()
-      // Browsers deliberately replace this value with their own localized
-      // confirmation text. Assigning it is still required by older engines.
-      event.returnValue = ''
-    }
-
-    window.addEventListener('beforeunload', warnBeforeLeaving)
-    return () => window.removeEventListener('beforeunload', warnBeforeLeaving)
-  }, [hasUnsavedAssignmentChanges])
+  const draftNavigation = useAssignmentDraftNavigation(hasUnsavedAssignmentChanges)
 
   const scheduleRef = useRef<HTMLDivElement>(null)
   const additionalClassroomsRef = useRef<HTMLDivElement>(null)
@@ -717,8 +701,6 @@ export function CreateAssignmentForm({
           .map(g => g.name)
           .join(', ')}`
       : `เฉพาะบางกลุ่มใน ${limitedRooms.length} ห้อง`
-  // What survives of the แฟ้มย่อย after the teacher's own picking.
-  const assignedSections = filterSectionsToQuestions(sections, selectedIds)
 
   // How the ข้อต่อหน้า setting will actually break up this งาน. Counted
   // against the สุ่ม draw when one is set, since that is how many questions a
@@ -976,7 +958,6 @@ export function CreateAssignmentForm({
         description: description.trim(),
         question_ids: selectedIds,
         sections: filterSectionsToQuestions(sections, selectedIds),
-        show_sections: showSections,
         question_points: questionPoints,
         display_max_score: displayMax,
         set_id: preselectedSet?.id,
@@ -1170,12 +1151,12 @@ export function CreateAssignmentForm({
         </div>
       )}
 
-      {/* ── Step 1 continued: โจทย์ คะแนน และเวลา ─────────────────────── */}
+      {/* ── Step 1 continued: โจทย์และคะแนน ─────────────────────── */}
       {step === 0 && (
         <div className="space-y-3">
           <Card padding="md" className="flex min-w-0 flex-col gap-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-sm font-semibold text-foreground">โจทย์ คะแนน และเวลา</h2>
+              <h2 className="text-sm font-semibold text-foreground">โจทย์และคะแนน</h2>
               <span className="shrink-0 text-sm font-semibold text-primary">
                 {previewQuestions.length} ข้อ · {randomDrawOn ? 'ข้อละ 1 คะแนน' : `รวม ${pointsSum} คะแนน`}
               </span>
@@ -1322,7 +1303,7 @@ export function CreateAssignmentForm({
               </SortableContext>
             </DndContext>
             <Separator />
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="flex flex-col gap-3">
               {streakOn && (
                 <p data-assignment-description className="text-xs text-muted-foreground rounded-lg bg-muted px-3 py-2">
                   {completionSectionLabel}ตั้งไว้เป็น “ทำถูกติดต่อกัน {streakTarget} ข้อ” — หน้าทำโจทย์จึงแสดงทีละ 1 ข้อ
@@ -1346,18 +1327,6 @@ export function CreateAssignmentForm({
                 </div>
               )}
 
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="dur">เวลาทำ (นาที)</Label>
-                <Input
-                  id="dur"
-                  type="number"
-                  min={1}
-                  value={duration}
-                  onChange={e => setDuration(e.target.value)}
-                  placeholder="ไม่จำกัด (เว้นว่าง)"
-                  className="max-w-[200px]"
-                />
-              </div>
             </div>
 
           </Card>
@@ -1725,14 +1694,6 @@ export function CreateAssignmentForm({
                 set: setScratchpadEnabled,
                 footer: null as React.ReactNode,
               },
-              ...(assignedSections.length > 0 ? [{
-                label: 'แสดงชื่อแฟ้มย่อยให้นักเรียนเห็น',
-                desc: shuffleQ
-                  ? `${assignedSections.length} แฟ้มย่อย — สับลำดับข้ออยู่ ชื่อแฟ้มย่อยจะแสดงกำกับรายข้อแทนหัวเรื่อง`
-                  : `${assignedSections.length} แฟ้มย่อยจากแฟ้มโจทย์ เช่น "${assignedSections[0].title || 'ไม่ได้ตั้งชื่อ'}"`,
-                value: showSections,
-                set: setShowSections,
-              }] : []),
               {
                 label: 'สับลำดับข้อ',
                 desc: randomDrawOn
@@ -2016,6 +1977,8 @@ export function CreateAssignmentForm({
                 </div>
               </CollapsibleContent>
             </Collapsible>
+            <Separator className="my-3" />
+            <AssignmentDurationField id="dur" value={duration} onChange={setDuration} />
           </Card>
 
           {preselectedClassroomId && (
@@ -2182,11 +2145,12 @@ export function CreateAssignmentForm({
       />
 
       {/* Navigation */}
+      {draftNavigation.dialog}
       <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:items-center sm:justify-between">
         <Button
           type="button"
           variant="outline"
-          onClick={() => step > 0 ? setStep(s => s - 1) : router.back()}
+          onClick={() => step > 0 ? setStep(s => s - 1) : void draftNavigation.back()}
           className="w-full gap-2 sm:w-auto"
         >
           <ChevronLeft className="w-4 h-4" />

@@ -94,7 +94,7 @@ export function assignmentPresetDefaults(type: AssignmentType): AssignmentPreset
     completion_rule: 'fixed', streak_target: STREAK_TARGET_DEFAULT,
     streak_question_cap: defaultQuestionCap(STREAK_TARGET_DEFAULT), streak_recycle_pool: true,
     passing_type: null, passing_value: null, random_question_count: null,
-    display_max_score: null, show_question_sections: true, require_work_image: false,
+    display_max_score: null, show_question_sections: false, require_work_image: false,
   }
 }
 

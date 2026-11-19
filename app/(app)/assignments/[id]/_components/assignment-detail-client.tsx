@@ -77,8 +77,9 @@ export function AssignmentDetailClient({
     : `/assignments/${a.id}/results`
   const submittedSubs = submissions.filter(s => s.status === 'submitted' || s.status === 'graded')
   const inProgressSubs = submissions.filter(s => s.status === 'in_progress')
-  const avgScore = submittedSubs.length > 0
-    ? Math.round(submittedSubs.reduce((sum, s) => sum + (s.total_score ?? 0) / (s.max_score || 1) * 100, 0) / submittedSubs.length)
+  const gradedSubs = submittedSubs.filter(s => !s.pendingReview && (s.id == null || !pendingIdSet.has(s.id)))
+  const avgScore = gradedSubs.length > 0
+    ? Math.round(gradedSubs.reduce((sum, s) => sum + (s.total_score ?? 0) / (s.max_score || 1) * 100, 0) / gradedSubs.length)
     : null
   const uniqueQuestionCount = new Set(a.question_ids).size
   const missingQuestionCount = Math.max(0, uniqueQuestionCount - questions.length)
@@ -229,7 +230,6 @@ export function AssignmentDetailClient({
       <AssignmentQuestionCards
         questions={questions}
         sections={parseSections(a.sections)}
-        showSections={a.show_sections !== false}
       />
 
       {confirmDialog}
@@ -462,7 +462,7 @@ function StudentsTab({ submissions, pendingIdSet }: { submissions: SubmissionRow
                   : null
                 // A row only opens when there is an attempt to read; a student
                 // who has not started has nothing to score yet.
-                const isPendingReview = submission.id != null && pendingIdSet.has(submission.id)
+                const isPendingReview = submission.pendingReview === true || (submission.id != null && pendingIdSet.has(submission.id))
                 return (
                   <TableRow key={submission.id ?? submission.student_id}>
                     <TableCell className="min-w-64 whitespace-normal py-3">
@@ -494,7 +494,7 @@ function StudentsTab({ submissions, pendingIdSet }: { submissions: SubmissionRow
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      {submission.total_score != null ? (
+                      {isPendingReview ? <Badge variant="statusWarning">รอตรวจ</Badge> : submission.total_score != null ? (
                         <div className="ml-auto w-24">
                           <span className="font-bold text-foreground">{submission.total_score}/{submission.max_score}</span>
                           {percentage !== null && (

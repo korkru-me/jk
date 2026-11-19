@@ -30,6 +30,7 @@ export default async function CompleteProfilePage({ searchParams }: Props) {
   if (!profile) redirect('/login')
   if (profile.role === 'admin' || profile.survey_role) redirect('/dashboard')
 
+  const teacherOnly = user.app_metadata?.provider === 'google'
   const params = await searchParams
   const defaultRole: AccountRole | undefined =
     params.role === 'teacher' || params.role === 'student' ? params.role : undefined
@@ -50,10 +51,12 @@ export default async function CompleteProfilePage({ searchParams }: Props) {
         <div className="mb-3 text-center">
           <h1 className="text-2xl font-bold text-foreground">ตั้งค่าบัญชีอีกนิดเดียว</h1>
           <p className="text-sm text-muted-foreground">
-            ยืนยันชื่อและประเภทบัญชี แล้วเริ่มใช้งานได้ทันที
+            {teacherOnly
+              ? 'ยืนยันชื่อสำหรับบัญชีครู แล้วเริ่มใช้งานได้ทันที'
+              : 'ยืนยันชื่อและประเภทบัญชี แล้วเริ่มใช้งานได้ทันที'}
           </p>
         </div>
-        <CompleteProfileForm defaultName={defaultName} defaultRole={defaultRole} />
+        <CompleteProfileForm defaultName={defaultName} defaultRole={defaultRole} teacherOnly={teacherOnly} />
       </Card>
       <Link href="/contact" className="inline-flex min-h-11 items-center text-sm text-muted-foreground hover:underline">ติดต่อผู้ดูแล</Link>
     </main>

@@ -1,61 +1,51 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it } from 'vitest'
-import { PracticeWaitingRoom } from '@/components/practice/practice-waiting-room'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { PracticeAccessCodeForm } from '@/components/practice/practice-access-code-form'
+import PracticeEntryPage from '@/app/(app)/practice/[id]/page'
 
-const library = {
-  id: '10000000-0000-4000-8000-000000000001',
-  classroomId: '10000000-0000-4000-8000-000000000002',
-  title: 'สอวน. ค่าย 1 · ไฟฟ้า',
-  description: '<p><strong>เลือกฝึกตามหัวข้อที่ต้องการ</strong><img src=x onerror=alert(1)></p>',
-  revealAnswerKey: false,
-  requiresAccessCode: false,
-  calculatorEnabled: false,
-  scratchpadEnabled: true,
-  shuffleOptions: true,
+const mocks = vi.hoisted(() => ({ read: vi.fn(), hasCodeSession: vi.fn() }))
+vi.mock('next/navigation', () => ({
+  redirect: (href: string) => { throw new Error(`redirect:${href}`) },
+  notFound: () => { throw new Error('not-found') },
+}))
+vi.mock('@/lib/auth/server', () => ({ getAuthUser: async () => ({ id: 'student' }) }))
+vi.mock('@/lib/practice-question', () => ({ isPracticeLibraryEnabled: () => true }))
+vi.mock('@/lib/practice-question-access.server', () => ({ loadPracticeLibraryWaiting: mocks.read }))
+vi.mock('@/lib/practice-access-session.server', () => ({ hasPracticeAccessSession: mocks.hasCodeSession, grantPracticeAccessSession: vi.fn() }))
+
+const id = '10000000-0000-4000-8000-000000000001'
+const title = 'สอวน. ค่าย 1 · ไฟฟ้า'
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  vi.stubGlobal('React', { createElement })
+})
+afterEach(() => vi.unstubAllGlobals())
+
+function entry(requiresAccessCode: boolean, searchParams = {}) {
+  mocks.read.mockResolvedValue({ status: 'ready', library: { id, title, requiresAccessCode } })
+  return PracticeEntryPage({ params: Promise.resolve({ id }), searchParams: Promise.resolve(searchParams) })
 }
 
-describe('practice waiting room', () => {
-  it('explains the unscored flow before exposing the searchable library', () => {
-    const html = renderToStaticMarkup(createElement(PracticeWaitingRoom, {
-      library,
-      questionCount: 128,
-      enterHref: '/practice/library-1/library',
-    }))
-
-    expect(html).toContain('หน้ารอเข้าคลังฝึก')
-    expect(html).toContain('128 ข้อ')
-    expect(html).toContain('ไม่เก็บคำตอบ ผลถูกผิด หรือคะแนน')
-    expect(html).toContain('ส่งคำตอบเพื่อดูสรุปผลการฝึกได้')
-    expect(html).toContain('href="/practice/library-1/library"')
-    expect(html).not.toContain('<input')
+describe('student practice library entry', () => {
+  it('preserves search and enters the question list directly for an unlocked library', async () => {
+    await expect(entry(false, { q: 'test' })).rejects.toThrow(`redirect:/practice/${id}/library?q=test`)
+    expect(mocks.hasCodeSession).not.toHaveBeenCalled()
+    mocks.hasCodeSession.mockResolvedValue(true)
+    await expect(entry(true)).rejects.toThrow(`redirect:/practice/${id}/library`)
   })
 
-  it('keeps supported formatting and removes unsafe announcement markup', () => {
-    const html = renderToStaticMarkup(createElement(PracticeWaitingRoom, {
-      library,
-      questionCount: 1,
-      enterHref: '/practice/library-1/library',
-    }))
-
-    expect(html).toContain('<strong>เลือกฝึกตามหัวข้อที่ต้องการ</strong>')
-    expect(html).not.toContain('src="x"')
-    expect(html).not.toContain('onerror')
-  })
-
-  it('requires the configured access code before showing the library link', () => {
-    const html = renderToStaticMarkup(createElement(PracticeWaitingRoom, {
-      library: { ...library, requiresAccessCode: true },
-      questionCount: 1,
-      enterHref: '/practice/library-1/library',
-      locked: true,
-      unlockAction: () => {},
-      accessError: 'invalid',
-    }))
-
+  it('renders only the code prompt when access is locked', async () => {
+    mocks.hasCodeSession.mockResolvedValue(false)
+    const page = await entry(true, { access: 'invalid' })
+    expect(page.type).toBe(PracticeAccessCodeForm)
+    const html = renderToStaticMarkup(page)
+    expect(html).toContain(title)
     expect(html).toContain('name="accessCode"')
     expect(html).toContain('required=""')
     expect(html).toContain('รหัสผ่านไม่ถูกต้อง')
-    expect(html).not.toContain('href="/practice/library-1/library"')
+    expect(html).not.toContain('หน้ารอ')
+    expect(html).not.toContain(`href="/practice/${id}/library"`)
   })
 })

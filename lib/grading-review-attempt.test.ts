@@ -14,7 +14,7 @@ describe('pending contributors in average grading review', () => {
     const official = officialSubmissionsByStudent(rows, 'average')
     const reviewed = preferPendingAverageReviewAttempts(official, rows, new Set(['older']))
 
-    expect(reviewed.get('student')).toEqual({ representative: rows[0], total_score: 2.5, max_score: 7 })
+    expect(reviewed.get('student')).toEqual({ representative: rows[0], total_score: 2.5, max_score: 7, pendingReview: false })
     expect(official.get('student')?.representative).toBe(rows[1])
     expect(rows.map(row => row.total_score)).toEqual([1, 4])
   })

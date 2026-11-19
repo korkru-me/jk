@@ -256,8 +256,8 @@ export function ClassroomDetailClient({
   }, [])
 
   const switchClassroom = useCallback((classroomId: string) => {
-    router.push(classroomNavigationPath(classroomId, activeTab))
-  }, [activeTab, router])
+    router.push(classroomNavigationPath(classroomId, 'overview'))
+  }, [router])
 
   useEffect(() => {
     function syncNavigationFromHistory() {

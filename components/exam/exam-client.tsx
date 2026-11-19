@@ -53,7 +53,6 @@ import { RichText } from '@/components/ui/rich-text'
 import { containsMath } from '@/lib/math/latex'
 import { renderRichTextHtml } from '@/lib/rich-text-html'
 import { partLabels } from '@/lib/part-labels'
-import { sectionByQuestionId, type QuestionSetSection } from '@/lib/question-set-sections'
 import { getBlankType, splitFillBlankHtml, extractBlankNumbers } from '@/lib/fill-blank'
 import { splitAnswerBlankHtml, countAnswerBlanks, splitNumberedAnswerBlanks } from '@/lib/answer-blank'
 import type { AnswerPart, AssignmentType, MatchingAnswerMode, MathInputMode, TrueFalseConfig, TrueFalseStatement, TrueFalseExplanationMode, FillBlankConfig, OrderingConfig, OrderingItem, RandomQuestionConfig, FileUploadConfig, SubmittedFile, CompositeConfig, ClassifyConfig, ImageLabelConfig, LogicRule, Question } from '@/lib/types'
@@ -220,7 +219,6 @@ interface Props {
   config: ExamConfig
   /** แฟ้มย่อย snapshotted onto the assignment, already filtered by the server to
    *  what this assignment contains. Empty/omitted = plain numbered list. */
-  sections?: QuestionSetSection[]
   /** How many questions share one screen. 1 (the default, and every
    *  assignment saved before the setting existed) is the original
    *  one-question-per-screen layout. */
@@ -243,6 +241,7 @@ interface Props {
   previewEditWarning?: string
   classroomCover?: string
   assignmentTitle?: string
+  exerciseInstructions?: string | null
   /** "ดูข้อสอบที่ทำเสร็จแล้ว": the handed-in ข้อสอบ reopened read-only, each ข้อ
    *  already carrying its ถูก/ผิด panel and เฉลย, built on the server by
    *  lib/exam-review.ts. Nothing is saved, timed, proctored or submitted, and
@@ -310,7 +309,7 @@ function requiredWorkImageCount(a: AnswerRow, config: ExamConfig): number {
   return parts && parts.length > 0 ? parts.length : 1
 }
 
-export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkArtifacts = [], durationMinutes, startedAt, expiresAt, serverNow, config, sections = [], questionsPerPage = 1, streak, previewMode = false, previewReturnHref, previewEditWarning, review, classroomCover, assignmentTitle }: Props) {
+export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkArtifacts = [], durationMinutes, startedAt, expiresAt, serverNow, config, questionsPerPage = 1, streak, previewMode = false, previewReturnHref, previewEditWarning, review, classroomCover, assignmentTitle, exerciseInstructions }: Props) {
   const router = useRouter()
   const [expired, setExpired] = useState(false)
   // A teacher's preview opens the same read-only review from its own result
@@ -345,11 +344,6 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
   const [currentIndex, setCurrentIndex] = useState(0)
   /** -1 for every งาน that is not a streak run, which disables the sync below. */
   const streakLatestIndex = streak != null ? answers.length - 1 : -1
-  // The question card may still show the first section that owns it, but the
-  // navigator is deliberately one uninterrupted number sequence. A question
-  // can belong to more than one section, so section headings here implied a
-  // grouping that the student's actual order does not guarantee.
-  const sectionOwner = sectionByQuestionId(sections)
   // Preview-only: the client-side (never persisted) grading result shown
   // after a teacher clicks submit in previewMode, in place of the real
   // /submissions/[id] results page.
@@ -1448,9 +1442,6 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                     <Badge variant="outline" className="font-mono text-xs" data-study-number>
                       {streakOn ? `ข้อที่ ${questionIndex + 1}` : `ข้อ ${questionIndex + 1} / ${answers.length}`}
                     </Badge>
-                    {sectionOwner.get(current.question_id)?.title && (
-                      <Badge variant="outline" className="max-w-full overflow-hidden text-xs"><span className="truncate">{sectionOwner.get(current.question_id)!.title}</span></Badge>
-                    )}
                     {current.questions.question_type === 'mcq' && (
                       <Badge variant="outline" className="text-xs">ปรนัย</Badge>
                     )}
@@ -1931,6 +1922,12 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
               focusModeButtonRef={focusModeTriggerRef}
             />
           </ExamToolbarDock>
+          {exerciseInstructions && (
+            <details className="rounded-lg border px-3">
+              <summary className="min-h-11 cursor-pointer py-3 text-sm font-medium">คำชี้แจงจากครู</summary>
+              <RichText text={exerciseInstructions} blocks className="whitespace-pre-wrap break-words pb-3 text-sm leading-6" />
+            </details>
+          )}
           <div className="flex-1">{examBody}</div>
         </div>
       )}

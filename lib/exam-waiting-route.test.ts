@@ -24,8 +24,8 @@ const waiting: ExamWaitingSummary = {
   activeSubmissionId: receipt, completedSubmissionId: null, expired: false,
   startedAt: '2026-10-10T03:00:00Z', blockedReason: null,
 }
-function page(attempt?: string | string[]) {
-  return TakePage({ params: Promise.resolve({ id }), searchParams: Promise.resolve({ attempt }) })
+function page(attempt?: string | string[], retry?: string) {
+  return TakePage({ params: Promise.resolve({ id }), searchParams: Promise.resolve({ attempt, retry }) })
 }
 beforeEach(() => {
   vi.clearAllMocks()
@@ -42,11 +42,24 @@ afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers() })
 
 describe.each(['exam', 'exercise'] as const)('ordinary %s page composition (mocked external reads)', type => {
   beforeEach(() => m.entry.mockResolvedValue({ waitingRoom: { ...waiting, assignmentType: type } }))
-  it.each([undefined, 'foreign-receipt', [receipt]])('default/stale/forged GET %j returns only waiting without exam data', async hint => {
-    expect((await page(hint) as ReactElement).type).toBe(m.waiting)
+  it.each(['foreign-receipt', [receipt]])('stale or forged GET %j never loads question data', async hint => {
+    const rendered = await page(hint) as ReactElement<{ autoEnterExercise: boolean }>
+    expect(rendered.type).toBe(m.waiting)
+    expect(rendered.props.autoEnterExercise).toBe(false)
     expect(m.exam).not.toHaveBeenCalled(); expect(m.draw).not.toHaveBeenCalled()
   })
-  it('only an exact active receipt gets safe question data and the original start time', async () => {
+  it('resumes an active exercise directly while the exam still needs its receipt', async () => {
+    const rendered = await page() as ReactElement<{ children?: ReactElement }>
+    if (type === 'exam') {
+      expect(rendered.type).toBe(m.waiting)
+      expect(m.exam).not.toHaveBeenCalled()
+    } else {
+      expect(rendered.props.children?.type).toBe(m.client)
+      expect(m.exam).toHaveBeenCalledExactlyOnceWith(receipt)
+    }
+    expect(m.draw).not.toHaveBeenCalled()
+  })
+  it('an exact active receipt gets safe question data and the original start time', async () => {
     const rendered = await page(receipt) as ReactElement<{ children: ReactElement<{ startedAt: string; classroomCover: string }> }>
     expect(m.exam).toHaveBeenCalledExactlyOnceWith(receipt)
     expect(rendered.props.children.type).toBe(m.client)
@@ -81,4 +94,20 @@ describe.each(['exam', 'exercise'] as const)('ordinary %s page composition (mock
     await expect(page()).rejects.toThrow('redirect:/assignments')
     expect(m.draw).not.toHaveBeenCalled(); expect(m.exam).not.toHaveBeenCalled()
   })
+})
+
+it('an unstarted exercise only gets entry metadata from GET', async () => {
+  m.entry.mockResolvedValue({ waitingRoom: { ...waiting, assignmentType: 'exercise', activeSubmissionId: null, previousSubmissionId: null } })
+  const element = await page() as ReactElement<{ autoEnterExercise: boolean; retryExercise: boolean }>
+  expect(element.type).toBe(m.waiting)
+  expect(element.props).toMatchObject({ autoEnterExercise: true, retryExercise: false })
+  expect(m.exam).not.toHaveBeenCalled(); expect(m.draw).not.toHaveBeenCalled()
+})
+
+it('an exercise receipt reload cannot trigger a successor after submission', async () => {
+  m.entry.mockResolvedValue({ waitingRoom: { ...waiting, assignmentType: 'exercise', activeSubmissionId: null, finishedSubmissionId: receipt } })
+  await expect(page(receipt, '1')).rejects.toThrow(`redirect:/submissions/${receipt}`)
+  const retry = await page(undefined, '1') as ReactElement<{ retryExercise: boolean }>
+  expect(retry.props.retryExercise).toBe(true)
+  expect(m.exam).not.toHaveBeenCalled(); expect(m.draw).not.toHaveBeenCalled()
 })

@@ -11,10 +11,9 @@ import { Card } from '@/components/ui/card'
 import { buttonVariants } from '@/components/ui/button'
 import { subQuestionCount } from '@/lib/question-parts'
 
-export function AssignmentQuestionCards({ questions, sections, showSections }: {
+export function AssignmentQuestionCards({ questions, sections }: {
   questions: Question[]
   sections: QuestionSetSection[]
-  showSections: boolean
 }) {
   const [open, setOpen] = useState(true)
   const [previewIds, setPreviewIds] = useState<string[]>([])
@@ -33,7 +32,7 @@ export function AssignmentQuestionCards({ questions, sections, showSections }: {
             {open ? 'พับรายการ' : 'แสดงรายการ'}{open ? <ChevronUp /> : <ChevronDown />}
           </CollapsibleTrigger>
         </div>
-        {!showSections && sections.length > 0 && <p className="text-xs text-muted-foreground">ชื่อแฟ้มย่อยในหน้านี้แสดงเฉพาะครู</p>}
+        {sections.length > 0 && <p className="text-xs text-muted-foreground">ชื่อแฟ้มย่อยในหน้านี้แสดงเฉพาะครู</p>}
         <CollapsibleContent>
           <div className="flex min-w-0 flex-col gap-2">
             {questions.length === 0 ? <Card padding="md" edge="dashed" className="text-center text-sm text-muted-foreground">ยังไม่มีโจทย์ที่เปิดดูได้</Card> : questions.map((question, index) => (
