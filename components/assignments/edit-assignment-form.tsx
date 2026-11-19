@@ -56,6 +56,7 @@ import {
   RESULT_VISIBILITY_OPTIONS,
 } from '@/components/assignments/result-visibility-options'
 import {
+  AssignmentDurationField,
   LateSubmissionScheduleFields,
   type LateBandDraft,
 } from '@/components/assignments/late-submission-schedule-fields'
@@ -117,7 +118,6 @@ export type EditableAssignment = Pick<
   | 'show_solutions'
   | 'allow_exam_review'
   | 'sections'
-  | 'show_sections'
   | 'shuffle_questions'
   | 'shuffle_options'
   | 'access_code'
@@ -181,7 +181,6 @@ export function EditAssignmentForm({
   // เฉลย back until every class has sat it.
   const [showSolutions, setShowSolutions] = useState(a.show_solutions === true)
   const [allowExamReview, setAllowExamReview] = useState(a.allow_exam_review === true)
-  const [showSections, setShowSections] = useState(a.show_sections !== false)
   const [shuffleQuestions, setShuffleQuestions] = useState(a.shuffle_questions === true)
   const [shuffleOptions, setShuffleOptions] = useState(a.shuffle_options === true)
   const [accessCode, setAccessCode] = useState(a.access_code ?? '')
@@ -450,7 +449,6 @@ export function EditAssignmentForm({
         // Like เฉลยวิธีทำ, changeable after students have finished: it only
         // decides whether the read-only review opens.
         ...(a.type === 'exam' ? { allow_exam_review: allowExamReview } : {}),
-        show_sections: showSections,
         proctoring_enabled: proctoringEnabled,
         fullscreen_required: fullscreenRequired,
         block_clipboard: blockClipboard,
@@ -490,7 +488,7 @@ export function EditAssignmentForm({
 
       <Card padding="md" className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold text-foreground">โจทย์ คะแนน และเวลา</h2>
+          <h2 className="text-sm font-semibold text-foreground">โจทย์และคะแนน</h2>
           <span className="text-sm font-semibold text-primary shrink-0">
             {questionIds.length} ข้อ · {randomDrawOn ? 'ข้อละ 1 คะแนน' : `รวม ${pointsSum} คะแนน`}
           </span>
@@ -599,7 +597,7 @@ export function EditAssignmentForm({
         {a.mode === 'online' && (
           <>
             <Separator />
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="flex flex-col gap-3">
               {streakOn && (
                 <p className="text-xs text-muted-foreground rounded-lg bg-muted px-3 py-2">
                   {completionSectionLabel}เป็น “ทำถูกติดต่อกัน {streakTarget} ข้อ” — หน้าทำโจทย์แสดงทีละ 1 ข้อ และเปิดการตรวจทีละข้อให้เสมอ
@@ -626,18 +624,6 @@ export function EditAssignmentForm({
                   </p>
                 </div>
               )}
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="edit-duration">เวลาทำ (นาที)</Label>
-                <Input
-                  id="edit-duration"
-                  type="number"
-                  min={1}
-                  value={durationMinutes}
-                  onChange={e => setDurationMinutes(e.target.value)}
-                  placeholder="ไม่จำกัด (เว้นว่าง)"
-                  className="max-w-[200px]"
-                />
-              </div>
             </div>
           </>
         )}
@@ -1006,14 +992,6 @@ export function EditAssignmentForm({
             </>
           )}
 
-          {assignmentSections.length > 0 && (
-            <AssignmentSettingToggle
-              label="แสดงชื่อแฟ้มย่อยให้นักเรียนเห็น"
-              description={`${assignmentSections.length} แฟ้มย่อย — ลำดับและเลขข้อไม่เปลี่ยนไม่ว่าจะเปิดหรือปิด`}
-              checked={showSections}
-              onCheckedChange={setShowSections}
-            />
-          )}
 
           <AssignmentSettingToggle
             label="สับลำดับข้อ"
@@ -1183,6 +1161,9 @@ export function EditAssignmentForm({
             onEndAtChange={setEndAt}
             onBandsChange={setLateBands}
           />
+          {a.mode === 'online' && (
+            <AssignmentDurationField id="edit-duration" value={durationMinutes} onChange={setDurationMinutes} />
+          )}
         </div>
       </Card>
 

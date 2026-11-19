@@ -27,7 +27,7 @@ export interface AbilitySubmission extends AttemptRow {
   student_id: string
 }
 
-export type AbilityCellState = 'done' | 'in_progress' | 'missing'
+export type AbilityCellState = 'done' | 'pending' | 'in_progress' | 'missing'
 
 export interface AbilityCell {
   assignmentId: string
@@ -104,14 +104,12 @@ export function buildStudentAbilities(
         })
         continue
       }
-      // A handed-in attempt with no total yet reads as 0, as it does in the
-      // scores table — it was handed in, so it is not "missing".
-      const score = result.total_score ?? 0
+      const score = result.pendingReview ? null : result.total_score
       const maxScore = result.max_score
       cells.set(studentId, {
         assignmentId: assignment.id,
-        state: 'done',
-        percent: maxScore > 0 ? Math.min(100, Math.max(0, (score / maxScore) * 100)) : null,
+        state: result.pendingReview ? 'pending' : 'done',
+        percent: score !== null && maxScore > 0 ? Math.min(100, Math.max(0, (score / maxScore) * 100)) : null,
         score,
         maxScore,
         submissionId: result.representative.id,
@@ -135,7 +133,7 @@ export function buildStudentAbilities(
       studentId,
       cells,
       average: mean(percents),
-      submittedCount: cells.filter(cell => cell.state === 'done').length,
+      submittedCount: cells.filter(cell => cell.state === 'done' || cell.state === 'pending').length,
     })
   }
   return result
@@ -150,7 +148,7 @@ export function assignmentAverages(
   const submitted = new Map<string, number>(assignmentIds.map(id => [id, 0]))
   for (const ability of abilities) {
     for (const cell of ability.cells) {
-      if (cell.state !== 'done') continue
+      if (cell.state !== 'done' && cell.state !== 'pending') continue
       submitted.set(cell.assignmentId, (submitted.get(cell.assignmentId) ?? 0) + 1)
       if (cell.percent !== null) percents.get(cell.assignmentId)?.push(cell.percent)
     }

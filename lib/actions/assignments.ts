@@ -92,8 +92,6 @@ interface CreateAssignmentData {
    *  it was built from. Filtered server-side to questions this assignment
    *  actually contains. */
   sections?: QuestionSetSection[]
-  /** Whether those แฟ้มย่อย appear for students and on the printed sheet. */
-  show_sections?: boolean
   start_at: string | null
   /** Phase 1 data boundary; the create UI is added in phase 2. Both fields
    * must travel together once the UI starts sending them. */
@@ -437,7 +435,7 @@ async function createQuestionAssignment(data: CreateAssignmentData, inline?: { a
       display_max_score: displayMaxScore,
       set_id: data.set_id ?? null,
       sections: sections.length > 0 ? filterSectionsToQuestions(sections, questionIds) : null,
-      show_sections: data.show_sections ?? true,
+      show_sections: false,
       start_at: data.start_at || null,
       due_at: lateSchedule.value.dueAt,
       late_bands: lateSchedule.value.bands,
@@ -661,9 +659,6 @@ interface UpdateAssignmentData {
    *  anyone has started, and leaving it on keeps the seed already stored — a
    *  new one would hand the next student different numbers. */
   shared_random_values?: boolean
-  /** Only the visibility of the frozen แฟ้มย่อย is editable after the fact —
-   *  the grouping itself belongs to the แฟ้มโจทย์ this งาน came from. */
-  show_sections?: boolean
   proctoring_enabled: boolean
   fullscreen_required: boolean
   block_clipboard: boolean
@@ -1018,7 +1013,6 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
       title: data.title.trim(),
       description: sanitizeRichTextForStorage(data.description.trim()) || null,
       ...(data.access_code === undefined ? {} : { access_code: data.access_code?.trim() || null }),
-      ...(data.show_sections === undefined ? {} : { show_sections: data.show_sections }),
       ...(questionSet ? { question_ids: questionSet.question_ids, sections: questionSet.sections } : {}),
       start_at: data.start_at || null,
       ...(lateScheduleChanged

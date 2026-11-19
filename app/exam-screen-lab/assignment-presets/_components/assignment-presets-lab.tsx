@@ -45,7 +45,7 @@ function copiedAssignment(type: AssignmentType): AssignmentCopyPreset {
     ...assignmentPresetDefaults(type), id: '00000000-0000-4000-8600-000000000001',
     title: 'งานต้นฉบับจำลอง', description: 'คำอธิบายจำลองที่ชุดการตั้งค่าห้ามทับ',
     question_ids: questions.map(question => question.id), question_points: { [questions[0].id]: 7 },
-    display_max_score: 20, sections: [], show_sections: true,
+    display_max_score: 20, sections: [],
     start_at: '2026-10-08T02:00:00.000Z', due_at: null, late_bands: [], end_at: '2026-10-10T09:00:00.000Z',
     duration_minutes: 7, type, shared_random_seed: null, random_question_count: null,
     streak_target: null, streak_question_cap: null, access_code: 'LAB-ONLY', allow_exam_review: false,
@@ -164,7 +164,8 @@ export function AssignmentPresetsLab() {
       <CreateAssignmentForm key={`${type}-${copy}-${generation}`}
         classrooms={[{ id: ROOM, name: 'ห้องจำลอง', description: null }]} questions={questions}
         preselectedAssignmentType={type} preselectedClassroomId={ROOM}
-        preselectedSet={{ id: '00000000-0000-4000-8400-000000000001', title: 'แฟ้มจำลองหกข้อ', description: 'คำอธิบายที่ชุดการตั้งค่าห้ามทับ', question_ids: questions.map(question => question.id), sections: [] }}
+        preselectedSet={{ id: '00000000-0000-4000-8400-000000000001', title: 'แฟ้มจำลองหกข้อ', description: 'คำอธิบายที่ชุดการตั้งค่าห้ามทับ', question_ids: questions.map(question => question.id),
+          sections: [{ id: 'lab-section', title: 'แฟ้มย่อยจำลองของครู', question_ids: questions.slice(0, 2).map(question => question.id) }] }}
         copySource={copy ? copiedAssignment(type) : undefined}
         presetBootstrap={bootstrapError ? { presets: [], defaultPresetId: null, error: '(จำลอง) โหลดชุดเริ่มต้นไม่สำเร็จ' } : structuredClone(store.current[type])}
         presetActions={presetActions} actions={assignmentActions}

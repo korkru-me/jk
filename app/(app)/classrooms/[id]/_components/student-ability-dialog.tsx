@@ -206,7 +206,7 @@ function DialogBody({
                           ? formatPercent(d.percent)
                           : (
                             <span className="text-xs font-normal text-muted-foreground">
-                              {isUnscored(d) ? 'ไม่มีคะแนน' : d.state === 'in_progress' ? 'กำลังทำ' : 'ยังไม่ส่ง'}
+                              {isUnscored(d) ? 'ไม่มีคะแนน' : d.state === 'pending' ? 'รอตรวจ' : d.state === 'in_progress' ? 'กำลังทำ' : 'ยังไม่ส่ง'}
                             </span>
                           )}
                       </td>

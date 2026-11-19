@@ -25,6 +25,21 @@ function build(assignments: LearningAssignment[], submissions: LearningSubmissio
 }
 
 describe('combined student learning data', () => {
+  it('hides a provisional zero on work cards and history until it is published', () => {
+    const a = assignment({ passing_type: null, passing_value: null })
+    const s = { ...attempt(a, 0), status: 'submitted' as const, pendingReview: true }
+    const pending = build([a], [s])
+    expect(pending.completedWork[0]).toMatchObject({ pendingReview: true, previousScore: null })
+    expect(pending.history[0]).toMatchObject({ pendingReview: true, score: null })
+    const reviewed = build([a], [{ ...s, pendingReview: false }])
+    expect(reviewed.completedWork[0]).toMatchObject({ pendingReview: false, previousScore: { total: 0, max: 10 } })
+    expect(reviewed.history[0].score).toEqual({ total: 0, max: 10 })
+  })
+  it('keeps averages pending when an older contributing attempt is ungraded', () => {
+    const a = assignment({ score_strategy: 'average', passing_type: null, passing_value: null })
+    const data = build([a], [{ ...attempt(a, 0), status: 'submitted', pendingReview: true }, attempt(a, 10, 2)])
+    expect(data.completedWork[0]).toMatchObject({ pendingReview: true, previousScore: null })
+  })
   it.each(['best', 'latest', 'average'] as const)('uses the official %s attempt consistently in every section', strategy => {
     const a = assignment({ score_strategy: strategy })
     const data = build([a], [attempt(a, 9), attempt(a, 2, 2)])

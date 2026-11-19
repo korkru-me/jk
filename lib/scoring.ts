@@ -48,6 +48,8 @@ export const SCORE_STRATEGY_LABELS: Record<ScoreStrategy, string> = {
 }
 
 export interface AttemptRow {
+  /** Resolved from grading metadata, independent of the submission lifecycle. */
+  pendingReview?: boolean
   status: string
   total_score: number | null
   max_score: number
@@ -58,6 +60,7 @@ export interface OfficialScore<T extends AttemptRow> {
   representative: T
   total_score: number | null
   max_score: number
+  pendingReview: boolean
 }
 
 // Picks the "official" score across a student's attempts at one assignment,
@@ -80,23 +83,23 @@ export function selectOfficialAttempt<T extends AttemptRow>(
   )
 
   if (strategy === 'best') {
-    return { representative: best, total_score: best.total_score, max_score: best.max_score }
+    return { representative: best, total_score: best.total_score, max_score: best.max_score, pendingReview: best.pendingReview === true }
   }
 
   const latest = attempts.reduce((prev, s) => (s.attempt_number > prev.attempt_number ? s : prev))
   if (strategy === 'latest') {
-    return { representative: latest, total_score: latest.total_score, max_score: latest.max_score }
+    return { representative: latest, total_score: latest.total_score, max_score: latest.max_score, pendingReview: latest.pendingReview === true }
   }
 
   // average: mean of graded/submitted attempts only (in-progress attempts
   // have no score yet and would skew the average)
   const graded = attempts.filter(s => (s.status === 'submitted' || s.status === 'graded') && s.total_score !== null)
   if (graded.length === 0) {
-    return { representative: best, total_score: null, max_score: best.max_score }
+    return { representative: best, total_score: null, max_score: best.max_score, pendingReview: best.pendingReview === true }
   }
   const avg = graded.reduce((sum, s) => sum + (s.total_score as number), 0) / graded.length
   const representative = graded.reduce((prev, s) => (s.attempt_number > prev.attempt_number ? s : prev))
-  return { representative, total_score: avg, max_score: representative.max_score }
+  return { representative, total_score: avg, max_score: representative.max_score, pendingReview: graded.some(s => s.pendingReview === true) }
 }
 
 // Groups a flat list of submissions (every attempt, every student) by

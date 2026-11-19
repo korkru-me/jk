@@ -1,3 +1,4 @@
+import { withSubmissionReviewStatus } from '@/lib/classroom-score-review.server'
 import { createClient } from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/auth/server'
 import { notFound, redirect } from 'next/navigation'
@@ -12,6 +13,7 @@ export type AnalyticsSubmissionRow = {
   id: string
   student_id: string
   status: string
+  pendingReview?: boolean
   total_score: number | null
   max_score: number
   submitted_at: string | null
@@ -66,7 +68,7 @@ export default async function AnalyticsPage({
       .in('id', a.question_ids),
     supabase
       .from('submissions')
-      .select('id, student_id, status, total_score, score_adjustment, max_score, submitted_at, started_at, attempt_number, users!submissions_student_id_fkey(full_name, avatar_url)')
+      .select('id, assignment_id, student_id, status, total_score, score_adjustment, max_score, submitted_at, started_at, attempt_number, users!submissions_student_id_fkey(full_name, avatar_url)')
       .eq('assignment_id', id)
       .in('status', ['submitted', 'graded'])
       .order('total_score', { ascending: false }),
@@ -78,13 +80,14 @@ export default async function AnalyticsPage({
   // A student may have multiple attempts — reduce to the "official" score
   // per the assignment's score_strategy, so retries don't skew the stats.
   const rescaledSubmissions = rescaleToDisplayMax(
-    await withVoidedScoreMetadata(supabase, (submissions ?? []) as any[]),
+    await withVoidedScoreMetadata(supabase, await withSubmissionReviewStatus(supabase, (submissions ?? []) as any[])),
     () => a.display_max_score,
   )
   const officialByStudent = officialSubmissionsByStudent(rescaledSubmissions, a.score_strategy)
   const dedupedSubmissions = Array.from(officialByStudent.values())
     .map(official => ({
       ...official.representative,
+      pendingReview: official.pendingReview,
       total_score: official.total_score,
       max_score: official.max_score,
     }))

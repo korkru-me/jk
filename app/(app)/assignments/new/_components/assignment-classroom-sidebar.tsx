@@ -9,6 +9,7 @@ import {
   type ClassroomNavigationKey,
 } from '@/lib/classroom-navigation'
 import { useContextualSidebar } from '@/components/layout/sidebar-context'
+import { confirmPageExit } from '@/components/layout/confirm-page-exit'
 import { ClassroomContextNavigation } from '@/app/(app)/classrooms/[id]/_components/classroom-context-sidebar'
 import { ClassroomSettingsDialog } from '@/app/(app)/classrooms/[id]/_components/classroom-settings-dialog'
 
@@ -30,13 +31,8 @@ export function AssignmentClassroomSidebar({
     () => classroomNavigationFor(classroom.classroom_type, true),
     [classroom.classroom_type],
   )
-  const navigateTo = useCallback((nextItem: ClassroomNavigationKey) => {
-    router.push(classroomNavigationPath(classroom.id, nextItem))
-  }, [classroom.id, router])
-  const switchClassroom = useCallback((classroomId: string) => {
-    const url = new URL(window.location.href)
-    url.searchParams.set('classroom', classroomId)
-    router.push(`${url.pathname}${url.search}${url.hash}`)
+  const navigateTo = useCallback(async (classroomId: string, item: ClassroomNavigationKey) => {
+    if (await confirmPageExit()) router.push(classroomNavigationPath(classroomId, item))
   }, [router])
 
   const renderContextualSidebar = useCallback((onNavigate?: () => void) => (
@@ -47,14 +43,14 @@ export function AssignmentClassroomSidebar({
       navigationItems={navigationItems}
       assignmentCreationActive
       studentCount={studentCount}
-      onNavigate={navigateTo}
-      onSwitchClassroom={switchClassroom}
+      onNavigate={item => { void navigateTo(classroom.id, item) }}
+      onSwitchClassroom={id => { void navigateTo(id, 'overview') }}
       onClose={onNavigate}
       managementActions={isOwner
         ? <ClassroomSettingsDialog classroom={classroom} placement="sidebar" />
         : undefined}
     />
-  ), [classroom, isOwner, navigateTo, navigationItems, studentCount, switchableClassrooms, switchClassroom])
+  ), [classroom, isOwner, navigateTo, navigationItems, studentCount, switchableClassrooms])
 
   useContextualSidebar('/assignments/new', renderContextualSidebar, classroom.id)
 

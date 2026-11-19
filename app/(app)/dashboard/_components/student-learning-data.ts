@@ -16,6 +16,7 @@ export type LearningSubmission = Pick<Submission,
   'id' | 'assignment_id' | 'total_score' | 'max_score' | 'score_adjustment' |
   'status' | 'attempt_number' | 'created_at'
 > & {
+  pendingReview?: boolean
   voided_max_score?: number | null
   assignments: (WorkSettings & { classrooms: { name: string } | null }) | null
 }
@@ -34,6 +35,7 @@ export type StudentWorkItem = {
   submissionId: string | null
   hasPreviousAttempt: boolean
   previousScore: { total: number | null; max: number } | null
+  pendingReview: boolean
 }
 export type StudentWorkHistory = {
   id: string
@@ -41,6 +43,7 @@ export type StudentWorkHistory = {
   classroomName: string
   createdAt: string
   score: { total: number | null; max: number } | null
+  pendingReview: boolean
   reviewLabel: string
 }
 export type StudentPracticeWorkItem = {
@@ -92,12 +95,12 @@ export function buildStudentLearningData({ classrooms, assignments, submissions,
     attempts.push(submission)
     attemptsByAssignment.set(submission.assignment_id, attempts)
   }
-  const officialByAssignment = new Map<string, LearningSubmission>()
+  const officialByAssignment = new Map<string, LearningSubmission & { pendingReview: boolean }>()
   const doneIds = new Set<string>()
   for (const [id, attempts] of attemptsByAssignment) {
     const official = selectOfficialAttempt(attempts, attempts[0].assignments?.score_strategy ?? 'best')
     if (!official) continue
-    const submission = { ...official.representative, total_score: official.total_score, max_score: official.max_score }
+    const submission = { ...official.representative, total_score: official.total_score, max_score: official.max_score, pendingReview: official.pendingReview }
     officialByAssignment.set(id, submission)
     const settings = submission.assignments
     if (settings?.type === 'exercise' && settings.passing_type != null && settings.passing_value != null
@@ -127,7 +130,8 @@ export function buildStudentLearningData({ classrooms, assignments, submissions,
       otherClassroomNames: rooms.slice(1).map(c => c.name),
       endAt: a.end_at, assignedAt: a.created_at ?? null, durationMinutes: a.duration_minutes,
       inProgress: !doneIds.has(a.id) && inProgressIds.has(a.id), completed: doneIds.has(a.id), submissionId: previous?.id ?? null, hasPreviousAttempt: !!previous,
-      previousScore: previous && canStudentViewScore(previous.assignments?.show_results, previous.assignments?.end_at, now)
+      pendingReview: previous?.pendingReview ?? false,
+      previousScore: previous && !previous.pendingReview && canStudentViewScore(previous.assignments?.show_results, previous.assignments?.end_at, now)
         ? { total: previous.total_score, max: previous.max_score } : null,
     }
   }).sort((a, b) => (a.endAt ? Date.parse(a.endAt) : Infinity) - (b.endAt ? Date.parse(b.endAt) : Infinity))
@@ -158,7 +162,8 @@ export function buildStudentLearningData({ classrooms, assignments, submissions,
       return {
         id: s.id, title: s.assignments?.title ?? 'งานเดิม',
         classroomName: s.assignments?.classrooms?.name ?? '', createdAt: s.created_at,
-        score: canShow ? { total: s.total_score, max: s.max_score } : null,
+        pendingReview: s.pendingReview === true,
+        score: canShow && !s.pendingReview ? { total: s.total_score, max: s.max_score } : null,
         reviewLabel: canStudentReviewAnswers(s.assignments?.show_results, s.assignments?.end_at, now)
           ? 'ดูเฉลย' : canShow ? 'ดูคะแนน' : 'ดูสถานะ',
       }

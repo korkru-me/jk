@@ -1,5 +1,7 @@
 'use client'
 
+import { Badge } from '@/components/ui/badge'
+
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -187,12 +189,12 @@ export function HomeroomOverview({ classroomId, students, assignments, submissio
     arr.push(s)
     attemptsByKey.set(key, arr)
   }
-  const bestSubmission = new Map<string, SubmissionRow>()
+  const bestSubmission = new Map<string, SubmissionRow & { pendingReview: boolean }>()
   for (const [key, attempts] of attemptsByKey) {
     const strategy = strategyByAssignment.get(attempts[0].assignment_id) ?? 'best'
     const official = selectOfficialAttempt(attempts, strategy)
     if (official) {
-      bestSubmission.set(key, { ...official.representative, total_score: official.total_score, max_score: official.max_score })
+      bestSubmission.set(key, { ...official.representative, pendingReview: official.pendingReview, total_score: official.total_score, max_score: official.max_score })
     }
   }
 
@@ -287,6 +289,8 @@ export function HomeroomOverview({ classroomId, students, assignments, submissio
                             <span className="text-xs text-muted-foreground">ไม่ได้อยู่ในห้องเรียน</span>
                           ) : !audienceByAssignment.get(a.id)!.has(student.id) ? (
                             <span className="text-xs text-muted-foreground">ไม่ได้รับมอบหมาย</span>
+                          ) : sub?.pendingReview ? (
+                            <Badge variant="statusWarning">รอตรวจ</Badge>
                           ) : submitted ? (
                             <div className={`flex items-center justify-center gap-1 ${
                               passed === false ? 'text-destructive' : 'text-success'

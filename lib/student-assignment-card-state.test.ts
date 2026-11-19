@@ -12,6 +12,23 @@ const BASE: StudentAssignmentRow = {
 const FINISHED = { id: 'submission', status: 'graded', total_score: 8, max_score: 10 }
 
 describe('whole student assignment card navigation', () => {
+  it.each([0, 5])('hides the provisional score %s and the pass/fail status while waiting for review', total_score => {
+    const state = studentAssignmentCardState({ ...BASE, passing_type: 'percent', passing_value: 60,
+      submission: { ...FINISHED, status: 'submitted', pendingReview: true, total_score }, attempts_used: 1 }, now)
+    expect(state.score).toBeNull()
+    expect(state.statusLabel).toBe('รอตรวจ')
+    expect(state.statusVariant).toBe('statusWarning')
+  })
+  it('shows a genuine zero after the teacher publishes it', () => {
+    const state = studentAssignmentCardState({ ...BASE, submission: { ...FINISHED, total_score: 0 }, attempts_used: 1 }, now)
+    expect(state.score).toEqual({ total: 0, max: 10 })
+    expect(state.pendingReview).toBe(false)
+  })
+  it('hides an average with a pending contributor even if its representative was graded', () => {
+    const state = studentAssignmentCardState({ ...BASE, submission: { ...FINISHED, pendingReview: true }, attempts_used: 1 }, now)
+    expect(state.statusLabel).toBe('รอตรวจ')
+    expect(state.score).toBeNull()
+  })
   it('opens the existing waiting/take route for an unstarted assignment', () => {
     expect(studentAssignmentCardState(BASE, now).href).toBe('/assignments/work/take')
   })
@@ -24,7 +41,7 @@ describe('whole student assignment card navigation', () => {
   it('routes exhausted attempts to results and routes available wrong-only retries to take', () => {
     expect(studentAssignmentCardState({ ...BASE, submission: FINISHED, attempts_used: 1 }, now).href).toBe('/submissions/submission')
     const retry = studentAssignmentCardState({ ...BASE, type: 'exercise', max_attempts: 3, attempts_used: 1, retry_scope: 'wrong_only', submission: FINISHED }, now)
-    expect(retry.href).toBe('/assignments/work/take')
+    expect(retry.href).toBe('/assignments/work/take?retry=1')
     expect(retry.actionLabel).toBe('แก้ข้อที่ยังไม่เต็ม')
     expect(retry.remaining).toBe(2)
   })

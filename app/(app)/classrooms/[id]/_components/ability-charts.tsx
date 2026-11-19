@@ -33,6 +33,7 @@ export interface AbilityDatum {
 
 const STATE_LABEL: Record<AbilityCellState, string> = {
   done: 'ส่งแล้ว',
+  pending: 'รอตรวจ',
   in_progress: 'กำลังทำ',
   missing: 'ยังไม่ส่ง',
 }

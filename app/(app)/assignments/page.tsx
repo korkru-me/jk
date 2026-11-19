@@ -1,3 +1,4 @@
+import { withSubmissionReviewStatus } from '@/lib/classroom-score-review.server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getAuthUser } from '@/lib/auth/server'
@@ -65,7 +66,7 @@ export default async function AssignmentsPage() {
   if (isTeacher) redirect('/classrooms')
 
   // Student view
-  const submissionRows = await withVoidedScoreMetadata(admin, submissionsRes.data ?? [])
+  const submissionRows = await withVoidedScoreMetadata(admin, await withSubmissionReviewStatus(admin, submissionsRes.data ?? []))
   const memberships = membershipsRes.data
   const cids = (memberships ?? []).map((m: any) => m.classroom_id)
 
@@ -140,7 +141,7 @@ export default async function AssignmentsPage() {
     arr.push(s)
     attemptsByAssignment.set(s.assignment_id, arr)
   }
-  const mySubMap: Record<string, { id: string; status: string; total_score: number | null; max_score: number }> = {}
+  const mySubMap: Record<string, { id: string; status: string; pendingReview: boolean; total_score: number | null; max_score: number }> = {}
   for (const [assignmentId, attempts] of attemptsByAssignment) {
     const official = selectOfficialAttempt(attempts, strategyByAssignment.get(assignmentId) ?? 'best')
     if (official) {
@@ -149,7 +150,8 @@ export default async function AssignmentsPage() {
       mySubMap[assignmentId] = {
         id: official.representative.id,
         status: official.representative.status,
-        total_score: scoreVisible ? official.total_score : null,
+        pendingReview: official.pendingReview,
+        total_score: scoreVisible && !official.pendingReview ? official.total_score : null,
         max_score: official.max_score,
       }
     }

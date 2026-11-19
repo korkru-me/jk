@@ -110,11 +110,10 @@ const MATRIX_HEADER_TEXT = 'text-[color-mix(in_oklab,var(--primary)_50%,var(--fo
 const MATRIX_ROW_CELL = 'border-b border-border/60 bg-card transition-colors group-even/row:bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))] group-hover/row:bg-[color-mix(in_oklab,var(--primary)_5%,var(--card))] motion-reduce:transition-none'
 const PENDING_REVIEW_COLOR = 'border-warning/35 bg-warning/10 text-[color-mix(in_oklab,var(--warning)_50%,var(--foreground))] hover:bg-warning/20 focus-visible:border-warning/50 focus-visible:ring-warning/25'
 
-function PendingReviewLink({ assignmentId, label, description, appearance = 'badge', className, children }: {
+function PendingReviewLink({ assignmentId, label, description, className, children }: {
   assignmentId: string
   label: string
   description: string
-  appearance?: 'badge' | 'score'
   className?: string
   children: ReactNode
 }) {
@@ -123,13 +122,7 @@ function PendingReviewLink({ assignmentId, label, description, appearance = 'bad
       <TooltipTrigger
         render={<Button render={<Link href={`/assignments/${assignmentId}/results`} />} variant="outline" size="xs" />}
         aria-label={label}
-        className={cn(
-          'rounded-full pointer-coarse:min-h-[44px]',
-          appearance === 'badge'
-            ? PENDING_REVIEW_COLOR
-            : 'h-auto min-h-8 gap-1.5 rounded-lg border-transparent bg-transparent px-0 text-[color-mix(in_oklab,var(--warning)_50%,var(--foreground))] hover:bg-warning/5 focus-visible:border-warning/50 focus-visible:ring-warning/25',
-          className,
-        )}
+        className={cn('rounded-full pointer-coarse:min-h-[44px]', PENDING_REVIEW_COLOR, className)}
       >
         {children}
       </TooltipTrigger>
@@ -443,18 +436,19 @@ export function ClassroomScoresMatrix({
     arr.push(s)
     submissionsByAssignment.set(s.assignment_id, arr)
   }
-  const bestSubmission = new Map<string, SubmissionRow>()
+  const bestSubmission = new Map<string, SubmissionRow & { pendingReview: boolean }>()
   for (const [assignmentId, subs] of submissionsByAssignment) {
     const strategy = strategyByAssignment.get(assignmentId) ?? 'best'
     const officialByStudent = officialSubmissionsByStudent(subs, strategy)
     for (const [studentId, official] of officialByStudent) {
-      bestSubmission.set(subKey(assignmentId, studentId), { ...official.representative, total_score: official.total_score, max_score: official.max_score })
+      bestSubmission.set(subKey(assignmentId, studentId), { ...official.representative, total_score: official.total_score, max_score: official.max_score, pendingReview: official.pendingReview })
     }
   }
 
   function scoreFor(studentId: string, assignmentId: string): number | null {
     const submission = bestSubmission.get(subKey(assignmentId, studentId))
     if (!submission || (submission.status !== 'submitted' && submission.status !== 'graded')) return null
+    if (isPendingReview(assignmentId, studentId)) return null
     if (submission.max_score <= 0) return submission.total_score ?? 0
     return (submission.total_score ?? 0) / submission.max_score
   }
@@ -541,16 +535,17 @@ export function ClassroomScoresMatrix({
     return audience !== undefined && !audience.has(studentId) && !bestSubmission.has(subKey(assignmentId, studentId))
   }
 
-  function awaitsReview(assignmentId: string, studentId: string) {
+  function isPendingReview(assignmentId: string, studentId: string) {
     const sub = bestSubmission.get(subKey(assignmentId, studentId))
     return (sub?.status === 'submitted' || sub?.status === 'graded')
       && !notGiven(assignmentId, studentId)
-      && pendingReviewByStudent[assignmentId]?.[studentId] === true
+      && (sub.pendingReview || pendingReviewByStudent[assignmentId]?.[studentId] === true)
   }
 
   function cellText(assignmentId: string, studentId: string) {
     const sub = bestSubmission.get(subKey(assignmentId, studentId))
     if (notGiven(assignmentId, studentId)) return 'ไม่ได้มอบหมาย'
+    if (isPendingReview(assignmentId, studentId)) return 'รอตรวจ'
     if (!sub || (sub.status !== 'submitted' && sub.status !== 'graded')) {
       return ''
     }
@@ -585,15 +580,16 @@ export function ClassroomScoresMatrix({
     const rows = orderedStudents.map((s, i) => {
       const sub = bestSubmission.get(subKey(assignment.id, s.id))
       const submitted = sub?.status === 'submitted' || sub?.status === 'graded'
-      const passed = submitted
+      const pendingReview = isPendingReview(assignment.id, s.id)
+      const passed = submitted && !pendingReview
         ? computePassed(sub!.total_score, sub!.max_score, assignment.passing_type, assignment.passing_value)
         : null
       const extension = extensionMap.get(subKey(assignment.id, s.id))
       return [
         i + 1, s.full_name, s.email, s.grade_level ?? '', s.section_number ?? '',
         s.class_number ?? '', s.student_code ?? '',
-        sub ? (STATUS_LABEL[sub.status] ?? sub.status) : notGiven(assignment.id, s.id) ? 'ไม่ได้มอบหมาย' : 'ยังไม่ทำ',
-        submitted ? sub!.total_score ?? 0 : '',
+        pendingReview ? 'รอตรวจ' : sub ? (STATUS_LABEL[sub.status] ?? sub.status) : notGiven(assignment.id, s.id) ? 'ไม่ได้มอบหมาย' : 'ยังไม่ทำ',
+        submitted && !pendingReview ? sub!.total_score ?? 0 : '',
         submitted ? sub!.max_score : '',
         passed === null ? '' : (passed ? 'ผ่าน' : 'ไม่ผ่าน'),
         sub?.submitted_at ? new Date(sub.submitted_at).toLocaleString('th-TH') : '',
@@ -784,7 +780,7 @@ export function ClassroomScoresMatrix({
                     assignment={a}
                     disabled={isAssignmentOrderPending}
                     hasNonSubmitter={hasNonSubmitter}
-                    pendingReviewCount={orderedStudents.filter(student => awaitsReview(a.id, student.id)).length}
+                    pendingReviewCount={orderedStudents.filter(student => isPendingReview(a.id, student.id)).length}
                     reminding={reminding === a.id}
                     groupNameById={groupNameById}
                     onRemind={() => handleRemind(a.id)}
@@ -831,8 +827,8 @@ export function ClassroomScoresMatrix({
                   const sub = bestSubmission.get(subKey(a.id, student.id))
                   const submitted = sub?.status === 'submitted' || sub?.status === 'graded'
                   const inProgress = sub?.status === 'in_progress'
-                  const pendingReview = awaitsReview(a.id, student.id)
-                  const passed = submitted
+                  const pendingReview = isPendingReview(a.id, student.id)
+                  const passed = submitted && !pendingReview
                     ? computePassed(sub!.total_score, sub!.max_score, a.passing_type, a.passing_value)
                     : null
 
@@ -857,16 +853,10 @@ export function ClassroomScoresMatrix({
                       {pendingReview ? (
                         <PendingReviewLink
                           assignmentId={a.id}
-                          label={`ตรวจให้คะแนน ${a.title} · ${student.full_name} · รอตรวจ · คะแนนชั่วคราว ${sub!.total_score ?? '—'}/${sub!.max_score}`}
-                          description="คะแนนชั่วคราว · รอผู้สอนตรวจให้ครบ กดเพื่อเปิดหน้าตรวจของงานนี้"
-                          appearance="score"
-                          className="mx-auto tabular-nums"
+                          label={`ตรวจให้คะแนน ${a.title} · ${student.full_name} · รอตรวจ`}
+                          description="รอผู้สอนตรวจให้ครบ กดเพื่อเปิดหน้าตรวจของงานนี้"
                         >
-                          <span className={cn('inline-flex min-w-20 items-center justify-center gap-1 rounded-full border px-2 py-1 text-xs font-semibold', PENDING_REVIEW_COLOR)}>
-                            <Clock aria-hidden="true" />
-                            {sub!.total_score ?? '—'}/{sub!.max_score}
-                          </span>
-                          <span className="text-[10px] leading-tight">รอตรวจ</span>
+                          <Clock aria-hidden="true" /> รอตรวจ
                         </PendingReviewLink>
                       ) : submitted ? (
                         <Link
@@ -922,8 +912,8 @@ export function ClassroomScoresMatrix({
                   const sub = bestSubmission.get(subKey(assignment.id, student.id))
                   const submitted = sub?.status === 'submitted' || sub?.status === 'graded'
                   const inProgress = sub?.status === 'in_progress'
-                  const pendingReview = awaitsReview(assignment.id, student.id)
-                  const passed = submitted
+                  const pendingReview = isPendingReview(assignment.id, student.id)
+                  const passed = submitted && !pendingReview
                     ? computePassed(sub!.total_score, sub!.max_score, assignment.passing_type, assignment.passing_value)
                     : null
 
@@ -935,12 +925,8 @@ export function ClassroomScoresMatrix({
                       {notGiven(assignment.id, student.id) ? (
                         <span className="text-[11px] text-muted-foreground/60">ไม่ได้มอบหมาย</span>
                       ) : pendingReview ? (
-                        <span className={cn('flex flex-col items-center gap-0.5 text-xs font-semibold', PENDING_REVIEW_COLOR)}>
-                          <span className="flex items-center gap-1">
-                            <Clock className="size-3.5" aria-hidden="true" />
-                            {sub!.total_score ?? '—'}/{sub!.max_score}
-                          </span>
-                          <span className="text-[10px] font-medium">รอตรวจ</span>
+                        <span className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-semibold', PENDING_REVIEW_COLOR)}>
+                          <Clock className="size-3.5" aria-hidden="true" /> รอตรวจ
                         </span>
                       ) : submitted ? (
                         <span className={cn(

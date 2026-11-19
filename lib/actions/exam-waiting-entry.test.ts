@@ -222,7 +222,9 @@ describe.each(['exam', 'exercise'])('question-free %s entry', type => {
   })
   it('future-open and deadline-blocked metadata cannot resume or allocate', async () => {
     db.assignments[0].start_at = new Date(NOW + 60_000).toISOString()
-    expect((await summary()).blockedReason).toContain('ยังไม่ถึง')
+    const beforeOpen = await summary()
+    expect(beforeOpen.blockedReason).toContain('ยังไม่ถึง')
+    expect(beforeOpen.opensAt).toBe(type === 'exam' ? db.assignments[0].start_at : undefined)
     db.assignments[0].start_at = null
     db.assignments[0].end_at = new Date(NOW - 60_000).toISOString()
     db.submissions = [attempt()]

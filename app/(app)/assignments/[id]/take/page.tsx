@@ -6,7 +6,6 @@ import { readSubmissionEntry } from '@/lib/actions/submissions'
 import { readAssignmentClassroomCover } from '@/lib/assignment-classroom-appearance.server'
 import { ExamClient, type ExamConfig } from '@/components/exam/exam-client'
 import { AccessCodeForm } from '@/components/exam/access-code-form'
-import { parseSections } from '@/lib/question-set-sections'
 import { getExamTakingData } from '@/lib/exam-taking'
 import { SecureExamLaunchGate } from '@/components/exam/secure-exam-launch-gate'
 import { ExamWaitingClient } from '@/components/exam/exam-waiting-client'
@@ -20,15 +19,15 @@ export default async function TakeExamPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ sebChallenge?: string | string[]; attempt?: string | string[] }>
+  searchParams: Promise<{ sebChallenge?: string | string[]; attempt?: string | string[]; retry?: string | string[] }>
 }) {
   const { id } = await params
   const query = await searchParams
   const rawChallenge = query.sebChallenge
   const sebChallenge = typeof rawChallenge === 'string' ? rawChallenge : undefined
 
-  // Exam/exercise GET/prefetch never creates or grades an attempt. Only the
-  // waiting room's explicit POST starts one.
+  // GET/prefetch only reads the entry state. The exam button and the
+  // exercise entry client use the same guarded POST to open a new attempt.
   const result = await readSubmissionEntry(id, sebChallenge)
 
   if ('unauthenticated' in result && result.unauthenticated) {
@@ -78,10 +77,19 @@ export default async function TakeExamPage({
   // A bare receipt from an old entry implementation must not restore the
   // former start-on-GET path. Only current, authorized waiting metadata counts.
   if (!result.waitingRoom) redirect('/assignments')
-  const submissionId = waitingResumeId(result.waitingRoom, query.attempt)
+  const summary = result.waitingRoom
+  const exercise = summary.assignmentType === 'exercise'
+  const retryExercise = exercise && query.retry === '1' && query.attempt === undefined
+  const autoEnterExercise = query.attempt === undefined || query.attempt === summary.activeSubmissionId
+  if (exercise && summary.completedSubmissionId) redirect(`/submissions/${summary.completedSubmissionId}`)
+  if (exercise && query.attempt && summary.finishedSubmissionId && !summary.activeSubmissionId && !summary.expired) {
+    redirect(`/submissions/${summary.finishedSubmissionId}`)
+  }
+  const submissionId = waitingResumeId(summary, query.attempt ?? (exercise ? summary.activeSubmissionId : undefined))
   if (!submissionId) {
-    return <ExamWaitingClient key={`${id}:${result.waitingRoom.previousSubmissionId ?? 'new'}`}
-      assignmentId={id} summary={result.waitingRoom} sebChallenge={sebChallenge} />
+    return <ExamWaitingClient key={`${id}:${summary.previousSubmissionId ?? 'new'}`}
+      assignmentId={id} summary={summary} sebChallenge={sebChallenge}
+      autoEnterExercise={autoEnterExercise} retryExercise={retryExercise} />
   }
   const [exam, classroomCover] = await Promise.all([
     getExamTakingData(submissionId),
@@ -95,7 +103,7 @@ export default async function TakeExamPage({
     const deadlinePassed = result.waitingRoom.endAt != null && new Date(result.waitingRoom.endAt).getTime() < Date.now()
     if (expired || deadlinePassed) {
       return <ExamWaitingClient assignmentId={id} sebChallenge={sebChallenge}
-        summary={{ ...result.waitingRoom, activeSubmissionId: null, expired: expired || deadlinePassed,
+        summary={{ ...result.waitingRoom, activeSubmissionId: null, expired: true,
           blockedReason: null }} />
     }
   }
@@ -105,7 +113,7 @@ export default async function TakeExamPage({
   if (result.waitingRoom && exam.assignment.completion_rule === 'streak' && exam.answers.length === 0) {
     // An interrupted POST may have opened a header before drawing. Resume it
     // deliberately from the waiting room; GET/prefetch must not draw or grade.
-    return <ExamWaitingClient assignmentId={id} summary={result.waitingRoom} sebChallenge={sebChallenge} />
+    return <ExamWaitingClient assignmentId={id} summary={summary} sebChallenge={sebChallenge} autoEnterExercise={autoEnterExercise} />
   }
 
   const { assignment, submission, answers, artifacts } = exam
@@ -147,6 +155,7 @@ export default async function TakeExamPage({
       <ExamClient
         classroomCover={classroomCover}
         assignmentTitle={result.waitingRoom.title}
+        exerciseInstructions={exercise ? summary.description : null}
         submissionId={submissionId}
         storageOwnerId={submission.student_id}
         answers={answers}
@@ -156,7 +165,6 @@ export default async function TakeExamPage({
         expiresAt={result.waitingRoom.expiresAt}
         serverNow={new Date().toISOString()}
         config={examConfig}
-        sections={assignment.show_sections === false ? [] : parseSections(assignment.sections)}
         questionsPerPage={assignment.questions_per_page}
         // Only a "ถูกติดต่อกัน" งาน gets this, and its absence is what keeps
         // every other attempt on the paging layout untouched. askedCount is

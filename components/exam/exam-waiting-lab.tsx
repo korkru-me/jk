@@ -26,7 +26,9 @@ const cases: Record<string, ExamWaitingSummary> = {
   active: { ...base, previousSubmissionId: receipt, activeSubmissionId: receipt, startedAt: '2026-10-10T03:00:00Z' },
   active_short: { ...base, previousSubmissionId: receipt, activeSubmissionId: receipt, startedAt: '2026-10-10T03:00:00Z' },
   expired: { ...base, previousSubmissionId: receipt, expired: true, startedAt: '2026-10-10T03:00:00Z' },
-  blocked: { ...base, blockedReason: 'ยังไม่ถึงเวลาเปิดสอบ กรุณาโหลดหน้านี้ใหม่เมื่อถึงเวลา' },
+  scheduled: base,
+  scheduled_short: base,
+  blocked: { ...base, blockedReason: 'หมดเวลาส่งแล้ว กรุณาติดต่อครูผู้สอน' },
   completed: { ...base, previousSubmissionId: receipt, completedSubmissionId: receipt },
   untimed: { ...base, durationMinutes: null },
   seb: { ...base, accessMode: 'seb' },
@@ -45,20 +47,22 @@ const cases: Record<string, ExamWaitingSummary> = {
   exercise_retry: { ...exercise, exerciseDetails: { ...exercise.exerciseDetails!, retryWrongOnly: true } },
   exercise_threshold: { ...exercise, exerciseDetails: { ...exercise.exerciseDetails!, completion: 'threshold', maxAttempts: null, passingType: 'percent', passingValue: 70 } },
   exercise_streak: { ...exercise, questionCount: null, exerciseDetails: { ...exercise.exerciseDetails!, completion: 'streak', maxAttempts: null, streakTarget: 3, streakQuestionCap: 10 } },
-  preview_exercise: exercise,
-  preview_exercise_code: { ...exercise, requiresAccessCode: true },
 }
 
-export function ExamWaitingLab() {
-  const [mode, setMode] = useState('ready')
+export function ExamWaitingLab({ initialMode, initialClockBase }: { initialMode: string; initialClockBase: number }) {
+  const [mode, setMode] = useState(initialMode)
   const [starts, setStarts] = useState(0)
-  const [clockBase, setClockBase] = useState(() => Date.now())
+  const [clockBase, setClockBase] = useState(initialClockBase)
   const [entered, setEntered] = useState('ยังไม่มีการเริ่มหรือส่งรอบทำงาน')
   const [showRoom, setShowRoom] = useState(true)
   const [confirmed, setConfirmed] = useState(false)
+  const [opened, setOpened] = useState(false)
   const fixture = cases[mode]
   const remaining = mode.endsWith('_short') ? 3000 : 90000
-  const summary = confirmed ? { ...fixture, expired: false, activeSubmissionId: null,
+  const opensAt = mode.startsWith('scheduled') && !opened
+    ? new Date(clockBase + (mode.endsWith('_short') ? 10000 : 93_845_000)).toISOString() : undefined
+  const summary = opensAt ? { ...fixture, opensAt, blockedReason: 'ยังไม่ถึงเวลาเปิดสอบ', serverNow: new Date(clockBase).toISOString() }
+    : confirmed ? { ...fixture, expired: false, activeSubmissionId: null,
     completedSubmissionId: receipt, expiresAt: null, startedAt: null } : fixture.activeSubmissionId
     ? { ...fixture, startedAt: new Date(clockBase - (fixture.durationMinutes ?? 30) * 60000 + remaining).toISOString(),
       expiresAt: new Date(clockBase + remaining).toISOString(), serverNow: new Date().toISOString() } : fixture
@@ -67,7 +71,7 @@ export function ExamWaitingLab() {
     <FieldGroup><Field>
       <FieldLabel htmlFor="waiting-lab-mode">สถานการณ์ตัวอย่าง</FieldLabel>
       <NativeSelect id="waiting-lab-mode" value={mode} onChange={event => {
-        setMode(event.target.value); setClockBase(Date.now()); setConfirmed(false); setShowRoom(true); setStarts(0); setEntered('ยังไม่มีการเริ่มหรือส่งรอบทำงาน')
+        setMode(event.target.value); setClockBase(Date.now()); setConfirmed(false); setOpened(false); setShowRoom(true); setStarts(0); setEntered('ยังไม่มีการเริ่มหรือส่งรอบทำงาน')
       }}>
         {Object.keys(cases).map(value => <option key={value} value={value}>{value}</option>)}
       </NativeSelect>
@@ -85,7 +89,15 @@ export function ExamWaitingLab() {
       if (mode === 'failure') return { error: 'ตัวอย่าง: เซิร์ฟเวอร์ปฏิเสธคำขอเริ่มสอบ' }
       if (cases[mode].requiresAccessCode && code !== 'TEST') return { error: 'รหัสผ่านไม่ถูกต้อง' }
       return { submissionId: receipt, alreadySubmitted: cases[mode].expired }
-    }} onEntered={result => { setConfirmed(result.alreadySubmitted); setEntered(`ยืนยัน receipt เดิม · ${result.alreadySubmitted ? 'ไปหน้าผลรอบสอบ' : 'ไปหน้าทำข้อสอบ'}`) }}
-      onReload={() => setEntered('โหลดข้อมูลใหม่เท่านั้น ไม่ส่งคำขอเริ่ม')} />)}
+    }} onEntered={result => {
+      setConfirmed(result.alreadySubmitted)
+      if (fixture.assignmentType === 'exercise') setShowRoom(false)
+      setEntered(result.alreadySubmitted ? 'ไปหน้าผลรอบเดิม'
+        : fixture.assignmentType === 'exercise' ? 'เปิดหน้าทำแบบฝึกหัดโดยตรง' : 'ไปหน้าทำข้อสอบ')
+    }}
+      onReload={() => {
+        if (opensAt && Date.now() >= Date.parse(opensAt)) setOpened(true)
+        setEntered('โหลดข้อมูลใหม่เท่านั้น ไม่ส่งคำขอเริ่ม')
+      }} />)}
   </div>
 }

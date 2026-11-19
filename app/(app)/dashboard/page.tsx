@@ -1,3 +1,4 @@
+import { withSubmissionReviewStatus } from '@/lib/classroom-score-review.server'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -178,7 +179,7 @@ export default async function DashboardPage({ searchParams }: {
   const data = buildStudentLearningData({
     classrooms, groupOf,
     assignments: (assignmentsRes.data ?? []) as unknown as LearningAssignment[],
-    submissions: (await withVoidedScoreMetadata(admin, submissionsRes.data ?? [])) as unknown as LearningSubmission[],
+    submissions: (await withVoidedScoreMetadata(admin, await withSubmissionReviewStatus(admin, submissionsRes.data ?? []))) as unknown as LearningSubmission[],
     practiceLibraries: practiceLibraries.items,
     practiceError: practiceLibraries.error,
   })

@@ -65,6 +65,10 @@ export function AnalyticsClient({ assignment, questions, submissions, teacherNam
 
   function exportCsv() {
     const rows = submissions.map(s => {
+      if (s.pendingReview) return [
+        s.users?.full_name ?? '—', 'รอตรวจ', s.max_score, '', 'รอตรวจ',
+        s.submitted_at ? new Date(s.submitted_at).toLocaleString('th-TH') : '—',
+      ]
       const ov = [...overrides].reverse().find(o => o.submissionId === s.id)
       const score = ov ? ov.newScore : (s.total_score ?? 0)
       const pct = s.max_score > 0 ? Math.round((score / s.max_score) * 100) : 0
@@ -185,6 +189,7 @@ function OverviewSection({ assignment, questions, submissions }: {
   submissions: AnalyticsSubmissionRow[]
 }) {
   const scores = submissions
+    .filter(s => !s.pendingReview)
     .map(s => s.max_score > 0 ? Math.round((s.total_score ?? 0) / s.max_score * 100) : 0)
     .sort((a, b) => a - b)
 

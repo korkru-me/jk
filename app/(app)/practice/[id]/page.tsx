@@ -1,6 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import { PracticeAccessState } from '@/components/practice/practice-access-state'
-import { PracticeWaitingRoom } from '@/components/practice/practice-waiting-room'
+import { PracticeAccessCodeForm } from '@/components/practice/practice-access-code-form'
 import { getAuthUser } from '@/lib/auth/server'
 import { isPracticeLibraryEnabled } from '@/lib/practice-question'
 import { loadPracticeLibraryWaiting } from '@/lib/practice-question-access.server'
@@ -10,7 +10,7 @@ import { unlockPracticeLibrary } from '../_access-actions'
 
 export const metadata = { title: 'คลังฝึกด้วยตนเอง — KorKru' }
 
-export default async function StudentPracticeLibraryWaitingPage({
+export default async function StudentPracticeLibraryEntryPage({
   params,
   searchParams,
 }: {
@@ -31,16 +31,14 @@ export default async function StudentPracticeLibraryWaitingPage({
   }
   const unlocked = !result.library.requiresAccessCode
     || await hasPracticeAccessSession(user.id, id)
+  if (unlocked) redirect(buildPracticeSearchHref(id, parsePracticeSearchParams(rawSearch)))
   const rawAccessError = Array.isArray(rawSearch.access) ? rawSearch.access[0] : rawSearch.access
   const accessError = rawAccessError === 'invalid' || rawAccessError === 'unavailable'
     ? rawAccessError
     : null
   return (
-    <PracticeWaitingRoom
-      library={result.library}
-      questionCount={result.questionCount}
-      enterHref={buildPracticeSearchHref(id, parsePracticeSearchParams({}))}
-      locked={!unlocked}
+    <PracticeAccessCodeForm
+      title={result.library.title}
       accessError={accessError}
       unlockAction={unlockPracticeLibrary.bind(null, id)}
     />

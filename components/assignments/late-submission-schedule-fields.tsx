@@ -37,6 +37,21 @@ function makeDraft(startsAt: string, index: number): LateBandDraft {
   }
 }
 
+export function AssignmentDurationField({ id, value, onChange }: {
+  id: string
+  value: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <Field className="gap-1.5">
+      <FieldLabel htmlFor={id}>เวลาทำ (นาที)</FieldLabel>
+      <Input id={id} type="number" min={1} value={value}
+        onChange={event => onChange(event.target.value)}
+        placeholder="ไม่จำกัด (เว้นว่าง)" className="min-h-11 max-w-[200px]" />
+    </Field>
+  )
+}
+
 export function LateSubmissionScheduleFields({
   idPrefix,
   dueAt,

@@ -100,7 +100,7 @@ function classificationConfig(config: Pick<GradingConfig, 'question_type' | 'ext
 }
 
 /** Read-only projection. A saved private draft never settles a published score. */
-export function buildClassroomScoreReview(input: {
+interface ScoreReviewInput {
   assignments: readonly ClassroomScoreReviewAssignment[]
   submissions: readonly ClassroomScoreReviewSubmission[]
   rosterStudentIds: readonly string[]
@@ -108,16 +108,22 @@ export function buildClassroomScoreReview(input: {
   answers: readonly ClassroomScoreReviewAnswer[]
   gradingParts?: readonly ClassroomScoreReviewQuestionRef[]
   voidedQuestions?: readonly ClassroomScoreReviewQuestionRef[]
-}): ClassroomScoreReviewMap {
-  const selected = selectClassroomReviewSubmissions(input.assignments, input.submissions, input.rosterStudentIds)
-  const submissionById = new Map(selected.map(row => [row.id, row]))
+}
+
+export type SubmissionScoreReviewInput = Omit<ScoreReviewInput, 'submissions' | 'rosterStudentIds'> & {
+  submissions: readonly Pick<ClassroomScoreReviewSubmission, 'id' | 'assignment_id' | 'status'>[]
+}
+
+export function buildSubmissionScoreReview(input: SubmissionScoreReviewInput): Set<string> {
+  const submissionById = new Map(input.submissions.filter(row => row.status === 'submitted' || row.status === 'graded')
+    .map(row => [row.id, row]))
   const assignmentById = new Map(input.assignments.map(row => [row.id, row]))
   const questionById = new Map(input.questions.map(row => [row.id, row]))
   const assignedById = new Map(input.assignments.map(row => [row.id, new Set(row.question_ids)]))
   const refKey = (assignmentId: string, questionId: string) => `${assignmentId}:${questionId}`
   const configured = new Set((input.gradingParts ?? []).map(row => refKey(row.assignment_id, row.question_id)))
   const voided = new Set((input.voidedQuestions ?? []).map(row => refKey(row.assignment_id, row.question_id)))
-  const result: ClassroomScoreReviewMap = {}
+  const result = new Set<string>()
   for (const row of input.answers) {
     const submission = submissionById.get(row.submission_id)
     if (!submission || !assignedById.get(submission.assignment_id)?.has(row.question_id)) continue
@@ -132,7 +138,7 @@ export function buildClassroomScoreReview(input: {
       requires_work_image: bankQuestion?.requires_work_image === true || assignment.require_work_image === true,
     } as Question
     const answer: GradingAnswer = {
-      id: row.id, submissionId: submission.id, studentId: submission.student_id, questionId: row.question_id,
+      id: row.id, submissionId: submission.id, studentId: '', questionId: row.question_id,
       randomValues: {}, correctAnswer: '', studentAnswer: null, optionOrder: null, orderIndex: 0,
       workImages: [], scoreEditedBy: row.score_edited_by, scoreEditedAt: null,
       score: Number(row.score), maxScore: Number(row.max_score), isCorrect: row.is_correct,
@@ -143,7 +149,20 @@ export function buildClassroomScoreReview(input: {
       gradingPartsConfigured: configured.has(refKey(submission.assignment_id, row.question_id)),
     }
     if (scoreParts(answer, question).pending) {
-      ;(result[assignment.id] ??= {})[submission.student_id] = true
+      result.add(submission.id)
+    }
+  }
+  return result
+}
+
+/** Match the classroom matrix's official contributors without changing scores. */
+export function buildClassroomScoreReview(input: ScoreReviewInput): ClassroomScoreReviewMap {
+  const selected = selectClassroomReviewSubmissions(input.assignments, input.submissions, input.rosterStudentIds)
+  const pending = buildSubmissionScoreReview({ ...input, submissions: selected })
+  const result: ClassroomScoreReviewMap = {}
+  for (const submission of selected) {
+    if (pending.has(submission.id)) {
+      ;(result[submission.assignment_id] ??= {})[submission.student_id] = true
     }
   }
   return result

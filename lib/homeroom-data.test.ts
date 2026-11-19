@@ -3,6 +3,9 @@ import { getHomeroomAggregate } from './homeroom-data'
 
 vi.mock('./supabase/admin', () => ({ createAdminClient: vi.fn() }))
 vi.mock('./voided-score-metadata.server', () => ({ withVoidedScoreMetadata: (_admin: unknown, rows: unknown[]) => rows }))
+vi.mock('./classroom-score-review.server', () => ({
+  withSubmissionReviewStatus: (_admin: unknown, rows: unknown[]) => rows,
+}))
 
 const member = (student_id: string, classroom_id: string, name: string) => ({
   student_id, classroom_id, classrooms: { id: classroom_id, name, classroom_type: 'subject', status: 'active' },

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { Badge } from '@/components/ui/badge'
 import { Pencil, BookOpen, ChevronUp, ChevronDown, AlertCircle, CheckCircle2, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Question } from '@/lib/types'
@@ -77,7 +78,7 @@ export function StudentScoreTable({
 
   const hasThreshold = passingType != null && passingValue != null
   const passCount = hasThreshold
-    ? sorted.filter(s => computePassed(getEffectiveScore(s), maxScore, passingType, passingValue) === true).length
+    ? sorted.filter(s => !s.pendingReview && computePassed(getEffectiveScore(s), maxScore, passingType, passingValue) === true).length
     : 0
 
   function handleRemediation(sub: AnalyticsSubmissionRow) {
@@ -158,9 +159,10 @@ export function StudentScoreTable({
 
         {/* Rows */}
         {sorted.map((sub) => {
+          const pendingReview = sub.pendingReview === true
           const effectiveScore = getEffectiveScore(sub)
           const pct = maxScore > 0 ? Math.round(effectiveScore / maxScore * 100) : 0
-          const realPass = hasThreshold ? computePassed(effectiveScore, maxScore, passingType, passingValue) : null
+          const realPass = hasThreshold && !pendingReview ? computePassed(effectiveScore, maxScore, passingType, passingValue) : null
           // No threshold configured: fall back to the pct>=60 heuristic just
           // for row tint / remediation grouping — never shown as a verdict.
           const pass = realPass ?? pct >= 60
@@ -173,7 +175,7 @@ export function StudentScoreTable({
             <div
               key={sub.id}
               className={`grid grid-cols-[2fr_1fr_1fr_auto] gap-0 items-center px-5 py-3.5 border-b border-border last:border-0 transition-colors ${
-                pass ? 'hover:bg-muted/50' : 'bg-destructive/10 hover:bg-destructive/10'
+                pass || pendingReview ? 'hover:bg-muted/50' : 'bg-destructive/10 hover:bg-destructive/10'
               }`}
             >
               {/* Name + avatar */}
@@ -200,6 +202,7 @@ export function StudentScoreTable({
 
               {/* Score */}
               <div className="text-center">
+                {pendingReview ? <Badge variant="statusWarning">รอตรวจ</Badge> : <>
                 <p className={`text-lg font-black tabular-nums ${pass ? 'text-foreground' : 'text-destructive'}`}>
                   {effectiveScore}<span className="text-xs font-normal text-muted-foreground/40">/{maxScore}</span>
                 </p>
@@ -210,11 +213,12 @@ export function StudentScoreTable({
                   />
                 </div>
                 <p className="text-[10px] text-muted-foreground mt-0.5">{pct}%</p>
+                </>}
               </div>
 
               {/* Status */}
               <div className="flex justify-center">
-                {realPass !== null ? (
+                {pendingReview ? <Badge variant="statusWarning">รอตรวจ</Badge> : realPass !== null ? (
                   <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
                     realPass ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'
                   }`}>
@@ -235,7 +239,7 @@ export function StudentScoreTable({
                   <Pencil className="w-3 h-3" />
                   แก้ไข
                 </button>
-                {!pass && (
+                {!pass && !pendingReview && (
                   <button
                     onClick={() => handleRemediation(sub)}
                     title="จัดแบบฝึกหัดซ่อมเสริม"

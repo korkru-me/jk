@@ -142,7 +142,7 @@ function StudentAssignmentCard({ assignment: a, now, href }: { assignment: Stude
     !completed ? a.end_at ? `กำหนดส่ง ${formatThaiDateTime(a.end_at)}` : 'ไม่มีกำหนดส่ง' : null,
     state.statusLabel,
     state.score ? `${a.has_in_progress ? 'คะแนนเดิม' : 'คะแนน'} ${state.score.total}/${state.score.max}` : null,
-    state.finished && state.canShowScore && !state.score ? 'รอครูตรวจ' : null,
+    state.pendingReview && a.has_in_progress ? 'คะแนนเดิมรอตรวจ' : null,
     retryLabel,
   ].filter(Boolean).join(' · ')
 
@@ -169,9 +169,10 @@ function StudentAssignmentCard({ assignment: a, now, href }: { assignment: Stude
           <div className="flex h-5 min-w-0 items-center gap-1.5 text-xs">
             {completed ? <Badge variant="statusSuccess">ส่งแล้ว</Badge>
               : <Badge variant={due.variant} title={a.end_at ? formatThaiDateTime(a.end_at) : undefined}>{due.label}</Badge>}
-            {!completed && shortStatus && <span className="min-w-0 truncate font-medium" title={state.statusLabel}>{shortStatus}</span>}
+            {state.pendingReview
+              ? <Badge variant="statusWarning">{a.has_in_progress ? 'คะแนนเดิมรอตรวจ' : 'รอตรวจ'}</Badge>
+              : !completed && shortStatus && <span className="min-w-0 truncate font-medium" title={state.statusLabel}>{shortStatus}</span>}
             {state.score && <span className="shrink-0 font-semibold">{a.has_in_progress ? 'เดิม ' : ''}{state.score.total}/{state.score.max}</span>}
-            {state.finished && state.canShowScore && !state.score && <span className="min-w-0 truncate text-foreground/75">รอครูตรวจ</span>}
             {retryLabel ? <span className="min-w-0 truncate text-foreground/75" title={retryLabel}>{a.retry_scope === 'wrong_only' ? 'แก้ข้อเดิม' : 'ทำซ้ำได้'}{state.remaining != null ? ` อีก ${state.remaining} ครั้ง` : ''}</span>
               : !completed && !shortStatus && passingThreshold && <span className="min-w-0 truncate text-foreground/75">เกณฑ์ {passingThreshold}</span>}
           </div>

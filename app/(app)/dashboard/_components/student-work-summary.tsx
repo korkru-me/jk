@@ -91,8 +91,9 @@ function WorkRow({ work, now }: { work: StudentSummaryItem; now: number }) {
   const cover = coverOf(meta)
   const due = dueInfo(work.endAt, now)
   const roomNames = [work.classroom?.name, ...work.otherClassroomNames].filter(Boolean).join(' · ')
-  const href = isPractice ? `/practice/${work.id}`
-    : work.completed && work.submissionId ? `/submissions/${work.submissionId}` : `/assignments/${work.id}/take`
+  const retryExercise = workType === 'exercise' && !isPractice && work.hasPreviousAttempt && !work.inProgress
+  const href = isPractice ? `/practice/${work.id}/library`
+    : work.completed && work.submissionId ? `/submissions/${work.submissionId}` : `/assignments/${work.id}/take${retryExercise ? '?retry=1' : ''}`
   const actionLabel = isPractice ? 'เข้าไปฝึก' : work.completed ? 'ดูงานที่ส่งแล้ว' : work.inProgress ? 'ทำต่อ' : work.hasPreviousAttempt ? 'ลองใหม่' : 'เริ่มทำ'
 
   return (
@@ -123,7 +124,9 @@ function WorkRow({ work, now }: { work: StudentSummaryItem; now: number }) {
               <Clock aria-hidden="true" />{due.label}
             </Badge>}
             {!isPractice && work.durationMinutes != null && <span className="text-foreground/75">{work.durationMinutes} นาที</span>}
-            {!isPractice && work.previousScore && <span className="text-foreground/75">{work.completed ? 'คะแนน' : 'คะแนนเดิม'} {work.previousScore.total ?? 'รอตรวจ'}/{work.previousScore.max}</span>}
+            {!isPractice && (work.pendingReview
+              ? <Badge variant="statusWarning">รอตรวจ</Badge>
+              : work.previousScore?.total != null && <span className="text-foreground/75">{work.completed ? 'คะแนน' : 'คะแนนเดิม'} {work.previousScore.total}/{work.previousScore.max}</span>)}
           </div>
         </div>
         {work.completed ? <CheckCircle2 className="size-5 shrink-0 text-success" aria-label="ส่งงานแล้ว" /> : <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden="true" />}

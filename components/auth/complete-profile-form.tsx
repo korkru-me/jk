@@ -17,9 +17,9 @@ import { StudentEducationFields } from '@/components/auth/student-education-fiel
 import { STUDENT_EDUCATION_FIELDS } from '@/lib/student-education'
 import { Input } from '@/components/ui/input'
 
-type Props = { defaultName: string; defaultRole?: AccountRole }
+type Props = { defaultName: string; defaultRole?: AccountRole; teacherOnly?: boolean }
 
-export function CompleteProfileForm({ defaultName, defaultRole }: Props) {
+export function CompleteProfileForm({ defaultName, defaultRole, teacherOnly = false }: Props) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -31,7 +31,7 @@ export function CompleteProfileForm({ defaultName, defaultRole }: Props) {
     formState: { errors },
   } = useForm<CompleteProfileInput>({
     resolver: zodResolver(completeProfileSchema),
-    defaultValues: { full_name: defaultName, role: defaultRole, accept_terms: false },
+    defaultValues: { full_name: defaultName, role: teacherOnly ? 'teacher' : defaultRole, accept_terms: false },
   })
 
   const selectedRole = watch('role')
@@ -70,7 +70,9 @@ export function CompleteProfileForm({ defaultName, defaultRole }: Props) {
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate aria-busy={loading}>
       <FieldGroup className="gap-3">
-        <AccountRoleField id="profile-role" value={selectedRole} onChange={(role) => setValue('role', role, { shouldValidate: true })} error={errors.role?.message} disabled={loading} />
+        {!teacherOnly && (
+          <AccountRoleField id="profile-role" value={selectedRole} onChange={(role) => setValue('role', role, { shouldValidate: true })} error={errors.role?.message} disabled={loading} />
+        )}
         <Field data-invalid={!!errors.full_name} className="gap-1">
           <FieldLabel htmlFor="full_name">ชื่อที่ใช้แสดง</FieldLabel>
           <Input
