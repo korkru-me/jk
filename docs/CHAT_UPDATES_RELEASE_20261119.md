@@ -39,3 +39,18 @@ Primary ที่ต้องตรวจหลังปล่อยคือ /U
 - Primary หลัง integrate หน้าตรวจคะแนนผ่าน TypeScript, token lint, 351 suites / 4,946 tests; คง unrelated work และ environment เดิม
 - ปุ่มกลับคลังฝึก integrate เฉพาะ hunk ใน primary โดยรักษางาน disclosure คำชี้แจงที่มีอยู่เดิม ไม่คัดทั้งไฟล์ทับ
 - Production PR #141 พร้อมปล่อยหลัง hosted validation ข้างต้น บันทึก commit/deployment และผล primary localhost:3000 หลังปล่อยด้านล่าง
+
+## Production และ handoff เสร็จแล้ว
+
+- Production PR #141 merge เข้า master เป็น 71bdee02eeec931be0728c85e706b10754c45eac และ push บน origin/master แล้ว
+- Vercel dpl_9CFGGHZt3SXpZCKH6tyzNF6KEbQu เป็น READY, exact githubCommitSha 71bdee02eeec931be0728c85e706b10754c45eac, canonical aliases www.korkru.com และ korkru.com
+- ตรวจเว็บจริงแบบอ่านอย่างเดียว: signup เลือกนักเรียนไม่มี Google มีข้อมูลการศึกษาครบและบัญชีอีเมลก่อนข้อมูลนักเรียน เลือกครูมี Google; assignments/new ที่ยังไม่ล็อกอินกลับ login ถูกต้อง ไม่สร้าง/แก้/ลบข้อมูล Production
+- Primary process PID 26292 ให้บริการ /Users/korkusonmasaen/Korkru/korkru ที่ localhost:3000; HEAD 83245b7 ยังเดิมเพราะเป็น shared dirty checkout จึง integrate เฉพาะ scope โดยไม่ reset/pull/stash/stage งานอื่น
+- เทียบทุก path ใน scope กับ release แล้วตรงกัน ยกเว้น lib/actions/submissions.ts ซึ่งรักษางานส่งไฟล์และ copy เพิ่มเติมเดิม และ components/practice/practice-library-view.tsx ซึ่งรักษา disclosure คำชี้แจงเดิม แต่ hunk ปุ่มกลับห้องตรงกับ release ทั้งสองไฟล์
+- ตรวจ primary หลัง Production READY: signup email-first/สี่ช่อง/no school/no Google นักเรียน, นับถอยหลัง desktop/mobile เดินจริงและเมื่อถึงเวลาเปิดปุ่มใช้ได้โดยยังไม่เริ่มรอบอัตโนมัติ, ตารางรอตรวจเทียบศูนย์จริงและบัตรงานนักเรียน, หน้าสรุป/รายคน pending กับช่องคะแนนว่าง, wizard ไม่มีตัวเลือกแฟ้มและเวลาทำอยู่ในขั้น 3 ใต้กำหนดวันทำ ไม่เรียกฐานข้อมูลจริงบน Local
+- primary หลัง patch สุดท้าย TypeScript, token lint และ 29 targeted tests ผ่าน; full suite ก่อน patch ปุ่มกลับ 351 suites / 4,946 tests ผ่าน Next.js MCP get_compilation_issues = [] และ get_errors configErrors/sessionErrors = []
+- หลักฐานภาพเก็บใน private temporary directory ไม่รวมข้อมูลจริง: Production signup, Staging countdown/teacher matrix/switch overview/signup, primary countdown desktop/mobile และ student pending mobile
+- เก็บกวาดบัญชี/ห้อง/งาน/คำตอบ/โจทย์/ชุดโจทย์/คลังฝึก/องค์กรสังเคราะห์ครบแล้ว ยืนยันทุกกลุ่ม 0 แถวและ Auth 0 บัญชีในโครงการ Staging เท่านั้น (run 0242809c-7a64-4cc6-ac6b-af93f68b740b) การ DELETE คลังฝึกโดยตรงไม่มีสิทธิ์และ connector SQL confirmation หมดอายุ จึงใช้ cleanup ของห้องสังเคราะห์ที่ lifecycle รองรับ cascade อยู่แล้ว โดยไม่เปลี่ยน grants/RLS/triggers
+- รอบนี้ไม่มี migration ใหม่หรือค้างต้อง apply ไม่ได้ทดสอบ Google OAuth กับบัญชีจริง, SEB/Android จริง หรือโทรศัพท์จริง; integration ที่มีการเขียนทั้งหมดทดสอบเฉพาะ Staging
+
+บันทึกผลหลังปล่อยนี้เป็น docs-only handoff บน branch codex/chat-updates-release-20261119 ที่ push แล้ว ไม่เปลี่ยน application source ของ Production 71bdee02
