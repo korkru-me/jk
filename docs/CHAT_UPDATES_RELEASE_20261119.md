@@ -18,3 +18,12 @@
 ก่อนส่ง Staging ผ่าน TypeScript, design-token lint และ 348 ชุด / 4,902 tests บน candidate การตรวจ hosted และผล deployment จะบันทึกหลังทำเสร็จ
 
 Primary ที่ต้องตรวจหลังปล่อยคือ /Users/korkusonmasaen/Korkru/korkru บน localhost:3000 เก็บ snapshot digest ของไฟล์ก่อนปล่อยและคงค่าการเชื่อมต่อเฉพาะ Local
+
+## Staging พร้อมตรวจ hosted
+
+- Candidate 5c9de5d และ Staging PR #140 รวมเป็น 8c13b0a8caac500579d016b9ed36d6dff1e50bd8 Vercel dpl_HtLKKmXnJHZVYEQ4a1XmgVPQscgf เป็น READY และ alias staging.korkru.com ตรงกัน
+- Staging integration checkout ผ่าน TypeScript, token lint และ 350 ชุด / 4,924 tests
+- สร้างข้อมูลสังเคราะห์เฉพาะโครงการ dyuxkrzeveknqgtuzpbh สองบัญชี สองห้องเรียน และสามงานสำหรับตรวจกรณีรอตรวจ นับถอยหลัง และเข้าทำแบบฝึกหัด ล็อกอินนักเรียนผ่าน Supabase Auth ปกติและตรวจ RLS แล้วเห็นเฉพาะรอบที่เป็นของตน คำตอบรอตรวจมีคะแนนรวมชั่วคราว 0 และนักเรียนอ่านแถว questions ไม่ได้
+- เปิด Production draft PR #141 แล้ว การตรวจหน้าจอ hosted ยังรอผ่าน Vercel SSO ระบบอนุมัติอัตโนมัติปฏิเสธการอ่าน protection bypass token และการใช้ Chrome ที่ล็อกอินไว้ โดยต้องมีคำอนุญาตเฉพาะสำหรับ Vercel SSO จึงส่งคำขอให้เจ้าของอนุญาตการใช้ Chrome เข้าระบบตามปกติไว้แล้ว
+- Primary snapshot 1,814 ไฟล์ไม่เปลี่ยนระหว่างเตรียม release HEAD ยังเป็น 83245b7 ชุดนี้ยังไม่ merge เข้า master และยังไม่ deploy Production
+- บัญชีและแถวสังเคราะห์ยังเก็บไว้เฉพาะ Staging สำหรับตรวจหน้าจอขั้นถัดไป ใช้ manifest และ cleanup script เฉพาะรอบใน private temporary directory ห้ามลบข้อมูลนอก manifest
