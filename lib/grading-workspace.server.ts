@@ -226,7 +226,8 @@ export async function loadGradingWorkspace(assignmentId: string, scope: GradingW
       total += parts?.total ?? answer.score
       max += parts?.maxScore ?? answer.maxScore
     }
-    return { ...row, total_score: Math.round(total * 100) / 100, max_score: Math.round(max * 100) / 100 }
+    return { ...row, total_score: Math.round(total * 100) / 100, max_score: Math.round(max * 100) / 100,
+      pendingReview: pendingSubmissionIds.has(row.id) }
   })
   const scaled = rescaleToDisplayMax(projected, () => assignment.display_max_score)
   const officialScores = officialSubmissionsByStudent(scaled, assignment.score_strategy)
@@ -246,7 +247,7 @@ export async function loadGradingWorkspace(assignmentId: string, scope: GradingW
       sectionNumber: profileRow?.section_number ?? null, classNumber: profileRow?.class_number ?? null, studentCode: profileRow?.student_code ?? null,
       classroom: profileRow?.grade_level ? `${profileRow.grade_level}${profileRow.section_number == null ? '' : `/${profileRow.section_number}`}` : null,
       submissionId: row.id, attemptNumber: row.attempt_number, status: row.status === 'graded' ? 'graded' : 'submitted',
-      score: result.total_score, maxScore: result.max_score, streakReached: row.streak_reached,
+      score: result.total_score, maxScore: result.max_score, pendingReview: result.pendingReview, streakReached: row.streak_reached,
     }
   })
   const officialIds = new Set(students.map(student => student.submissionId!))

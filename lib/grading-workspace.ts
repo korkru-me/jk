@@ -17,6 +17,7 @@ export interface GradingStudent {
   attemptNumber: number | null
   score: number | null
   maxScore: number
+  pendingReview?: boolean
   status?: 'not_submitted' | 'in_progress' | 'submitted' | 'graded'
   streakReached?: boolean
 }
