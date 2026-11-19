@@ -20,10 +20,11 @@ export function GradingWorkspaceHeader({ data, title = 'ตรวจให้ค
 }) {
   const submitted = data.students.filter(student => student.submissionId != null
     && (student.status == null || student.status === 'submitted' || student.status === 'graded'))
-  const scored = submitted.filter(student => student.score != null && student.maxScore > 0)
+  const scored = submitted.filter(student => !student.pendingReview && student.score != null && student.maxScore > 0)
   const commonMax = scored[0]?.maxScore
   const mixedMax = scored.some(student => student.maxScore !== commonMax)
-  const average = scored.length === 0 ? '—' : mixedMax
+  const emptyAverage = submitted.some(student => student.pendingReview) ? 'รอตรวจ' : '—'
+  const average = scored.length === 0 ? emptyAverage : mixedMax
     ? `${formatNumber(scored.reduce((sum, student) => sum + student.score! / student.maxScore * 100, 0) / scored.length)}%`
     : `${formatNumber(scored.reduce((sum, student) => sum + student.score!, 0) / scored.length)}/${formatNumber(commonMax!)}`
   const streak = data.assignment.completionRule === 'streak'

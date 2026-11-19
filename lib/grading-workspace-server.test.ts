@@ -166,6 +166,7 @@ describe('authenticated grading workspace reader', () => {
     const { admin } = install()
     const result = await loadGradingWorkspace(assignmentId)
     expect(result?.data.students[0].score).toBe(0)
+    expect(result?.data.students[0].pendingReview).toBe(true)
     expect(result?.pendingCount).toBe(1)
     expect(admin.queries.every(query => !/student_answer|correct_answer|random_values|work_images/.test(query.columns))).toBe(true)
   })
@@ -234,7 +235,7 @@ describe('authenticated grading workspace reader', () => {
       work_reviewed_at: now, score_edited_by: actorId, score_edited_at: now }
     install({ draftRows: [saved] })
     const complete = await loadGradingWorkspace(assignmentId, { kind: 'student', studentId })
-    expect(complete?.data.students[0]).toMatchObject({ submissionId: latestSubmissionId, attemptNumber: 2, score: 0.75, maxScore: 1 })
+    expect(complete?.data.students[0]).toMatchObject({ submissionId: latestSubmissionId, attemptNumber: 2, score: 0.75, maxScore: 1, pendingReview: false })
     expect(complete?.pendingCount).toBe(0)
     expect(complete?.data.answers.map(row => row.id)).toEqual([latestAnswerId])
     expect(complete?.data.answers[0]).toMatchObject({ studentAnswer: 'LATEST_PRIVATE_RESPONSE', correctAnswer: 'LATEST_PRIVATE_KEY' })
