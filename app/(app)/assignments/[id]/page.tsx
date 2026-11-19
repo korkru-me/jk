@@ -1,3 +1,4 @@
+import { withSubmissionReviewStatus } from '@/lib/classroom-score-review.server'
 import { createClient } from '@/lib/supabase/server'
 import { getAuthUser } from '@/lib/auth/server'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -23,6 +24,7 @@ export type SubmissionRow = {
   id: string | null
   student_id: string
   status: string
+  pendingReview?: boolean
   total_score: number | null
   max_score: number
   submitted_at: string | null
@@ -66,7 +68,7 @@ export default async function AssignmentDetailPage({
     loadAssignmentQuestionsByProvenance(a),
     admin
       .from('submissions')
-      .select('id, student_id, status, total_score, score_adjustment, max_score, submitted_at, started_at, attempt_number, users!submissions_student_id_fkey(full_name)')
+      .select('id, assignment_id, student_id, status, total_score, score_adjustment, max_score, submitted_at, started_at, attempt_number, users!submissions_student_id_fkey(full_name)')
       .eq('assignment_id', id)
       .order('submitted_at', { ascending: false }),
     admin
@@ -124,14 +126,14 @@ export default async function AssignmentDetailPage({
   // A student may have multiple submissions (retries) — reduce to the
   // "official" attempt per the assignment's own score_strategy.
   const rescaledSubmissions = rescaleToDisplayMax(
-    (await withVoidedScoreMetadata(admin, submissions ?? [])) as unknown as SubmissionRow[],
+    (await withVoidedScoreMetadata(admin, await withSubmissionReviewStatus(admin, submissions ?? []))) as unknown as SubmissionRow[],
     () => a.display_max_score
   )
   const normalizedSubmissions = rescaledSubmissions.map(s => ({ ...s, attempt_number: s.attempt_number ?? 1 }))
   const officialByStudent = officialSubmissionsByStudent(normalizedSubmissions, a.score_strategy)
   const bestByStudent = new Map<string, SubmissionRow>()
   for (const [studentId, official] of officialByStudent) {
-    bestByStudent.set(studentId, { ...official.representative, total_score: official.total_score, max_score: official.max_score })
+    bestByStudent.set(studentId, { ...official.representative, pendingReview: official.pendingReview, total_score: official.total_score, max_score: official.max_score })
   }
 
   // Merge: every enrolled student gets a row, even with zero submissions —

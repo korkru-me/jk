@@ -26,3 +26,29 @@ describe('teacher score adjustments', () => {
     expect(selectOfficialAttempt(attempts, 'average')?.total_score).toBe(5)
   })
 })
+
+describe('official score review status', () => {
+  const graded = { status: 'graded', total_score: 7, max_score: 10, attempt_number: 1 }
+  const pending = { status: 'submitted', pendingReview: true, total_score: 0, max_score: 10, attempt_number: 2 }
+
+  it('distinguishes a published zero from a provisional zero', () => {
+    expect(selectOfficialAttempt([pending], 'best')?.pendingReview).toBe(true)
+    expect(selectOfficialAttempt([{ ...pending, pendingReview: false }], 'best')).toMatchObject({
+      pendingReview: false, total_score: 0,
+    })
+  })
+
+  it('follows the selected attempt for best and latest', () => {
+    expect(selectOfficialAttempt([graded, pending], 'best')).toMatchObject({ total_score: 7, pendingReview: false })
+    expect(selectOfficialAttempt([graded, pending], 'latest')).toMatchObject({ total_score: 0, pendingReview: true })
+  })
+
+  it('keeps an average pending while any contributing attempt needs review', () => {
+    const latestGraded = { ...graded, attempt_number: 3 }
+    expect(selectOfficialAttempt([graded, pending, latestGraded], 'average')).toMatchObject({
+      representative: latestGraded, pendingReview: true, total_score: 14 / 3,
+    })
+    expect(selectOfficialAttempt([graded, { ...pending, pendingReview: false }, latestGraded], 'average'))
+      .toMatchObject({ pendingReview: false, total_score: 14 / 3 })
+  })
+})

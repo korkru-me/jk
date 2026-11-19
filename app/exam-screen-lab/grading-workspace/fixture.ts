@@ -85,14 +85,16 @@ export function recomputeLab<T extends GradingWorkspaceData>(data: T): T {
   return { ...data, students: data.students.map(student => {
     const answers = data.answers.filter(answer => answer.studentId === student.id)
     let score = 0, maxScore = 0, bestStreak = 0, currentStreak = 0
+    let pendingReview = false
     for (const answer of answers.sort((a, b) => a.orderIndex - b.orderIndex)) {
       const q = data.questions.find(item => item.id === answer.questionId)
       if (!q) continue
       const parts = scoreParts(answer, q)
+      pendingReview ||= parts.pending
       score += parts.total; maxScore += parts.maxScore
       currentStreak = parts.maxScore > 0 && parts.total >= parts.maxScore && !parts.pending ? currentStreak + 1 : 0
       bestStreak = Math.max(bestStreak, currentStreak)
     }
-    return { ...student, score: Math.round(score * 100) / 100, maxScore, streakReached: bestStreak >= (data.assignment.streakTarget ?? 3) }
+    return { ...student, score: Math.round(score * 100) / 100, maxScore, pendingReview, streakReached: bestStreak >= (data.assignment.streakTarget ?? 3) }
   }) }
 }

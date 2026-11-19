@@ -66,7 +66,6 @@ export function ExamScreenLabClient({
         calculatorEnabled: true,
         scratchpadEnabled: true,
       }}
-      sections={fixture.sections}
       questionsPerPage={questionsPerPage}
       streak={streak}
       previewMode

@@ -21,6 +21,8 @@ import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui
 import { Input } from '@/components/ui/input'
 import { RichText } from '@/components/ui/rich-text'
 import { Separator } from '@/components/ui/separator'
+import { attemptSecondsLeft } from '@/lib/attempt-expiry'
+import { formatThaiDate, formatThaiDateTime } from '@/lib/thai-time'
 import type { ExamWaitingSummary } from '@/lib/exam-waiting-room'
 
 interface Props {
@@ -33,21 +35,56 @@ interface Props {
   onReload: () => void
   previewMode?: boolean
   secondsLeft?: number | null
+  secondsUntilOpen?: number | null
   returnHref?: string
+}
+
+function OpeningCountdown({ opensAt, seconds }: { opensAt: string; seconds: number }) {
+  const units = [
+    { label: 'วัน', value: Math.floor(seconds / 86_400) },
+    { label: 'ชั่วโมง', value: Math.floor(seconds / 3_600) % 24 },
+    { label: 'นาที', value: Math.floor(seconds / 60) % 60 },
+    { label: 'วินาที', value: seconds % 60 },
+  ]
+  return (
+    <Card aria-labelledby="exam-open-countdown" radius="md" padding="sm"
+      className="flex flex-col gap-2 border-primary/25 bg-primary/5 sm:gap-3 sm:p-4">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+        <h2 id="exam-open-countdown" className="flex items-center gap-2 text-base font-semibold">
+          <CalendarClock className="size-5 text-primary" aria-hidden="true" /> นับถอยหลังเปิดสอบ
+        </h2>
+        <time dateTime={opensAt} className="text-sm text-muted-foreground">
+          เปิดสอบ {formatThaiDate(opensAt, { dateStyle: 'medium' })}{' '}
+          <span className="whitespace-nowrap">{formatThaiDateTime(opensAt, { timeStyle: 'short' })} น.</span>
+        </time>
+      </div>
+      <div className="grid grid-cols-4 gap-1.5 sm:gap-3" role="timer" aria-live="off">
+        {units.map(({ label, value }) => (
+          <Card key={label} radius="sm" className="flex min-w-0 flex-col items-center justify-center gap-1 border-primary/15 px-0.5 py-2 sm:py-3">
+            <span className="max-w-full text-center text-2xl leading-none font-bold tabular-nums wrap-anywhere text-primary sm:text-4xl">{String(value).padStart(2, '0')}</span>
+            <span className="text-xs text-muted-foreground sm:text-sm">{label}</span>
+          </Card>
+        ))}
+      </div>
+      {seconds === 0 && <p role="status" className="text-sm text-muted-foreground">กำลังตรวจสอบเวลาเปิดสอบ</p>}
+    </Card>
+  )
 }
 
 /** Uses the repository's Card API (intentionally no header/footer slots).
  * It contains metadata only, never an ExamClient/countdown or question input. */
 export function ExamWaitingRoom({ summary, busy, error, code, onCodeChange, onStart, onReload,
-  previewMode = false, returnHref = '/assignments', secondsLeft = null }: Props) {
+  previewMode = false, returnHref = '/assignments', secondsLeft = null, secondsUntilOpen = null }: Props) {
   const active = summary.activeSubmissionId !== null
+  const openingSeconds = secondsUntilOpen ?? (summary.opensAt && summary.serverNow
+    ? attemptSecondsLeft(summary.opensAt, Date.parse(summary.serverNow)) : null)
   const exercise = summary.assignmentType === 'exercise'
   const task = exercise ? 'แบบฝึกหัด' : 'ข้อสอบ'
   const room = exercise ? 'ห้องทำแบบฝึกหัด' : 'ห้องสอบ'
   const round = exercise ? 'รอบทำแบบฝึกหัด' : 'รอบสอบ'
   const timed = summary.durationMinutes != null && summary.durationMinutes > 0
   const details = exercise ? summary.exerciseDetails : undefined
-  const actionClassName = 'h-auto min-h-8 whitespace-normal py-1.5'
+  const actionClassName = 'h-auto min-h-11 whitespace-normal py-1.5'
   const facts: Array<{ icon: LucideIcon; text: string }> = [
     {
       icon: Clock3,
@@ -110,6 +147,8 @@ export function ExamWaitingRoom({ summary, busy, error, code, onCodeChange, onSt
         <h1 className="text-2xl font-semibold leading-tight text-foreground sm:text-3xl">{summary.title}</h1>
         {previewMode && <p className="text-sm leading-5 text-muted-foreground">มุมมองตัวอย่างสำหรับครู · ไม่สร้าง{round} ไม่บันทึกคำตอบหรือคะแนนจริง และไม่ตรวจ{exercise ? `รหัสเข้าทำ${task}จริง` : 'เครื่อง SEB หรือรหัสเข้าทำข้อสอบจริง'}</p>}
       </header>
+      {summary.opensAt && openingSeconds !== null &&
+        <OpeningCountdown opensAt={summary.opensAt} seconds={openingSeconds} />}
       <Separator />
       <section aria-label={`ข้อมูลก่อนเข้า${room}`} className="flex flex-col gap-3">
         {active && secondsLeft !== null && <Card radius="sm" edge="none" padding="md" className="flex flex-col gap-1 bg-primary/10">
@@ -137,7 +176,7 @@ export function ExamWaitingRoom({ summary, busy, error, code, onCodeChange, onSt
           <div className="flex flex-col gap-1">
             {summary.accessMode === 'seb' && <p className="text-sm text-muted-foreground">ใช้การตั้งค่า SEB ที่ผ่านการตรวจแล้ว กรณีฉุกเฉินให้ติดต่อครูเพื่อขอรหัสออก</p>}
             {summary.accessMode === 'android_monitored' && <p className="text-sm text-muted-foreground">ใช้โหมด Android ที่ครูอนุมัติ ไม่ใช่ Safe Exam Browser</p>}
-            {summary.blockedReason && <p role="alert" className="text-sm text-destructive">{summary.blockedReason}</p>}
+            {summary.blockedReason && !summary.opensAt && <p role="alert" className="text-sm text-destructive">{summary.blockedReason}</p>}
             {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           </div>
         )}

@@ -48,6 +48,7 @@ export interface ExamWaitingSummary {
   durationMinutes: number | null
   questionCount: number | null
   endAt: string | null
+  opensAt?: string
   accessMode: 'browser' | 'seb' | 'android_monitored'
   requiresAccessCode: boolean
   previousSubmissionId: string | null

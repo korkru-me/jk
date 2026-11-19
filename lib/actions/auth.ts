@@ -162,8 +162,8 @@ export async function register(formData: FormData) {
 }
 
 export async function loginWithGoogle(role?: AccountRole, acceptTerms?: boolean) {
-  if (role !== undefined && (role !== 'teacher' && role !== 'student')) {
-    return { error: 'กรุณาเลือกว่าคุณเป็นครูหรือนักเรียน' }
+  if (role !== undefined && role !== 'teacher') {
+    return { error: 'สมัครด้วย Google ได้เฉพาะบัญชีครู' }
   }
   if (role && acceptTerms !== true) {
     return { error: 'กรุณายอมรับข้อกำหนดและรับทราบนโยบายความเป็นส่วนตัว' }
@@ -172,7 +172,7 @@ export async function loginWithGoogle(role?: AccountRole, acceptTerms?: boolean)
   const configuredCallback = emailCallbackUrl('login')
   if (!configuredCallback) return { error: 'ระบบเข้าสู่ระบบยังไม่พร้อมใช้งาน กรุณาติดต่อผู้ดูแล KorKru' }
   const callbackUrl = new URL(configuredCallback)
-  if (role === 'teacher' || role === 'student') callbackUrl.searchParams.set('role', role)
+  if (role === 'teacher') callbackUrl.searchParams.set('role', role)
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
@@ -297,6 +297,9 @@ export async function completeProfile(formData: FormData) {
   if (profile.role === 'admin' || profile.survey_role) return { success: true }
 
   const { role, full_name } = parsed.data
+  if (role === 'student' && user.app_metadata?.provider === 'google') {
+    return { error: 'บัญชีนักเรียนต้องสมัครด้วยอีเมล' }
+  }
   const education = role === 'student' ? studentEducationSchema.parse(parsed.data) : null
   // Do not mark onboarding complete when the acknowledgement write failed:
   // the protected layout uses survey_role to decide whether to show this step.

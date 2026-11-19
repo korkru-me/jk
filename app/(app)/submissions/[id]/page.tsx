@@ -1,3 +1,4 @@
+import { withSubmissionReviewStatus } from '@/lib/classroom-score-review.server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getAuthUser } from '@/lib/auth/server'
@@ -66,8 +67,8 @@ function reorderOptions<T>(options: T[] | null, order: number[] | null): (T & { 
 // all (see the essay branch in gradeAnswer). A submitted row is graded, so
 // null here means pending review, never "not looked at yet"; an attempt
 // still in progress is redirected away above.
-function isPendingTeacherReview(a: { is_correct: boolean | null }): boolean {
-  return a.is_correct === null
+function isPendingTeacherReview(a: { is_correct: boolean | null; max_score?: number }): boolean {
+  return a.max_score !== 0 && a.is_correct === null
 }
 
 export default async function SubmissionResultPage({
@@ -105,7 +106,7 @@ export default async function SubmissionResultPage({
     const { data: answerSummary } = mayReview
       ? await admin
           .from('submission_answers')
-          .select('id, correct_answer, is_correct')
+          .select('id, correct_answer, is_correct, max_score')
           .eq('submission_id', id)
       : { data: [] }
     submission = { ...ownSubmission, assignments: ownAssignment, submission_answers: answerSummary ?? [] }
@@ -121,7 +122,7 @@ export default async function SubmissionResultPage({
         id, assignment_id, student_id, status, closed_at, close_reason, missing_work_evidence, total_score, score_adjustment, max_score, attempt_number, submitted_at, secure_browser_verified_at,
         users!submissions_student_id_fkey(full_name),
         assignments(title, show_results, end_at, passing_type, passing_value, type, status, max_attempts, score_strategy, retry_scope, classroom_id, display_max_score, secure_browser_mode),
-        submission_answers(id, correct_answer, is_correct)
+        submission_answers(id, correct_answer, is_correct, max_score)
       `)
       .eq('id', id)
       .maybeSingle()
@@ -212,6 +213,7 @@ export default async function SubmissionResultPage({
 
   const answers = (submission as any).submission_answers as any[]
   const pendingManualCount = answers.filter(isPendingTeacherReview).length
+  const [submissionReview] = await withSubmissionReviewStatus(admin, [submission])
 
   // The limit startSubmission enforces: a ข้อสอบ saved without max_attempts is
   // one attempt, not unlimited — otherwise this page offered a retry the
@@ -322,6 +324,7 @@ export default async function SubmissionResultPage({
 
       <SubmissionScoreSummary
         visible={canShowScore} score={displayScore} maxScore={displayMax} percentage={pct}
+        pendingReview={submissionReview.pendingReview}
         passed={passed} threshold={passed !== null ? passingThreshold : null}
         counts={canShowAnswers ? { correct: answers.filter(a => a.max_score !== 0 && a.is_correct === true).length, wrong: answers.filter(a => a.max_score !== 0 && a.is_correct === false).length, pending: pendingManualCount } : null}
         submittedAt={submission.submitted_at ? thaiDateTime.format(new Date(submission.submitted_at)) : null}
@@ -331,7 +334,7 @@ export default async function SubmissionResultPage({
           <BookOpenCheck aria-hidden="true" />ดูข้อสอบที่ทำเสร็จแล้ว
         </Button>}
         {solutionsOpen && hasSolutionIdentity && <AttemptSolutionsButton />}
-        {canRetry && <Button size="sm" render={<Link href={`/assignments/${submission.assignment_id}/take`} />}>
+        {canRetry && <Button size="sm" render={<Link href={`/assignments/${submission.assignment_id}/take${assignment.type === 'exercise' ? '?retry=1' : ''}`} />}>
           <RotateCcw aria-hidden="true" />
           {isWrongOnlyRetry ? `แก้เฉพาะข้อที่ยังไม่ได้คะแนนเต็ม (${retryableCount} ข้อ)` : assignment.type === 'exam' ? 'เริ่มทำข้อสอบอีกครั้ง' : 'เริ่มทำแบบฝึกหัดอีกครั้ง'}
         </Button>}
@@ -516,7 +519,7 @@ async function SubmissionAnswerDetails({
                       <Badge variant="outline" className={`text-xs ${
                         isPendingManual ? 'border-warning/20 text-warning' : ''
                       }`}>
-                        {isPendingManual ? `รอผล/${a.max_score}` : `${a.score}/${a.max_score}`}
+                        {isPendingManual ? 'รอตรวจ' : `${a.score}/${a.max_score}`}
                       </Badge>
                     )}
                   </div>

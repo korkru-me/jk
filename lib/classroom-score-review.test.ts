@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildClassroomScoreReview, selectClassroomReviewSubmissions,
+import { buildClassroomScoreReview, buildSubmissionScoreReview, selectClassroomReviewSubmissions,
   type ClassroomScoreReviewAnswer, type ClassroomScoreReviewAssignment,
   type ClassroomScoreReviewQuestion, type ClassroomScoreReviewSubmission,
 } from './classroom-score-review'
@@ -25,6 +25,25 @@ const review = (overrides: Partial<Parameters<typeof buildClassroomScoreReview>[
 })
 
 describe('classroom score review flags', () => {
+  it('resolves pending status per attempt from the score parts, including automatic zero and pending work', () => {
+    const input = {
+      assignments: [assignment()], questions: [question()],
+      submissions: [
+        submission({ id: 'automatic' }), submission({ id: 'pending-work', status: 'graded' }),
+        submission({ id: 'voided' }), submission({ id: 'active', status: 'in_progress' }),
+      ],
+      answers: [
+        answer({ id: 'a1', submission_id: 'automatic', is_correct: false }),
+        answer({ id: 'a2', submission_id: 'pending-work', answer_score: 0, answer_max_score: 0.5,
+          work_score: 0, work_max_score: 0.5 }),
+        answer({ id: 'a3', submission_id: 'voided', is_correct: null, is_void: true }),
+        answer({ id: 'a4', submission_id: 'active', is_correct: null }),
+      ],
+    }
+    expect([...buildSubmissionScoreReview(input)]).toEqual(['pending-work'])
+    input.answers[1].work_reviewed_at = '2026-11-19T01:00:00Z'
+    expect([...buildSubmissionScoreReview(input)]).toEqual([])
+  })
   it('keeps an automatically awarded zero complete', () => {
     expect(review({ answers: [answer({ is_correct: false })] })).toEqual({})
   })

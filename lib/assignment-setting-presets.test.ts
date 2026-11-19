@@ -13,6 +13,12 @@ describe('private assignment settings allowlist', () => {
     expect(values.instant_check_answer_key).toBe(false)
     expect(values.shuffle_options).toBe(true)
     expect(values.questions_per_page).toBe(5)
+    expect(values.show_question_sections).toBe(false)
+  })
+
+  it('can still load a preset saved with the former section visibility setting', () => {
+    const saved = { ...assignmentPresetDefaults('exam'), show_question_sections: true, duration_minutes: 30 }
+    expect(assignmentPresetSettingsSchema.parse(saved)).toEqual(saved)
   })
 
   it.each(['question_ids', 'question_points', 'classroom_ids', 'group_ids', 'title', 'description',

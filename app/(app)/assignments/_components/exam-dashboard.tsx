@@ -10,12 +10,13 @@ import {
 } from 'lucide-react'
 import { buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { assignmentSizeLabel } from '@/lib/assignment-size-label'
 import type { AssignmentRow } from '../page'
 import { Card } from '@/components/ui/card'
 
-type StudentSub = { id: string; status: string; total_score: number | null; max_score: number }
+type StudentSub = { id: string; status: string; pendingReview?: boolean; total_score: number | null; max_score: number }
 
 interface Props {
   assignments: AssignmentRow[]
@@ -126,7 +127,7 @@ export function ExamDashboard({ assignments, mySubMap, attemptsUsed, hasInProgre
                   </div>
                   {isInProgress ? (
                     <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
-                      {isDone && canShowResults && sub.total_score != null && (
+                      {sub?.pendingReview ? <Badge variant="statusWarning">คะแนนเดิมรอตรวจ</Badge> : isDone && canShowResults && sub.total_score != null && (
                         <p className="text-xs text-muted-foreground">ครั้งก่อนหน้า {sub.total_score}/{sub.max_score}</p>
                       )}
                       <Link
@@ -139,11 +140,11 @@ export function ExamDashboard({ assignments, mySubMap, attemptsUsed, hasInProgre
                   ) : canRetry ? (
                     <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
                       <p className="text-xs text-success font-medium">ส่งแล้ว ✓</p>
-                      {canShowResults && sub.total_score != null && (
+                      {sub.pendingReview ? <Badge variant="statusWarning">รอตรวจ</Badge> : canShowResults && sub.total_score != null && (
                         <p className="text-lg font-bold">{sub.total_score}/{sub.max_score}</p>
                       )}
                       <Link
-                        href={`/assignments/${a.id}/take`}
+                        href={`/assignments/${a.id}/take${a.type === 'exercise' ? '?retry=1' : ''}`}
                         className={cn(buttonVariants({ size: 'sm', variant: type.variant }), 'gap-1.5')}
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
@@ -153,7 +154,7 @@ export function ExamDashboard({ assignments, mySubMap, attemptsUsed, hasInProgre
                   ) : isDone ? (
                     <div className="text-right shrink-0">
                       <p className="text-xs text-success font-medium">ส่งแล้ว ✓</p>
-                      {canShowResults && sub.total_score != null && (
+                      {sub.pendingReview ? <Badge variant="statusWarning">รอตรวจ</Badge> : canShowResults && sub.total_score != null && (
                         <p className="text-lg font-bold">{sub.total_score}/{sub.max_score}</p>
                       )}
                     </div>

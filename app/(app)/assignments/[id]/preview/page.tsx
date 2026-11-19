@@ -5,14 +5,12 @@ import { readAssignmentClassroomCover } from '@/lib/assignment-classroom-appeara
 import { ExamClient } from '@/components/exam/exam-client'
 import { buildSolutionWatermark } from '@/lib/solution-watermark'
 import { buildAssignmentAttempt } from '@/lib/assignment-attempt'
-import { parseSections } from '@/lib/question-set-sections'
 import { matchingChoices } from '@/lib/matching-choices'
 import type { Assignment, MCQOption, Question, MatchingConfig, MatchingPair } from '@/lib/types'
 import { canManageAssignment } from '@/lib/auth/assignment-access'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { loadAssignmentQuestionsByProvenance } from '@/lib/assignment-question-access.server'
 import { ExamWaitingPreviewClient } from '@/components/exam/exam-waiting-preview'
-import { exerciseWaitingDetails } from '@/lib/exam-waiting-room'
 
 export const metadata = { title: 'ตัวอย่างมุมมองนักเรียน — KorKru' }
 
@@ -43,14 +41,13 @@ export default async function AssignmentPreviewPage({
   if (!assignment || !canManage) notFound()
   const a = assignment as Assignment
 
-  // Teacher-only preview has the same question-free entrance as real work.
+  // An exam preview uses the same question-free entrance as the exam.
   // Do not build/load answer-bearing preview props until the teacher explicitly
   // opens the simulated exam. This query is presentation, never student access.
   const query = await searchParams
-  if (query.preview !== a.type) {
+  if (a.type === 'exam' && query.preview !== 'exam') {
     return <ExamWaitingPreviewClient assignmentId={id} summary={{
       assignmentType: a.type,
-      ...(a.type === 'exercise' ? { exerciseDetails: exerciseWaitingDetails(a) } : {}),
       title: a.title,
       description: a.description,
       durationMinutes: a.duration_minutes,
@@ -61,14 +58,14 @@ export default async function AssignmentPreviewPage({
       requiresAccessCode: Boolean(a.access_code),
       previousSubmissionId: null, activeSubmissionId: null, completedSubmissionId: null,
       expired: false, startedAt: null,
-      blockedReason: a.question_ids.length === 0 ? `ชุด${a.type === 'exercise' ? 'แบบฝึกหัด' : 'ข้อสอบ'}นี้ยังไม่มีโจทย์` : null,
+      blockedReason: a.question_ids.length === 0 ? 'ชุดข้อสอบนี้ยังไม่มีโจทย์' : null,
     }} />
   }
 
   if (a.question_ids.length === 0) {
     return (
       <div className="max-w-md mx-auto mt-16 text-center">
-        <p className="text-lg font-semibold text-foreground">ชุดข้อสอบนี้ยังไม่มีโจทย์</p>
+        <p className="text-lg font-semibold text-foreground">ชุด{a.type === 'exercise' ? 'แบบฝึกหัด' : 'ข้อสอบ'}นี้ยังไม่มีโจทย์</p>
         <a href={`/assignments/${id}`} className="text-primary hover:underline text-sm mt-4 inline-block">
           ← กลับ
         </a>
@@ -215,6 +212,7 @@ export default async function AssignmentPreviewPage({
       <ExamClient
         classroomCover={classroomCover}
         assignmentTitle={a.title}
+        exerciseInstructions={a.type === 'exercise' ? a.description : null}
         submissionId={`preview-${id}`}
         storageOwnerId={user.id}
         answers={previewAnswers as any}
@@ -222,7 +220,6 @@ export default async function AssignmentPreviewPage({
         durationMinutes={a.duration_minutes}
         startedAt={new Date().toISOString()}
         config={examConfig}
-        sections={a.show_sections === false ? [] : parseSections(a.sections)}
         questionsPerPage={Math.max(1, Number(a.questions_per_page ?? 1))}
         previewMode
         previewReturnHref={`/assignments/${id}`}

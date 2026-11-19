@@ -105,7 +105,6 @@ export default async function ExamReviewLab() {
             calculatorEnabled: false,
             scratchpadEnabled: false,
           }}
-          sections={fixture.sections}
           questionsPerPage={1}
           review={{ feedback, returnHref: '/exam-screen-lab/submission-result' }}
         />

@@ -24,6 +24,22 @@ describe('shared exam waiting presentation', () => {
       expect(html).toContain('href="/assignments/test"')
     } else expect(html).toContain('เข้าห้องสอบและเริ่มจับเวลา')
   })
+  it('shows the server-anchored opening countdown and keeps entry disabled until refreshed', () => {
+    const scheduled: ExamWaitingSummary = { ...summary, serverNow: '2026-11-18T03:00:00.000Z',
+      opensAt: '2026-11-19T05:03:04.000Z', blockedReason: 'ยังไม่ถึงเวลาเปิดสอบ' }
+    const html = renderToStaticMarkup(createElement(ExamWaitingRoom, {
+      summary: scheduled, busy: false, code: '', error: null, ...callbacks(),
+    }))
+    expect(html).toContain('นับถอยหลังเปิดสอบ')
+    expect(html).toMatch(/datetime="2026-11-19T05:03:04.000Z"/i)
+    for (const unit of ['วัน', 'ชั่วโมง', 'นาที', 'วินาที']) expect(html).toContain(`>${unit}<`)
+    for (const value of ['01', '02', '03', '04']) expect(html).toContain(`>${value}<`)
+    const zero = renderToStaticMarkup(createElement(ExamWaitingRoom, {
+      summary: scheduled, secondsUntilOpen: 0, busy: false, code: '', error: null, ...callbacks(),
+    }))
+    expect(zero).toContain('กำลังตรวจสอบเวลาเปิดสอบ')
+    expect(zero).toMatch(/<button[^>]*disabled[^>]*type="submit"|<button[^>]*type="submit"[^>]*disabled/)
+  })
   it('renders editor formatting while removing unsafe announcement markup', () => {
     const html = renderToStaticMarkup(createElement(ExamWaitingRoom, { summary: { ...summary, description: '<p><strong>อ่านก่อนเริ่ม</strong><img src=x onerror=alert(1)></p>' },
       busy: false, code: '', error: null, ...callbacks() }))
