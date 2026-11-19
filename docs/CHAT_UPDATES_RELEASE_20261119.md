@@ -19,11 +19,23 @@
 
 Primary ที่ต้องตรวจหลังปล่อยคือ /Users/korkusonmasaen/Korkru/korkru บน localhost:3000 เก็บ snapshot digest ของไฟล์ก่อนปล่อยและคงค่าการเชื่อมต่อเฉพาะ Local
 
-## Staging พร้อมตรวจ hosted
+## Staging และการตรวจหน้าจอที่ผ่านแล้ว
 
-- Candidate 5c9de5d และ Staging PR #140 รวมเป็น 8c13b0a8caac500579d016b9ed36d6dff1e50bd8 Vercel dpl_HtLKKmXnJHZVYEQ4a1XmgVPQscgf เป็น READY และ alias staging.korkru.com ตรงกัน
-- Staging integration checkout ผ่าน TypeScript, token lint และ 350 ชุด / 4,924 tests
-- สร้างข้อมูลสังเคราะห์เฉพาะโครงการ dyuxkrzeveknqgtuzpbh สองบัญชี สองห้องเรียน และสามงานสำหรับตรวจกรณีรอตรวจ นับถอยหลัง และเข้าทำแบบฝึกหัด ล็อกอินนักเรียนผ่าน Supabase Auth ปกติและตรวจ RLS แล้วเห็นเฉพาะรอบที่เป็นของตน คำตอบรอตรวจมีคะแนนรวมชั่วคราว 0 และนักเรียนอ่านแถว questions ไม่ได้
-- เปิด Production draft PR #141 แล้ว การตรวจหน้าจอ hosted ยังรอผ่าน Vercel SSO ระบบอนุมัติอัตโนมัติปฏิเสธการอ่าน protection bypass token และการใช้ Chrome ที่ล็อกอินไว้ โดยต้องมีคำอนุญาตเฉพาะสำหรับ Vercel SSO จึงส่งคำขอให้เจ้าของอนุญาตการใช้ Chrome เข้าระบบตามปกติไว้แล้ว
-- Primary snapshot 1,814 ไฟล์ไม่เปลี่ยนระหว่างเตรียม release HEAD ยังเป็น 83245b7 ชุดนี้ยังไม่ merge เข้า master และยังไม่ deploy Production
-- บัญชีและแถวสังเคราะห์ยังเก็บไว้เฉพาะ Staging สำหรับตรวจหน้าจอขั้นถัดไป ใช้ manifest และ cleanup script เฉพาะรอบใน private temporary directory ห้ามลบข้อมูลนอก manifest
+เจ้าของอนุญาตให้ใช้ Chrome ที่ลงชื่อเข้า Vercel ไว้เพื่อเข้าผ่าน SSO ตามปกติ หลังจาก auto-review ปฏิเสธการอ่าน bypass token ไม่ได้ใช้ token หรือปิด protection
+
+- PR #140 merge 8c13b0a8caac500579d016b9ed36d6dff1e50bd8; PR #142 merge 6c871e9265878e847ede20314acf103e91d72684; PR #143 merge 1a9d5b58bb337ebd5e9b3d42344525052301dbd8
+- Staging สุดท้าย Vercel dpl_335RE7mDBPXVXsLqW22G3iKKRggX เป็น READY และ alias staging.korkru.com ตรงกับ commit 1a9d5b5
+- ตรวจป้าย STAGING และใช้เฉพาะบัญชี/ข้อมูลสังเคราะห์ของรอบนี้ ไม่เขียนข้อมูล Production
+- นักเรียนเห็นรอตรวจทั้งงานที่ seed และแบบฝึกหัดที่ตอบและส่งผ่าน UI จริง โดยไม่มีคะแนนรวม 0 หรือเปอร์เซ็นต์ก่อนตรวจ ครูเห็นรอตรวจในตาราง หน้าสรุปตรวจ รายคน และช่องคะแนนว่าง หลังครูกรอก 0 และยืนยันเผยแพร่ผ่าน UI ครูและนักเรียนจึงเห็น 0/10 จริง
+- ข้อสอบอนาคตมีนับถอยหลังวัน/ชั่วโมง/นาที/วินาทีที่เปลี่ยนจริงและปุ่มเริ่มยังปิดอยู่ แบบฝึกหัดเข้าหน้าโจทย์โดยตรง คลังฝึกเข้ารายการโจทย์ปรนัยโดยตรง และปุ่มกลับไปห้องเรียนพาไปห้องต้นทาง ไม่มีหน้ารอหรือชื่อแฟ้มของครูในหน้าทำงาน
+- แบบสร้างไม่มีตัวเลือกแสดงแฟ้ม เวลาทำอยู่ใต้กำหนดวันทำในขั้นที่ 3 สลับห้องมีคำเตือน ยกเลิกแล้วร่าง/ขั้น/ห้องเดิมยังอยู่ ยืนยันออกแล้วเปิดภาพรวมห้องปลายทางจริง
+- สมัครนักเรียนแสดงอีเมลก่อนข้อมูลนักเรียน บังคับสี่ช่องการศึกษา ไม่ขอโรงเรียน และไม่มี Google เมื่อเลือกครูจึงมีปุ่มสมัคร Google ตรวจ UI โดยไม่สมัครบัญชีจริงหรือยอมรับข้อตกลงแทนผู้ใช้
+- Hosted ตรวจ desktop; mobile และ fixture ตรวจใน primary Local แยกจากข้อมูลจริง ไม่ได้ทดสอบ OAuth Google กับบัญชีจริงหรือ SEB ในรอบนี้
+
+## Validation และ primary
+
+- Candidate หลังแก้หน้าตรวจคะแนนผ่าน TypeScript, token lint, 349 suites / 4,905 tests และ production build
+- Patch ปุ่มคลังฝึกสุดท้ายผ่าน TypeScript, token lint, 3 suites / 29 tests และ production build ซ้ำแล้ว (เคยระบุชื่อ test component ที่ไม่มีไฟล์ จึงเปลี่ยนใช้ suites ที่มีจริง)
+- Primary หลัง integrate หน้าตรวจคะแนนผ่าน TypeScript, token lint, 351 suites / 4,946 tests; คง unrelated work และ environment เดิม
+- ปุ่มกลับคลังฝึก integrate เฉพาะ hunk ใน primary โดยรักษางาน disclosure คำชี้แจงที่มีอยู่เดิม ไม่คัดทั้งไฟล์ทับ
+- Production PR #141 พร้อมปล่อยหลัง hosted validation ข้างต้น บันทึก commit/deployment และผล primary localhost:3000 หลังปล่อยด้านล่าง
