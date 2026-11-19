@@ -42,16 +42,16 @@ export function GradingScoreFields({ answer, question, disabled = false, student
   function scoreField(part: typeof parts.answer, kind: 'answer' | 'work') {
     const label = kind === 'work' ? 'คะแนนวิธีทำ' : parts.hasWork || parts.needsAllocation ? 'คะแนนคำตอบ' : 'คะแนน'
     const savedValue = kind === 'answer' ? saved?.answerScore : saved?.workScore
-    const value = draft?.fields[kind] ?? String(savedValue ?? part.score)
+    const value = draft?.fields[kind] ?? (savedValue !== undefined ? String(savedValue) : part.pending ? '' : String(part.score))
     const unsaved = batch.unsavedDrafts[answer.id]?.fields[kind] !== undefined
     const unpublished = draft?.fields[kind] !== undefined
     const description = [error ? `${id}-error` : undefined, unpublished ? `${id}-${kind}-draft` : undefined].filter(Boolean).join(' ') || undefined
     return <Field key={kind} className="@container/score-part min-w-0 gap-1" data-invalid={!!error}>
       <FieldLabel htmlFor={`${id}-${kind}`} className="flex flex-wrap items-center gap-x-2 gap-y-0 text-xs text-muted-foreground">
-        {label}{part.pending && savedValue === undefined && <span className="font-normal text-foreground/75">ยังไม่ตรวจ</span>}
+        {label}{part.pending && savedValue === undefined && <span className="font-normal text-foreground/75">รอตรวจ</span>}
       </FieldLabel>
       <div className="flex min-w-0 items-center gap-1 text-sm">
-        <Input id={`${id}-${kind}`} type="number" min={0} max={part.maxScore} step="any" inputMode="decimal" aria-label={`${label}${studentName ? `ของ ${studentName}` : ''} ข้อ ${question.title}${occurrence ? ` ครั้งที่ตอบ ${occurrence}` : ''}`} aria-invalid={!!error} aria-describedby={description} value={value}
+        <Input id={`${id}-${kind}`} type="number" min={0} max={part.maxScore} step="any" inputMode="decimal" placeholder={part.pending ? 'รอตรวจ' : undefined} aria-label={`${label}${studentName ? `ของ ${studentName}` : ''} ข้อ ${question.title}${occurrence ? ` ครั้งที่ตอบ ${occurrence}` : ''}`} aria-invalid={!!error} aria-describedby={description} value={value}
           onInput={event => {
             // React's change event can omit replacing a displayed 0 with 0.
             // The native input event records that explicit pending review.
