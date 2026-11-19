@@ -23,7 +23,7 @@ export interface StudentAssignmentRow {
   // separate from `submission` (which reflects the best/official-strategy
   // attempt for score display) since those can be two different attempts.
   has_in_progress: boolean
-  submission: { id: string; status: string; total_score: number | null; max_score: number; streak_reached?: boolean } | null
+  submission: { id: string; status: string; total_score: number | null; max_score: number; streak_reached?: boolean; pendingReview?: boolean } | null
 }
 
 // Mastery assignments (exercises and exams alike) are complete only after a

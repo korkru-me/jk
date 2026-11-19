@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ClassroomScoreReviewAssignment, ClassroomScoreReviewSubmission } from './classroom-score-review'
 vi.mock('server-only', () => ({}))
-import { loadClassroomScoreReview } from './classroom-score-review.server'
+import { loadClassroomScoreReview, withSubmissionReviewStatus } from './classroom-score-review.server'
 
 type Row = Record<string, unknown>
 interface Log { table: string; columns: string; filters: [string, string[]][]; from: number; to: number }
@@ -35,6 +35,38 @@ const answer = (overrides: Row = {}): Row => ({ id: 'answer', submission_id: 'su
   score: 0, max_score: 1, score_edited_by: null, ...overrides })
 
 describe('authorized classroom score review metadata reader', () => {
+  it('annotates every authorized attempt independently of lifecycle status and leaves raw scores intact', async () => {
+    const rows = [
+      { ...submission, id: 'automatic' }, { ...submission, id: 'pending' },
+      { ...submission, id: 'reviewed', status: 'graded' }, { ...submission, id: 'active', status: 'in_progress' },
+    ]
+    const db = reader({
+      assignments: [{ ...assignment }],
+      submission_answers: [
+        answer({ id: 'a1', submission_id: 'automatic', is_correct: false }),
+        answer({ id: 'a2', submission_id: 'pending' }),
+        answer({ id: 'a3', submission_id: 'reviewed', is_correct: false }),
+        answer({ id: 'a4', submission_id: 'foreign' }),
+      ],
+    })
+    const annotated = await withSubmissionReviewStatus(db.value, rows)
+    expect(annotated.map(row => row.pendingReview)).toEqual([false, true, false, false])
+    expect(annotated.map(row => row.total_score)).toEqual([0, 0, 0, 0])
+    expect(db.logs.find(log => log.table === 'submission_answers')?.filters)
+      .toEqual([['submission_id', ['automatic', 'pending', 'reviewed']]])
+    expect(rows[0]).not.toHaveProperty('pendingReview')
+  })
+  it('requires no reads for active attempts and rejects missing assignment metadata', async () => {
+    const db = reader({})
+    expect(await withSubmissionReviewStatus(db.value, [{ ...submission, status: 'in_progress' }]))
+      .toMatchObject([{ pendingReview: false }])
+    expect(db.logs).toEqual([])
+    await expect(withSubmissionReviewStatus(db.value, [submission])).rejects.toThrow('โหลดสถานะรอตรวจคะแนนไม่สำเร็จ')
+  })
+  it.each(['assignments', 'questions', 'submission_answers'])('does not release a score when its %s metadata read fails', async table => {
+    const db = reader({ assignments: [{ ...assignment }] }, { [table]: '42501' })
+    await expect(withSubmissionReviewStatus(db.value, [submission])).rejects.toThrow('โหลดสถานะรอตรวจคะแนนไม่สำเร็จ')
+  })
   it('does no reads without contributing completed attempts in the exact roster/assignment scope', async () => {
     const db = reader({})
     expect(await loadClassroomScoreReview(db.value, [assignment], [submission], [])).toEqual({})

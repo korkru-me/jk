@@ -156,6 +156,7 @@ export function SignupForm() {
   }
 
   async function handleGoogleSignup() {
+    if (selectedRole !== 'teacher') return
     setValidationMethod('google')
     setSubmitError(null)
     clearErrors(['full_name', 'email', 'password', 'confirm_password'])
@@ -191,11 +192,15 @@ export function SignupForm() {
         <AccountRoleField id="signup-role" value={selectedRole} onChange={(role) => setValue('role', role, { shouldValidate: true })} error={errors.role?.message} disabled={busy} />
         <PolicyAcknowledgmentField id="accept_terms" checked={acceptedTerms === true} onChange={(checked) => setValue('accept_terms', checked, { shouldValidate: true })} error={errors.accept_terms?.message} disabled={busy} />
 
-        {validationMethod === 'google' && validationSummary}
-        <Button type="button" variant="outline" className="min-h-[44px] w-full" disabled={busy} onClick={handleGoogleSignup} aria-describedby={validationMethod === 'google' && invalidFields.length > 0 ? 'signup-validation-summary' : undefined}>
-          {googleLoading ? <Loader2 data-icon="inline-start" className="motion-safe:animate-spin" /> : <GoogleIcon />}
-          สมัครด้วย Google
-        </Button>
+        {selectedRole === 'teacher' && (
+          <>
+            {validationMethod === 'google' && validationSummary}
+            <Button type="button" variant="outline" className="min-h-[44px] w-full" disabled={busy} onClick={handleGoogleSignup} aria-describedby={validationMethod === 'google' && invalidFields.length > 0 ? 'signup-validation-summary' : undefined}>
+              {googleLoading ? <Loader2 data-icon="inline-start" className="motion-safe:animate-spin" /> : <GoogleIcon />}
+              สมัครด้วย Google
+            </Button>
+          </>
+        )}
       </FieldGroup>
 
       <FieldSet className="min-w-0 gap-2 rounded-xl border border-border px-3 pb-3">

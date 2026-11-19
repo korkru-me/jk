@@ -26,6 +26,17 @@ describe('buildStudentAbilities', () => {
   const a1 = assignment({ id: 'a1' })
   const a2 = assignment({ id: 'a2' })
 
+  it('shows pending work without a percentage and releases a published zero', () => {
+    const pending = submission({ assignment_id: 'a1', student_id: 's1', status: 'submitted', pendingReview: true, total_score: 0 })
+    const abilities = buildStudentAbilities(['s1'], [a1], [pending])
+    expect(abilities.get('s1')).toMatchObject({
+      average: null, submittedCount: 1, cells: [{ state: 'pending', score: null, percent: null }],
+    })
+    expect(assignmentAverages(abilities.values(), ['a1']).get('a1')).toEqual({ average: null, submittedCount: 1 })
+    const reviewed = buildStudentAbilities(['s1'], [a1], [{ ...pending, pendingReview: false }])
+    expect(reviewed.get('s1')?.cells[0]).toMatchObject({ state: 'done', score: 0, percent: 0 })
+  })
+
   it('turns each official score into a share of full marks', () => {
     const abilities = buildStudentAbilities(['s1'], [a1, a2], [
       submission({ assignment_id: 'a1', student_id: 's1', total_score: 15, max_score: 20 }),

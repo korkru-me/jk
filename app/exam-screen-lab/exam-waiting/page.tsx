@@ -6,15 +6,18 @@ import { ShellClient } from '@/components/layout/shell-client'
 export const metadata = { title: 'ทดลองหน้ารอสอบ — KorKru' }
 export const dynamic = 'force-dynamic'
 
-export default function ExamWaitingLabPage() {
+export default async function ExamWaitingLabPage({ searchParams }: {
+  searchParams: Promise<{ mode?: string }>
+}) {
   if (!isExamScreenLabEnabled(process.env)) notFound()
+  const { mode } = await searchParams
   return (
     <ShellClient
       user={{ id: '80000000-0000-4000-8000-000000000001', email: 'waiting@example.invalid', full_name: 'ครูจำลอง', role: 'teacher' }}
       initialUnreadCount={0}
       notificationsEnabled={false}
     >
-      <ExamWaitingLab />
+      <ExamWaitingLab initialMode={mode === 'scheduled' ? mode : 'ready'} initialClockBase={Date.now()} />
     </ShellClient>
   )
 }

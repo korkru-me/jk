@@ -1,9 +1,9 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllRows, fetchRowsInChunks } from './supabase/fetch-all-rows'
-import { buildClassroomScoreReview, selectClassroomReviewSubmissions,
+import { buildSubmissionScoreReview, selectClassroomReviewSubmissions,
   type ClassroomScoreReviewAnswer, type ClassroomScoreReviewAssignment, type ClassroomScoreReviewMap,
-  type ClassroomScoreReviewQuestion, type ClassroomScoreReviewQuestionRef, type ClassroomScoreReviewSubmission,
+  type SubmissionScoreReviewInput, type ClassroomScoreReviewQuestion, type ClassroomScoreReviewQuestionRef, type ClassroomScoreReviewSubmission,
 } from './classroom-score-review'
 
 const CHUNK_SIZE = 100
@@ -20,14 +20,12 @@ async function pagedChunks<T>(ids: string[], read: (ids: string[], from: number,
 /** Caller must verify the active teaching relationship before supplying this
  * reader, linked assignments and the exact classroom roster. No auth fallback,
  * learner bodies, private drafts, writes or storage access occur here. */
-export async function loadClassroomScoreReview(
+async function loadSubmissionReviewIds(
   reader: SupabaseClient,
   assignments: readonly ClassroomScoreReviewAssignment[],
-  submissions: readonly ClassroomScoreReviewSubmission[],
-  rosterStudentIds: readonly string[],
-): Promise<ClassroomScoreReviewMap> {
-  const selected = selectClassroomReviewSubmissions(assignments, submissions, rosterStudentIds)
-  if (selected.length === 0) return {}
+  selected: SubmissionScoreReviewInput['submissions'],
+): Promise<Set<string>> {
+  if (selected.length === 0) return new Set()
   const relevantIds = new Set(selected.map(row => row.assignment_id))
   const relevant = assignments.filter(row => relevantIds.has(row.id))
   const assignmentIds = [...relevantIds]
@@ -54,8 +52,46 @@ export async function loadClassroomScoreReview(
   const answers = await pagedChunks([...new Set(selected.map(row => row.id))], (ids, from, to) => reader.from('submission_answers')
     .select(columns).in('submission_id', ids).order('id').range(from, to).returns<ClassroomScoreReviewAnswer[]>())
   if (answers.error) throw new Error('โหลดสถานะรอตรวจคะแนนไม่สำเร็จ กรุณาลองใหม่')
-  return buildClassroomScoreReview({ assignments: relevant, submissions: selected, rosterStudentIds,
+  return buildSubmissionScoreReview({ assignments: relevant, submissions: selected,
     questions: questions.rows, answers: answers.rows,
     gradingParts: policies.rows, voidedQuestions: voids.rows,
   })
+}
+
+export async function loadClassroomScoreReview(
+  reader: SupabaseClient,
+  assignments: readonly ClassroomScoreReviewAssignment[],
+  submissions: readonly ClassroomScoreReviewSubmission[],
+  rosterStudentIds: readonly string[],
+): Promise<ClassroomScoreReviewMap> {
+  const selected = selectClassroomReviewSubmissions(assignments, submissions, rosterStudentIds)
+  const pending = await loadSubmissionReviewIds(reader, assignments, selected)
+  const result: ClassroomScoreReviewMap = {}
+  for (const submission of selected) {
+    if (pending.has(submission.id)) {
+      ;(result[submission.assignment_id] ??= {})[submission.student_id] = true
+    }
+  }
+  return result
+}
+
+/** Supply only attempts already authorized by the caller. Read metadata, with
+ * no answer bodies, private drafts or writes. Status "submitted" also covers
+ * automatically graded attempts, so review must be resolved from score parts. */
+export async function withSubmissionReviewStatus<T extends {
+  id: string
+  assignment_id: string
+  status: string
+}>(reader: SupabaseClient, rows: readonly T[]): Promise<Array<T & { pendingReview: boolean }>> {
+  const finished = rows.filter(row => row.status === 'submitted' || row.status === 'graded')
+  if (finished.length === 0) return rows.map(row => ({ ...row, pendingReview: false }))
+  const assignments = await pagedChunks([...new Set(finished.map(row => row.assignment_id))],
+    (ids, from, to) => reader.from('assignments')
+      .select('id, question_ids, score_strategy, require_work_image').in('id', ids)
+      .order('id').range(from, to).returns<ClassroomScoreReviewAssignment[]>())
+  if (assignments.error || assignments.rows.length !== new Set(finished.map(row => row.assignment_id)).size) {
+    throw new Error('โหลดสถานะรอตรวจคะแนนไม่สำเร็จ กรุณาลองใหม่')
+  }
+  const pending = await loadSubmissionReviewIds(reader, assignments.rows, finished)
+  return rows.map(row => ({ ...row, pendingReview: pending.has(row.id) }))
 }

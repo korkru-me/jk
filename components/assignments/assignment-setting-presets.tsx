@@ -51,7 +51,7 @@ const defaultActions: AssignmentPresetActions = {
   load: loadAssignmentSettingPresets,
 }
 
-const SETTING_LABELS: Record<keyof AssignmentPresetSettings, string> = {
+const SETTING_LABELS: Record<Exclude<keyof AssignmentPresetSettings, 'show_question_sections'>, string> = {
   duration_minutes: 'เวลาทำ (นาที)', shuffle_questions: 'สลับลำดับโจทย์',
   shuffle_options: 'สลับตัวเลือก', shared_random_values: 'ตัวเลขชุดเดียวกัน',
   show_results: 'การแสดงผลลัพธ์', show_solutions: 'แสดงเฉลยวิธีทำ',
@@ -66,7 +66,7 @@ const SETTING_LABELS: Record<keyof AssignmentPresetSettings, string> = {
   streak_question_cap: 'ขีดจำกัดจำนวนข้อของการฝึก', streak_recycle_pool: 'วนโจทย์ในคลัง',
   passing_type: 'ชนิดเกณฑ์ผ่าน', passing_value: 'เกณฑ์ผ่าน',
   random_question_count: 'จำนวนโจทย์ที่สุ่มให้', display_max_score: 'คะแนนเต็มที่แสดงผล',
-  show_question_sections: 'แสดงแฟ้มย่อย', require_work_image: 'แนบรูปแสดงวิธีทำ',
+  require_work_image: 'แนบรูปแสดงวิธีทำ',
 }
 
 const VALUE_LABELS: Record<string, string> = {
@@ -85,7 +85,7 @@ function valueLabel(value: AssignmentPresetSettings[keyof AssignmentPresetSettin
 }
 
 function changedKeys(a: AssignmentPresetSettings, b: AssignmentPresetSettings) {
-  return (Object.keys(SETTING_LABELS) as (keyof AssignmentPresetSettings)[])
+  return (Object.keys(SETTING_LABELS) as (keyof typeof SETTING_LABELS)[])
     .filter(key => !Object.is(a[key], b[key]))
 }
 

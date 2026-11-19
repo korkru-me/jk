@@ -1,3 +1,4 @@
+import { withSubmissionReviewStatus } from '@/lib/classroom-score-review.server'
 import { Suspense } from 'react'
 import { notFound, redirect } from 'next/navigation'
 import { isFileAssignment } from '@/lib/file-assignment'
@@ -182,7 +183,7 @@ export default async function ClassroomDetailPage({
           .order('id').range(from, to)).then(({ rows, error }) => ({ data: rows, error }))
       : { data: [] }
 
-    const rawSubRows = await withVoidedScoreMetadata(admin, queriedSubRows ?? [])
+    const rawSubRows = await withVoidedScoreMetadata(admin, await withSubmissionReviewStatus(admin, queriedSubRows ?? []))
     const displayMaxByAssignment = new Map((assignmentRows ?? []).map((a: any) => [a.id as string, a.display_max_score as number | null]))
     const subRows = rescaleToDisplayMax(
       (rawSubRows ?? []) as any[],
@@ -212,7 +213,7 @@ export default async function ClassroomDetailPage({
     for (const [assignmentId, attempts] of Object.entries(attemptsByAssignment)) {
       const official = selectOfficialAttempt(attempts, strategyByAssignment.get(assignmentId) ?? 'best')
       if (official) {
-        subMap[assignmentId] = { ...official.representative, total_score: official.total_score, max_score: official.max_score }
+        subMap[assignmentId] = { ...official.representative, total_score: official.pendingReview ? null : official.total_score, max_score: official.max_score, pendingReview: official.pendingReview }
       }
     }
 
@@ -240,7 +241,7 @@ export default async function ClassroomDetailPage({
         attempts_used: attemptsUsed[a.id] ?? 0,
         has_in_progress: hasInProgress[a.id] ?? false,
         submission: subMap[a.id]
-          ? { id: subMap[a.id].id, status: subMap[a.id].status, total_score: subMap[a.id].total_score, max_score: subMap[a.id].max_score }
+          ? { id: subMap[a.id].id, status: subMap[a.id].status, total_score: subMap[a.id].total_score, max_score: subMap[a.id].max_score, pendingReview: subMap[a.id].pendingReview }
           : null,
       }))
 
@@ -462,7 +463,9 @@ async function TeacherClassroomContent({
     }
     const linkByAssignment = new Map(links.map(link => [link.assignment_id, link]))
     const displayMaxByAssignment = new Map((assignmentRows ?? []).map(assignment => [assignment.id, assignment.display_max_score as number | null]))
-    const scoredSubmissions = rescaleToDisplayMax(submissionResult.data ?? [], row => displayMaxByAssignment.get(row.assignment_id) ?? null)
+    const reviewSubmissions = initialNavigationItem === 'ability'
+      ? await withSubmissionReviewStatus(admin, submissionResult.data ?? []) : submissionResult.data ?? []
+    const scoredSubmissions = rescaleToDisplayMax(reviewSubmissions, row => displayMaxByAssignment.get(row.assignment_id) ?? null)
     // Exact classroom management was verified before this roster-scoped service read.
     const pendingReviewByStudent = isScores && studentIds.length > 0
       ? await loadClassroomScoreReview(admin, assignmentRows ?? [], scoredSubmissions, studentIds)
