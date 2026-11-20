@@ -1,5 +1,11 @@
 # Data model และ invariants
 
+## รูปประกอบข้อความถูก–ผิด — 20 พฤศจิกายน 2026 (release candidate)
+
+`questions.extra_data.statements[].image_urls?: string[]` เป็นรูปของข้อความย่อยแต่ละข้อ ข้อหลักยังใช้ `questions.image_urls` เดิม ข้อมูลเก่าไม่มี field นี้ยังทำงานเหมือนเดิม ไม่มี migration; safe exam DTO ส่งเฉพาะ id/text/image_urls โดยตัด correct_answer ออก
+
+
+
 ## Assignment-owned file instructions — 2 November 2026 (local)
 
 No schema change. A direct file assignment remains `assignments.type = exercise`, fixed completion, one attempt, no instant grading/proctoring, and one assignment-owned `file_upload` prompt. Its `extra_data.file_assignment_id` UUID binds it to that assignment; `file_assignment_max_score` and the assignment's existing `question_points` supply the whole-work ceiling. `assignments.description` begins with `<!--korkru:file-assignment:v1:UUID-->` followed by sanitized instructions; the marker is stripped by rich-text rendering and is never shown as product copy. The public FileUploadConfig and legacy Word question format are unchanged.

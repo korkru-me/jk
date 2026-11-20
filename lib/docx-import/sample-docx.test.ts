@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { parseDocx } from './index'
 import { AUTO_PROFILE, IMPORT_PROFILES, PROFILE_BY_TYPE, sampleLineText, type ImportProfile } from './profiles'
 import { packSampleDocx, sampleFileName } from './sample-docx'
+import { draftToEntry } from './to-question'
 
 /**
  * The example file, read back by the app that hands it out.
@@ -163,6 +164,13 @@ describe('generated sample worksheets', () => {
     // that `docx.ts` still reads `w:sym`.
     expect(question.statements.map(statement => statement.isTrue)).toEqual([false, true, true, false])
     expect(question.statements.every(statement => statement.score === 0.25)).toBe(true)
+    const ids = question.statements[1].imageRelIds ?? []
+    expect(ids).toHaveLength(1)
+    const entry = draftToEntry(question, new Map([[ids[0], 'https://example.test/statement.png']]))
+    expect(entry.question.extra_data).toMatchObject({
+      statements: [{ image_urls: ['https://example.test/statement.png'] }, {}, {}],
+    })
+    expect(entry.question.image_urls).not.toContain('https://example.test/statement.png')
     expect(question.warnings).toEqual([])
   })
 
