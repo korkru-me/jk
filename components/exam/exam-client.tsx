@@ -1,5 +1,7 @@
 'use client'
 
+import { StatementImages } from '@/components/questions/statement-images'
+
 import { lazy, Suspense, useState, useEffect, useCallback, useMemo, useRef, type ReactNode, type RefObject } from 'react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
@@ -3310,7 +3312,7 @@ function TrueFalseSelectMatching({ config, subStatements, mode, questionText, ra
   // question_text is statement ก), followed by the remaining statements.
   // The shared prompt is rendered above; each judged statement appears here
   // once, beside its answer control.
-  const items: Array<{ text: string }> = [{ text: questionText }, ...subStatements]
+  const items: Array<{ text: string; image_urls?: string[] }> = [{ text: questionText }, ...subStatements]
   return (
     <div className="flex flex-col gap-2">
       <p className="text-xs text-muted-foreground">{choiceListHint(questionText, target)}</p>
@@ -3320,10 +3322,13 @@ function TrueFalseSelectMatching({ config, subStatements, mode, questionText, ra
             answers[i] === 'true' ? 'border-primary bg-primary/10' : 'border-border hover:border-muted-foreground'
           }`}>
             <input type="checkbox" className="mt-0.5" checked={answers[i] === 'true'} onChange={() => toggle(i)} />
-            <span className="flex items-center gap-1.5 flex-wrap text-sm">
-              <span className="text-xs font-bold text-muted-foreground">{labels[i] ?? i + 1})</span>
-              {st.text && <RichText text={st.text} />}
-            </span>
+            <div className="flex min-w-0 flex-col gap-1.5 text-sm">
+              <div className="flex items-start gap-1.5">
+                <span className="text-xs font-bold text-muted-foreground">{labels[i] ?? i + 1})</span>
+                {st.text && <RichText text={st.text} />}
+              </div>
+              <StatementImages urls={st.image_urls} />
+            </div>
           </label>
         ))}
       </div>
@@ -3409,11 +3414,12 @@ function TrueFalseAnswerInput({ config, questionText, rawValue, onChange }: {
   return (
     <div className="flex flex-col gap-2.5">
       <p className="text-sm font-medium">ข้อความแต่ละข้อถูกหรือผิด?</p>
-      {([{ text: questionText }, ...subStatements] as Array<{ text: string }>).map((st, i) => (
+      {([{ text: questionText }, ...subStatements] as Array<{ text: string; image_urls?: string[] }>).map((st, i) => (
         <div key={i} className="grid items-center gap-1.5 sm:grid-cols-[minmax(0,1fr)_10rem]">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-xs font-bold text-muted-foreground">{labels[i] ?? i + 1})</span>
             {st.text && <RichText text={st.text} className="text-sm" />}
+            <StatementImages urls={st.image_urls} />
           </div>
           <div className="flex gap-2">
             {([

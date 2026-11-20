@@ -399,6 +399,7 @@ export type ChoiceScoring = 'partial' | 'all_or_nothing'
 export interface TrueFalseStatement {
   id: string
   text: string   // rich text (HTML) — the statement to judge true/false
+  image_urls?: string[] // illustrations belonging to this statement only
   correct_answer: boolean
 }
 
