@@ -20,6 +20,7 @@ import { matchingChoices } from '@/lib/matching-choices'
 export interface SafeTrueFalseStatement {
   id: string
   text: string
+  image_urls?: string[]
 }
 
 export interface SafeTrueFalseConfig {
@@ -279,9 +280,11 @@ function shuffle<T>(items: T[], random: () => number): T[] {
 
 function sanitizeTrueFalseStatement(value: unknown): SafeTrueFalseStatement {
   const statement = asRecord(value)
+  const imageUrls = asStringArray(statement.image_urls)
   return {
     id: asString(statement.id),
     text: asString(statement.text),
+    ...(imageUrls?.length ? { image_urls: imageUrls } : {}),
   }
 }
 

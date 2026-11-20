@@ -1,5 +1,7 @@
 'use client'
 
+import { StatementImages } from '@/components/questions/statement-images'
+
 import { useState } from 'react'
 
 import { ImageLabelInput } from '@/components/exam/image-label-input'
@@ -297,6 +299,7 @@ function TrueFalseInput({ question, value, onChange, disabled }: PracticeAnswerI
             <span className="font-medium text-muted-foreground">{labels[index] ?? index + 1}.</span>
             <RichText text={statement.text} blocks />
           </div>
+          <StatementImages urls={statement.image_urls} />
           {selectMode ? (
             <label className="flex min-h-[44px] cursor-pointer items-center gap-2 rounded-lg bg-muted/50 px-3 py-2 text-sm">
               <span id={`${promptId}-select`} className="order-2">เลือกข้อนี้</span>

@@ -78,6 +78,7 @@ export interface DraftStatement {
   isTrue: boolean | null
   /** Points the file gives this statement — "(0.25 คะแนน)" — if it says. */
   score: number | null
+  imageRelIds?: string[]
 }
 
 /** One ช่องว่าง in a เติมคำ โจทย์, in the order it appears. */
@@ -681,7 +682,9 @@ function readStatement(paragraph: DocxParagraph): DraftStatement {
     .replace(/\s+/g, ' ')
     .trim()
 
-  return { html: `<p>${escapeHtml(body)}</p>`, isTrue: marked, score }
+  const imageRelIds = collectImages([paragraph]).relIds
+  return { html: `<p>${escapeHtml(body)}</p>`, isTrue: marked, score,
+    ...(imageRelIds.length ? { imageRelIds } : {}) }
 }
 
 // ─── Splitting the document into questions ───────────────────────────────────
@@ -1485,14 +1488,22 @@ function buildQuestion(
     const typed = /^[\s ]*([0-9]{1,2})\s*[.)]/.exec(plainText(head.inlines))
     const parent = typed ? parseInt(typed[1], 10) : number
 
+    let imageStatement: DraftStatement | undefined
     body = body.filter(block => {
-      if (block.kind !== 'paragraph') return true
+      if (block.kind !== 'paragraph') { imageStatement = undefined; return true }
       // Either numbered by hand as "8.1", or by Word as a deeper level of the
       // list the โจทย์ itself is numbered with. Worksheets use both.
       const typedStatement = statementOf(block, parent) !== null
       const listStatement = !!head.numId && block.numId === head.numId && block.ilvl > head.ilvl
-      if (!typedStatement && !listStatement) return true
-      statements.push(readStatement(block))
+      // A picture-only paragraph immediately below a statement illustrates it.
+      if (!typedStatement && !listStatement && imageStatement
+        && !plainText(block.inlines).trim() && collectImages([block]).relIds.length > 0) {
+        imageStatement.imageRelIds = [...(imageStatement.imageRelIds ?? []), ...collectImages([block]).relIds]
+        return false
+      }
+      if (!typedStatement && !listStatement) { imageStatement = undefined; return true }
+      imageStatement = readStatement(block)
+      statements.push(imageStatement)
       return false
     })
   }

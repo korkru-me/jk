@@ -206,6 +206,20 @@ describe('toSafeExamAnswer', () => {
     expect(tf.json).not.toContain('prompt')
   })
 
+  it('keeps statement illustrations while stripping the answer key', () => {
+    const images = ['https://example.test/statement.png']
+    const tf = serializedSafe('true_false', {
+      extra_data: {
+        correct_answer: true,
+        statements: [{ id: 's1', text: 'ข้อความ', image_urls: images, correct_answer: false }],
+      },
+    })
+    expect(tf.safe.questions.extra_data).toMatchObject({
+      statements: [{ id: 's1', text: 'ข้อความ', image_urls: images }],
+    })
+    expect(tf.json).not.toContain('correct_answer')
+  })
+
   it('removes nested true/false and fill-blank answer keys', () => {
     const tf = serializedSafe('true_false', {
       extra_data: {

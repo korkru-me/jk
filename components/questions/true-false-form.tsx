@@ -72,7 +72,7 @@ function TrueFalseMainItem({
       </div>
       <div>
         <p className="text-sm text-muted-foreground mb-2">ข้อความนี้ <strong>ถูกหรือผิด?</strong></p>
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           {[
             { val: true,  label: '✓ ถูก',  cls: 'border-success bg-success/10 text-success' },
             { val: false, label: '✗ ผิด',  cls: 'border-destructive bg-destructive/10 text-destructive' },
@@ -80,8 +80,9 @@ function TrueFalseMainItem({
             <button
               key={String(val)}
               type="button"
+              aria-pressed={correctAnswer === val}
               onClick={() => onCorrectAnswerChange(val)}
-              className={`flex-1 py-4 rounded-xl border-2 font-semibold text-lg transition-colors ${
+              className={`h-[44px] min-w-20 px-4 rounded-lg border text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors ${
                 correctAnswer === val ? cls : 'border-border text-muted-foreground hover:border-ring'
               }`}
             >
@@ -374,9 +375,13 @@ export function TrueFalseForm({ allTags, mode = 'create', question, isOwner = tr
                 rows={2}
               />
             </div>
+            <div className="flex flex-col gap-1.5">
+              <Label>รูปภาพประกอบ (ไม่บังคับ)</Label>
+              <QuestionImageUpload value={st.image_urls ?? []} onChange={urls => updateStatement(i, { image_urls: urls })} />
+            </div>
             <div>
               <p className="text-sm text-muted-foreground mb-2">ข้อความนี้ <strong>ถูกหรือผิด?</strong></p>
-              <div className="flex gap-3">
+              <div className="flex gap-2">
                 {[
                   { val: true,  label: '✓ ถูก',  cls: 'border-success bg-success/10 text-success' },
                   { val: false, label: '✗ ผิด',  cls: 'border-destructive bg-destructive/10 text-destructive' },
@@ -384,8 +389,9 @@ export function TrueFalseForm({ allTags, mode = 'create', question, isOwner = tr
                   <button
                     key={String(val)}
                     type="button"
+                    aria-pressed={st.correct_answer === val}
                     onClick={() => updateStatement(i, { correct_answer: val })}
-                    className={`flex-1 py-3 rounded-xl border-2 font-semibold transition-colors ${
+                    className={`h-[44px] min-w-20 px-4 rounded-lg border text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors ${
                       st.correct_answer === val ? cls : 'border-border text-muted-foreground hover:border-ring'
                     }`}
                   >
