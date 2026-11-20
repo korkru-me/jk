@@ -185,7 +185,7 @@ function blanksToConfig(blanks: DraftBlank[]): FillBlankItem[] {
  * writes "(0.25 คะแนน)" beside each — and falls back to the form's own default
  * of 1 when it says nothing.
  */
-function trueFalseFields(draft: DraftQuestion): { question_text: string; extra_data: TrueFalseConfig } {
+function trueFalseFields(draft: DraftQuestion, imageUrls: Map<string, string>): { question_text: string; image_urls: string[]; extra_data: TrueFalseConfig } {
   const [first, ...rest] = draft.statements
   const scores = draft.statements.map(statement => statement.score).filter((score): score is number => score !== null)
 
@@ -193,10 +193,12 @@ function trueFalseFields(draft: DraftQuestion): { question_text: string; extra_d
     id: `${draft.id}-s${index + 1}`,
     text: statement.html,
     correct_answer: statement.isTrue === true,
+    ...(statement.imageRelIds?.length ? { image_urls: statement.imageRelIds.map(id => imageUrls.get(id)).filter((url): url is string => !!url) } : {}),
   }))
 
   return {
     question_text: first?.html ?? '',
+    image_urls: (first?.imageRelIds ?? []).map(id => imageUrls.get(id)).filter((url): url is string => !!url),
     extra_data: {
       // An empty lead-in is left out: most ถูก-ผิด โจทย์ do not have one, and
       // an empty paragraph would print as a blank line above the statements.
@@ -385,7 +387,7 @@ export function draftToEntry(draft: DraftQuestion, imageUrls: Map<string, string
     is_correct: choice.isCorrect,
   }))
 
-  const trueFalse = draft.type === 'true_false' ? trueFalseFields(draft) : null
+  const trueFalse = draft.type === 'true_false' ? trueFalseFields(draft, imageUrls) : null
   const ordering = draft.type === 'ordering' ? orderingOf(draft) : null
   const matching = draft.type === 'matching' && draft.matching
     ? matchingFields(draft.matching, imageUrls)
@@ -417,7 +419,7 @@ export function draftToEntry(draft: DraftQuestion, imageUrls: Map<string, string
         : imageLabel ? imageLabel.extra_data
           : ordering ? { items: orderedItems(ordering) }
             : draft.type === 'fill_blank' ? { blanks: blanksToConfig(draft.blanks) } : {},
-    image_urls,
+    image_urls: [...image_urls, ...(trueFalse?.image_urls ?? [])],
   }
 
   return {

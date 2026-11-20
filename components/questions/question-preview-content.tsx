@@ -1,5 +1,7 @@
 'use client'
 
+import { StatementImages } from '@/components/questions/statement-images'
+
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { drawFreshValues } from '@/lib/math/fresh-random-values'
@@ -1064,7 +1066,7 @@ export function QuestionPreviewContent({
       {questionType === 'true_false' && trueFalseConfig && trueFalseConfig.answer_mode === 'select_matching' && (() => {
         const subStatements = trueFalseConfig.statements ?? []
         const labels = partLabels(trueFalseConfig.part_label_style)
-        const items = [{ text: renderedText, correct_answer: trueFalseConfig.correct_answer }, ...subStatements]
+        const items = [{ text: renderedText, correct_answer: trueFalseConfig.correct_answer, image_urls: undefined }, ...subStatements]
         const isTarget = (correct: boolean) => trueFalseConfig.select_target === 'wrong' ? !correct : correct
         const correctCount = items.reduce((n, st, i) => n + (((tfAnswers[i] === 'true') === isTarget(st.correct_answer)) ? 1 : 0), 0)
         const total = items.length
@@ -1091,10 +1093,13 @@ export function QuestionPreviewContent({
                       onChange={() => { if (!tfChecked) setTfAnswers(a => a.map((v, ai) => ai === i ? (v === 'true' ? 'false' : 'true') : v)) }}
                       className="mt-0.5"
                     />
-                    <span className="flex items-center gap-1.5 flex-wrap text-sm text-foreground">
-                      <span className="text-xs font-bold text-muted-foreground">{labels[i] ?? i + 1})</span>
-                      {st.text && <RenderText text={st.text} />}
-                    </span>
+                    <div className="flex min-w-0 flex-col gap-1.5 text-sm text-foreground">
+                      <div className="flex items-start gap-1.5">
+                        <span className="text-xs font-bold text-muted-foreground">{labels[i] ?? i + 1})</span>
+                        {st.text && <RenderText text={st.text} />}
+                      </div>
+                      <StatementImages urls={st.image_urls} />
+                    </div>
                   </label>
                 )
               })}
@@ -1152,7 +1157,7 @@ export function QuestionPreviewContent({
         return (
           <div className="space-y-4">
             <p className="text-xs text-muted-foreground font-medium">ข้อความแต่ละข้อถูกหรือผิด?</p>
-            {[{ text: renderedText, correct_answer: trueFalseConfig.correct_answer }, ...subStatements].map((st, i) => (
+            {[{ text: renderedText, correct_answer: trueFalseConfig.correct_answer, image_urls: undefined }, ...subStatements].map((st, i) => (
               <div key={i} className="space-y-1.5">
                 {hasSubs && (
                   <div className="flex items-center gap-1.5">
@@ -1160,6 +1165,7 @@ export function QuestionPreviewContent({
                     {st.text && <RenderText text={st.text} />}
                   </div>
                 )}
+                <StatementImages urls={st.image_urls} />
                 <div className="flex gap-3">
                   {([
                     { val: 'true' as const,  label: '✓ ถูก', cls: 'border-success bg-success/10 text-success' },

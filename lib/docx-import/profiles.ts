@@ -287,6 +287,7 @@ export const PROFILE_BY_TYPE: Record<QuestionType, ImportProfile> = {
       { id: 'tick', text: 'ทำ ✓ หน้าข้อความที่ถูก และ x หน้าข้อความที่ผิด — แทรก ✓ จากเมนู Symbol ของ Word ได้ ระบบอ่านออก' },
       ANSWER_MARK,
       { id: 'statement-score', text: 'จะเขียนคะแนนท้ายข้อความ เช่น (0.25 คะแนน) ก็ได้ ระบบใช้เป็นคะแนนต่อข้อความให้' },
+      { id: 'statement-image', text: 'แทรกรูปในบรรทัดข้อความย่อย หรือวางรูปแบบอยู่ในแนวเดียวกับข้อความในบรรทัดถัดไป รูปจะติดกับข้อความย่อยนั้น' },
       { id: 'lead-in', text: 'ข้อความนำหน้าข้อหลัก เช่น "พิจารณาการปล่อยวัตถุในแนวดิ่ง โดยไม่คิดแรงต้านอากาศ" จะกลายเป็นคำสั่งนำ ที่นักเรียนอ่านก่อนแต่ไม่ต้องตัดสินถูก-ผิด' },
     ],
     sample: [
@@ -294,6 +295,7 @@ export const PROFILE_BY_TYPE: Record<QuestionType, ImportProfile> = {
       line('question', t('พิจารณาการปล่อยวัตถุในแนวดิ่ง โดยไม่คิดแรงต้านอากาศ (1 คะแนน)')),
       line('part', t('……… '), key('x'), t(' …… วัตถุที่ตกแบบเสรีจะมีความเร่งเพิ่มขึ้นเรื่อย ๆ ตามเวลา (0.25 คะแนน)')),
       line('part', t('……… '), key('✓'), t(' …… วัตถุที่ปล่อยจากที่สูงจะมีความเร็วเพิ่มขึ้นเท่ากันทุก ๆ วินาที (0.25 คะแนน)')),
+      { kind: 'picture', spans: [t('ภาพวงจรไฟฟ้าประกอบข้อความย่อย')] },
       line('part', t('……… '), key('✓'), t(' …… ระยะทางที่วัตถุตกในแต่ละวินาทีจะเพิ่มขึ้น (0.25 คะแนน)')),
       line('part', t('……… '), key('x'), t(' …… วัตถุที่มีมวลมากกว่าจะตกถึงพื้นก่อน (0.25 คะแนน)')),
     ],
@@ -602,6 +604,7 @@ export function findProfile(slug: string): ImportProfile | null {
  *  and a picture reads as the words written in the boxes standing on it. */
 export function sampleLineText(line: SampleLine): string {
   if (line.kind === 'picture') return (line.boxes ?? []).map(box => box.text).join(' ').trim()
+    || line.spans.map(span => span.text).join('').trim()
   const left = line.spans.map(span => span.text).join('')
   const right = (line.right ?? []).map(span => span.text).join('')
   return right ? `${left} ${right}`.trim() : left

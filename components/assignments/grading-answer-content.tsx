@@ -1,3 +1,4 @@
+import { StatementImages } from '@/components/questions/statement-images'
 import type { GradingAnswer } from '@/lib/grading-workspace'
 import type { ClassifyConfig, CompositeConfig, ImageLabelConfig, MatchingPair, OrderingConfig, Question, TrueFalseConfig } from '@/lib/types'
 import { parseSubmittedFiles } from '@/lib/exam-attachment'
@@ -71,7 +72,7 @@ export function GradingQuestionContent({ question, answer }: { question: Questio
     {questionImages(question.image_urls)}
     {question.question_type === 'mcq' && optionsContent(question.mcq_options, answer?.optionOrder)}
     {question.question_type === 'written' && parts?.some(part => part.sub_text?.trim()) && <ol className="flex flex-col gap-1">{parts.map((part, index) => part.sub_text?.trim() ? <li key={part.id || index} className="flex gap-2"><span>{choiceLabel(index)}.</span><QuestionText text={substitute(part.sub_text, values)} /></li> : null)}</ol>}
-    {question.question_type === 'true_false' && trueFalse.statements?.map((statement, index) => <div key={statement.id} className="flex gap-2"><span>{choiceLabel(index + 1)}.</span><QuestionText text={substitute(statement.text, values)} /></div>)}
+    {question.question_type === 'true_false' && trueFalse.statements?.map((statement, index) => <div key={statement.id} className="flex gap-2"><span>{choiceLabel(index + 1)}.</span><div className="flex min-w-0 flex-col gap-2"><QuestionText text={substitute(statement.text, values)} /><StatementImages urls={statement.image_urls} /></div></div>)}
     {question.question_type === 'matching' && <div className="grid grid-cols-2 gap-x-4 gap-y-1">{(question.mcq_options as unknown as MatchingPair[] | null)?.map((pair, index) => <div key={index} className="contents"><div className="flex min-w-0 flex-col gap-1"><QuestionText text={pair.left_text} />{pair.left_image && <ImagePreview url={pair.left_image} label={`รูปด้านซ้าย ${index + 1}`} />}</div><div className="flex min-w-0 flex-col gap-1"><QuestionText text={pair.right_text} />{pair.right_image && <ImagePreview url={pair.right_image} label={`รูปด้านขวา ${index + 1}`} />}</div></div>)}</div>}
     {question.question_type === 'ordering' && ordering.items?.map((item, index) => <div key={item.id} className="flex flex-col gap-1"><QuestionText text={`${index + 1}. ${item.text}`} />{item.image_url && <ImagePreview url={item.image_url} label={`ภาพรายการ ${index + 1}`} />}</div>)}
     {question.question_type === 'image_label' && diagram.image_url && <><DiagramPreview diagram={diagram} />{diagram.bank?.length ? <p className="text-xs text-muted-foreground">คลังคำ: {diagram.bank.join(' · ')}</p> : null}</>}
