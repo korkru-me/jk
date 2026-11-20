@@ -1,6 +1,6 @@
 # Data model และ invariants
 
-## รูปประกอบข้อความถูก–ผิด — 20 พฤศจิกายน 2026 (release candidate)
+## รูปประกอบข้อความถูก–ผิด — 20 พฤศจิกายน 2026 (Production released)
 
 `questions.extra_data.statements[].image_urls?: string[]` เป็นรูปของข้อความย่อยแต่ละข้อ ข้อหลักยังใช้ `questions.image_urls` เดิม ข้อมูลเก่าไม่มี field นี้ยังทำงานเหมือนเดิม ไม่มี migration; safe exam DTO ส่งเฉพาะ id/text/image_urls โดยตัด correct_answer ออก
 
