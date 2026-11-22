@@ -8,6 +8,7 @@
 
 - ใช้ bounded Auth 429 retry ที่ origin/endpoint allowlist เดิม ครบ server client, browser client และ session-refresh proxy จึงไม่ปล่อยให้ proxy/browser refresh ล้มทันทีขณะคำขอกระจุก
 - ใช้ jitter และเคารพ Retry-After จำกัดแปด retries / 40 วินาทีของการรอ ไม่ cache session ข้ามผู้ใช้ ไม่เปลี่ยน getUser/RLS/ownership verification
+- คำขอฐานข้อมูล/Storage และ Auth operations นอก allowlist ส่งผ่าน input/init เดิม รวมถึง Next.js fetch metadata
 - ไม่ replay ambiguous network errors, 5xx, invalid credentials, database writes หรือ email quota รองรับรูปแบบ quota error ทั้ง code และ error_code
 - คง anonymous email/IP reservations เดิม: 120 requests/hour/IP ฝั่งแอป ไม่มี privileged signup shortcut
 - Supabase signup/sign-in และ token limits ที่จะใช้: 600 requests/5 min/IP โดยไม่อัปเกรด ค่า Confirm email ของ Production คงปิดตามเดิม Staging ปิดชั่วคราวระหว่างทดสอบตามที่เคยอนุญาต แล้วคืนเปิดหลังจบ
@@ -22,4 +23,4 @@
 
 ## สถานะ
 
-Local checks ผ่าน: TypeScript, 352 suites / 4,928 tests, design-token lint และ Webpack production build กำลังปล่อย Staging ก่อนทดสอบ cohort ใหม่ ยังไม่ใช่ Production release evidence และไม่มี migration ใหม่
+Local checks ผ่าน: TypeScript, 352 suites / 4,929 tests, design-token lint และ Webpack production build กำลังปล่อย Staging ก่อนทดสอบ cohort ใหม่ ยังไม่ใช่ Production release evidence และไม่มี migration ใหม่
