@@ -29,7 +29,7 @@ export function createAuthRateLimitFetch(
       // A provider email quota cannot be solved by replaying the same signup.
       // Preserve the response so the caller can show its existing quota copy.
       const rejection = await response.clone().json().catch(() => null)
-      if (rejection?.code === 'over_email_send_rate_limit') return response
+      if ([rejection?.code, rejection?.error_code].includes('over_email_send_rate_limit')) return response
       const retryAfter = response.headers.get('retry-after')
       const seconds = retryAfter === null ? NaN : Number(retryAfter)
       const serverDelay = Number.isFinite(seconds) && seconds >= 0
