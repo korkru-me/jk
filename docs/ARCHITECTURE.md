@@ -1,5 +1,16 @@
 # Architecture
 
+## Auth burst transport — 22 November 2026 (candidate)
+
+`lib/auth/rate-limit-fetch.ts` is a request-local transport for the existing
+cookie-bound Supabase server client, browser client and session-refresh proxy. It retries explicit transient Auth 429
+rejections with bounded jitter while leaving verification and authorization in
+their original actions. It does not replay database writes, 5xx or lost signup
+responses. The Staging-only capacity runner drives the deployed Server Actions
+with 80 distinct synthetic users and records application failures independently
+of HTTP status. Hosted findings are tracked in `EXAM_CAPACITY_20261122.md`.
+The resumed, quota-bounded signup release is tracked in `AUTH_SIGNUP_RELEASE_20261122.md`.
+
 ## File instruction documents and recipient picker — 2 November 2026 (local)
 
 `QuestionFileUpload` shares one guarded file handler between the picker and the optional drop surface; direct file assignments opt into document formats and report upload busy state to the form. Existing image downscaling remains before size validation. Images/PDF retain their bucket; Office/text/ZIP use the existing owner-scoped classroom document bucket under `file-assignment-instructions`, with a narrow URL parser reused by create/update actions. `InstructionAttachment` renders PDF previews, images, or native download links in teacher previews and the student view. The file form composes the exercise wizard's `ClassroomPicker`; recipient payload and server classroom authorization stay on the existing whole-class file-work path. Removing an instruction reference preserves its object for published/copy references; the question-images sweeper does not manage the document namespace.
