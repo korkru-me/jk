@@ -1,6 +1,6 @@
 # Architecture
 
-## Auth burst transport — 22 November 2026 (candidate)
+## Auth burst transport — 22 November 2026 (Staging only)
 
 `lib/auth/rate-limit-fetch.ts` is a request-local transport for the existing
 cookie-bound Supabase server client. It retries explicit transient Auth 429

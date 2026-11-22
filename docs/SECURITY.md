@@ -1,6 +1,6 @@
 # Security และ privacy guardrails
 
-## Auth burst handling — 22 November 2026 (candidate)
+## Auth burst handling — 22 November 2026 (Staging only)
 
 The cookie-bound Supabase server client retries only explicit HTTP 429 rejections
 from this project's signup, token and user endpoints. Retries retain the same

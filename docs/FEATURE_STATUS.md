@@ -1,8 +1,8 @@
 # Feature status
 
-## เตรียมสอบ 80 คน — 22 พฤศจิกายน 2026 (candidate)
+## เตรียมสอบ 80 คน — 22 พฤศจิกายน 2026 (Staging only; หยุดทดสอบโหลด)
 
-กำลังทดสอบสมัคร/ทำข้อสอบพร้อมกันบน Staging และเพิ่ม bounded retry เฉพาะ Auth 429 ยังไม่ใช่ผลรับรองความพร้อม Production ดู [EXAM_CAPACITY_20261122.md](EXAM_CAPACITY_20261122.md)
+ปล่อย bounded retry เฉพาะ Auth 429 บน Staging แล้ว สมัครรอบสองผ่าน 55/80 ก่อนผู้ใช้สั่งหยุด ล้างข้อมูลสังเคราะห์ที่อนุมัติแล้ว ตั้งลิมิต Auth 600 เฉพาะ Staging และคง Confirm email เปิด ไม่มีผลทดสอบครบทั้งข้อสอบหรือการปล่อย Production ดู [EXAM_CAPACITY_20261122.md](EXAM_CAPACITY_20261122.md)
 
 ## รูปประกอบข้อย่อยถูก–ผิด — 20 พฤศจิกายน 2026 (release candidate)
 
