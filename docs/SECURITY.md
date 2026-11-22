@@ -1,5 +1,16 @@
 # Security และ privacy guardrails
 
+## Auth burst handling — 22 November 2026 (candidate)
+
+The cookie-bound Supabase server client retries only explicit HTTP 429 rejections
+from this project's signup, token and user endpoints. Retries retain the same
+request body and credentials, use jitter, honor Retry-After, and are bounded by
+eight retries / 40 seconds of sleep. Email-quota rejections, ambiguous network
+failures, 5xx, invalid credentials and database writes are not replayed. Existing
+getUser verification, RLS, ownership checks and email/IP reservations remain the
+authorization boundaries; there is no cross-request session cache or privileged
+signup shortcut. See EXAM_CAPACITY_20261122.md for hosted evidence and limits.
+
 ## File instruction document uploads — 2 November 2026 (local)
 
 The explicit file-assignment document mode mirrors the existing classroom document bucket MIME allowlist; it does not widen the question-images bucket or student answer uploader. Create/update accept document URLs only from this project's `classroom-post-files` bucket under `actor/file-assignment-instructions/...`, preserving the legacy question-images path. The actor prefix must match the verified session unless the exact URL is already in an authorized source/assignment. Foreign hosts, other bucket namespaces, encoded traversal and query-bearing references are rejected. Document references render as downloads, PDF bytes retain the bounded viewer validation, and published content refuses drops. No Storage policy, bucket setting, migration or hosted test write was performed; local mocks are not a hosted Storage/RLS certification.

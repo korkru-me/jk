@@ -62,6 +62,7 @@ export async function login(_prevState: unknown, formData: FormData) {
   if (error) {
     const connectionError = authConnectionError(error)
     if (connectionError) return { error: connectionError }
+    if (error.status === 429) return { error: 'มีผู้ใช้งานพร้อมกันจำนวนมาก กรุณารอสักครู่แล้วลองเข้าสู่ระบบใหม่' }
     return {
       error: error.message === 'Invalid login credentials'
         ? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง'
@@ -153,6 +154,8 @@ export async function register(formData: FormData) {
     if (error.code !== 'user_already_exists') {
       return { error: error.code === 'over_email_send_rate_limit'
         ? 'มีคำขอส่งอีเมลถี่เกินไป กรุณารอสักครู่แล้วลองใหม่'
+        : error.status === 429
+          ? 'มีผู้สมัครพร้อมกันจำนวนมาก กรุณารอสักครู่แล้วลองสมัครใหม่'
         : 'ยังสมัครสมาชิกไม่ได้ กรุณาตรวจสอบข้อมูลแล้วลองใหม่ หรือติดต่อผู้ดูแล KorKru' }
     }
   }
