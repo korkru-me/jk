@@ -22,5 +22,6 @@ describe('bounded Staging exam load harness',()=>{
   expect(()=>validateManifest(m)).not.toThrow()
   expect(()=>validateManifest({...m,accounts:[{...m.accounts[0],email:'real@example.com'}]})).toThrow()
   expect(()=>validateManifest({...m,accounts:Array(82).fill(m.accounts[0])})).toThrow()
+  expect(()=>validateManifest({...m,accounts:[m.accounts[0],m.accounts[0]]})).toThrow('Duplicate identity')
  })
 })
