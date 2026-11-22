@@ -23,10 +23,29 @@ describe('Auth burst retry', () => {
     await expect(createAuthRateLimitFetch('https://fixture.invalid', { fetch: send })('https://fixture.invalid/auth/v1/signup')).rejects.toThrow('network')
     expect(send).toHaveBeenCalledTimes(1)
   })
-  it('does not retry an exhausted email quota', async () => {
-    const send = vi.fn<typeof fetch>().mockResolvedValue(new Response('{"code":"over_email_send_rate_limit"}', { status: 429 }))
+  it.each(['code', 'error_code'])('does not retry an exhausted email quota returned as %s', async field => {
+    const send = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ [field]: 'over_email_send_rate_limit' }), { status: 429 }))
     await createAuthRateLimitFetch('https://fixture.invalid', { fetch: send })('https://fixture.invalid/auth/v1/signup', { method: 'POST' })
     expect(send).toHaveBeenCalledTimes(1)
+  })
+  it('keeps simultaneous users isolated while recovering a synchronized burst', async () => {
+    const attempts = new Map<string, number>()
+    const send = vi.fn<typeof fetch>().mockImplementation(async input => {
+      const request = input as Request
+      const identity = request.headers.get('authorization')!
+      const attempt = (attempts.get(identity) ?? 0) + 1
+      attempts.set(identity, attempt)
+      return new Response(attempt === 1 ? '' : await request.text(), { status: attempt === 1 ? 429 : 200 })
+    })
+    const fetcher = createAuthRateLimitFetch('https://fixture.invalid', { fetch: send, sleep: async () => {}, random: () => 0 })
+    const responses = await Promise.all(Array.from({ length: 80 }, async (_, index) => {
+      const body = JSON.stringify({ syntheticUser: index })
+      const response = await fetcher('https://fixture.invalid/auth/v1/token', { method: 'POST', headers: { authorization: `synthetic-${index}` }, body })
+      return { body, received: await response.text() }
+    }))
+    expect(responses.every(result => result.received === result.body)).toBe(true)
+    expect(attempts.size).toBe(80)
+    expect([...attempts.values()].every(attempt => attempt === 2)).toBe(true)
   })
   it.each(['https://other.invalid/auth/v1/token', 'https://fixture.invalid/rest/v1/submissions', 'https://fixture.invalid/auth/v1/logout'])('does not retry %s', async url => {
     const send = vi.fn<typeof fetch>().mockResolvedValue(new Response('', { status: 429 }))

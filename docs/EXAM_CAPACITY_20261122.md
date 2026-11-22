@@ -16,7 +16,7 @@
 
 SQL อิสระพบ 11 Auth users และ 11 profiles ของ run (รวม canary) และยังไม่มีผู้ยืนยันอีเมล ไม่มีบัญชีจากคำขอ validation ที่ผิดก่อนรอบทดสอบ
 
-ตรวจการตั้งค่าจริงแล้ว: Production ปิด Confirm email อยู่เดิม; Staging เปิด Confirm email จึงไม่ใช่สภาพสมัครแบบเดียวกัน ต้องแยกผลลิมิตอีเมลของ Staging ออกจากประสบการณ์สมัครของนักเรียนพรุ่งนี้ ยังไม่เปลี่ยน Confirm email ของ Production ขออนุญาตเฉพาะการปิด Staging ชั่วคราวและคืนค่าหลังทดสอบอยู่ระหว่างรอคำตอบ เพราะเป็นการลดการตรวจยืนยันอีเมลบน Staging
+ตรวจการตั้งค่าจริงแล้ว: Production ปิด Confirm email อยู่เดิม; Staging เปิด Confirm email จึงไม่ใช่สภาพสมัครแบบเดียวกัน ต้องแยกผลลิมิตอีเมลของ Staging ออกจากประสบการณ์สมัครของนักเรียนพรุ่งนี้ ยังไม่เปลี่ยน Confirm email ของ Production เจ้าของอนุญาตปิด Confirm email เฉพาะ Staging ชั่วคราว และได้คืนค่าเป็นเปิดหลังสั่งหยุดทดสอบแล้ว
 
 ## Candidate
 
@@ -32,3 +32,28 @@ SQL อิสระพบ 11 Auth users และ 11 profiles ของ run (ร
 - Full unit suite หลังแพตช์ Auth: 350 suites / 4,919 tests ผ่าน; harness ใหม่และ Auth retry targeted: 17 tests ผ่าน
 - Default Turbopack build ติด filesystem boundary ของ symlink node_modules ใน isolated worktree; Webpack production build ผ่านหลังอนุญาต network สำหรับ Google Fonts ไม่เปลี่ยน bundler ของเว็บที่ deploy
 - ยังไม่มีผลยืนยัน 80 คนครบตั้งแต่สมัครจนส่ง และยังไม่ปล่อยแพตช์ขึ้น Production ต้องบันทึกผล hosted, cleanup, exact release และ primary localhost parity ก่อนประกาศพร้อม
+
+
+## ผลรอบสองและขอบเขตสุดท้าย
+
+- Staging PR #147 merge เป็น e04aedbc8b1def2905439b1cc118b6de9609ee5f; deployment dpl_5QwzgXJ4uKA8oe69DLrHrQ9dcZMW READY และ alias staging.korkru.com ตรงกับ commit นี้
+- ทดสอบสมัครด้วย cohort ใหม่ 80 คน หลังลงแพตช์ retry และปิด Confirm email ให้ตรงกับ Production: ผ่าน 55 / ไม่ผ่าน 25; p50 4,640 ms, p95 35,415 ms, max 35,537 ms ข้อผิดพลาดรอบนี้เป็น Auth rate limit ไม่มีลิมิตอีเมล จึงยังไม่ผ่านเกณฑ์ 80/80
+- ก่อนรอบสอง reset เฉพาะ network counter ของเครื่องทดสอบที่พิสูจน์ว่ามี 81 requests และ 81 email-hour counters จาก baseline เท่านั้น มี optimistic count/time guards และไม่เพิ่มเพดานตัว limiter การ reset ไม่คืนโควตาผู้ให้บริการ
+- เจ้าของอนุญาตตั้ง Staging signup/sign-in และ token limits เป็น 600 requests/5 min/IP แต่สั่งหยุดก่อนวัดซ้ำ จึงไม่มีผลรับรองการสมัคร 80 คนภายใต้ค่า 600 และไม่ได้รันทดสอบทำข้อสอบ/heartbeat/ส่งข้อสอบ
+- หลังสั่งหยุด คืนค่าชั่วคราวทั้งหมดก่อน ต่อมาเจ้าของยืนยันให้ Accept cleanup และแก้เฉพาะ Staging จึงตั้งสอง Auth limits ของ Staging กลับเป็น 600 ตามที่อนุญาต โดย Confirm email ยังคงเปิดตามเดิม ไม่ทดสอบโหลดเพิ่ม
+- Production ไม่เปลี่ยนโค้ดหรือ Auth settings และไม่อัปเกรดแพ็กเกจ Draft PR #146 ไม่ได้รับอนุญาตให้ปล่อย Production ภายใต้ขอบเขตล่าสุด
+
+## Cleanup ที่อนุมัติและตรวจแล้ว
+
+คำขอลบครั้งแรกถูกปฏิเสธ จึงยังไม่เปลี่ยนข้อมูล หลังเจ้าของยืนยัน Accept จึงรัน transaction เดิมเฉพาะ Staging พร้อมตรวจ exact run namespaces, 66 synthetic Auth users, personal organizations ที่ไม่มีสมาชิกอื่น, resource ownership และไม่มี learner attempts ก่อนลบ หากจำนวนหรือ provenance เปลี่ยน transaction จะยกเลิกทั้งหมด
+
+ผลหลัง transaction: synthetic Auth users 0, questions 0, classroom 0, exam 0 ลบเฉพาะบัญชีที่สร้างสำเร็จ 11 บัญชีใน baseline (รวม canary) และ 55 บัญชีในรอบสอง รวม 66 บัญชี รวมถึง personal organizations/session ของบัญชีเหล่านั้น ไม่มี DROP/TRUNCATE หรือ schema/RLS/migration change ไม่มี Production data ถูกเขียน
+
+เก็บเฉพาะสรุปตัวเลขและ provenance ที่จำเป็น ลบไฟล์ชั่วคราวที่มี passwords, cookies และ automation credential หลัง cleanup โควตาคำขอ/egress/MAU ที่ใช้ไปไม่ย้อนคืนจากการลบข้อมูล
+
+## ยอดที่อ่านได้หลังหยุดและข้อจำกัด
+
+- Vercel Last 30 Days: Function Invocations ประมาณ 145K/1M, Active CPU 1h38m/4h, Fast Data Transfer 1.23/100 GB และ Origin Transfer 831.7 MB/10 GB
+- Supabase Usage รอบ 26 Oct–26 Nov ยังคงแสดง Egress 0.42/5 GB, Cached Egress 0.402/5 GB, MAU 183/50K และข้อความว่ายังไม่เกิน Free quota แต่ dashboard ระบุว่าบางยอดช้าได้ 1 ชั่วโมง และ MAU อัปเดตเป็นช่วง จึงไม่อ้างว่าตัวเลขเหล่านี้สะท้อนทุกคำขอที่เพิ่งทดสอบหรือใช้ผลต่างเป็นต้นทุนทดสอบที่แน่นอน
+- ความเสี่ยงหลักที่พิสูจน์ได้คือ Auth burst ขณะที่โควตารายเดือนยังมีพื้นที่เหลือ ไม่มี full exam load result จึงยังไม่รับรอง database latency หรือการส่งพร้อมกัน 80 คน
+- ผู้ใช้สั่งหยุดโหลด และขอบเขตล่าสุดคือ Staging เท่านั้น ห้ามตีความการอนุมัติ cleanup เป็นการอนุญาตทดสอบหรือปล่อย Production ต่อ
