@@ -1,5 +1,9 @@
 # Feature status
 
+## สมัครใหม่พร้อมกัน 80 คน — 22 พฤศจิกายน 2026 (กำลังตรวจ candidate)
+
+เจ้าของอนุญาตแก้ Production อีกครั้งโดยตรวจ Staging ก่อน เพิ่ม bounded Auth retry ให้ครบ server/browser/proxy และกำหนดงบทดสอบสมัครใหม่ 80 คนหนึ่ง cohort ไม่ส่งอีเมล ไม่รันข้อสอบยาว ดู AUTH_SIGNUP_RELEASE_20261122.md ยังไม่ใช่ผลรับรองการปล่อย Production
+
 ## เตรียมสอบ 80 คน — 22 พฤศจิกายน 2026 (candidate)
 
 กำลังทดสอบสมัคร/ทำข้อสอบพร้อมกันบน Staging และเพิ่ม bounded retry เฉพาะ Auth 429 ยังไม่ใช่ผลรับรองความพร้อม Production ดู [EXAM_CAPACITY_20261122.md](EXAM_CAPACITY_20261122.md)

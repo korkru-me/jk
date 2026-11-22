@@ -2,7 +2,7 @@
 
 ## Auth burst handling — 22 November 2026 (candidate)
 
-The cookie-bound Supabase server client retries only explicit HTTP 429 rejections
+The cookie-bound Supabase server/browser clients and session-refresh proxy retry only explicit HTTP 429 rejections
 from this project's signup, token and user endpoints. Retries retain the same
 request body and credentials, use jitter, honor Retry-After, and are bounded by
 eight retries / 40 seconds of sleep. Email-quota rejections, ambiguous network
@@ -10,6 +10,7 @@ failures, 5xx, invalid credentials and database writes are not replayed. Existin
 getUser verification, RLS, ownership checks and email/IP reservations remain the
 authorization boundaries; there is no cross-request session cache or privileged
 signup shortcut. See EXAM_CAPACITY_20261122.md for hosted evidence and limits.
+The subsequent signup release and bounded Staging budget are recorded in AUTH_SIGNUP_RELEASE_20261122.md.
 
 ## File instruction document uploads — 2 November 2026 (local)
 
