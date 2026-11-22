@@ -5,7 +5,7 @@ const SITE='https://staging.korkru.com', REF='dyuxkrzeveknqgtuzpbh'
 export function assertTarget(keys) { if(keys.site!==SITE || keys.projectRef!==REF || typeof keys.protection!=='string' || !keys.protection) throw Error('Exact protected Staging required') }
 export function encodeForm(fields) { const f=new FormData(); for(const [key,value] of Object.entries(fields)) f.set(`_1_${key}`,String(value)); f.set('0','["$K1"]'); return f }
 export function actionResult(body) { const line=body.split('\n').find(x=>x.startsWith('1:')); if(!line) throw Error('Missing action receipt'); const v=JSON.parse(line.slice(2)); if(v?.error) throw Error(String(v.error)); return v }
-export function validateManifest(m) { if(m.site!==SITE||m.projectRef!==REF||! /^[a-f0-9-]{36}$/.test(m.run)||m.accounts.length>81)throw Error('Invalid manifest');for(const a of m.accounts)if(a.email!==`capacity-${m.run}-${a.label}@qa.staging.korkru.com`||!Array.isArray(a.cookies))throw Error('Invalid synthetic identity'); }
+export function validateManifest(m) { if(m.site!==SITE||m.projectRef!==REF||! /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(m.run)||m.accounts.length>81)throw Error('Invalid manifest');if(new Set(m.accounts.map(a=>a.label)).size!==m.accounts.length)throw Error('Duplicate identity');for(const a of m.accounts)if(!/^(canary|student(?:0[1-9]|[1-7][0-9]|80))$/.test(a.label)||a.email!==`capacity-${m.run}-${a.label}@qa.staging.korkru.com`||!Array.isArray(a.cookies))throw Error('Invalid synthetic identity'); }
 const save=(path,data)=>{writeFileSync(path,JSON.stringify(data,null,2),{mode:0o600});chmodSync(path,0o600)}
 export async function main(argv=process.argv.slice(2)) {
  if(!argv.includes('--execute')||!argv.includes('--confirm=80-synthetic-staging'))throw Error('Explicit bounded synthetic execution required')
@@ -33,7 +33,13 @@ export async function main(argv=process.argv.slice(2)) {
  }else if(mode==='login'){
   await Promise.allSettled(students.map(async a=>{const f=encodeForm({email:a.email,password:a.password});f.set('0','[null,"$K1"]');const r=await call('login',[],a,'/login',f);a.loggedIn=Boolean(r.redirect?.includes('/dashboard'));if(!a.loggedIn)throw Error('Missing login redirect');persist()}))
  }else if(mode==='discover-exam'){
-  const a=students.find(a=>a.loggedIn);if(!a||!m.assignmentId)throw Error('Fixture/login required');await discover(`/assignments/${m.assignmentId}/take`,a);await discover('/classrooms',a);console.log({actions:Object.keys(m.actions)});
+  const a=students.find(a=>a.loggedIn);if(!a||!m.assignmentId)throw Error('Fixture/login required');await discover('/classrooms',a);if(a.joined)await discover(`/assignments/${m.assignmentId}/take`,a);console.log({actions:Object.keys(m.actions)});
+ }else if(mode==='join'){
+  if(!m.classCode||students.length!==80||!students.every(a=>a.loggedIn))throw Error('80 authenticated synthetic students required');
+  await Promise.allSettled(students.map(async a=>{const r=await call('joinClassroom',[m.classCode],a,'/classrooms');if(!r.redirect?.includes('/classrooms'))throw Error('Missing join receipt');a.joined=true;persist()}))
+ }else if(mode==='pages'){
+  if(students.length!==80||!students.every(a=>a.loggedIn&&a.joined))throw Error('80 enrolled synthetic students required');
+  await Promise.allSettled(students.map(async a=>{for(const path of [`/classrooms/${m.classroomId}`,`/assignments/${m.assignmentId}/take`]){const t=performance.now();const sample={phase:mode,action:'GET '+path.replace(m.classroomId,'[classroom]').replace(m.assignmentId,'[assignment]'),label:a.label};try{const r=await request(path,{headers:{Accept:'text/html'}},a);sample.http=r.status;const body=await r.text();if(!r.ok||!body.includes('STAGING'))throw Error('Authenticated page failed');sample.ok=true;}catch(e){sample.ok=false;sample.error=e.message;}sample.ms=Math.round(performance.now()-t);samples.push(sample)}}))
  }else if(mode==='start'){
   await Promise.allSettled(students.map(async a=>{const {result}=await call('startAssignmentFromWaiting',[m.assignmentId,null,'start'],a,`/assignments/${m.assignmentId}/take`);a.submissionId=result.submissionId;if(!a.submissionId)throw Error('Missing attempt');persist()}))
  }else if(mode==='answers'){
