@@ -1,12 +1,12 @@
 # Feature status
 
-## สมัครใหม่พร้อมกัน 80 คน — 22 พฤศจิกายน 2026 (กำลังตรวจ candidate)
+## สมัครใหม่พร้อมกัน 80 คน — 22 พฤศจิกายน 2026 (Production)
 
-เจ้าของอนุญาตแก้ Production อีกครั้งโดยตรวจ Staging ก่อน เพิ่ม bounded Auth retry ให้ครบ server/browser/proxy และกำหนดงบทดสอบสมัครใหม่ 80 คนหนึ่ง cohort ไม่ส่งอีเมล ไม่รันข้อสอบยาว ดู AUTH_SIGNUP_RELEASE_20261122.md ยังไม่ใช่ผลรับรองการปล่อย Production
+ปล่อย Auth retry เฉพาะ 429 ครบ server/browser/proxy พร้อมข้อความไทย และเพิ่ม Supabase signup/sign-in + token limits เป็น 600 requests/5min/IP บนแพ็กเกจฟรี ทดสอบ canonical Staging สมัครใหม่พร้อมกันผ่าน 80/80, dashboard 8/8, SQL ตรวจบัญชี/โปรไฟล์/การศึกษา/session ครบ p95 11.61 วินาที ใช้หนึ่ง cohort 105 requests / 2.52 MB ไม่ส่งอีเมล คืน Confirm email ของ Staging และล้างบัญชีจำลองแล้ว
 
-## เตรียมสอบ 80 คน — 22 พฤศจิกายน 2026 (candidate)
+Production PR #146, Ready fb8e0665fcd8cbcf00c0c8e4b9e3f8f4c29f3e4f ซิงก์หกไฟล์ Auth ไป primary localhost:3000 แล้ว ผ่าน TypeScript, 4,963 local tests, isolated build และ Next runtime ไม่มี errors ไม่มี migration/dependency/env change ดู [หลักฐานและขอบเขต](AUTH_SIGNUP_RELEASE_20261122.md) ยังไม่ได้ทดสอบข้อสอบเต็มคาบ 40 ข้อ/heartbeat
 
-กำลังทดสอบสมัคร/ทำข้อสอบพร้อมกันบน Staging และเพิ่ม bounded retry เฉพาะ Auth 429 ยังไม่ใช่ผลรับรองความพร้อม Production ดู [EXAM_CAPACITY_20261122.md](EXAM_CAPACITY_20261122.md)
+การตรวจเตรียมสอบรอบก่อนหยุดตามคำสั่งเจ้าของแล้ว ดู [บันทึกรอบก่อน](EXAM_CAPACITY_20261122.md) คำขอใหม่อนุญาต Production เฉพาะงาน Auth ข้างต้น
 
 ## รูปประกอบข้อย่อยถูก–ผิด — 20 พฤศจิกายน 2026 (release candidate)
 

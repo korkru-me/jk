@@ -31,4 +31,12 @@ Staging canonical alias ใช้ Ready deployment dpl_BB5XgvTrgUvsVywbrcWmrV2MN
 
 SQL ยืนยัน auth users, confirmed users, active student profiles, education records ที่ตรงแต่ละบัญชี, owner memberships และ sessions อย่างละ 80 คืน Confirm email ของ Staging เป็น ON แล้ว Production บันทึก token refresh 150 → 600 และ signup/signin 30 → 600 requests/5min/IP ยืนยันค่าคงอยู่หลัง reload ไม่เปลี่ยน SMTP/Confirm email/IP forwarding ของ Production
 
-Production deploy และ primary localhost parity จะบันทึกเมื่อ Ready ไม่รันทดสอบข้อสอบ 40 ข้อ/heartbeat และไม่สร้างบัญชีทดสอบใน Production
+Production PR #146 merged เป็น fb8e0665fcd8cbcf00c0c8e4b9e3f8f4c29f3e4f, deployment dpl_XPff6FGSWgTqMKvZJgVTmaHqfa1w READY และ canonical www.korkru.com ชี้ deployment นี้แล้ว ตรวจหน้า signup บนเว็บจริงแบบอ่านอย่างเดียวได้ ไม่มีบัญชีทดสอบ Production
+
+Primary /Users/korkusonmasaen/Korkru/korkru ที่ localhost:3000 (PID 5498) ซิงก์ exact released source/test หกไฟล์: lib/actions/auth.ts, lib/auth/rate-limit-fetch.ts + test และ lib/supabase/{client,server,middleware}.ts ไม่มี dependency/env change รักษา hash ของ dirty/untracked files อื่น 349 ไฟล์ครบ
+
+Primary validation: TypeScript ผ่าน, targeted retry tests 16/16, full suite 352 files / 4,963 tests ผ่าน (ต่างจาก candidate เพราะคงงาน local อื่นไว้), isolated Webpack production build ผ่านโดยใช้ NEXT_DIST_DIR แยก แล้วคืนเฉพาะ generated build includes เพื่อรักษา tsconfig เดิม ตรวจ localhost signup เลือกนักเรียนและ empty-form validation ได้ Next MCP compilation issues [], configErrors 0, sessionErrors 0 การสมัคร hosted ที่มี Auth จริงตรวจบน Staging เท่านั้น
+
+Cleanup สำเร็จ: guarded transaction ตรวจ email/full_name/run/time/role/ownership ครบ และตรวจ dependent rows ผ่าน pg_constraint ก่อนลบ exactly 80 sessions, 80 empty personal orgs, 80 synthetic Auth users ยืนยัน Auth users/public profiles/orgs ของ run เหลือ 0 ลบ temporary keys/passwords/session manifest แล้ว ไม่ reset limiter counters เพิ่ม
+
+ไม่ได้รันทดสอบข้อสอบ 40 ข้อตลอดคาบ/heartbeat จึงยืนยันเฉพาะ signup/authenticated entry burst ไม่ใช่การรับประกันโหลดข้อสอบทั้งระบบ คง app signup/email guard 120/hour/IP มีพื้นที่อีก 40 ครั้งต่อ IP ในชั่วโมงเดียวกันเมื่อเริ่มจาก bucket ว่าง; password login ไม่ผ่าน guard ตัวนี้ การลบบัญชีทดสอบไม่คืนโควตา usage ที่ใช้ไปแล้ว ไม่มี migrations หรือ schema/RLS changes
