@@ -15,17 +15,21 @@ export function createAuthRateLimitFetch(
   const sleep = options.sleep ?? ((ms: number) => new Promise(resolve => setTimeout(resolve, ms)))
   const random = options.random ?? Math.random
   return async (input, init) => {
-    const request = new Request(input, init)
-    const url = new URL(request.url)
+    const url = new URL(input instanceof Request ? input.url : input)
+    const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase()
     const retryable = url.origin === origin
       && ['/auth/v1/signup', '/auth/v1/token', '/auth/v1/user'].includes(url.pathname)
-      && (request.method === 'GET' || request.method === 'POST')
+      && (method === 'GET' || method === 'POST')
+    // Preserve Next.js fetch metadata and the original transport for every
+    // database/storage request and every non-retryable Auth operation.
+    if (!retryable) return send(input, init)
+    const request = new Request(input, init)
     // At most eight retries and 40 seconds of sleep. The original rejection is
     // returned if Retry-After exceeds that budget, rather than retrying early.
     let waited = 0
     for (let attempt = 0; ; attempt += 1) {
       const response = await send(request.clone())
-      if (!retryable || response.status !== 429 || attempt >= 8 || request.signal.aborted) return response
+      if (response.status !== 429 || attempt >= 8 || request.signal.aborted) return response
       // A provider email quota cannot be solved by replaying the same signup.
       // Preserve the response so the caller can show its existing quota copy.
       const rejection = await response.clone().json().catch(() => null)
