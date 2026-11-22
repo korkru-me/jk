@@ -56,3 +56,15 @@ Sensitivity ของ CPU สำหรับ 22,400 calls หลัก: ถ้�
 - https://supabase.com/docs/guides/platform/manage-your-usage/egress
 
 Branch codex/exam-capacity-auth-20261122: assessment documentation only. ไม่รันเว็บ/โหลด/ข้อสอบ/แอป tests เพิ่มตามคำสั่ง ตรวจเฉพาะความสมบูรณ์ของรายงาน; Canvas TS ผ่าน; ไม่มี migrations หรือ blockers ด้านการอ่านข้อมูล เหลือการเผยแพร่ข้อสอบ/ตรวจเวลา/เข้าห้องก่อนสอบโดยเจ้าของ ไม่เปลี่ยนให้ในงานประเมินนี้
+
+## กรณีใช้งานหนักจากคำถามต่อเนื่อง
+
+ประเมินใหม่โดยไม่ทดสอบ: 80 คน × 60 นาที; save จริงเฉลี่ย 10 ครั้งต่อข้อ (รวมเลือกครั้งแรก ไม่ใช่การกดภายใน debounce ที่ถูกรวม); 80 event flushes เพิ่ม/คน; อื่น ๆ 20 requests/คน
+
+- heartbeat 19,200 + saves 32,000 + event flushes 6,400 + อื่น ๆ 1,600 = 59,200 calls
+- เผื่อ retry/โหลดซ้ำ/proxy และการนับบริการที่ยังไม่วัด เป็นงบรวม 2–3 เท่า =118,400–177,600; ปัดเผื่อสูงถึง 200,000 Vercel invocations สำหรับวางงบ
+- ตัวคูณไม่ใช่คำยืนยันว่าทุก endpoint retry สามครั้งหรือ proxy นับตายตัว event บางอย่างถูก batch ส่วนการกดภายใน500msอาจถูกรวม งบ 120k–200k เป็น hypothetical heavy scenario ไม่ใช่ค่าสูงสุดจริง/เปอร์เซ็นไทล์จากข้อมูลใช้งาน
+- หากใช้จริง200k บวกยอดล่าสุด145,913=345,913/1m เหลือ654,087 ยังไม่เกินจำนวน invocations แต่ CPU อาจเกิน: สมมติ20ms/call=>66.7min,50ms=>166.7min เทียบส่วนเหลือประมาณ140min จุดใช้หมดส่วนเหลือคือเฉลี่ย42ms/call ไม่รวม traffic อื่น ยังไม่มีค่า CPU/call ของข้อสอบที่วัดจริง
+- ไม่มีค่าสูงสุดตายตัวสำหรับการโหลดซ้ำหรือแก้คำตอบไม่หยุด และหากระยะสอบเปลี่ยนจาก60นาทีต้องคำนวณใหม่ จำนวนคำขอไม่ยืนยัน latency หรือ Supabase compute throughput
+
+อ้างอิง https://vercel.com/docs/functions/usage-and-pricing (Hobby1m invocations/4CPU-hours; I/O waiting ไม่นับ Active CPU) ใช้ usage snapshot จากการอ่านรอบก่อน ไม่มีการอ่าน/ทดสอบเว็บเพิ่มในงานคำนวณนี้ Canvas TypeScript ผ่าน; ไม่มี code/config/migration changes
