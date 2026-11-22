@@ -23,4 +23,12 @@
 
 ## สถานะ
 
-Local checks ผ่าน: TypeScript, 352 suites / 4,929 tests, design-token lint และ Webpack production build กำลังปล่อย Staging ก่อนทดสอบ cohort ใหม่ ยังไม่ใช่ Production release evidence และไม่มี migration ใหม่
+Local checks ผ่าน: TypeScript, 352 suites / 4,929 tests, design-token lint และ Webpack production build ไม่มี migration ใหม่
+
+Staging canonical alias ใช้ Ready deployment dpl_BB5XgvTrgUvsVywbrcWmrV2MNHL1, commit c9288b0eb63eea0d951406319c417b2d586268b6 (PR #149; source ae813d7)
+
+ทดสอบ cohort 43018f00-0889-4c45-b4ac-177d4417cadf สมัครใหม่พร้อมกันผ่าน 80/80, p50 6,093 ms, p95 11,607 ms, max 11,756 ms; authenticated dashboard probes ผ่าน 8/8 ใช้ 105 HTTP requests, download 2,519,027 bytes และ email sends 0 ตัวเลขนี้เป็นเฉพาะ harness traffic ไม่รวมคำขอภายใน server/CI และไม่ใช่การวัด quota invoice
+
+SQL ยืนยัน auth users, confirmed users, active student profiles, education records ที่ตรงแต่ละบัญชี, owner memberships และ sessions อย่างละ 80 คืน Confirm email ของ Staging เป็น ON แล้ว Production บันทึก token refresh 150 → 600 และ signup/signin 30 → 600 requests/5min/IP ยืนยันค่าคงอยู่หลัง reload ไม่เปลี่ยน SMTP/Confirm email/IP forwarding ของ Production
+
+Production deploy และ primary localhost parity จะบันทึกเมื่อ Ready ไม่รันทดสอบข้อสอบ 40 ข้อ/heartbeat และไม่สร้างบัญชีทดสอบใน Production
