@@ -52,6 +52,13 @@ describe('Auth burst retry', () => {
     await createAuthRateLimitFetch('https://fixture.invalid', { fetch: send })(url)
     expect(send).toHaveBeenCalledTimes(1)
   })
+  it('preserves the original database request and framework fetch metadata', async () => {
+    const send = vi.fn<typeof fetch>().mockResolvedValue(new Response('{}'))
+    const url = 'https://fixture.invalid/rest/v1/submissions'
+    const options = { method: 'POST', body: '{"synthetic":true}', cache: 'no-store' as const, next: { revalidate: 0 } }
+    await createAuthRateLimitFetch('https://fixture.invalid', { fetch: send })(url, options)
+    expect(send).toHaveBeenCalledExactlyOnceWith(url, options)
+  })
   it('honors Retry-After and returns a rejection beyond its bounded budget', async () => {
     const send = vi.fn<typeof fetch>().mockResolvedValue(new Response('', { status: 429, headers: { 'Retry-After': '60' } }))
     const sleep = vi.fn(async (_ms: number) => {})
