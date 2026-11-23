@@ -96,6 +96,18 @@ beforeEach(() => {
 })
 
 describe('authenticated grading workspace reader', () => {
+  it('allows an active admin to review the same canonical answers and scores for all group members', async () => {
+    const peer = uuid(801)
+    adminTables.submissions.push(submission({ id: uuid(802), student_id: peer,
+      group_source_submission_id: submissionId, users: { full_name: 'สมาชิกกลุ่ม ข' } }))
+    install({}, { role: 'admin', status: 'active' })
+    const result = await loadGradingWorkspace(assignmentId, { kind: 'student', studentId: peer })
+    expect(result?.data.students.map(row => row.score)).toEqual([1, 1])
+    expect(result?.data.students.every(row => row.groupMembers?.length === 2)).toBe(true)
+    const responses = result?.data.answers.filter(row => row.studentId === peer)
+    expect(responses).toHaveLength(1)
+    expect(responses?.[0]).toMatchObject({ id: answerId, studentAnswer: 'PRIVATE_RESPONSE', submissionId: uuid(802) })
+  })
   it.each(['anonymous', 'inactive', 'student', 'no_manage'])('denies %s before constructing the service reader', async kind => {
     const { admin } = install({}, { role: kind === 'student' ? 'student' : 'teacher', status: kind === 'inactive' ? 'suspended' : 'active' })
     if (kind === 'anonymous') mocks.auth.mockResolvedValue(null)

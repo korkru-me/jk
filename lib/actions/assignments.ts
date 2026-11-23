@@ -74,6 +74,9 @@ function isSebPublishingReady() {
 }
 
 interface CreateAssignmentData {
+  submission_mode?: 'solo' | 'group'
+  group_min_members?: number
+  group_max_members?: number
   /** Present only when the teacher reviewed an existing assignment in the
    *  create wizard. Re-authorized here because a query string is not proof
    *  that the caller may copy that source. */
@@ -235,6 +238,18 @@ async function createQuestionAssignment(data: CreateAssignmentData, inline?: { a
   if (!orgId) return { error: 'ไม่พบข้อมูลสถาบัน กรุณาติดต่อผู้ดูแล' }
 
   const assignmentType = data.type ?? 'exercise'
+  const groupWork = data.submission_mode === 'group'
+  if (data.submission_mode !== undefined && !['solo', 'group'].includes(data.submission_mode)) return { error: 'รูปแบบการส่งงานไม่ถูกต้อง' }
+  if (groupWork && (assignmentType !== 'exercise' || !Number.isInteger(data.group_min_members)
+    || !Number.isInteger(data.group_max_members) || data.group_min_members! < 2
+    || data.group_max_members! < data.group_min_members! || data.group_max_members! > 300)) {
+    return { error: 'กรุณากำหนดจำนวนสมาชิกขั้นต่ำและสูงสุดให้ถูกต้อง (2–300 คน)' }
+  }
+  if (groupWork) {
+    data = { ...data, completion_rule: 'fixed', max_attempts: 1, retry_scope: 'all', score_strategy: 'latest',
+      passing_type: null, passing_value: null, instant_check: false, instant_check_answer_key: false,
+      duration_minutes: null, secure_browser_mode: 'browser', proctoring_enabled: false }
+  }
   let copiedSharedRandomSeed: number | null = null
   if (data.copy_source_assignment_id) {
     if (!await canManageAssignment(data.copy_source_assignment_id, user.id)) {
@@ -446,6 +461,7 @@ async function createQuestionAssignment(data: CreateAssignmentData, inline?: { a
       // reviving the retired 'print' value the enum still accepts.
       mode: 'online',
       type: assignmentType,
+      ...(groupWork ? { submission_mode: 'group', group_min_members: data.group_min_members, group_max_members: data.group_max_members } : {}),
       shuffle_questions: data.shuffle_questions ?? false,
       shuffle_options: data.shuffle_options ?? true,
       shared_random_seed: data.shared_random_values === true
@@ -691,11 +707,15 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   // has also made service-role reads safe for co-teacher submission checks.
   const { data: existing } = await supabase
     .from('assignments')
-    .select('id, description, created_by, org_id, question_ids, sections, type, mode, status, start_at, due_at, late_bands, end_at, random_question_count, shared_random_seed, calculator_enabled, scratchpad_enabled, shuffle_questions, shuffle_options, secure_browser_mode, android_exam_mode, completion_rule, passing_type, passing_value, streak_target, streak_question_cap, streak_recycle_pool')
+    .select('id, description, created_by, org_id, submission_mode, question_ids, sections, type, mode, status, start_at, due_at, late_bands, end_at, random_question_count, shared_random_seed, calculator_enabled, scratchpad_enabled, shuffle_questions, shuffle_options, secure_browser_mode, android_exam_mode, completion_rule, passing_type, passing_value, streak_target, streak_question_cap, streak_recycle_pool')
     .eq('id', id)
     .maybeSingle()
   if (!existing) return { error: 'ไม่พบชุดข้อสอบ' }
   if (isFileAssignment(existing)) return { error: 'กรุณาแก้ไขงานส่งไฟล์จากหน้าของงาน' }
+  if (existing.submission_mode === 'group') {
+    data = { ...data, max_attempts: 1, completion_rule: 'fixed', instant_check: false, instant_check_answer_key: false,
+      passing_type: null, passing_value: null, score_strategy: 'latest', retry_scope: 'all', duration_minutes: null }
+  }
 
   const sendsDueAt = data.due_at !== undefined
   const sendsLateBands = data.late_bands !== undefined

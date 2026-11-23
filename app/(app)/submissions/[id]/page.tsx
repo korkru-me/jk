@@ -33,6 +33,7 @@ import {
   AttemptSolutionShortcut, AttemptSolutionsButton, AttemptSolutionsProvider,
 } from '@/components/student/attempt-solutions'
 import { isFileAssignment } from '@/lib/file-assignment'
+import { exerciseGroupResultSource } from '@/lib/exercise-group.server'
 import { SolutionLockNotice } from '@/components/student/solution-lock-notice'
 
 // This page renders on the server, which runs in UTC on Vercel: a bare
@@ -76,9 +77,10 @@ export default async function SubmissionResultPage({
 }: {
   params: Promise<{ id: string }>
 }) {
-  const { id } = await params
+  const { id: requestedId } = await params
   const user = await getAuthUser()
   if (!user) redirect('/login')
+  const { id, ownerId } = await exerciseGroupResultSource(requestedId, user.id)
   const admin = createAdminClient()
 
   // Student assignment rows are intentionally not readable directly because
@@ -88,12 +90,12 @@ export default async function SubmissionResultPage({
   const { data: ownSubmission } = await admin
     .from('submissions')
     .select(`
-      id, assignment_id, student_id, status, closed_at, close_reason, missing_work_evidence, total_score, score_adjustment, max_score, attempt_number, submitted_at, secure_browser_verified_at,
+      id, assignment_id, student_id, status, closed_at, close_reason, missing_work_evidence, total_score, score_adjustment, max_score, voided_max_score, attempt_number, submitted_at, secure_browser_verified_at,
       users!submissions_student_id_fkey(full_name),
       assignments(id, title, description, show_results, show_solutions, allow_exam_review, end_at, duration_minutes, passing_type, passing_value, completion_rule, type, status, max_attempts, score_strategy, retry_scope, classroom_id, display_max_score, secure_browser_mode)
     `)
     .eq('id', id)
-    .eq('student_id', user.id)
+    .eq('student_id', ownerId)
     .maybeSingle()
 
   let submission: any = null
@@ -119,7 +121,7 @@ export default async function SubmissionResultPage({
     const { data: teacherVisibleSubmission } = await admin
       .from('submissions')
       .select(`
-        id, assignment_id, student_id, status, closed_at, close_reason, missing_work_evidence, total_score, score_adjustment, max_score, attempt_number, submitted_at, secure_browser_verified_at,
+        id, assignment_id, student_id, status, closed_at, close_reason, missing_work_evidence, total_score, score_adjustment, max_score, voided_max_score, attempt_number, submitted_at, secure_browser_verified_at,
         users!submissions_student_id_fkey(full_name),
         assignments(title, show_results, end_at, passing_type, passing_value, type, status, max_attempts, score_strategy, retry_scope, classroom_id, display_max_score, secure_browser_mode),
         submission_answers(id, correct_answer, is_correct, max_score)
@@ -133,7 +135,7 @@ export default async function SubmissionResultPage({
 
   if (!submission) notFound()
 
-  const isOwnSubmission = submission.student_id === user.id
+  const isOwnSubmission = ownSubmission != null
   const isTeacherViewer = !isOwnSubmission
 
   if (submission.status === 'in_progress') {

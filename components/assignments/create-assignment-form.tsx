@@ -39,6 +39,7 @@ import {
 } from '@/components/ui/collapsible'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Label } from '@/components/ui/label'
 import {
   Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
@@ -76,6 +77,7 @@ import { AssignmentAnnouncementEditor } from '@/components/assignments/assignmen
 import { QuestionPreviewDialog } from '@/components/assignments/question-preview-dialog'
 import { QuestionListPreviewDialog } from '@/components/assignments/question-list-preview-dialog'
 import type { getQuestionPreviewDetails } from '@/lib/actions/question-previews'
+import type { getQuestionCardData } from '@/lib/actions/question-card-data'
 import { toggleQuestionSetSelection } from '@/lib/question-set-selection'
 import {
   QuestionSetImport,
@@ -136,6 +138,9 @@ export type AssignmentQuestionSetOption = Pick<QuestionSet, 'id' | 'title' | 'de
 export type AssignmentCopyPreset = Pick<
   Assignment,
   | 'id'
+  | 'submission_mode'
+  | 'group_min_members'
+  | 'group_max_members'
   | 'title'
   | 'description'
   | 'question_ids'
@@ -196,6 +201,7 @@ interface Props {
   actions?: {
     createAssignment: typeof createAssignment
     getQuestionPreviewDetails?: typeof getQuestionPreviewDetails
+    getQuestionCardData?: typeof getQuestionCardData
   }
 }
 
@@ -229,6 +235,12 @@ export function CreateAssignmentForm({
       ?? assignmentPresetDefaults(assignmentType)
     : assignmentPresetDefaults(assignmentType)
   const [step, setStep] = useState(0)
+  const [submissionMode, setSubmissionMode] = useState<'solo' | 'group'>(copySource?.submission_mode ?? 'solo')
+  const [minMembers, setMinMembers] = useState(String(copySource?.group_min_members ?? 3))
+  const [maxMembers, setMaxMembers] = useState(String(copySource?.group_max_members ?? 5))
+  const groupWork = assignmentType === 'exercise' && submissionMode === 'group'
+  const groupRangeValid = Number.isInteger(Number(minMembers)) && Number.isInteger(Number(maxMembers))
+    && Number(minMembers) >= 2 && Number(maxMembers) >= Number(minMembers) && Number(maxMembers) <= 300
   const wizardRef = useRef<HTMLDivElement>(null)
   const previousStepRef = useRef(step)
 
@@ -775,14 +787,14 @@ export function CreateAssignmentForm({
   const streakAdvice = streakBlocked
     ? null
     : streakPoolAdvice(poolQuestionTypes, streakDecision.target as number)
-  const streakOn = completionRule === 'streak'
+  const streakOn = !groupWork && completionRule === 'streak'
 
   // What the three cards read as. Kept derived so the pair can never end up in
   // a state no card represents (a streak งาน with a percentage threshold is
   // refused by the database, not just by the form).
   const completionChoice: 'complete' | 'threshold' | 'streak' =
-    streakOn ? 'streak' : (passingEnabled ? 'threshold' : 'complete')
-  const canRepeat = completionChoice !== 'complete' || maxAttempts !== '1'
+    groupWork ? 'complete' : streakOn ? 'streak' : (passingEnabled ? 'threshold' : 'complete')
+  const canRepeat = !groupWork && (completionChoice !== 'complete' || maxAttempts !== '1')
 
   function chooseCompletion(choice: 'complete' | 'threshold' | 'streak') {
     if (choice === 'streak' && !streakAvailable) return
@@ -849,6 +861,7 @@ export function CreateAssignmentForm({
   function canNext() {
     if (step === 0) {
       return title.trim().length > 0 && classroomIds.length > 0 && classrooms.length > 0
+        && (!groupWork || groupRangeValid)
         && groupTargetsComplete(groupTargets, preselectedClassroomId ? [preselectedClassroomId] : classroomIds)
         && selectedIds.length > 0
         && !(streakOn && (!streakAvailable || streakBlocked))
@@ -900,6 +913,11 @@ export function CreateAssignmentForm({
   }
 
   function finalizeSubmit(status: AssignmentStatus, effectiveStartAt: string) {
+    if (groupWork && !groupRangeValid) {
+      toast.error('กรุณากำหนดจำนวนสมาชิกขั้นต่ำและสูงสุดให้ถูกต้อง')
+      setStep(0)
+      return
+    }
     if (randomDrawInvalid) {
       toast.error('จำนวนโจทย์ที่สุ่มต้องน้อยกว่าคลัง กรุณาเพิ่มโจทย์หรือปรับจำนวนก่อนสร้างงาน')
       setStep(0)
@@ -951,6 +969,8 @@ export function CreateAssignmentForm({
       const displayMax = manualDisplayMax ?? selectedRandomCount
 
       const res = await (actions?.createAssignment ?? createAssignment)({
+        submission_mode: groupWork ? 'group' : 'solo',
+        ...(groupWork ? { group_min_members: Number(minMembers), group_max_members: Number(maxMembers) } : {}),
         copy_source_assignment_id: copySource?.id,
         classroom_ids: classroomIds,
         group_targets: groupTargetsFor(groupTargets, classroomIds),
@@ -970,7 +990,7 @@ export function CreateAssignmentForm({
           color: band.color,
         })),
         end_at: thaiLocalDateTimeToIso(endAt),
-        duration_minutes: duration ? Number(duration) : null,
+        duration_minutes: groupWork ? null : duration ? Number(duration) : null,
         mode: 'online' as const,
         type: assignmentType,
         shuffle_questions: shuffleQ,
@@ -982,25 +1002,25 @@ export function CreateAssignmentForm({
         show_results: showResults,
         show_solutions: showSolutions,
         allow_exam_review: assignmentType === 'exam' && allowExamReview,
-        max_attempts: completionChoice === 'complete' && maxAttempts ? Number(maxAttempts) : null,
-        score_strategy: completionChoice === 'complete' ? scoreStrategy : 'best',
+        max_attempts: groupWork ? 1 : completionChoice === 'complete' && maxAttempts ? Number(maxAttempts) : null,
+        score_strategy: groupWork ? 'latest' : completionChoice === 'complete' ? scoreStrategy : 'best',
         // The wrong-only switch is hidden while a draw is on, so store the
         // behavior the teacher can actually see rather than whatever the
         // switch was left on before they turned the draw on.
         retry_scope: selectedRandomCount ? 'all' : retryScope,
         questions_per_page: Number(questionsPerPage) || 1,
-        instant_check: instantCheck,
-        instant_check_answer_key: instantCheckAnswerKey,
+        instant_check: !groupWork && instantCheck,
+        instant_check_answer_key: !groupWork && instantCheckAnswerKey,
         access_code: accessCodeEnabled ? accessCode.trim() || null : null,
-        completion_rule: completionRule,
+        completion_rule: groupWork ? 'fixed' : completionRule,
         streak_target: completionRule === 'streak' ? Number(streakTarget) : null,
         streak_question_cap: completionRule === 'streak' ? streakCapValue : null,
         streak_recycle_pool: streakRecycle,
         // A streak งาน has no fixed total to take a percentage of, and the
         // database refuses the pair outright — the card hides these controls
         // for that reason, so nothing is lost by clearing them here too.
-        passing_type: streakOn ? null : (passingEnabled && passingValue ? passingType : null),
-        passing_value: streakOn ? null : (passingEnabled && passingValue ? Number(passingValue) : null),
+        passing_type: groupWork || streakOn ? null : (passingEnabled && passingValue ? passingType : null),
+        passing_value: groupWork || streakOn ? null : (passingEnabled && passingValue ? Number(passingValue) : null),
         // A งาน with nothing to photograph is stored as not requiring it,
         // whatever the switch was left on before the last โจทย์ was removed.
         require_work_image: hasWorkImageQuestions && requireWorkImage,
@@ -1081,6 +1101,31 @@ export function CreateAssignmentForm({
         <div className="space-y-3">
           <Card padding="md" className="space-y-3">
             <h2 className="text-sm font-semibold text-foreground">ข้อมูลพื้นฐาน</h2>
+            {assignmentType === 'exercise' && <FieldGroup className="gap-2">
+              <Field className="gap-1.5">
+                <FieldLabel>รูปแบบการส่งงาน</FieldLabel>
+                <ToggleGroup aria-label="รูปแบบการส่งงาน" variant="outline" value={[submissionMode]} onValueChange={values => {
+                  if (values[0] === 'solo' || values[0] === 'group') setSubmissionMode(values[0])
+                }}>
+                  <ToggleGroupItem value="solo" className="min-h-11">{submissionMode === 'solo' && <Check data-icon="inline-start" />}งานเดี่ยว</ToggleGroupItem>
+                  <ToggleGroupItem value="group" className="min-h-11">{submissionMode === 'group' && <Check data-icon="inline-start" />}งานกลุ่ม</ToggleGroupItem>
+                </ToggleGroup>
+              </Field>
+              {groupWork && <>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field data-invalid={!groupRangeValid} className="gap-1.5">
+                    <FieldLabel htmlFor="exercise-group-min">สมาชิกอย่างน้อย</FieldLabel>
+                    <Input id="exercise-group-min" type="number" min={2} max={300} step={1} value={minMembers} onChange={event => setMinMembers(event.target.value)} aria-invalid={!groupRangeValid} />
+                  </Field>
+                  <Field data-invalid={!groupRangeValid} className="gap-1.5">
+                    <FieldLabel htmlFor="exercise-group-max">สมาชิกไม่เกิน</FieldLabel>
+                    <Input id="exercise-group-max" type="number" min={Number(minMembers) || 2} max={300} step={1} value={maxMembers} onChange={event => setMaxMembers(event.target.value)} aria-invalid={!groupRangeValid} />
+                  </Field>
+                </div>
+                <FieldDescription>นับรวมผู้ส่ง ตัวแทนตอบโจทย์และเลือกเพื่อนในห้องตอนส่ง สมาชิกทุกคนได้คะแนนเท่ากัน</FieldDescription>
+                {!groupRangeValid && <FieldError>จำนวนสมาชิกต้องเป็นจำนวนเต็มตั้งแต่ 2–300 คน และขั้นต่ำต้องไม่เกินจำนวนสูงสุด</FieldError>}
+              </>}
+            </FieldGroup>}
 
             {copySource && (
               <div className="flex items-center gap-2 rounded-xl bg-primary/10 px-3 py-2.5 text-sm text-primary">
@@ -1204,6 +1249,7 @@ export function CreateAssignmentForm({
                       showSelectedFooter={false}
                       surface="plain"
                       loadPreviewQuestions={actions?.getQuestionPreviewDetails}
+                      loadCardData={actions?.getQuestionCardData}
                     />
                   </div>
                 </CollapsibleContent>
@@ -1423,7 +1469,7 @@ export function CreateAssignmentForm({
             </Card>
           )}
 
-          <Card radius="md" padding="sm" className="space-y-2.5">
+          {!groupWork && <Card radius="md" padding="sm" className="space-y-2.5">
             <div>
               <h2 className="text-sm font-semibold text-foreground">{completionSectionLabel}</h2>
               <p data-assignment-description className="text-xs text-muted-foreground">
@@ -1615,7 +1661,8 @@ export function CreateAssignmentForm({
                 </div>
               </div>
             )}
-          </Card>
+          </Card>}
+          {groupWork && <p className="text-sm text-muted-foreground">ส่งหนึ่งครั้งต่อกลุ่ม ครูตรวจคำตอบชุดเดียวและคะแนนใช้ร่วมกันทุกคน</p>}
         </div>
       )}
 
@@ -1631,7 +1678,7 @@ export function CreateAssignmentForm({
               // The แบบฝึกหัด/ข้อสอบ difference itself, so it sits above the
               // rest rather than among the shuffles. Never offered to a ข้อสอบ:
               // one ส่งคำตอบ at the end is what a ข้อสอบ is.
-              ...(assignmentType === 'exercise' && !streakOn ? [{
+              ...(assignmentType === 'exercise' && !streakOn && !groupWork ? [{
                 label: INSTANT_CHECK_SETTING_LABEL,
                 desc: INSTANT_CHECK_SETTING_DESCRIPTION,
                 descriptionOnHover: true,
@@ -1978,7 +2025,7 @@ export function CreateAssignmentForm({
               </CollapsibleContent>
             </Collapsible>
             <Separator className="my-3" />
-            <AssignmentDurationField id="dur" value={duration} onChange={setDuration} />
+            {!groupWork && <AssignmentDurationField id="dur" value={duration} onChange={setDuration} />}
           </Card>
 
           {preselectedClassroomId && (
@@ -2056,6 +2103,7 @@ export function CreateAssignmentForm({
               },
               { label: 'มอบหมายให้', value: audienceSummary },
               { label: 'ประเภท', value: assignmentType === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด' },
+              ...(assignmentType === 'exercise' ? [{ label: 'รูปแบบการส่ง', value: groupWork ? `งานกลุ่ม ${minMembers}–${maxMembers} คน · คะแนนร่วมกัน` : 'งานเดี่ยว' }] : []),
               {
                 label: 'โจทย์',
                 value: randomDrawOn
@@ -2070,13 +2118,13 @@ export function CreateAssignmentForm({
                     ? `${automaticDisplayMax} คะแนน (ตามจำนวนข้อที่สุ่ม)`
                     : `${pointsSum} คะแนน`,
               },
-              ...(duration ? [{ label: 'เวลา', value: `${duration} นาที` }] : []),
+              ...(!groupWork && duration ? [{ label: 'เวลา', value: `${duration} นาที` }] : []),
               ...(dueAt ? [{ label: 'ส่งตรงเวลา', value: new Date(thaiLocalDateTimeToIso(dueAt) ?? dueAt).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) }] : []),
               ...(endAt ? [{ label: 'ปิดรับ', value: new Date(thaiLocalDateTimeToIso(endAt) ?? endAt).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) }] : []),
               ...(lateBands.length > 0 ? [{ label: 'ช่วงสีส่งช้า', value: `${lateBands.length} ช่วง · ครูเป็นผู้ปรับคะแนนเอง` }] : []),
               {
                 label: completionSectionLabel,
-                value: streakOn
+                value: groupWork ? 'ตัวแทนส่งหนึ่งครั้ง สมาชิกทุกคนได้คะแนนร่วมกัน' : streakOn
                   ? `ทำถูกติดต่อกัน ${streakTarget} ข้อ`
                   : (passingEnabled && passingValue
                       ? `ผ่านเกณฑ์ ${passingType === 'percent' ? `${passingValue}%` : `${passingValue} คะแนน`}`
@@ -2084,7 +2132,7 @@ export function CreateAssignmentForm({
               },
               ...(streakOn && streakCapValue ? [{ label: 'เพดานข้อ', value: `${streakCapValue} ข้อ` }] : []),
               ...(streakOn ? [{ label: 'ทำครบคลังแล้ว', value: streakRecycle ? 'วนกลับมาใหม่' : 'จบเลย' }] : []),
-              { label: 'จำนวนครั้ง', value: completionChoice !== 'complete' ? 'ทำจนผ่าน · ผ่านแล้วไม่เริ่มรอบใหม่' : maxAttempts ? `${maxAttempts} ครั้ง` : 'ไม่จำกัด' },
+              { label: 'จำนวนครั้ง', value: groupWork ? '1 ครั้งต่อกลุ่ม' : completionChoice !== 'complete' ? 'ทำจนผ่าน · ผ่านแล้วไม่เริ่มรอบใหม่' : maxAttempts ? `${maxAttempts} ครั้ง` : 'ไม่จำกัด' },
               ...(canRepeat ? [{ label: 'วิธีเก็บคะแนน', value: SCORE_STRATEGY_LABELS[completionChoice === 'complete' ? scoreStrategy : 'best'] }] : []),
               ...(canRepeat && !randomDrawOn && !streakOn && retryScope === 'wrong_only'
                 ? [{ label: 'การทำรอบต่อไป', value: 'แก้เฉพาะข้อที่ไม่ถูกต้อง' }]

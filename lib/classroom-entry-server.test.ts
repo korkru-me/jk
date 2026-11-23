@@ -150,7 +150,7 @@ describe('authorized classroom streaming and deferred tab reads (mocked server r
     const result = await content('scores')
     const submissions = result.props.classroomSubmissions as Row[]
     expect(submissions).toHaveLength(1001); expect(submissions.some(row => row.id === 'other-room-attempt')).toBe(false)
-    expect(queries.filter(query => query.table === 'submissions').map(query => query.from)).toEqual([0, 1000])
+    expect(queries.filter(query => query.table === 'submissions' && query.columns.includes('status')).map(query => query.from)).toEqual([0, 1000])
   })
   it.each(['overview', 'students', 'homeroom'])('homeroom %s loads sensitive profiles/notes only for people and homeroom work tabs', async view => {
     room.classroom_type = 'homeroom'
