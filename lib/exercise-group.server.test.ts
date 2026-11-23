@@ -3,21 +3,42 @@ vi.mock('server-only', () => ({}))
 const m = vi.hoisted(() => ({ manage: vi.fn(), client: vi.fn() }))
 vi.mock('@/lib/auth/assignment-access', () => ({ canManageAssignment: m.manage, studentHasAssignment: vi.fn() }))
 vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: m.client }))
-import { exerciseGroupTeacherAnswerSource } from './exercise-group.server'
+import { exerciseGroupResultSource, exerciseGroupTeacherAnswerSource } from './exercise-group.server'
 
 const receipt = { id: 'member-receipt', assignment_id: 'assignment', group_source_submission_id: 'source' }
-let rows: Array<{ id: string; assignment_id: string; group_source_submission_id: string | null }>
+let rows: Array<Record<string, unknown>>
+let members: Array<Record<string, unknown>>
 let filters: Array<[string, unknown]>
 beforeEach(() => {
-  vi.clearAllMocks(); m.manage.mockResolvedValue(true); filters = []
+  vi.clearAllMocks(); m.manage.mockResolvedValue(true); filters = []; members = []
   rows = [{ id: 'source', assignment_id: 'assignment', group_source_submission_id: null }]
-  m.client.mockImplementation(() => ({ from: () => {
+  m.client.mockImplementation(() => ({ from: (table: string) => {
+    const localFilters: Array<[string, unknown]> = []
+    const filter = (key: string, value: unknown) => { filters.push([key, value]); localFilters.push([key, value]); return query }
     const query = { select: () => query,
-      eq: (key: string, value: unknown) => { filters.push([key, value]); return query },
-      is: (key: string, value: unknown) => { filters.push([key, value]); return query },
-      maybeSingle: async () => ({ data: rows.find(row => filters.every(([key, value]) => row[key as keyof typeof row] === value)) ?? null, error: null }),
+      eq: filter, is: filter,
+      maybeSingle: async () => ({ data: (table === 'exercise_group_members' ? members : rows)
+        .find(row => localFilters.every(([key, value]) => row[key] === value)) ?? null, error: null }),
     }; return query
   } }))
+})
+describe('student access to a common answer source', () => {
+  beforeEach(() => {
+    rows = [{ ...receipt, student_id: 'member' }, { id: 'source', assignment_id: 'assignment', student_id: 'sender', group_source_submission_id: null }]
+    members = [{ submission_id: 'source', student_id: 'member', assignment_id: 'assignment' }]
+  })
+  it('resolves an owned receipt only through matching registered membership', async () => {
+    expect(await exerciseGroupResultSource('member-receipt', 'member')).toEqual({ id: 'source', ownerId: 'sender' })
+  })
+  it('does not resolve a source from another assignment or another group', async () => {
+    members[0].assignment_id = 'foreign-assignment'
+    expect(await exerciseGroupResultSource('member-receipt', 'member')).toEqual({ id: 'member-receipt', ownerId: 'member' })
+    expect(await exerciseGroupResultSource('source', 'outsider')).toEqual({ id: 'source', ownerId: 'outsider' })
+  })
+  it('preserves a solo owner without a group-membership read', async () => {
+    expect(await exerciseGroupResultSource('source', 'sender')).toEqual({ id: 'source', ownerId: 'sender' })
+    expect(filters).not.toContainEqual(['submission_id', 'source'])
+  })
 })
 describe('teacher access to a group member result', () => {
   it('authorizes the exact assignment before resolving canonical answers', async () => {
