@@ -84,6 +84,12 @@ describe('SEB quit-password owner service', () => {
       blockedReason: null,
     })
   })
+  it('gives an active admin owner the teacher controls', async () => {
+    mocks.createAdminClient.mockReturnValue(adminWith({
+      users: { data: { id: OWNER_ID, role: 'admin', status: 'active' }, error: null },
+    }))
+    expect(await readSebQuitPasswordSetupState(ASSIGNMENT_ID, OWNER_ID)).toMatchObject({ canManage: true, blockedReason: null })
+  })
 
   it('fails the publication gate closed when no revision can be proven', async () => {
     await expect(hasSebQuitPasswordRevision(ASSIGNMENT_ID)).resolves.toBe(true)

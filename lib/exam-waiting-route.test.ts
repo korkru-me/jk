@@ -9,6 +9,7 @@ vi.mock('@/lib/actions/submissions', () => ({ readSubmissionEntry: m.entry, draw
 vi.mock('@/lib/actions/file-assignments', () => ({ readFileAssignment: vi.fn().mockResolvedValue({ error: 'not a file assignment' }) }))
 vi.mock('@/components/assignments/file-assignment-student', () => ({ FileAssignmentStudent: () => null }))
 vi.mock('@/lib/exam-taking', () => ({ getExamTakingData: m.exam }))
+vi.mock('@/lib/exercise-group.server', () => ({ readExerciseGroupContext: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('@/components/exam/exam-waiting-client', () => ({ ExamWaitingClient: m.waiting }))
 vi.mock('@/components/exam/exam-client', () => ({ ExamClient: m.client }))
 vi.mock('@/components/exam/access-code-form', () => ({ AccessCodeForm: () => null }))

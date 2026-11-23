@@ -1,20 +1,31 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-const m = vi.hoisted(() => ({ auth:vi.fn(), admin:vi.fn(), release:vi.fn(), items:vi.fn(), watermark:vi.fn() }))
+const m = vi.hoisted(() => ({ auth:vi.fn(), admin:vi.fn(), release:vi.fn(), items:vi.fn(), watermark:vi.fn(), source:vi.fn() }))
 vi.mock('server-only',()=>({}))
 vi.mock('@/lib/auth/server',()=>({getAuthUser:m.auth}))
 vi.mock('@/lib/supabase/admin',()=>({createAdminClient:m.admin}))
 vi.mock('@/lib/attempt-solutions-server',()=>({loadSolutionRelease:m.release,loadAttemptSolutionItems:m.items,SOLUTION_RELEASE_ASSIGNMENT_FIELDS:'show_solutions'}))
 vi.mock('@/lib/solution-watermark-server',()=>({loadStudentSolutionWatermark:m.watermark}))
+vi.mock('@/lib/exercise-group.server',()=>({exerciseGroupResultSource:m.source}))
 import { getAttemptSolutions } from './actions/attempt-solutions'
 const id='00000000-0000-4000-8000-000000000007'
 let filters:Record<string,string>
 beforeEach(()=>{
   vi.clearAllMocks();filters={}
   m.auth.mockResolvedValue({id:'student'})
+  m.source.mockImplementation(async (id:string, ownerId:string)=>({id,ownerId}))
   const q={select:vi.fn().mockReturnThis(),eq:vi.fn((key:string,value:string)=>{filters[key]=value;return q}),maybeSingle:vi.fn(async()=>({data:filters.student_id==='student'?{id,status:'submitted',assignments:{show_solutions:true}}:null,error:null}))}
   m.admin.mockReturnValue({from:()=>q});m.release.mockResolvedValue({state:'open'});m.items.mockResolvedValue([{answerId:'one'}]);m.watermark.mockResolvedValue({name:'เด็กชายทดสอบ เรียนรู้',issuedAt:'2026-10-14T00:00:00Z'})
 })
 describe('released solutions require authorized identity',()=>{
+  it('shares the authorized group source while retaining the viewer watermark and release gate',async()=>{
+    m.auth.mockResolvedValue({id:'member'})
+    m.source.mockResolvedValue({id,ownerId:'student'})
+    expect(await getAttemptSolutions(id)).toHaveProperty('data')
+    expect(filters).toEqual({id,student_id:'student'})
+    expect(m.release).toHaveBeenCalledWith(expect.anything(),expect.anything(),'member')
+    expect(m.items).toHaveBeenCalledWith(expect.anything(),id)
+    expect(m.watermark).toHaveBeenCalledWith(expect.anything(),'member')
+  })
   it('binds both reads to the verified owner and returns a watermark with the solutions',async()=>{
     const result=await getAttemptSolutions(id)
     expect(filters).toEqual({id,student_id:'student'});expect(m.watermark).toHaveBeenCalledWith(expect.anything(),'student');expect(result).toHaveProperty('data.watermark.name','เด็กชายทดสอบ เรียนรู้')

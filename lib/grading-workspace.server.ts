@@ -40,6 +40,7 @@ type AssignmentRecord = Pick<Assignment,
 > & { classrooms: { name: string; description?: string | null } | null }
 interface SubmissionRecord {
   id: string; assignment_id: string; student_id: string; status: 'in_progress' | 'submitted' | 'graded'
+  group_source_submission_id?: string | null
   closed_at: string | null; total_score: number | null; score_adjustment: number | null; max_score: number
   attempt_number: number; streak_reached?: boolean
   users: { full_name: string | null } | { full_name: string | null }[] | null
@@ -187,7 +188,7 @@ export async function loadGradingWorkspace(assignmentId: string, scope: GradingW
   const reader = createAdminClient()
   const [allSubmissions, gradingState, policyResult] = await Promise.all([
     fetchAllRows((from, to) => reader.from('submissions')
-      .select('id, assignment_id, student_id, status, closed_at, total_score, score_adjustment, max_score, attempt_number, streak_reached, users!submissions_student_id_fkey(full_name)')
+      .select('id, assignment_id, student_id, status, closed_at, total_score, score_adjustment, max_score, attempt_number, streak_reached, group_source_submission_id, users!submissions_student_id_fkey(full_name)')
       .eq('assignment_id', assignmentId).order('id').range(from, to).returns<SubmissionRecord[]>()),
     loadAssignmentGradingState(reader, assignmentId),
     fetchAllRows((from, to) => reader.from('assignment_question_grading_parts').select('question_id, work_share, updated_at')
@@ -215,7 +216,7 @@ export async function loadGradingWorkspace(assignmentId: string, scope: GradingW
   for (const answer of summaryAnswers) { const list = bySubmission.get(answer.submissionId) ?? []; list.push(answer); bySubmission.set(answer.submissionId, list) }
   const pendingSubmissionIds = new Set<string>()
   const projected = (await withVoidedScoreMetadata(reader, finished)).map(row => {
-    const answers = bySubmission.get(row.id)
+    const answers = bySubmission.get(row.group_source_submission_id ?? row.id)
     if (!answers?.length) return row
     let total = 0
     let max = 0
@@ -250,7 +251,15 @@ export async function loadGradingWorkspace(assignmentId: string, scope: GradingW
       score: result.total_score, maxScore: result.max_score, pendingReview: result.pendingReview, streakReached: row.streak_reached,
     }
   })
-  const officialIds = new Set(students.map(student => student.submissionId!))
+  const officialIds = new Set(students.map(student => {
+    const row = submissionById.get(student.submissionId!)
+    return row?.group_source_submission_id ?? student.submissionId!
+  }))
+  for (const student of students) {
+    const source = submissionById.get(student.submissionId!)?.group_source_submission_id ?? student.submissionId
+    const members = students.filter(member => (submissionById.get(member.submissionId!)?.group_source_submission_id ?? member.submissionId) === source)
+    if (members.length > 1) student.groupMembers = members.map(member => member.name)
+  }
   const officialAnswers = summaryAnswers.filter(answer => officialIds.has(answer.submissionId) && questionById.has(answer.questionId))
   const pendingCount = new Set(officialAnswers.filter(answer => scoreParts(answer, questionById.get(answer.questionId)!).pending).map(answer => answer.submissionId)).size
 
@@ -261,8 +270,8 @@ export async function loadGradingWorkspace(assignmentId: string, scope: GradingW
     const filtered = students.filter(student => !query?.classroom || query.classroom === 'all' || student.classroom === query.classroom)
     const ordered = sortGradingStudents(filtered, sortKey[query?.sort ?? 'classroom'], query?.dir === 'desc' ? 'desc' : 'asc')
     const page = Number.isSafeInteger(query?.page) && query!.page! > 0 ? Math.min(query!.page!, Math.max(1, Math.ceil(ordered.length / PAGE_SIZE))) : 1
-    selectedSubmissionIds = ordered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map(student => student.submissionId!)
-  } else if (scope.kind === 'student') selectedSubmissionIds = students.filter(student => student.id === scope.studentId).map(student => student.submissionId!)
+    selectedSubmissionIds = ordered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map(student => submissionById.get(student.submissionId!)?.group_source_submission_id ?? student.submissionId!)
+  } else if (scope.kind === 'student') selectedSubmissionIds = students.filter(student => student.id === scope.studentId).map(student => submissionById.get(student.submissionId!)?.group_source_submission_id ?? student.submissionId!)
   if (selectedSubmissionIds.length > 0) {
     const selected = new Set(selectedSubmissionIds)
     const fullRows = await pagedChunks(selectedSubmissionIds, (ids, from, to) => {
@@ -279,6 +288,13 @@ export async function loadGradingWorkspace(assignmentId: string, scope: GradingW
     await attachArtifacts(reader, fullAnswers)
     const fullById = new Map(fullAnswers.map(answer => [answer.id, answer]))
     for (let index = 0; index < officialAnswers.length; index++) officialAnswers[index] = fullById.get(officialAnswers[index].id) ?? officialAnswers[index]
+  }
+  // Each member navigates to the same answer IDs. Saving any member's review
+  // updates the representative and the database synchronizes all score receipts.
+  for (const row of finished) {
+    if (!row.group_source_submission_id || !students.some(student => student.submissionId === row.id)) continue
+    const shared = officialAnswers.filter(answer => answer.submissionId === row.group_source_submission_id)
+    officialAnswers.push(...shared.map(answer => ({ ...answer, studentId: row.student_id, submissionId: row.id })))
   }
 
   const questionMaxScores = Object.fromEntries(questions.map(question => [question.id,

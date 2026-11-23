@@ -1258,14 +1258,19 @@ export async function updateSubmissionAnswerScore(submissionAnswerId: string, ne
   return { success: true as const }
 }
 
-export async function submitSubmission(submissionId: string) {
+export async function submitSubmission(submissionId: string, group?: { classroomId: string; peers: string[] }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
+  if (group && (typeof group.classroomId !== 'string' || !Array.isArray(group.peers)
+    || group.peers.length > 299 || group.peers.some(id => typeof id !== 'string' || !/^[0-9a-f-]{36}$/i.test(id)))) {
+    return { error: 'รายชื่อสมาชิกไม่ถูกต้อง' }
+  }
   const admin = createAdminClient()
   const result = await gradeAndFinalizeSubmission(admin, submissionId, user.id, {
     enforceWorkImage: true,
     enforceSecureBrowser: true,
+    group,
   })
   // Score visibility belongs to the result route. The submission receipt
   // must not leak a hidden/after-close score through the action response.

@@ -47,7 +47,7 @@ export async function applyLateColorScoreAdjustment(input: ApplyLateColorScoreAd
       .maybeSingle(),
     admin
       .from('submissions')
-      .select('student_id, status, submitted_at')
+      .select('id, student_id, group_source_submission_id, status, submitted_at')
       .eq('assignment_id', assignmentId),
     admin
       .from('assignment_extensions')
@@ -73,11 +73,15 @@ export async function applyLateColorScoreAdjustment(input: ApplyLateColorScoreAd
   })
   const studentIds = studentIdsForLateColor(timings, input.color)
   if (studentIds.length === 0) return { error: 'ยังไม่มีนักเรียนที่ส่งงานในกลุ่มสีนี้' }
+  const selected = new Set(studentIds)
+  const ownerById = new Map((submissions ?? []).map(row => [row.id, row.student_id]))
+  const scoreOwnerIds = [...new Set((submissions ?? []).filter(row => selected.has(row.student_id))
+    .map(row => row.group_source_submission_id ? ownerById.get(row.group_source_submission_id) ?? row.student_id : row.student_id))]
 
   const { data: batchId, error } = await admin.rpc('apply_assignment_score_adjustment', {
     p_org_id: assignment.org_id,
     p_assignment_id: assignmentId,
-    p_student_ids: studentIds,
+    p_student_ids: scoreOwnerIds,
     p_color: input.color,
     p_adjustment: adjustment,
     p_reason: reason,

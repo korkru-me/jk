@@ -808,6 +808,9 @@ import type { QuestionSetSection } from '@/lib/question-set-sections'
 
 export interface Assignment {
   id: string
+  submission_mode?: 'solo' | 'group'
+  group_min_members?: number | null
+  group_max_members?: number | null
   org_id: string
   classroom_id: string
   created_by: string

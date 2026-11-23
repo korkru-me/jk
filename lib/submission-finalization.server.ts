@@ -7,6 +7,7 @@ import { hasCompleteWorkEvidence } from '@/lib/math-work'
 import { parseSubmittedFiles } from '@/lib/exam-attachment'
 import { validateStoredExamAttachmentUrl } from '@/lib/exam-attachment-access.server'
 import { revalidatePath } from 'next/cache'
+import type { ExerciseGroupSelection } from '@/lib/exercise-group'
 
 // Shared by submitSubmission (student-initiated) and startSubmission's
 // stale-attempt handling (server-initiated, when a resumed in-progress
@@ -17,11 +18,11 @@ export async function gradeAndFinalizeSubmission(
   admin: ReturnType<typeof createAdminClient>,
   submissionId: string,
   studentId: string,
-  opts: { enforceWorkImage: boolean; enforceSecureBrowser: boolean; expiredOnly?: boolean }
+  opts: { enforceWorkImage: boolean; enforceSecureBrowser: boolean; expiredOnly?: boolean; group?: ExerciseGroupSelection }
 ): Promise<{ error?: string; success?: true; totalScore?: number; notExpired?: true }> {
   const { data: submission } = await admin
     .from('submissions')
-    .select('*, assignments(duration_minutes, end_at, require_work_image, secure_browser_mode, android_exam_mode)')
+    .select('*, assignments(duration_minutes, end_at, require_work_image, secure_browser_mode, android_exam_mode, submission_mode)')
     .eq('id', submissionId)
     .eq('student_id', studentId)
     .maybeSingle()
@@ -36,6 +37,14 @@ export async function gradeAndFinalizeSubmission(
   const assignment = Array.isArray((submission as any).assignments)
     ? (submission as any).assignments[0]
     : (submission as any).assignments
+  const groupWork = assignment?.submission_mode === 'group'
+  if (groupWork && !automatic && !opts.group) return { error: 'กรุณาเลือกสมาชิกกลุ่มก่อนส่งงาน' }
+  if (groupWork && automatic) {
+    const { data: member, error } = await admin.from('exercise_group_members').select('student_id')
+      .eq('submission_id', submissionId).eq('student_id', studentId).maybeSingle()
+    if (error) return { error: 'ตรวจสมาชิกกลุ่มไม่สำเร็จ กรุณาลองอีกครั้ง' }
+    if (!member) return { error: 'งานกลุ่มนี้หมดเวลาโดยยังไม่ได้ระบุสมาชิก กรุณาติดต่อครูผู้สอน' }
+  }
   if (
     !automatic && opts.enforceSecureBrowser
     && assignment?.secure_browser_mode === 'seb_required'
@@ -144,11 +153,22 @@ export async function gradeAndFinalizeSubmission(
 
   // Freeze first. Manual submissions compare the answer revision that was
   // validated above; automatic closure always reads the frozen DB copy.
-  const { data: closure, error: closeError } = await admin.rpc('claim_submission_close', {
+  const { data: closure, error: closeError } = groupWork && !automatic
+    ? await admin.rpc('claim_exercise_group_close', {
+      p_submission_id: submissionId, p_student_id: studentId,
+      p_classroom_id: opts.group!.classroomId, p_peers: opts.group!.peers,
+      p_expected_revision: submission.answer_revision,
+    })
+    : await admin.rpc('claim_submission_close', {
     p_submission_id: submissionId, p_student_id: studentId,
     p_expired_only: automatic,
     p_expected_revision: automatic ? null : submission.answer_revision,
   })
+  if (closeError?.message?.startsWith('GROUP_') || closeError?.code === '23505') {
+    return { error: closeError.message === 'GROUP_RANGE'
+      ? 'จำนวนสมาชิกอยู่นอกช่วงที่ครูกำหนด'
+      : 'สมาชิกบางคนส่งงานแล้ว หรือรายชื่อกลุ่มเปลี่ยน กรุณาตรวจสมาชิกแล้วส่งอีกครั้ง' }
+  }
   if (closeError?.code === 'PT425') return { error: 'เวลาของรอบนี้เปลี่ยนแล้ว กำลังตรวจสอบเวลาใหม่', notExpired: true }
   if (closeError) return { error: closeError.code === 'PT409'
     ? 'คำตอบกำลังเปลี่ยนแปลง กรุณาลองส่งอีกครั้ง'

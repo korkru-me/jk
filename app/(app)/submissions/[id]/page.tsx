@@ -2,7 +2,6 @@ import { withSubmissionReviewStatus } from '@/lib/classroom-score-review.server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getAuthUser } from '@/lib/auth/server'
-import { canManageAssignment } from '@/lib/auth/assignment-access'
 import { notFound, redirect } from 'next/navigation'
 import { Fragment, Suspense } from 'react'
 import { ExpiredAttemptStatus } from '@/components/exam/expired-attempt-status'
@@ -33,6 +32,7 @@ import {
   AttemptSolutionShortcut, AttemptSolutionsButton, AttemptSolutionsProvider,
 } from '@/components/student/attempt-solutions'
 import { isFileAssignment } from '@/lib/file-assignment'
+import { exerciseGroupResultSource, exerciseGroupTeacherAnswerSource } from '@/lib/exercise-group.server'
 import { SolutionLockNotice } from '@/components/student/solution-lock-notice'
 
 // This page renders on the server, which runs in UTC on Vercel: a bare
@@ -76,9 +76,11 @@ export default async function SubmissionResultPage({
 }: {
   params: Promise<{ id: string }>
 }) {
-  const { id } = await params
+  const { id: requestedId } = await params
   const user = await getAuthUser()
   if (!user) redirect('/login')
+  const { id, ownerId } = await exerciseGroupResultSource(requestedId, user.id)
+  let answerSubmissionId = id
   const admin = createAdminClient()
 
   // Student assignment rows are intentionally not readable directly because
@@ -88,12 +90,12 @@ export default async function SubmissionResultPage({
   const { data: ownSubmission } = await admin
     .from('submissions')
     .select(`
-      id, assignment_id, student_id, status, closed_at, close_reason, missing_work_evidence, total_score, score_adjustment, max_score, attempt_number, submitted_at, secure_browser_verified_at,
+      id, assignment_id, student_id, status, closed_at, close_reason, missing_work_evidence, total_score, score_adjustment, max_score, voided_max_score, attempt_number, submitted_at, secure_browser_verified_at,
       users!submissions_student_id_fkey(full_name),
       assignments(id, title, description, show_results, show_solutions, allow_exam_review, end_at, duration_minutes, passing_type, passing_value, completion_rule, type, status, max_attempts, score_strategy, retry_scope, classroom_id, display_max_score, secure_browser_mode)
     `)
     .eq('id', id)
-    .eq('student_id', user.id)
+    .eq('student_id', ownerId)
     .maybeSingle()
 
   let submission: any = null
@@ -119,21 +121,29 @@ export default async function SubmissionResultPage({
     const { data: teacherVisibleSubmission } = await admin
       .from('submissions')
       .select(`
-        id, assignment_id, student_id, status, closed_at, close_reason, missing_work_evidence, total_score, score_adjustment, max_score, attempt_number, submitted_at, secure_browser_verified_at,
+        id, assignment_id, student_id, group_source_submission_id, status, closed_at, close_reason, missing_work_evidence, total_score, score_adjustment, max_score, voided_max_score, attempt_number, submitted_at, secure_browser_verified_at,
         users!submissions_student_id_fkey(full_name),
         assignments(title, show_results, end_at, passing_type, passing_value, type, status, max_attempts, score_strategy, retry_scope, classroom_id, display_max_score, secure_browser_mode),
         submission_answers(id, correct_answer, is_correct, max_score)
       `)
       .eq('id', id)
       .maybeSingle()
-    const mayRead = teacherVisibleSubmission != null
-      && await canManageAssignment(teacherVisibleSubmission.assignment_id, user.id)
-    submission = mayRead ? teacherVisibleSubmission : null
+    const sourceId = teacherVisibleSubmission
+      ? await exerciseGroupTeacherAnswerSource(teacherVisibleSubmission, user.id) : null
+    if (sourceId && teacherVisibleSubmission) {
+      answerSubmissionId = sourceId
+      const { data: sourceSummary, error: sourceError } = sourceId !== id
+        ? await admin.from('submission_answers').select('id, correct_answer, is_correct, max_score')
+            .eq('submission_id', sourceId)
+        : { data: teacherVisibleSubmission.submission_answers, error: null }
+      if (sourceError) throw new Error('โหลดคำตอบร่วมของกลุ่มไม่สำเร็จ กรุณาลองใหม่')
+      submission = { ...teacherVisibleSubmission, submission_answers: sourceSummary ?? [] }
+    }
   }
 
   if (!submission) notFound()
 
-  const isOwnSubmission = submission.student_id === user.id
+  const isOwnSubmission = ownSubmission != null
   const isTeacherViewer = !isOwnSubmission
 
   if (submission.status === 'in_progress') {
@@ -281,7 +291,7 @@ export default async function SubmissionResultPage({
   const solutionsOpen = solutionRelease.state === 'open'
 
   const solutionWatermark = (canShowAnswers || solutionsOpen)
-    ? await loadStudentSolutionWatermark(admin, submission.student_id) : null
+    ? await loadStudentSolutionWatermark(admin, isOwnSubmission ? user.id : submission.student_id) : null
   const hasSolutionIdentity = solutionWatermark !== null
 
   const page = (
@@ -387,7 +397,7 @@ export default async function SubmissionResultPage({
           </Card>
         )}>
           <SubmissionAnswerDetails
-            submissionId={id}
+            submissionId={answerSubmissionId}
             isTeacherViewer={isTeacherViewer}
             solutionAnswerIds={solutionsOpen ? solutionAnswerIds : []}
           />
@@ -422,11 +432,21 @@ async function SubmissionAnswerDetails({
     .from('submission_answers')
     .select(`
       id, question_id, correct_answer, is_correct, max_score, option_order, order_index,
-      random_values, score, student_answer, work_images, carried_over, check_count,
-      student_work_artifacts(id, part_key, source_type, preview_path, updated_at)
+      random_values, score, student_answer, work_images, carried_over, check_count
     `)
     .eq('submission_id', submissionId)
     .order('order_index')
+
+  // The session read above enforces membership and the result-release time.
+  // Only artifacts of those exact visible answers may be signed; the artifact
+  // table's standalone owner policies and all write permissions stay unchanged.
+  const visibleAnswerIds = (answerRows ?? []).map(answer => answer.id)
+  const { data: artifactRows, error: artifactError } = visibleAnswerIds.length
+    ? await createAdminClient().from('student_work_artifacts')
+        .select('id, submission_answer_id, part_key, source_type, preview_path, updated_at')
+        .in('submission_answer_id', visibleAnswerIds)
+    : { data: [], error: null }
+  if (artifactError) throw new Error('โหลดวิธีทำของคำตอบไม่สำเร็จ กรุณาลองใหม่')
 
   // The โจทย์ behind those answers, read with the service role for exactly
   // the ids RLS just returned. A student may not read `questions` rows
@@ -444,7 +464,8 @@ async function SubmissionAnswerDetails({
   // Deleting a โจทย์ cascades to its answers, so a missing one is a row about
   // to disappear anyway.
   const sortedAnswers = (answerRows ?? [])
-    .map((row: any) => ({ ...row, questions: questionById.get(row.question_id) ?? null }))
+    .map((row: any) => ({ ...row, questions: questionById.get(row.question_id) ?? null,
+      student_work_artifacts: (artifactRows ?? []).filter(artifact => artifact.submission_answer_id === row.id) }))
     .filter((row: any) => row.questions !== null) as any[]
   const solutionIds = new Set(solutionAnswerIds)
   const artifactPreviewPaths = sortedAnswers.flatMap(answer => (
