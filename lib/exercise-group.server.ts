@@ -1,8 +1,20 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { studentHasAssignment } from '@/lib/auth/assignment-access'
+import { canManageAssignment, studentHasAssignment } from '@/lib/auth/assignment-access'
 import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
 import type { ExerciseGroupContext } from '@/lib/exercise-group'
+
+/** Teacher navigation keeps the selected member's header but reviews one answer set. */
+export async function exerciseGroupTeacherAnswerSource(receipt: {
+  id: string; assignment_id: string; group_source_submission_id?: string | null
+}, viewerId: string): Promise<string | null> {
+  if (!await canManageAssignment(receipt.assignment_id, viewerId)) return null
+  if (!receipt.group_source_submission_id) return receipt.id
+  const { data, error } = await createAdminClient().from('submissions').select('id')
+    .eq('id', receipt.group_source_submission_id).eq('assignment_id', receipt.assignment_id)
+    .is('group_source_submission_id', null).maybeSingle()
+  return !error && data ? data.id : null
+}
 
 export async function exerciseGroupResultSource(submissionId: string, viewerId: string) {
   const admin = createAdminClient()
