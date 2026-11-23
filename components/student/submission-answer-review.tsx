@@ -9,6 +9,8 @@ import { containsMath } from '@/lib/math/latex'
 import { renderRichTextHtml } from '@/lib/rich-text-html'
 import { choiceLabel, studentChoicePosition } from '@/lib/submission-choice-review'
 import { buildAnswerFeedback } from '@/lib/answer-feedback'
+import { FileAssignmentTextAndLink } from '@/components/assignments/file-assignment-text-and-link'
+import { fileAssignmentQuestionOwner, hasFileAssignmentResponse, parseFileAssignmentResponse } from '@/lib/file-assignment'
 
 const PART_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ', 'ช', 'ซ']
 const CHOICE_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ']
@@ -163,9 +165,16 @@ export function SubmissionAnswerReview({
 
   // ─── File upload: submitted files + submit status ────────────────────────
   if (questionType === 'file_upload') {
-    let files: SubmittedFile[] = []
-    try { files = studentAnswer ? JSON.parse(studentAnswer) : [] } catch { files = [] }
-    const submitted = files.length > 0
+    const isFileWork = Boolean(fileAssignmentQuestionOwner(extraData))
+    const response = isFileWork ? parseFileAssignmentResponse(studentAnswer) : null
+    let files: SubmittedFile[] = response?.files ?? []
+    if (!isFileWork) {
+      try {
+        const parsed = studentAnswer ? JSON.parse(studentAnswer) : []
+        if (Array.isArray(parsed)) files = parsed
+      } catch { /* Older responses may be empty or malformed. */ }
+    }
+    const submitted = response ? hasFileAssignmentResponse(response) : files.length > 0
     return (
       <div className="mt-2 space-y-2 text-sm">
         <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
@@ -173,8 +182,9 @@ export function SubmissionAnswerReview({
             ? 'bg-success/10 text-[color-mix(in_oklab,var(--success)_60%,var(--foreground))] dark:bg-success/15'
             : 'bg-destructive/10 text-[color-mix(in_oklab,var(--destructive)_75%,var(--foreground))]'
         }`}>
-          {submitted ? '✓ ส่งแล้ว' : '✗ ไม่ได้ส่งไฟล์'}
+          {submitted ? '✓ ส่งแล้ว' : isFileWork ? '✗ ไม่ได้ส่งคำตอบ' : '✗ ไม่ได้ส่งไฟล์'}
         </span>
+        {response && <FileAssignmentTextAndLink response={response} />}
         {files.length > 0 && (
           <div className="flex flex-wrap gap-3">
             {files.map((f, i) => (

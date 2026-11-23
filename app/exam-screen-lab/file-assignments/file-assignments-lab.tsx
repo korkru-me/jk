@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import { FileAssignmentForm } from '@/components/assignments/file-assignment-form'
 import { FileAssignmentStudent } from '@/components/assignments/file-assignment-student'
-import { fileAssignmentWithdrawalError, type FileAssignmentView } from '@/lib/file-assignment'
+import { EMPTY_FILE_ASSIGNMENT_RESPONSE, fileAssignmentWithdrawalError, serializeFileAssignmentResponse, type FileAssignmentView } from '@/lib/file-assignment'
+import { SubmissionAnswerReview } from '@/components/student/submission-answer-review'
 import { ShellClient } from '@/components/layout/shell-client'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -26,10 +27,11 @@ export function FileAssignmentsLab({ serverNow, mode = 'context' }: { serverNow:
   const [score, setScore] = useState('10')
   const [expired, setExpired] = useState(false)
   const [recipientIds, setRecipientIds] = useState<string[]>([])
+  const [groupViewer, setGroupViewer] = useState('ตัวแทน')
   const current = view ? { ...view, withdrawalError: view.submission ? fileAssignmentWithdrawalError({
     assignmentStatus: view.status, submissionStatus: view.submission.status,
     dueAt: expired ? '2020-01-01T00:00:00Z' : view.dueAt, endAt: view.endAt,
-    reviewed: view.submission.status === 'graded',
+    reviewed: view.submission.status === 'graded', submissionMode: view.groupWork ? 'group' : 'solo',
   }, Date.parse(serverNow)) : null } : null
 
   return <ShellClient user={{ id: 'local-file-teacher', email: 'file-lab@example.invalid', full_name: 'ครูตัวอย่าง', role: 'teacher' }} initialUnreadCount={0} notificationsEnabled={false}>
@@ -39,7 +41,7 @@ export function FileAssignmentsLab({ serverNow, mode = 'context' }: { serverNow:
         <Button size="sm" variant="outline" onClick={() => {
           setExpired(false)
           setView({ id: ASSIGNMENT, title: 'ใบงานฟิสิกส์ — ตัวอย่างแนบไฟล์', classroomId: CLASSROOM.id,
-            instructions: '<p>อ่านใบงาน PDF แล้วแสดงวิธีทำ แนบคำตอบเป็นรูปภาพหรือ PDF</p>',
+            instructions: '<p>อ่านใบงาน PDF แล้วแสดงวิธีทำในรูปแบบที่สะดวก</p>',
             attachments: ['/exam-screen-lab/grading-workspace/assets/file-0.pdf'], maxScore: 10,
             status: 'published', startAt: null, dueAt: null, endAt: null, submission: null, withdrawalError: null })
           setRole('student')
@@ -50,6 +52,11 @@ export function FileAssignmentsLab({ serverNow, mode = 'context' }: { serverNow:
       </div>
     </div>
     {role !== 'create' && <p role="status" className="mb-2 text-sm" data-local-file-recipients>มอบหมายตัวอย่างให้: {CLASSROOMS.filter(room => recipientIds.includes(room.id)).map(room => room.name).join(', ')}</p>}
+    {current?.groupMembers && role === 'student' && <div className="mb-3 flex flex-wrap items-center gap-2" aria-label="สมาชิกที่เปิดดูผลจำลอง">
+      <span className="text-sm text-muted-foreground">เปิดดูผลในชื่อ</span>
+      {current.groupMembers.map(name => <Button key={name} size="sm" variant={groupViewer === name ? 'navigation' : 'outline'} onClick={() => setGroupViewer(name)}>{name}</Button>)}
+      <span className="text-xs text-muted-foreground">ข้อมูลจำลองใช้ผลส่งงานร่วมกันหนึ่งชุด</span>
+    </div>}
     {role === 'create' ? <FileAssignmentForm classrooms={CLASSROOMS} preselectedClassroomId={mode === 'global' ? undefined : CLASSROOM.id} localOnly
       editing={mode === 'locked'} contentLocked={mode === 'locked'}
       initial={mode === 'locked' ? { title: 'งานเผยแพร่แล้ว (ตัวอย่าง)', instructions: '<p>คำสั่งที่นักเรียนได้รับแล้ว</p>', classroom_ids: [CLASSROOM.id], status: 'published' } : undefined}
@@ -58,18 +65,30 @@ export function FileAssignmentsLab({ serverNow, mode = 'context' }: { serverNow:
       setView({ id: ASSIGNMENT, title: input.title, classroomId: CLASSROOM.id, instructions: input.instructions,
         attachments: input.attachment_urls, maxScore: input.max_score, status: input.status,
         startAt: null, dueAt: input.due_at, endAt: null,
-        submission: null, withdrawalError: null })
+        submission: null, withdrawalError: null,
+        ...(input.submission_mode === 'group' ? { groupWork: {
+          min: input.group_min_members!, max: input.group_max_members!,
+          rooms: [{ id: CLASSROOM.id, name: CLASSROOM.name, students: Array.from({ length: 6 }, (_, index) => ({ id: `local-peer-${index + 1}`, name: `เพื่อนตัวอย่าง ${index + 1}` })) }],
+        } } : {}),
+      })
+      setGroupViewer('ตัวแทน')
       setScore(String(input.max_score))
       setRole('student')
       return { success: true }
     }} /> : current && role === 'student' ? <FileAssignmentStudent key={`${current.submission?.id}:${current.submission?.status}`} view={current} localOnly
-      onStart={async () => { setView(value => ({ ...value!, submission: { id: '30000000-0000-4000-8000-000000000001', answerId: '40000000-0000-4000-8000-000000000001', status: 'in_progress', files: [], score: null, submittedAt: null } })) }}
-      onSave={async files => { setView(value => ({ ...value!, submission: { ...value!.submission!, files } })) }}
-      onSubmit={async () => { setView(value => ({ ...value!, submission: { ...value!.submission!, status: 'submitted', submittedAt: serverNow } })) }}
+      onStart={async () => { setView(value => ({ ...value!, submission: { id: '30000000-0000-4000-8000-000000000001', answerId: '40000000-0000-4000-8000-000000000001', status: 'in_progress', response: EMPTY_FILE_ASSIGNMENT_RESPONSE, score: null, submittedAt: null } })) }}
+      onSave={async response => { setView(value => ({ ...value!, submission: { ...value!.submission!, response } })) }}
+      onSubmit={async group => { setView(value => ({ ...value!, submission: { ...value!.submission!, status: 'submitted', submittedAt: serverNow },
+        ...(group ? { groupMembers: ['ตัวแทน', ...value!.groupWork!.rooms.find(room => room.id === group.classroomId)!.students.filter(student => group.peers.includes(student.id)).map(student => student.name)] } : {}),
+      })) }}
       onWithdraw={async () => { setView(value => ({ ...value!, submission: { ...value!.submission!, status: 'in_progress', submittedAt: null } })) }}
     /> : current ? <Card padding="md" className="flex flex-col gap-3">
-      <h1 className="text-xl font-bold">{current.title}</h1><p className="text-sm">คะแนนเต็มทั้งงาน {current.maxScore} คะแนน · {current.submission?.files.length ?? 0} ไฟล์</p>
+      <h1 className="text-xl font-bold">{current.title}</h1><p className="text-sm">คะแนนเต็มทั้งงาน {current.maxScore} คะแนน</p>
+      {current.groupMembers && <p className="text-sm">สมาชิก: {current.groupMembers.join(', ')} · บันทึกคะแนนครั้งเดียวให้ทุกคนเท่ากัน</p>}
       {current.submission?.status === 'submitted' ? <>
+        <SubmissionAnswerReview questionType="file_upload" extraData={{ file_assignment_id: ASSIGNMENT }}
+          studentAnswer={serializeFileAssignmentResponse(current.submission.response)} correctAnswer={null}
+          isCorrect={null} answerParts={null} answerUnit={null} mcqOptions={null} workImages={null} />
         <Field><FieldLabel htmlFor="local-file-grade">คะแนนรวมทั้งงาน</FieldLabel><Input id="local-file-grade" type="number" min="0" max={current.maxScore} step="any" value={score} onChange={event => setScore(event.target.value)} /></Field>
         <Button disabled={!score.trim() || !Number.isFinite(Number(score)) || Number(score) < 0 || Number(score) > current.maxScore} onClick={() => {
           setView(value => ({ ...value!, submission: { ...value!.submission!, status: 'graded', score: Number(score) } })); setRole('student')

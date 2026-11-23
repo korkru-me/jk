@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { FileUp, FileText, Loader2, X } from 'lucide-react'
+import { FileUp, FileText, Image, Loader2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import {
@@ -33,6 +33,7 @@ interface FileSubmissionUploadProps {
    * ไฟล์ด้วย สิ่งที่อัปขึ้นไปจึงเป็นไฟล์กำพร้าตั้งแต่วินาทีแรก
    */
   localOnly?: boolean
+  separateImagePicker?: boolean
   onBusyChange?: (busy: boolean) => void
 }
 
@@ -55,13 +56,17 @@ interface FailedSubmissionUpload extends SubmissionUploadCandidate<File> {
 // mirrors WorkImageUpload's storage-upload pattern but keeps an array (like
 // the teacher-side QuestionImageUpload) instead of a single slot, and
 // accepts PDFs alongside images.
-export function FileSubmissionUpload({ submissionAnswerId, value, onChange, localOnly, onBusyChange }: FileSubmissionUploadProps) {
+export function FileSubmissionUpload({ submissionAnswerId, value, onChange, localOnly, separateImagePicker = false, onBusyChange }: FileSubmissionUploadProps) {
   const [uploading, setUploading] = useState(false)
+  const [removing, setRemoving] = useState(false)
   const [activeUploadId, setActiveUploadId] = useState<string | null>(null)
   const [failedUploads, setFailedUploads] = useState<FailedSubmissionUpload[]>([])
   const [limitOpen, setLimitOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
   const attachButtonRef = useRef<HTMLButtonElement>(null)
+  const lastPickerButton = useRef<HTMLButtonElement | null>(null)
+  const busy = uploading || removing
 
   async function uploadCandidate(candidate: SubmissionUploadCandidate<File>, retry: boolean) {
     if (!submissionAnswerId) throw new Error('ไม่พบคำตอบสำหรับแนบไฟล์ กรุณาโหลดข้อสอบใหม่')
@@ -90,11 +95,11 @@ export function FileSubmissionUpload({ submissionAnswerId, value, onChange, loca
   }
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? [])
-    if (files.length === 0) return
+    const files = Array.from(e.currentTarget.files ?? [])
+    e.currentTarget.value = ''
+    if (busy || files.length === 0) return
     if (value.length + files.length > MAX_SUBMISSION_FILES) {
       setLimitOpen(true)
-      e.target.value = ''
       return
     }
 
@@ -103,7 +108,6 @@ export function FileSubmissionUpload({ submissionAnswerId, value, onChange, loca
         ...value,
         ...files.map(f => ({ url: URL.createObjectURL(f), name: f.name, type: f.type })),
       ])
-      if (inputRef.current) inputRef.current.value = ''
       return
     }
 
@@ -142,13 +146,12 @@ export function FileSubmissionUpload({ submissionAnswerId, value, onChange, loca
       setActiveUploadId(null)
       setUploading(false)
       onBusyChange?.(false)
-      if (inputRef.current) inputRef.current.value = ''
     }
   }
 
   async function retryUpload(uploadId: string) {
     const candidate = failedUploads.find(item => item.uploadId === uploadId)
-    if (!candidate || !submissionAnswerId || uploading) return
+    if (!candidate || !submissionAnswerId || busy) return
     if (value.length >= MAX_SUBMISSION_FILES) { setLimitOpen(true); return }
 
     setUploading(true)
@@ -172,6 +175,7 @@ export function FileSubmissionUpload({ submissionAnswerId, value, onChange, loca
   }
 
   async function removeFile(url: string) {
+    if (busy) return
     if (isLocalUrl(url)) {
       URL.revokeObjectURL(url)
     } else {
@@ -179,16 +183,27 @@ export function FileSubmissionUpload({ submissionAnswerId, value, onChange, loca
         toast.error('ไม่พบคำตอบสำหรับลบไฟล์ กรุณาโหลดข้อสอบใหม่')
         return
       }
-      const { deleteExamAttachment } = await import('@/lib/actions/exam-attachments')
-      const removed = await deleteExamAttachment({
-        submissionAnswerId,
-        kind: 'submission_file',
-        url,
-      })
-      if (!removed || 'error' in removed) {
-        toast.error(removed?.error ?? 'ลบไฟล์ไม่สำเร็จ กรุณาลองใหม่')
-        return
+      setRemoving(true)
+      onBusyChange?.(true)
+      try {
+        const { deleteExamAttachment } = await import('@/lib/actions/exam-attachments')
+        const removed = await deleteExamAttachment({
+          submissionAnswerId,
+          kind: 'submission_file',
+          url,
+        })
+        if ('error' in removed) {
+          toast.error(removed.error ?? 'ลบไฟล์ไม่สำเร็จ กรุณาลองใหม่')
+          return
+        }
+        onChange(value.filter(f => f.url !== url))
+      } catch {
+        toast.error('ลบไฟล์ไม่สำเร็จ กรุณาลองใหม่')
+      } finally {
+        setRemoving(false)
+        onBusyChange?.(false)
       }
+      return
     }
     onChange(value.filter(f => f.url !== url))
   }
@@ -196,7 +211,7 @@ export function FileSubmissionUpload({ submissionAnswerId, value, onChange, loca
   return (
     <div className="space-y-3">
       <Dialog open={limitOpen} onOpenChange={setLimitOpen}>
-        <DialogContent finalFocus={attachButtonRef}>
+        <DialogContent finalFocus={() => lastPickerButton.current ?? attachButtonRef.current}>
           <DialogTitle>แนบได้สูงสุด {MAX_SUBMISSION_FILES} ไฟล์</DialogTitle>
           <DialogDescription>
             หากมีรูปภาพหรือเอกสารมากกว่านี้ แนะนำให้รวมเป็น PDF ไฟล์เดียวก่อนแนบ โดยแต่ละไฟล์ต้องไม่เกิน {SUBMISSION_FILE_MAX_MB} MB ไฟล์ที่แนบไว้แล้วจะยังอยู่ครบ
@@ -208,10 +223,10 @@ export function FileSubmissionUpload({ submissionAnswerId, value, onChange, loca
         <input
           ref={inputRef}
           type="file"
-          aria-label="เลือกไฟล์คำตอบ"
-          accept="image/*,application/pdf"
+          aria-label={separateImagePicker ? 'เลือกไฟล์ PDF' : 'เลือกไฟล์คำตอบ'}
+          accept={separateImagePicker ? 'application/pdf,.pdf' : 'image/*,application/pdf'}
           multiple
-          disabled={uploading}
+          disabled={busy}
           className="hidden"
           onChange={handleFileChange}
         />
@@ -220,13 +235,23 @@ export function FileSubmissionUpload({ submissionAnswerId, value, onChange, loca
           variant="outline"
           size="sm"
           type="button"
-          onClick={() => inputRef.current?.click()}
-          disabled={uploading}
+          onClick={event => {
+            lastPickerButton.current = event.currentTarget
+            inputRef.current?.click()
+          }}
+          disabled={busy}
           className="min-h-11"
         >
           {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileUp className="w-3.5 h-3.5" />}
-          {uploading ? 'กำลังอัปโหลด...' : 'แนบไฟล์'}
+          {uploading ? 'กำลังอัปโหลด...' : separateImagePicker ? 'แนบไฟล์ PDF' : 'แนบไฟล์'}
         </Button>
+        {separateImagePicker && <>
+          <input ref={imageInputRef} type="file" aria-label="เลือกรูปภาพ" accept="image/png,image/jpeg,image/webp" multiple disabled={busy} className="hidden" onChange={handleFileChange} />
+          <Button type="button" variant="outline" size="sm" className="min-h-11" disabled={busy} onClick={event => {
+            lastPickerButton.current = event.currentTarget
+            imageInputRef.current?.click()
+          }}><Image data-icon="inline-start" />แนบรูปภาพ</Button>
+        </>}
         <span className="text-[10px] text-muted-foreground">
           {localOnly
             ? `รูปภาพหรือ PDF · ${value.length}/${MAX_SUBMISSION_FILES} ไฟล์ · ตัวอย่างในเครื่อง`
@@ -252,7 +277,7 @@ export function FileSubmissionUpload({ submissionAnswerId, value, onChange, loca
                   type="button"
                   variant="outline"
                   size="sm"
-                  disabled={uploading}
+                  disabled={busy}
                   aria-label={`ลองอัปโหลดไฟล์ ${item.name} อีกครั้ง`}
                   onClick={() => retryUpload(item.uploadId)}
                 >
@@ -298,7 +323,7 @@ export function FileSubmissionUpload({ submissionAnswerId, value, onChange, loca
               <button
                 type="button"
                 onClick={() => removeFile(f.url)}
-                disabled={uploading}
+                disabled={busy}
                 className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-destructive text-destructive-foreground opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
                 aria-label={`นำไฟล์ ${f.name} ออก`}
               >

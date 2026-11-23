@@ -27,6 +27,7 @@ interface QuestionFileUploadProps {
   value: string[]
   onChange: (urls: string[]) => void
   localOnly?: boolean
+  compact?: boolean
   maxFiles?: number
   removeFromStorage?: boolean
   allowDrop?: boolean
@@ -48,7 +49,7 @@ function fileNameFromUrl(url: string) {
 // modeled on QuestionImageUpload, but accepts images AND PDFs (reusing the
 // same `question-images` bucket) and renders a PDF-aware preview instead of
 // always treating the attachment as an <img>.
-export function QuestionFileUpload({ value, onChange, localOnly = false, maxFiles, removeFromStorage = true, allowDrop = false, allowDocuments = false, disabled = false, onUploadingChange }: QuestionFileUploadProps) {
+export function QuestionFileUpload({ value, onChange, localOnly = false, compact = false, maxFiles, removeFromStorage = true, allowDrop = false, allowDocuments = false, disabled = false, onUploadingChange }: QuestionFileUploadProps) {
   const [uploading, setUploading] = useState(false)
   const [dragging, setDragging] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -142,7 +143,7 @@ export function QuestionFileUpload({ value, onChange, localOnly = false, maxFile
           onClick={() => inputRef.current?.click()}
           disabled={disabled || uploading}
           aria-describedby={allowDrop ? hintId : undefined}
-          className="min-h-[44px]"
+          className={compact ? "relative after:absolute after:inset-x-0 after:-inset-y-2" : "min-h-[44px]"}
         >
           {uploading ? (
             <Loader2 data-icon="inline-start" className="animate-spin" />
