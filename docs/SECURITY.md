@@ -1,6 +1,6 @@
 # Security และ privacy guardrails
 
-## สิทธิ์ Admin และคำตอบกลุ่ม — 23 พฤศจิกายน 2026 (local)
+## สิทธิ์ Admin และคำตอบกลุ่ม — 23 พฤศจิกายน 2026 (Production)
 
 งานกลุ่มตรวจ active teacher/admin พร้อมสิทธิ์เจ้าของห้องหรือผู้ช่วยสอน admin/manage ก่อนอ่านหรือจัดการ กลุ่มของแบบฝึกหัดจองสมาชิกผ่าน service-only RPC หลังตรวจ session และเจ้าของ attempt โดยตรวจห้องเดียวกัน ผู้ได้รับมอบหมาย จำนวนคน และ revision ใน transaction ที่ freeze คำตอบ ตารางสมาชิกเปิด RLS และเพิกถอน browser grants สมาชิกอ่านคำตอบต้นทางตามเวลาแสดงผลเดิม ส่วนการเข้าถึงผลใน server ต้องผ่าน header ของตนเองหรือสมาชิกกลุ่มที่ตรงกับ assignment
 

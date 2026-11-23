@@ -1,6 +1,6 @@
 # Data model และ invariants
 
-## แบบฝึกหัดร่วมกันเป็นกลุ่ม — 23 พฤศจิกายน 2026 (local)
+## แบบฝึกหัดร่วมกันเป็นกลุ่ม — 23 พฤศจิกายน 2026 (Production)
 
 `assignments.submission_mode` เริ่มต้นเป็น `solo` งานกลุ่มมี `group_min_members` และ `group_max_members` และส่งหนึ่งครั้ง `exercise_group_members` ผูกนักเรียนกับ assignment และ submission ของตัวแทน คีย์หลัก assignment+student ป้องกันการอยู่หลายกลุ่มในงานเดียว
 
