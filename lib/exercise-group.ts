@@ -17,3 +17,7 @@ export function exerciseGroupSelectionError(context: ExerciseGroupContext, selec
   if (count < context.min || count > context.max) return `กลุ่มต้องมีสมาชิก ${context.min}–${context.max} คน รวมผู้ส่ง`
   return null
 }
+export function exerciseGroupRangeError(min: number, max: number): string | null {
+  return Number.isInteger(min) && Number.isInteger(max) && min >= 2 && max >= min && max <= 300
+    ? null : 'จำนวนสมาชิกต้องเป็นจำนวนเต็มตั้งแต่ 2–300 คน และขั้นต่ำต้องไม่เกินจำนวนสูงสุด'
+}

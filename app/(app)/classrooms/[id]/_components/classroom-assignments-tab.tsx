@@ -55,7 +55,6 @@ import { cn } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { groupWorkHref } from '@/lib/classroom-group-work'
 import { AssignmentCreationMenu } from '@/components/assignments/assignment-creation-menu'
 import { AssignmentTypeFilter, type AssignmentTypeFilterValue } from '@/components/assignments/assignment-type-filter'
 import { groupPreset } from '@/app/(app)/classrooms/_components/group-colors'
@@ -550,7 +549,6 @@ export function ClassroomAssignmentsTab({
             assignmentCounts={assignmentCounts}
             onChange={handleCategoriesChange}
           />
-          <Button type="button" variant="outline" size="sm" nativeButton={false} render={<Link href={groupWorkHref(classroomId)} />}>งานกลุ่มและงานเดี่ยว</Button>
           <AssignmentCreationMenu classroomId={classroomId} size="sm" />
         </div>
       </div>

@@ -1,5 +1,11 @@
 # Architecture
 
+## File group submission and compact controls — 23 November 2026 (local only)
+
+Exercise and file forms share SubmissionModeFields. File actions validate existing submission_mode/min/max fields and forward them through the inline exercise creator and group-aware submitSubmission finalizer. No new schema/RPC is required. The authenticated file reader resolves the caller's receipt through exerciseGroupResultSource before reading the canonical answer; group names are scoped to that assignment/source and grades come from the caller's own receipt. Published settings and group withdrawal are guarded on the server.
+
+The branch includes the local file-response prerequisite: only standalone file-work markers opt into versioned text/link/files responses; bank file_upload questions keep array responses. Save/finalize checks, legacy removal authorization and both review renderers use the compatible parser. Writable-answer access projects only the owning file assignment ID. Local fixture callbacks remain in memory. See GROUP_FILE_ASSIGNMENT_UI_LOCAL_20261123.md.
+
 ## แบบฝึกหัดงานกลุ่ม — 23 พฤศจิกายน 2026 (Production)
 
 CreateAssignmentForm ใช้โจทย์และเส้นทางสร้างเดิมสำหรับทั้งงานเดี่ยวและกลุ่ม งานกลุ่มใช้หนึ่ง attempt ต่อกลุ่ม นักเรียนเลือกสมาชิกตอนยืนยันส่ง ส่วน `claim_exercise_group_close` ตรวจผู้ส่ง กลุ่มเป้าหมาย สมาชิกในห้อง จำนวนคน และ revision ของคำตอบ แล้วจองสมาชิกและปิดคำตอบใน transaction เดียว การตรวจใช้ grader และ answer IDs ของตัวแทนทั้งสำหรับคะแนนอัตโนมัติและคะแนนที่ครูตรวจ
