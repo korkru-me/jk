@@ -64,7 +64,7 @@ export function AssignmentDetailClient({
   const router = useRouter()
 
   const statusMeta = STATUS_META[a.status]
-  const assignmentTypeLabel = isFileAssignment(a) ? 'งานส่งไฟล์' : a.type === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'
+  const assignmentTypeLabel = isFileAssignment(a) ? 'งานอัปโหลดไฟล์' : a.type === 'exam' ? 'ข้อสอบ' : 'แบบฝึกหัด'
   const editLabel = `แก้ไข${assignmentTypeLabel}`
   const pendingIdSet = new Set(pendingSubmissionIds)
   // Counted as hand-ins, not students — the same unit the classroom overview

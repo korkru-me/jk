@@ -99,7 +99,7 @@ export function AssignmentCreationMenu({
             <span>แบบฝึกหัด</span>
           </DropdownMenuItem>
           <DropdownMenuItem className="py-2" render={<Link href={`/assignments/files/new?classroom=${encodeURIComponent(classroomId)}`} onNavigate={() => navigate(`/assignments/files/new?classroom=${encodeURIComponent(classroomId)}`)} />}>
-            <FileUp aria-hidden="true" /><span>งานส่งไฟล์</span>
+            <FileUp aria-hidden="true" /><span>งานอัปโหลดไฟล์</span>
           </DropdownMenuItem>
           {practiceLibrary && (
             <DropdownMenuItem
