@@ -24,7 +24,7 @@ beforeAll(async () => {
       max_attempts integer,completion_rule text,show_results text,end_at timestamptz,duration_minutes integer);
     create table public.assignment_classrooms(assignment_id uuid,classroom_id uuid,group_ids uuid[]);
     create table public.submissions(id uuid primary key default gen_random_uuid(),
-      assignment_id uuid references public.assignments(id),student_id uuid,
+      assignment_id uuid references public.assignments(id),student_id uuid,org_id uuid not null,
       attempt_number integer not null default 1, started_at timestamptz not null default now(),
       submitted_at timestamptz,total_score numeric,score_adjustment numeric default 0,max_score numeric default 20,voided_max_score numeric default 0,
       status public.submission_status default 'in_progress',closed_at timestamptz,close_reason text,answer_revision bigint default 0,
@@ -35,6 +35,7 @@ beforeAll(async () => {
   const original = await readFile(new URL('../supabase/migrations/20261014072745_attempt_expiry_finalization.sql', import.meta.url), 'utf8')
   await db.exec(original.slice(original.indexOf('CREATE FUNCTION public.claim_submission_close'), original.indexOf('CREATE FUNCTION public.commit_submission_grade')))
   await db.exec(await readFile(migration, 'utf8'))
+  await db.exec(await readFile(new URL('../supabase/migrations/20261123013055_exercise_group_receipt_org.sql', import.meta.url), 'utf8'))
   for (const [userId, role] of [[owner, 'admin'], [student, 'student'], [peer, 'student'], [peer2, 'student'], [outsider, 'admin']]) {
     await db.query("insert into public.users values ($1,$2,'active')", [userId, role])
   }
@@ -42,7 +43,7 @@ beforeAll(async () => {
   for (const userId of [student, peer, peer2]) await db.query('insert into public.classroom_students values ($1,$2)', [room, userId])
   await db.query("insert into public.assignments(id,type,status,max_attempts,completion_rule,show_results,submission_mode,group_min_members,group_max_members) values ($1,'exercise','published',1,'fixed','immediate','group',3,5)", [assignment])
   await db.query('insert into public.assignment_classrooms values ($1,$2,null)', [assignment, room])
-  await db.query('insert into public.submissions(id,assignment_id,student_id) values ($1,$2,$3),($4,$2,$5)', [source, assignment, student, second, peer])
+  await db.query('insert into public.submissions(id,assignment_id,student_id,org_id) values ($1,$2,$3,$2),($4,$2,$5,$2)', [source, assignment, student, second, peer])
 }, 20_000)
 afterAll(async () => { await db.close() })
 
@@ -65,7 +66,7 @@ describe.sequential('one exercise answer set and shared score receipts', () => {
   it('excludes expired drafts without a team from automatic grading and keeps solo drafts eligible', async () => {
     const soloAssignment = id(701), soloSubmission = id(702)
     await db.query("insert into public.assignments(id,type,status,max_attempts,completion_rule,show_results) values ($1,'exercise','published',1,'fixed','immediate')", [soloAssignment])
-    await db.query('insert into public.submissions(id,assignment_id,student_id,closed_at) values ($1,$2,$3,now())', [soloSubmission, soloAssignment, student])
+    await db.query('insert into public.submissions(id,assignment_id,student_id,org_id,closed_at) values ($1,$2,$3,$2,now())', [soloSubmission, soloAssignment, student])
     await db.query('update public.submissions set closed_at=now() where id=$1', [source])
     const pending = (await db.query<{ id: string }>('select * from public.pending_exercise_submission_finalization(40)')).rows
     expect(pending.map(row => row.id)).toEqual([soloSubmission])
@@ -77,6 +78,7 @@ describe.sequential('one exercise answer set and shared score receipts', () => {
     const rows = (await db.query<{ id: string; group_source_submission_id: string | null }>('select id,group_source_submission_id from public.submissions where assignment_id=$1', [assignment])).rows
     expect(rows).toHaveLength(3)
     expect(rows.filter(row => row.group_source_submission_id === source)).toHaveLength(2)
+    expect((await db.query<{ org_id: string }>('select org_id from public.submissions where assignment_id=$1', [assignment])).rows.every(row => row.org_id === assignment)).toBe(true)
     expect(rows.find(row => row.id === second)?.group_source_submission_id).toBe(source)
     await expect(claim([student, peer2], 0, second, peer)).rejects.toThrow('GROUP_ACCESS')
   })
