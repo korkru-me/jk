@@ -11,6 +11,7 @@ import {
 import type { AttemptSolutionItem } from '@/lib/attempt-solutions'
 import { loadStudentSolutionWatermark } from '@/lib/solution-watermark-server'
 import type { SolutionWatermarkData } from '@/lib/solution-watermark'
+import { exerciseGroupResultSource } from '@/lib/exercise-group.server'
 
 export interface AttemptSolutions {
   items: AttemptSolutionItem[]
@@ -23,10 +24,10 @@ const LOAD_FAILED = 'โหลดเฉลยไม่สำเร็จ — ก
 
 /**
  * The เฉลยวิธีทำ behind the summary page's ดูเฉลยวิธีทำ button: every ข้อ of
- * one attempt, for the student who made it and nobody else.
+ * one attempt, for its verified owner or registered group members.
  *
- * Nothing the button's presence implies is trusted. The attempt is read with
- * an exact owner filter, and whether the เฉลย is open is decided again here
+ * Nothing the button's presence implies is trusted. Group membership is
+ * resolved before the exact source-owner filter; release is decided again here
  * from the database — so an attempt still being worked on elsewhere, a งาน
  * reopened by a later deadline, or a teacher who has just unticked the setting
  * all turn the request away, and a withheld เฉลย is never serialized at all.
@@ -42,12 +43,13 @@ export async function getAttemptSolutions(
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   if (typeof submissionId !== 'string' || !UUID.test(submissionId)) return { error: NOT_FOUND }
 
+  const source = await exerciseGroupResultSource(submissionId, user.id)
   const admin = createAdminClient()
   const { data: submission, error } = await admin
     .from('submissions')
     .select(`id, status, assignments(${SOLUTION_RELEASE_ASSIGNMENT_FIELDS})`)
-    .eq('id', submissionId)
-    .eq('student_id', user.id)
+    .eq('id', source.id)
+    .eq('student_id', source.ownerId)
     .maybeSingle()
   if (error) {
     console.error('[attempt-solutions] submission read failed:', error)
@@ -65,7 +67,7 @@ export async function getAttemptSolutions(
   if (release.state !== 'open') return { error: 'เฉลยวิธีทำของงานนี้ยังไม่เปิดให้ดู' }
 
   const [items, watermark] = await Promise.all([
-    loadAttemptSolutionItems(admin, submissionId),
+    loadAttemptSolutionItems(admin, source.id),
     loadStudentSolutionWatermark(admin, user.id),
   ])
   if (!items || !watermark) return { error: LOAD_FAILED }

@@ -291,7 +291,7 @@ export default async function SubmissionResultPage({
   const solutionsOpen = solutionRelease.state === 'open'
 
   const solutionWatermark = (canShowAnswers || solutionsOpen)
-    ? await loadStudentSolutionWatermark(admin, submission.student_id) : null
+    ? await loadStudentSolutionWatermark(admin, isOwnSubmission ? user.id : submission.student_id) : null
   const hasSolutionIdentity = solutionWatermark !== null
 
   const page = (
@@ -432,11 +432,21 @@ async function SubmissionAnswerDetails({
     .from('submission_answers')
     .select(`
       id, question_id, correct_answer, is_correct, max_score, option_order, order_index,
-      random_values, score, student_answer, work_images, carried_over, check_count,
-      student_work_artifacts(id, part_key, source_type, preview_path, updated_at)
+      random_values, score, student_answer, work_images, carried_over, check_count
     `)
     .eq('submission_id', submissionId)
     .order('order_index')
+
+  // The session read above enforces membership and the result-release time.
+  // Only artifacts of those exact visible answers may be signed; the artifact
+  // table's standalone owner policies and all write permissions stay unchanged.
+  const visibleAnswerIds = (answerRows ?? []).map(answer => answer.id)
+  const { data: artifactRows, error: artifactError } = visibleAnswerIds.length
+    ? await createAdminClient().from('student_work_artifacts')
+        .select('id, submission_answer_id, part_key, source_type, preview_path, updated_at')
+        .in('submission_answer_id', visibleAnswerIds)
+    : { data: [], error: null }
+  if (artifactError) throw new Error('โหลดวิธีทำของคำตอบไม่สำเร็จ กรุณาลองใหม่')
 
   // The โจทย์ behind those answers, read with the service role for exactly
   // the ids RLS just returned. A student may not read `questions` rows
@@ -454,7 +464,8 @@ async function SubmissionAnswerDetails({
   // Deleting a โจทย์ cascades to its answers, so a missing one is a row about
   // to disappear anyway.
   const sortedAnswers = (answerRows ?? [])
-    .map((row: any) => ({ ...row, questions: questionById.get(row.question_id) ?? null }))
+    .map((row: any) => ({ ...row, questions: questionById.get(row.question_id) ?? null,
+      student_work_artifacts: (artifactRows ?? []).filter(artifact => artifact.submission_answer_id === row.id) }))
     .filter((row: any) => row.questions !== null) as any[]
   const solutionIds = new Set(solutionAnswerIds)
   const artifactPreviewPaths = sortedAnswers.flatMap(answer => (

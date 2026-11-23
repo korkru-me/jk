@@ -3,6 +3,7 @@
 import { readFileSync, writeFileSync, existsSync, chmodSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
+import sharp from 'sharp'
 
 const ref = 'dyuxkrzeveknqgtuzpbh'
 const site = 'https://staging.korkru.com'
@@ -79,7 +80,7 @@ async function snapshot() {
 }
 async function verify() {
   const works = must(await admin.from('assignments').select('*').eq('created_by', actor('admin').id), 'Read synthetic work')
-  const group = works.find(w => w.submission_mode === 'group')
+  const group = works.find(w => w.submission_mode === 'group' && w.id !== state.reviewAssignmentId)
   check(group && group.type === 'exercise' && group.group_min_members === 3 && group.group_max_members === 5 && group.max_attempts === 1
     && group.completion_rule === 'fixed' && group.question_ids.length === 2, 'Group settings or bank provenance wrong')
   const rows = must(await admin.from('submissions').select('*').eq('assignment_id', group.id), 'Read shared scores')
@@ -100,6 +101,35 @@ async function verify() {
     await c.auth.signOut({ scope: 'local' })
   }
   note('All three independent members receive 18/20 and shared answers; nonmembers are denied')
+}
+async function reviewSetup() {
+  check(!state.reviewAssignmentId, 'Do not replace a review fixture')
+  const q = state.questions.find(q => q.type === 'written').id
+  must(await admin.from('questions').update({ solution_text: '<p>เฉลยจำลองของกลุ่ม: หนึ่งบวกหนึ่งเท่ากับสอง</p>' }).eq('id', q).eq('created_by', actor('admin').id), 'Set synthetic solution')
+  state.reviewAssignmentId = randomUUID(); save()
+  must(await admin.from('assignments').insert({ id: state.reviewAssignmentId, org_id: actor('admin').org, classroom_id: state.rooms[0].id,
+    created_by: actor('admin').id, title: 'ทดสอบวิธีทำและเฉลยร่วมของกลุ่ม', type: 'exercise', mode: 'online', status: 'published',
+    submission_mode: 'group', group_min_members: 3, group_max_members: 5, max_attempts: 1, completion_rule: 'fixed', score_strategy: 'latest',
+    question_ids: [q], question_points: { [q]: 10 }, require_work_image: false, duration_minutes: null, shuffle_questions: false,
+    shuffle_options: false, fullscreen_required: false, proctoring_enabled: false, secure_browser_mode: 'browser', android_exam_mode: 'blocked',
+    show_results: 'immediate', show_solutions: true, instant_check: false }), 'Create isolated shared-review fixture')
+  must(await admin.from('assignment_classrooms').insert({ assignment_id: state.reviewAssignmentId, classroom_id: state.rooms[0].id }), 'Attach review fixture')
+  console.log(JSON.stringify({ reviewAssignmentId: state.reviewAssignmentId }))
+  note('A separate group review fixture prepared without changing completed answers')
+}
+async function reviewArtifact() {
+  check(state.reviewAssignmentId && !state.uploads?.length, 'Review fixture missing or already enriched')
+  const submission = must(await admin.from('submissions').select('id,status,closed_at').eq('assignment_id', state.reviewAssignmentId).eq('student_id', actor('sender').id).single(), 'Read open review attempt')
+  check(submission.status === 'in_progress' && !submission.closed_at, 'Never modify completed student evidence')
+  const answer = must(await admin.from('submission_answers').select('id').eq('submission_id', submission.id).single(), 'Read exact review answer')
+  const preview = `students/${actor('sender').id}/${submission.id}/${answer.id}/${randomUUID()}/preview.webp`
+  const bytes = await sharp({ create: { width: 120, height: 60, channels: 4, background: '#a83ac3' } }).webp().toBuffer()
+  state.uploads = [preview]; save()
+  must(await admin.storage.from('math-work-artifacts').upload(preview, bytes, { contentType: 'image/webp', upsert: false }), 'Upload synthetic preview')
+  must(await admin.from('student_work_artifacts').insert({ org_id: actor('admin').org, student_id: actor('sender').id,
+    submission_answer_id: answer.id, part_key: 'answer', source_type: 'photo', preview_path: preview, preview_size_bytes: bytes.length,
+    scene_path: null, scene_size_bytes: null, element_count: null }), 'Attach synthetic evidence to open attempt')
+  note('Private synthetic preview attached while the attempt is open')
 }
 async function invalidGroups() {
   const works = must(await admin.from('assignments').select('id').eq('created_by', actor('admin').id).eq('submission_mode', 'group'), 'Read synthetic group work')
@@ -126,6 +156,7 @@ async function cleanup() {
     check(u?.email === row.email && u.user_metadata?.qa_run === state.run, 'Refuse cleanup outside synthetic run')
   }
   const assignments = must(await admin.from('assignments').select('id').eq('created_by', actor('admin').id), 'List disposable assignments')
+  if (state.uploads?.length && (await admin.storage.from('math-work-artifacts').remove(state.uploads)).error) failures.push('private previews')
   if (assignments.length && (await admin.from('assignments').delete().in('id', assignments.map(a => a.id)).eq('created_by', actor('admin').id)).error) failures.push('assignments')
   for (const room of state.rooms) if ((await admin.from('classrooms').delete().eq('id', room.id).eq('teacher_id', actor('admin').id)).error) failures.push('classrooms')
   for (const q of state.questions) if ((await admin.from('questions').delete().eq('id', q.id).eq('created_by', actor('admin').id)).error) failures.push('questions')
@@ -142,6 +173,8 @@ if (mode === 'setup') await setup()
 else if (mode === 'snapshot') await snapshot()
 else if (mode === 'verify') await verify()
 else if (mode === 'invalid') await invalidGroups()
+else if (mode === 'review-setup') await reviewSetup()
+else if (mode === 'review-artifact') await reviewArtifact()
 else if (mode === 'cleanup') await cleanup()
 else if (mode === 'info') console.log(JSON.stringify({ run: state.run, accounts: state.accounts.map(({ label, email }) => ({ label, email })), rooms: state.rooms }, null, 2))
 else throw Error('Use --mode=setup|snapshot|verify|cleanup|info')
