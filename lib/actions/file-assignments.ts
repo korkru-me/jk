@@ -95,7 +95,7 @@ export async function readFileAssignmentEditor(assignmentId: string) {
   const admin = createAdminClient()
   const { data: assignment } = await admin.from('assignments').select('id, title, description, question_ids, question_points, start_at, due_at, end_at, status')
     .eq('id', assignmentId).maybeSingle()
-  if (!assignment || !isFileAssignment(assignment) || assignment.question_ids.length !== 1) return { error: 'ไม่พบงานส่งไฟล์' } as const
+  if (!assignment || !isFileAssignment(assignment) || assignment.question_ids.length !== 1) return { error: 'ไม่พบงานอัปโหลดไฟล์' } as const
   const { data: question } = await admin.from('questions').select('id, question_text, extra_data').eq('id', assignment.question_ids[0]).maybeSingle()
   if (!question || fileAssignmentQuestionOwner(question.extra_data) !== assignment.id) return { error: 'คำสั่งไม่ตรงกับงานนี้' } as const
   const links = await admin.from('assignment_classrooms').select('classroom_id').eq('assignment_id', assignmentId)
@@ -169,7 +169,7 @@ async function ownFileAssignment(assignmentId: string) {
   if (!await studentHasAssignment(admin, assignmentId, user.id)) return { error: 'คุณไม่มีสิทธิ์เข้าถึงงานนี้' } as const
   const { data: assignment } = await admin.from('assignments').select('id, title, description, question_ids, classroom_id, status, start_at, due_at, end_at')
     .eq('id', assignmentId).neq('status', 'draft').maybeSingle()
-  if (!assignment || !isFileAssignment(assignment) || assignment.question_ids.length !== 1) return { error: 'ไม่พบงานส่งไฟล์' } as const
+  if (!assignment || !isFileAssignment(assignment) || assignment.question_ids.length !== 1) return { error: 'ไม่พบงานอัปโหลดไฟล์' } as const
   const { data: question } = await admin.from('questions').select('id, question_text, extra_data')
     .eq('id', assignment.question_ids[0]).maybeSingle()
   if (!question || fileAssignmentQuestionOwner(question.extra_data) !== assignment.id) return { error: 'คำสั่งไม่ตรงกับงานนี้' } as const

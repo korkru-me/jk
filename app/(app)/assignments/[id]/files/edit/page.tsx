@@ -5,7 +5,7 @@ import { readFileAssignmentEditor, updateFileAssignment } from '@/lib/actions/fi
 import { FileAssignmentForm } from '@/components/assignments/file-assignment-form'
 import { ClearPendingSidebar } from '@/components/layout/sidebar-context'
 
-export const metadata = { title: 'แก้ไขงานส่งไฟล์ — KorKru' }
+export const metadata = { title: 'แก้ไขงานอัปโหลดไฟล์ — KorKru' }
 
 export default async function EditFileAssignmentPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params

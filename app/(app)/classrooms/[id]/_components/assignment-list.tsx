@@ -25,7 +25,7 @@ export type { StudentAssignmentRow }
 type StatusFilterKey = 'all' | 'pending' | 'done'
 type TypeFilterKey = 'all' | 'exercise' | 'exam' | 'file'
 const TYPE_OPTIONS = [
-  { value: 'all', label: 'ทุกประเภท' }, { value: 'exercise', label: 'แบบฝึกหัด' }, { value: 'exam', label: 'ข้อสอบ' }, { value: 'file', label: 'งานส่งไฟล์' },
+  { value: 'all', label: 'ทุกประเภท' }, { value: 'exercise', label: 'แบบฝึกหัด' }, { value: 'exam', label: 'ข้อสอบ' }, { value: 'file', label: 'งานอัปโหลดไฟล์' },
 ] as const
 
 function dueInfo(endAt: string | null, now: number) {

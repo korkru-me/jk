@@ -8,7 +8,7 @@ import { AssignmentClassroomSidebar } from '../../new/_components/assignment-cla
 import { ClearPendingSidebar } from '@/components/layout/sidebar-context'
 import type { Classroom } from '@/lib/types'
 
-export const metadata = { title: 'มอบหมายงานส่งไฟล์ — KorKru' }
+export const metadata = { title: 'มอบหมายงานอัปโหลดไฟล์ — KorKru' }
 
 export default async function NewFileAssignmentPage({ searchParams }: { searchParams: Promise<{ classroom?: string; copy?: string }> }) {
   const { classroom, copy } = await searchParams

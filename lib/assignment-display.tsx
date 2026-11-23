@@ -14,7 +14,7 @@ export interface AssignmentTypeMeta {
 }
 
 export const WORK_TYPE_CFG: Record<WorkType, AssignmentTypeMeta> = {
-  file: { label: 'งานส่งไฟล์', bg: 'bg-work-exercise/10', text: 'text-work-exercise', icon: FileUp, variant: 'workExercise', toggle: 'text-work-exercise hover:bg-work-exercise/10 hover:text-work-exercise aria-pressed:bg-work-exercise aria-pressed:text-work-foreground' },
+  file: { label: 'งานอัปโหลดไฟล์', bg: 'bg-work-exercise/10', text: 'text-work-exercise', icon: FileUp, variant: 'workExercise', toggle: 'text-work-exercise hover:bg-work-exercise/10 hover:text-work-exercise aria-pressed:bg-work-exercise aria-pressed:text-work-foreground' },
   exercise: {
     label: 'แบบฝึกหัด',
     bg: 'bg-work-exercise/10',
