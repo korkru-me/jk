@@ -1,7 +1,7 @@
 import { normalizeAssignmentLateSchedule } from './late-submission'
 import type { SubmittedFile } from '@/lib/types'
 
-export const FILE_ASSIGNMENT_LABEL = 'งานส่งไฟล์'
+export const FILE_ASSIGNMENT_LABEL = 'งานอัปโหลดไฟล์'
 export const MAX_SUBMISSION_FILES = 10
 export interface FileAssignmentView {
   id: string

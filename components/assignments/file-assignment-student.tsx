@@ -60,7 +60,7 @@ export function FileAssignmentStudent({ view, localOnly = false, onStart, onSave
     {confirmation}
     <Link href={`/classrooms/${view.classroomId}?tab=assignments`} className="text-sm text-muted-foreground">← กลับห้องเรียน</Link>
     <Card padding="md"><div className="flex flex-wrap items-start justify-between gap-2">
-      <div className="min-w-0"><p className="flex items-center gap-1.5 text-xs font-medium text-primary"><FileUp className="size-4" />งานส่งไฟล์</p>
+      <div className="min-w-0"><p className="flex items-center gap-1.5 text-xs font-medium text-primary"><FileUp className="size-4" />งานอัปโหลดไฟล์</p>
         <h1 className="mt-1 text-xl font-bold">{view.title}</h1></div>
       <p className="text-sm font-medium">{graded ? `${view.submission!.score ?? 0} / ${view.maxScore}` : `${view.maxScore} คะแนน`}</p>
     </div>
