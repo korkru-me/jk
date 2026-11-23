@@ -1,6 +1,6 @@
 # Architecture
 
-## File group submission and compact controls — 23 November 2026 (local only)
+## File group submission and compact controls — 23 November 2026 (Production)
 
 Exercise and file forms share SubmissionModeFields. File actions validate existing submission_mode/min/max fields and forward them through the inline exercise creator and group-aware submitSubmission finalizer. No new schema/RPC is required. The authenticated file reader resolves the caller's receipt through exerciseGroupResultSource before reading the canonical answer; group names are scoped to that assignment/source and grades come from the caller's own receipt. Published settings and group withdrawal are guarded on the server.
 
