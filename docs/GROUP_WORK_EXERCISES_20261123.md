@@ -56,4 +56,3 @@ Primary ผ่าน TypeScript, token lint, production build แยก output �
 ไฟล์ภาพตรวจ local อยู่ /private/tmp/group-exercise-primary-final-create-desktop.png, /private/tmp/group-exercise-primary-final-create-mobile.png และ /private/tmp/group-exercise-primary-final-members-mobile.png ข้อมูลทั้งหมดเป็น fixture ไม่ใช่งานส่งจริง ปิด browser ทดสอบที่สร้างเองแล้ว ลบไฟล์คีย์ Staging ชั่วคราวหลังตรวจ cleanup ครบ เปิดหน้าแบบฝึกหัด Production ในบัญชี Admin ให้เจ้าของไว้
 
 ขอบเขต UAT รอบนี้: bank written/essay, คะแนนอัตโนมัติและครูตรวจ/แก้, สมาชิกสามบัญชี, ภาพวิธีทำส่วนตัว, เฉลย, isolation และ solo regression ไม่สร้างข้อมูลทดสอบ Production และไม่ใช่ UAT บนมือถือจริง
-
