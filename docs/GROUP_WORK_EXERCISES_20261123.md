@@ -43,4 +43,16 @@ Production candidate ผ่าน TypeScript, design-token lint, Webpack product
 
 Local Chrome ตรวจค่าเริ่มต้น solo ช่วงสมาชิกผิด เลือกโจทย์และ payload กลุ่ม หน้าส่งที่ 390px ไม่มีล้น Next.js MCP ไม่พบ config/session errors Preview แยกพอร์ต 3094 ส่วน primary localhost:3000 เคยคืนเฉพาะ patch นี้เพื่อรอ schema ต้อง sync รุ่นที่ปล่อยและตรวจ primary จริงหลัง Production ตามกฎ release
 
-ณ บันทึกนี้ Staging UAT ผ่านแล้วและล้างข้อมูลแล้ว Production ยังรอลงเฉพาะสอง migrations ใหม่ รวม PR #150 ตรวจ Ready deployment/โดเมนจริงแบบอ่านอย่างเดียว และทำ primary local parity ก่อนปิดงาน
+## Production release และ primary local parity
+
+ปล่อยผ่าน PR #150 แล้ว Application release commit `2248e556204a974629d11dbd709ab88a32bb43cd` และ deployment `dpl_52h9MthQLrnrbBXgTHu1oncv4Py2` อยู่สถานะ Ready ผูกทั้ง https://www.korkru.com และ https://korkru.com ตรวจด้วย Vercel deployment metadata และเปิดหน้าสร้างแบบฝึกหัดจริงแบบอ่านอย่างเดียว ครูใน Chrome เห็นตัวเลือกและช่วงสมาชิก บัญชี Admin เดิมของเจ้าของใน IAB เห็นห้องของตน ค่าเริ่มต้น solo และเปิด group 3–5 ได้ ไม่สร้างหรือส่งข้อมูลทดสอบบน Production
+
+Production มี 157 migration versions หลังเพิ่มสองรายการของงานนี้ รายการ SEB ที่รอทั้ง 12 versions ตรงกับก่อนปล่อยทุกตัวและยังไม่ถูกลง ไม่มีการแก้ไฟล์ migration เก่าหรือ repair history ตรวจ RLS เปิด ไม่มี browser table grant/privileged close RPC grant และ trigger คัดลอก org_id แล้ว Advisory ของตารางสมาชิกมีเพียง INFO ว่าไม่มี browser policy ซึ่งตั้งใจให้ service-only
+
+Primary checkout `/Users/korkusonmasaen/Korkru/korkru` branch `codex/student-classroom-cards` (HEAD เดิม `83245b7`) ให้บริการ `127.0.0.1:3000` ซิงก์เฉพาะ scope ของ release และเก็บงานค้างเดิม ไม่แตะ index ของ primary รวม conflict ข้อความงานอัปโหลดไฟล์โดยเก็บถ้อยคำ local และเพิ่มเฉพาะเงื่อนไขกลุ่ม เอกสารเพิ่มเฉพาะ section ของงานนี้ ตรวจ 176 modified tracked files นอก scope แล้ว hash เหมือนเดิม
+
+Primary ผ่าน TypeScript, token lint, production build แยก output และ 354 suites / 4,982 tests (มี tests ของ local เพิ่มจาก candidate) คืน tsconfig เดิมแบบ byte-for-byte หลัง build ไม่ลบหรือย้าย .next ที่ dev ใช้อยู่ ตรวจ UI จริงบน port 3000: solo เป็นค่าเริ่มต้น, group เปิด min/max 3–5, mobile 390px ไม่มี overflow, เลือกเพื่อนสองคนรวมเป็นสามคนและยืนยันได้, เมื่อครบห้าคนปิด checkbox คนอื่น React inspect ยืนยัน ExamClient รับ groupWork; Next.js MCP compilation issues, config errors และ session errors เป็นว่าง
+
+ไฟล์ภาพตรวจ local อยู่ /private/tmp/group-exercise-primary-final-create-desktop.png, /private/tmp/group-exercise-primary-final-create-mobile.png และ /private/tmp/group-exercise-primary-final-members-mobile.png ข้อมูลทั้งหมดเป็น fixture ไม่ใช่งานส่งจริง ปิด browser ทดสอบที่สร้างเองแล้ว ลบไฟล์คีย์ Staging ชั่วคราวหลังตรวจ cleanup ครบ เปิดหน้าแบบฝึกหัด Production ในบัญชี Admin ให้เจ้าของไว้
+
+ขอบเขต UAT รอบนี้: bank written/essay, คะแนนอัตโนมัติและครูตรวจ/แก้, สมาชิกสามบัญชี, ภาพวิธีทำส่วนตัว, เฉลย, isolation และ solo regression ไม่สร้างข้อมูลทดสอบ Production และไม่ใช่ UAT บนมือถือจริง

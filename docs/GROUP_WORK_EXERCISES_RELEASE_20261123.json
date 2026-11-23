@@ -1,0 +1,74 @@
+{
+  "date": "2026-11-23",
+  "application_release_commit": "2248e556204a974629d11dbd709ab88a32bb43cd",
+  "application_pr": 150,
+  "deployment_id": "dpl_52h9MthQLrnrbBXgTHu1oncv4Py2",
+  "deployment_state": "READY",
+  "canonical_domains": [
+    "https://www.korkru.com",
+    "https://korkru.com"
+  ],
+  "staging_commit": "900ae6f8231ebe8ed741e0b090fb33d3cdf770ee",
+  "migrations_applied": [
+    "20261122232814",
+    "20261123013055"
+  ],
+  "production_versions": 157,
+  "pending_seb_versions_unchanged": [
+    "20260922005743",
+    "20260923073215",
+    "20260923161000",
+    "20260923163333",
+    "20260923201848",
+    "20260924133500",
+    "20260924134000",
+    "20260924142500",
+    "20260924145500",
+    "20260927093000",
+    "20260927094000",
+    "20260927095000"
+  ],
+  "staging_uat": {
+    "admin_creation": true,
+    "bank_questions": 2,
+    "group_min": 3,
+    "group_max": 5,
+    "representative_submission": true,
+    "independent_member_scores": [
+      18,
+      18,
+      18
+    ],
+    "max_score": 20,
+    "member_result_correction_scores": [
+      19,
+      19,
+      19
+    ],
+    "shared_private_preview": true,
+    "shared_solution": true,
+    "nonmember_denied": true,
+    "solo_submission": true,
+    "synthetic_accounts_removed": 8,
+    "temporary_stage_keys_removed": true
+  },
+  "production_verification": "read-only teacher and Admin UI plus migration/privilege metadata",
+  "primary": {
+    "checkout": "/Users/korkusonmasaen/Korkru/korkru",
+    "branch": "codex/student-classroom-cards",
+    "preexisting_head": "83245b7",
+    "port": 3000,
+    "unrelated_modified_tracked_files_preserved": 176,
+    "typecheck": true,
+    "tokens": true,
+    "build": true,
+    "test_suites": 354,
+    "tests_passed": 4982,
+    "mobile_width": 390,
+    "document_width": 390,
+    "react_group_context_verified": true,
+    "next_config_errors": [],
+    "next_session_errors": [],
+    "next_compilation_issues": []
+  }
+}
