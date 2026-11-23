@@ -25,8 +25,12 @@ Staging migration history 170 versions และ Production 157 versions เท�
 
 ## Production และส่งต่อ
 
-Release branch codex/group-file-ui-release-20261123 แยกจาก master และนำเฉพาะ commit งานนี้มา ไม่ merge ทั้ง staging จึงไม่พางานอื่นหรือ 12 migration SEB ไปด้วย ขณะบันทึกนี้ Staging ผ่านแล้วและกำลังเตรียม Production ต้องตรวจ Ready deployment/aliases, เปิดฟอร์มจริงแบบอ่านอย่างเดียว และตรวจ actual primary localhost:3000 หลังปล่อยก่อนประกาศเสร็จ
+Release branch codex/group-file-ui-release-20261123 แยกจาก master และนำเฉพาะ commit งานนี้มา ไม่ merge ทั้ง staging จึงไม่พางานอื่นหรือ 12 migration SEB ไปด้วย PR #159 รวมเป็น Production app commit 5f765f04720151fbedfffaaed118c1932b5d4dd7; deployment dpl_3BHC9v9oVPN1bkw9GCKFvKue2ffS Ready และ alias https://www.korkru.com กับ https://korkru.com ชี้เวอร์ชันนี้แล้ว
 
-ต้องล้าง fixture identities/sessions, ห้อง, assignments, private prompts และ Storage objects ของ run นี้ พร้อมลบไฟล์คีย์/สถานะล็อกอินชั่วคราวหลังตรวจครบ ผล cleanup และเลข Production deployment จะเติมเมื่อยืนยันแล้ว
+เปิดหน้าสร้างงานไฟล์และแบบฝึกหัดจริงใน Chrome ด้วยบัญชี Admin เดิมของเจ้าของ ตรวจ default solo และเปิด group 3–5 ได้ ไม่กดมอบหมาย/บันทึกและไม่สร้างข้อมูลทดสอบ Production เก็บสองฟอร์มไว้ให้เจ้าของใช้ต่อ
+
+Primary process 33781 ให้บริการ 127.0.0.1:3000 จาก /Users/korkusonmasaen/Korkru/korkru ยังเป็น shared dirty branch codex/student-classroom-cards โค้ดฟอร์มและ dependencies ที่ปล่อยตรงกับ release อยู่แล้ว ตรวจหลัง Ready ผ่านทั้งแบบฝึกหัดและงานไฟล์ด้วย fixture บนพอร์ต 3000 จริง จอ 390px ไม่ล้นแนวนอน คืน viewport แล้ว เก็บ snapshot ของ 213 modified tracked files ก่อน sync เพื่อไม่ทับงานอื่น ผล Next compilation issues=[] และ runtime errors=[]
+
+ล้าง fixture identities/sessions ทั้ง 8 บัญชี, 8 workspaces, 2 ห้อง, 5 assignments, private prompts/โจทย์ และ Storage objects ครบ ตรวจ rows ทุกตารางที่ระบุเป็นศูนย์ และตรวจ storage.objects เฉพาะ namespace ของบัญชีรอบนี้เหลือ 0 ไฟล์ ไม่ล้างข้อมูลนอก run นี้ ไฟล์คีย์/สถานะล็อกอินชั่วคราวจะลบหลังปิด browser ทดสอบที่สร้างเอง เจ้าของเป็นผู้เปิดและปิดคืนสิทธิ์ file URLs เพราะ Chrome policy ไม่ให้เครื่องมือควบคุมหน้านั้น
 
 งานกลุ่มยังไม่เปิดถอนส่งหลังส่งแล้ว เพราะการเปิดเพียง receipt เดียวทำให้สถานะทั้งกลุ่มแยกกัน ต้องมี whole-group atomic reopen ก่อนจึงเปิดความสามารถนี้ได้ งานเดี่ยวคงเงื่อนไขเดิม

@@ -1,6 +1,6 @@
 # Brand, language และ UI rules
 
-## ตัวเลือกรูปแบบส่งงาน — 23 พฤศจิกายน 2026 (local)
+## ตัวเลือกรูปแบบส่งงาน — 23 พฤศจิกายน 2026 (Production)
 
 SubmissionModeFields ใช้ ToggleGroup variant="soft" size="sm" ร่วมกันในแบบฝึกหัดและงานไฟล์ ค่าเริ่มต้นงานเดี่ยว เลือกแล้วใช้ bg-primary/10, text-primary, border-primary/25 ไม่แสดงเครื่องหมายถูก ปุ่มคะแนนทุกข้อใช้ Button navigation เพื่อให้ม่วงอ่อนเท่ากัน ปุ่มแนบเอกสารครูเลือก compact เฉพาะหน้าสร้างงานไฟล์ ปุ่ม sm สูงตามสเกลปกติ 28px ต่อ rem ของแอป และขยายพื้นที่กดด้วย pseudo-element โดยไม่เพิ่มความสูงแถว
 
