@@ -1,5 +1,7 @@
 import 'server-only'
 
+import { isAuthRetryableFetchError } from '@supabase/supabase-js'
+import { AUTH_UNAVAILABLE_MESSAGE } from '@/lib/auth/profile-read'
 import type { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import {
@@ -284,7 +286,8 @@ export async function authenticatePracticeTeacher(supabase: SupabaseServerClient
   | { ok: true; userId: string }
   | { ok: false; error: string; unauthenticated?: boolean }
 > {
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (isAuthRetryableFetchError(authError)) return { ok: false, error: AUTH_UNAVAILABLE_MESSAGE }
   if (!user) return { ok: false, error: 'ไม่ได้เข้าสู่ระบบ', unauthenticated: true }
 
   const { data: profile, error } = await supabase
