@@ -2,7 +2,6 @@ import { withSubmissionReviewStatus } from '@/lib/classroom-score-review.server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getAuthUser } from '@/lib/auth/server'
-import { canManageAssignment } from '@/lib/auth/assignment-access'
 import { notFound, redirect } from 'next/navigation'
 import { Fragment, Suspense } from 'react'
 import { ExpiredAttemptStatus } from '@/components/exam/expired-attempt-status'
@@ -33,7 +32,7 @@ import {
   AttemptSolutionShortcut, AttemptSolutionsButton, AttemptSolutionsProvider,
 } from '@/components/student/attempt-solutions'
 import { isFileAssignment } from '@/lib/file-assignment'
-import { exerciseGroupResultSource } from '@/lib/exercise-group.server'
+import { exerciseGroupResultSource, exerciseGroupTeacherAnswerSource } from '@/lib/exercise-group.server'
 import { SolutionLockNotice } from '@/components/student/solution-lock-notice'
 
 // This page renders on the server, which runs in UTC on Vercel: a bare
@@ -81,6 +80,7 @@ export default async function SubmissionResultPage({
   const user = await getAuthUser()
   if (!user) redirect('/login')
   const { id, ownerId } = await exerciseGroupResultSource(requestedId, user.id)
+  let answerSubmissionId = id
   const admin = createAdminClient()
 
   // Student assignment rows are intentionally not readable directly because
@@ -121,16 +121,24 @@ export default async function SubmissionResultPage({
     const { data: teacherVisibleSubmission } = await admin
       .from('submissions')
       .select(`
-        id, assignment_id, student_id, status, closed_at, close_reason, missing_work_evidence, total_score, score_adjustment, max_score, voided_max_score, attempt_number, submitted_at, secure_browser_verified_at,
+        id, assignment_id, student_id, group_source_submission_id, status, closed_at, close_reason, missing_work_evidence, total_score, score_adjustment, max_score, voided_max_score, attempt_number, submitted_at, secure_browser_verified_at,
         users!submissions_student_id_fkey(full_name),
         assignments(title, show_results, end_at, passing_type, passing_value, type, status, max_attempts, score_strategy, retry_scope, classroom_id, display_max_score, secure_browser_mode),
         submission_answers(id, correct_answer, is_correct, max_score)
       `)
       .eq('id', id)
       .maybeSingle()
-    const mayRead = teacherVisibleSubmission != null
-      && await canManageAssignment(teacherVisibleSubmission.assignment_id, user.id)
-    submission = mayRead ? teacherVisibleSubmission : null
+    const sourceId = teacherVisibleSubmission
+      ? await exerciseGroupTeacherAnswerSource(teacherVisibleSubmission, user.id) : null
+    if (sourceId && teacherVisibleSubmission) {
+      answerSubmissionId = sourceId
+      const { data: sourceSummary, error: sourceError } = sourceId !== id
+        ? await admin.from('submission_answers').select('id, correct_answer, is_correct, max_score')
+            .eq('submission_id', sourceId)
+        : { data: teacherVisibleSubmission.submission_answers, error: null }
+      if (sourceError) throw new Error('โหลดคำตอบร่วมของกลุ่มไม่สำเร็จ กรุณาลองใหม่')
+      submission = { ...teacherVisibleSubmission, submission_answers: sourceSummary ?? [] }
+    }
   }
 
   if (!submission) notFound()
@@ -389,7 +397,7 @@ export default async function SubmissionResultPage({
           </Card>
         )}>
           <SubmissionAnswerDetails
-            submissionId={id}
+            submissionId={answerSubmissionId}
             isTeacherViewer={isTeacherViewer}
             solutionAnswerIds={solutionsOpen ? solutionAnswerIds : []}
           />
