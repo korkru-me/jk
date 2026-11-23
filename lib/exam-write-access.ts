@@ -10,6 +10,7 @@ type Relation<T> = T | T[] | null
 export interface WritableExamQuestion {
   question_type: string
   answer_parts: unknown[] | null
+  file_assignment_id: string | null
 }
 
 export interface WritableExamAssignment {
@@ -81,7 +82,7 @@ export async function getWritableStudentAnswer(
     .from('submission_answers')
     .select(`
       id, submission_id, student_answer, work_images, carried_over, check_count, random_values,
-      questions(question_type, answer_parts),
+      questions(question_type, answer_parts, file_assignment_id:extra_data->>file_assignment_id),
       submissions(
         id, student_id, status, closed_at, started_at, assignment_id, ${includeRevision ? 'seb_config_revision, ' : ''}exam_access_mode,
         current_streak, best_streak, streak_reached,

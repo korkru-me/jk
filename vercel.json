@@ -3,7 +3,8 @@
   "regions": ["sin1"],
   "git": {
     "deploymentEnabled": {
-      "exam-uat-evidence": false
+      "exam-uat-evidence": false,
+      "codex/group-file-ui-local-20261123": false
     }
   },
   "crons": [
