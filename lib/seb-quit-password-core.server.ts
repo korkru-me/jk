@@ -202,7 +202,7 @@ function assertOwnerMayRotate(
   context: SebQuitPasswordOwnerContext,
 ): void {
   if (
-    context.actor.role !== 'teacher'
+    !['teacher', 'admin'].includes(context.actor.role)
     || context.actor.status !== 'active'
     || context.assignment.createdBy !== context.actor.id
     || !context.memberOrgIds.includes(context.assignment.orgId)

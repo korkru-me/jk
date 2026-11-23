@@ -23,9 +23,13 @@ const questions: AssignmentQuestionOption[] = [1, 2, 3].map(i => ({
 export function AssignmentCreationLabClient({ contextual, type }: { contextual: boolean; type: AssignmentType }) {
   const [receivedAssignment, setReceivedAssignment] = useState('')
   const actions = useMemo<NonNullable<ComponentProps<typeof CreateAssignmentForm>['actions']>>(() => ({
+    async getQuestionCardData() {
+      return { details: {}, duplicateCounts: {}, subQuestionCounts: {}, setMemberships: {}, solutionPresence: {} }
+    },
     async createAssignment(data) {
       const pointValues = Object.values(data.question_points ?? {}).join(',') || 'ไม่มี'
-      setReceivedAssignment(`${data.title} · ${data.classroom_ids?.length ?? 0} ห้อง · ${data.random_question_count ?? 'ทุก'} ข้อ · คะแนนรายข้อ: ${pointValues} · จำนวนครั้ง: ${data.max_attempts ?? 'ไม่จำกัด'} · คะแนน: ${data.score_strategy} · จบ: ${data.completion_rule} · เกณฑ์: ${data.passing_value ?? 'ไม่มี'}`)
+      const group = data.submission_mode === 'group' ? `งานกลุ่ม ${data.group_min_members}–${data.group_max_members} คน` : 'งานเดี่ยว'
+      setReceivedAssignment(`${data.title} · ${group} · ${data.classroom_ids?.length ?? 0} ห้อง · ${data.random_question_count ?? 'ทุก'} ข้อ · คะแนนรายข้อ: ${pointValues} · จำนวนครั้ง: ${data.max_attempts ?? 'ไม่จำกัด'} · คะแนน: ${data.score_strategy} · จบ: ${data.completion_rule} · เกณฑ์: ${data.passing_value ?? 'ไม่มี'}`)
       return { error: '(ห้องทดลอง) รับข้อมูลแล้ว ไม่มีการบันทึกฐานข้อมูล' }
     },
     async getQuestionPreviewDetails(ids) {

@@ -7,6 +7,7 @@ export type GradingReviewStatus = 'void' | 'teacher' | 'pending' | 'automatic'
 export type GradingScoreSource = 'automatic' | 'teacher' | 'none'
 export interface GradingStudent {
   id: string
+  groupMembers?: string[]
   name: string
   gradeLevel: string | null
   sectionNumber: number | null

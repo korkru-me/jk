@@ -1,5 +1,11 @@
 # Data model และ invariants
 
+## แบบฝึกหัดร่วมกันเป็นกลุ่ม — 23 พฤศจิกายน 2026 (local)
+
+`assignments.submission_mode` เริ่มต้นเป็น `solo` งานกลุ่มมี `group_min_members` และ `group_max_members` และส่งหนึ่งครั้ง `exercise_group_members` ผูกนักเรียนกับ assignment และ submission ของตัวแทน คีย์หลัก assignment+student ป้องกันการอยู่หลายกลุ่มในงานเดียว
+
+คำตอบอยู่ใน submission ของตัวแทนชุดเดียว สมาชิกคนอื่นมี header สำหรับแสดงผลที่ชี้ด้วย `group_source_submission_id` Trigger ซิงก์สถานะ คะแนน คะแนนปรับ และคะแนนเต็มหลังโมฆะจากต้นทาง การแก้ header ของสมาชิกคงค่าจากต้นทางไว้ จึงใช้ตารางคะแนน การแจ้งเตือน และประวัติงานเดิมได้โดยใช้แหล่งคะแนนร่วมกัน
+
 ## รูปประกอบข้อความถูก–ผิด — 20 พฤศจิกายน 2026 (release candidate)
 
 `questions.extra_data.statements[].image_urls?: string[]` เป็นรูปของข้อความย่อยแต่ละข้อ ข้อหลักยังใช้ `questions.image_urls` เดิม ข้อมูลเก่าไม่มี field นี้ยังทำงานเหมือนเดิม ไม่มี migration; safe exam DTO ส่งเฉพาะ id/text/image_urls โดยตัด correct_answer ออก

@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic'
 export default async function ExamScreenLabPage({
   searchParams,
 }: {
-  searchParams: Promise<{ perPage?: string | string[]; streak?: string | string[]; at?: string | string[]; timed?: string | string[]; type?: string | string[]; shell?: string | string[]; watermark?: string | string[]; random?: string; fullscreen?: string }>
+  searchParams: Promise<{ perPage?: string | string[]; streak?: string | string[]; at?: string | string[]; timed?: string | string[]; type?: string | string[]; shell?: string | string[]; watermark?: string | string[]; random?: string; group?: string; fullscreen?: string }>
 }) {
   if (!isExamScreenLabEnabled(process.env)) notFound()
 
@@ -53,9 +53,15 @@ export default async function ExamScreenLabPage({
       assignmentType={params.type === 'exercise' ? 'exercise' : 'exam'}
       shell={params.shell === '1'}
       optionalWatermark={params.watermark !== 'off'}
-      requireWorkImage={params.random !== '1'}
-      // ?fullscreen=1 turns the teacher's บังคับเต็มจอ on, so a tablet can be
-      // checked for whether it can still type an answer under it.
+      requireWorkImage={params.group === '1' ? false : params.random !== '1'}
+      groupWork={params.group === '1' ? { min: 3, max: 5, rooms: [{
+        id: '00000000-0000-4000-8000-000000000001', name: 'ห้องตัวอย่าง',
+        students: Array.from({ length: 6 }, (_, index) => ({
+          id: `00000000-0000-4000-8000-${String(index + 10).padStart(12, '0')}`,
+          name: `เพื่อนตัวอย่าง ${index + 1}`,
+        })),
+      }] } : undefined}
+      // ?fullscreen=1 checks the enforced full-screen experience on a tablet.
       fullscreenEnforced={params.fullscreen === '1'}
     />
   )

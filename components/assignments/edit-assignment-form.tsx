@@ -87,6 +87,9 @@ interface Props {
 export type EditableAssignment = Pick<
   Assignment,
   | 'id'
+  | 'submission_mode'
+  | 'group_min_members'
+  | 'group_max_members'
   | 'org_id'
   | 'created_by'
   | 'status'
@@ -288,7 +291,7 @@ export function EditAssignmentForm({
   // anyone starts — otherwise two students' results measure different things.
   // The ceiling and pool recycling stay editable: relaxing either does not
   // change what "ผ่าน" means. The server refuses the locked pair as well.
-  const canEditCompletion = !hasSubmissions
+  const canEditCompletion = !hasSubmissions && a.submission_mode !== 'group'
   const completionChoice: 'complete' | 'threshold' | 'streak' =
     streakOn ? 'streak' : (passingEnabled ? 'threshold' : 'complete')
 
@@ -730,7 +733,7 @@ export function EditAssignmentForm({
         <div>
             <h2 className="text-sm font-semibold text-foreground">{completionSectionLabel}</h2>
             <p className="text-xs text-muted-foreground">
-              {canEditCompletion
+              {a.submission_mode === 'group' ? `งานกลุ่ม ${a.group_min_members}–${a.group_max_members} คน ตัวแทนส่งหนึ่งครั้ง คะแนนใช้ร่วมกันทุกคน` : canEditCompletion
                 ? 'นักเรียนทำถึงตรงไหนถือว่าเสร็จ และครูวัดว่าผ่านจากอะไร'
                 : 'ล็อกแล้วเพราะมีนักเรียนเริ่มทำ — เปลี่ยนตอนนี้จะทำให้ผลของคนที่ทำไปแล้วเทียบกับคนที่ทำทีหลังไม่ได้'}
             </p>
@@ -1161,7 +1164,7 @@ export function EditAssignmentForm({
             onEndAtChange={setEndAt}
             onBandsChange={setLateBands}
           />
-          {a.mode === 'online' && (
+          {a.mode === 'online' && a.submission_mode !== 'group' && (
             <AssignmentDurationField id="edit-duration" value={durationMinutes} onChange={setDurationMinutes} />
           )}
         </div>

@@ -5,6 +5,7 @@ import { ShellClient } from '@/components/layout/shell-client'
 import { buildSolutionWatermark } from '@/lib/solution-watermark'
 import { useAppViewport } from '@/hooks/use-app-viewport'
 import type { ExamScreenQaFixture } from '../_lib/fixture'
+import type { ExerciseGroupContext } from '@/lib/exercise-group'
 
 export function ExamScreenLabClient({
   fixture,
@@ -18,6 +19,7 @@ export function ExamScreenLabClient({
   optionalWatermark = true,
   requireWorkImage = true,
   fullscreenEnforced = false,
+  groupWork,
 }: {
   fixture: ExamScreenQaFixture
   submissionId: string
@@ -29,6 +31,7 @@ export function ExamScreenLabClient({
   optionalWatermark?: boolean
   requireWorkImage?: boolean
   fullscreenEnforced?: boolean
+  groupWork?: ExerciseGroupContext
   /** Opt-in via ?streak=1, so the default lab screen is unchanged. Lets the
    *  "ถูกติดต่อกัน" chrome be looked at on a real device without a teacher
    *  login or a live attempt behind it. */
@@ -45,6 +48,7 @@ export function ExamScreenLabClient({
 
   const exam = (
     <ExamClient
+      groupWork={groupWork}
       classroomCover="sky"
       assignmentTitle="กลศาสตร์ 2"
       submissionId={submissionId}
@@ -61,7 +65,7 @@ export function ExamScreenLabClient({
         watermarkText: optionalWatermark ? 'ข้อมูลจำลอง • DEVICE QA' : null,
         solutionWatermark: buildSolutionWatermark({ full_name: 'เด็กชายทดสอบ เรียนรู้ (ข้อมูลจำลอง)', prefix: 'เด็กชาย', first_name: null, last_name: null }, { student_code: '00007', grade_level: 'ม.4', section_number: 1, class_number: 7 }, startedAt),
         isWorkImageEnforced: requireWorkImage,
-        instantCheck: true,
+        instantCheck: !groupWork,
         instantCheckAnswerKey: true,
         // The preview's result screen then offers "ดูข้อสอบที่ทำเสร็จแล้ว".
         examReview: assignmentType === 'exam',

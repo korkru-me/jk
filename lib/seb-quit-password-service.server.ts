@@ -196,7 +196,7 @@ export async function readSebQuitPasswordSetupState(
       blockedReason: 'owner_only',
     })
   }
-  if (context.actor.role !== 'teacher' || context.actor.status !== 'active') {
+  if (!['teacher', 'admin'].includes(context.actor.role) || context.actor.status !== 'active') {
     return Object.freeze({ currentRevision: context.currentRevision, configuredAt, releaseRevision, artifactStatus: safeArtifactStatus, canManage: false, blockedReason: 'inactive_owner' })
   }
   if (
