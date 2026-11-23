@@ -1,5 +1,6 @@
 'use client'
 
+import { SubmissionModeFields } from './submission-mode-fields'
 import { WorkTypeIcon } from '@/components/assignments/work-type'
 import { workTypeConfig } from '@/lib/assignment-display'
 import { useEffect, useId, useMemo, useRef, useState, useTransition } from 'react'
@@ -1101,31 +1102,8 @@ export function CreateAssignmentForm({
         <div className="space-y-3">
           <Card padding="md" className="space-y-3">
             <h2 className="text-sm font-semibold text-foreground">ข้อมูลพื้นฐาน</h2>
-            {assignmentType === 'exercise' && <FieldGroup className="gap-2">
-              <Field className="gap-1.5">
-                <FieldLabel>รูปแบบการส่งงาน</FieldLabel>
-                <ToggleGroup aria-label="รูปแบบการส่งงาน" variant="outline" value={[submissionMode]} onValueChange={values => {
-                  if (values[0] === 'solo' || values[0] === 'group') setSubmissionMode(values[0])
-                }}>
-                  <ToggleGroupItem value="solo" className="min-h-11">{submissionMode === 'solo' && <Check data-icon="inline-start" />}งานเดี่ยว</ToggleGroupItem>
-                  <ToggleGroupItem value="group" className="min-h-11">{submissionMode === 'group' && <Check data-icon="inline-start" />}งานกลุ่ม</ToggleGroupItem>
-                </ToggleGroup>
-              </Field>
-              {groupWork && <>
-                <div className="grid grid-cols-2 gap-3">
-                  <Field data-invalid={!groupRangeValid} className="gap-1.5">
-                    <FieldLabel htmlFor="exercise-group-min">สมาชิกอย่างน้อย</FieldLabel>
-                    <Input id="exercise-group-min" type="number" min={2} max={300} step={1} value={minMembers} onChange={event => setMinMembers(event.target.value)} aria-invalid={!groupRangeValid} />
-                  </Field>
-                  <Field data-invalid={!groupRangeValid} className="gap-1.5">
-                    <FieldLabel htmlFor="exercise-group-max">สมาชิกไม่เกิน</FieldLabel>
-                    <Input id="exercise-group-max" type="number" min={Number(minMembers) || 2} max={300} step={1} value={maxMembers} onChange={event => setMaxMembers(event.target.value)} aria-invalid={!groupRangeValid} />
-                  </Field>
-                </div>
-                <FieldDescription>นับรวมผู้ส่ง ตัวแทนตอบโจทย์และเลือกเพื่อนในห้องตอนส่ง สมาชิกทุกคนได้คะแนนเท่ากัน</FieldDescription>
-                {!groupRangeValid && <FieldError>จำนวนสมาชิกต้องเป็นจำนวนเต็มตั้งแต่ 2–300 คน และขั้นต่ำต้องไม่เกินจำนวนสูงสุด</FieldError>}
-              </>}
-            </FieldGroup>}
+            {assignmentType === 'exercise' && <SubmissionModeFields mode={submissionMode} min={minMembers} max={maxMembers}
+              onModeChange={setSubmissionMode} onMinChange={setMinMembers} onMaxChange={setMaxMembers} />}
 
             {copySource && (
               <div className="flex items-center gap-2 rounded-xl bg-primary/10 px-3 py-2.5 text-sm text-primary">
@@ -1285,24 +1263,22 @@ export function CreateAssignmentForm({
             <div role="group" aria-label="ปรับคะแนนทุกข้อ" className="flex flex-wrap gap-2">
               <Button
                 type="button"
-                variant={!randomDrawOn && questionPointsPreset === 'one' ? 'default' : 'outline'}
+                variant={!randomDrawOn && questionPointsPreset === 'one' ? 'navigation' : 'outline'}
                 size="sm"
                 aria-pressed={!randomDrawOn && questionPointsPreset === 'one'}
                 disabled={previewQuestions.length === 0 || randomDrawOn}
                 onClick={() => setAllQuestionPoints('one', () => 1)}
               >
-                {!randomDrawOn && questionPointsPreset === 'one' && <Check data-icon="inline-start" />}
                 ทุกข้อ 1 คะแนน
               </Button>
               <Button
                 type="button"
-                variant={!randomDrawOn && questionPointsPreset === 'parts' ? 'default' : 'outline'}
+                variant={!randomDrawOn && questionPointsPreset === 'parts' ? 'navigation' : 'outline'}
                 size="sm"
                 aria-pressed={!randomDrawOn && questionPointsPreset === 'parts'}
                 disabled={previewQuestions.length === 0 || randomDrawOn}
                 onClick={() => setAllQuestionPoints('parts', question => question.default_points)}
               >
-                {!randomDrawOn && questionPointsPreset === 'parts' && <Check data-icon="inline-start" />}
                 คะแนนตามข้อย่อย
               </Button>
               <span role="status" aria-live="polite" className="sr-only">
