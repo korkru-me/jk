@@ -6,7 +6,8 @@ import { CompleteProfileForm } from '@/components/auth/complete-profile-form'
 import { BrandLogo } from '@/components/brand-logo'
 import { Card } from '@/components/ui/card'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/auth/server'
+import { isProfileRowMissing, PROFILE_READ_FAILED_MESSAGE } from '@/lib/auth/profile-read'
 import type { AccountRole } from '@/lib/auth/validation'
 
 export const metadata: Metadata = { title: 'ตั้งค่าบัญชี — KorKru' }
@@ -16,17 +17,17 @@ type Props = {
 }
 
 export default async function CompleteProfilePage({ searchParams }: Props) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser()
   if (!user) redirect('/login')
 
   const admin = createAdminClient()
-  const { data: profile } = await admin
+  const { data: profile, error: profileError } = await admin
     .from('users')
     .select('full_name, role, survey_role')
     .eq('id', user.id)
     .maybeSingle()
 
+  if (!profile && !isProfileRowMissing(profileError)) throw new Error(PROFILE_READ_FAILED_MESSAGE)
   if (!profile) redirect('/login')
   if (profile.role === 'admin' || profile.survey_role) redirect('/dashboard')
 

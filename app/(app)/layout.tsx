@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { ShellClient, type ShellUser } from '@/components/layout/shell-client'
 import { getAuthUser } from '@/lib/auth/server'
+import { isProfileRowMissing, PROFILE_READ_FAILED_MESSAGE } from '@/lib/auth/profile-read'
 import { getUnreadNotificationCount } from '@/lib/actions/notifications'
 import { isPracticeLibraryEnabled } from '@/lib/practice-question'
 import { isAnnouncementAcknowledgementEnabled } from '@/lib/classroom-announcement-acknowledgements'
@@ -29,6 +30,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const profile = profileRes.data
 
   if (!profile) {
+    if (!isProfileRowMissing(profileRes.error)) throw new Error(PROFILE_READ_FAILED_MESSAGE)
     // Auto-create profile if missing (orphaned auth user)
     const meta = authUser.user_metadata
     const role = meta?.role === 'teacher' ? 'teacher' : 'student'
@@ -48,11 +50,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       p_user_id: authUser.id,
       p_display_name: fullName,
     })
-    const { data: newProfile } = await admin
+    const { data: newProfile, error: newProfileError } = await admin
       .from('users')
       .select('id, email, full_name, role, survey_role')
       .eq('id', authUser.id)
       .single()
+    if (!newProfile && !isProfileRowMissing(newProfileError)) throw new Error(PROFILE_READ_FAILED_MESSAGE)
     if (!newProfile) redirect('/login')
     if (newProfile.role !== 'admin' && !newProfile.survey_role) redirect('/complete-profile')
     return (

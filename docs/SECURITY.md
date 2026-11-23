@@ -4,6 +4,10 @@
 
 งานกลุ่มตรวจ active teacher/admin พร้อมสิทธิ์เจ้าของห้องหรือผู้ช่วยสอน admin/manage ก่อนอ่านหรือจัดการ กลุ่มของแบบฝึกหัดจองสมาชิกผ่าน service-only RPC หลังตรวจ session และเจ้าของ attempt โดยตรวจห้องเดียวกัน ผู้ได้รับมอบหมาย จำนวนคน และ revision ใน transaction ที่ freeze คำตอบ ตารางสมาชิกเปิด RLS และเพิกถอน browser grants สมาชิกอ่านคำตอบต้นทางตามเวลาแสดงผลเดิม ส่วนการเข้าถึงผลใน server ต้องผ่าน header ของตนเองหรือสมาชิกกลุ่มที่ตรงกับ assignment
 
+## Backend failure handling — 23 November 2026 (candidate)
+
+Retryable Auth failures and failed profile reads now fail closed through an error state instead of being treated as signed-out or missing-profile states. Profile auto-creation requires a confirmed zero-row result. Timeouts cover only Data API GET/HEAD and Auth user reads; writes, RPCs, refresh-token rotation and Storage are not abandoned by this layer. SEB-required attempts still reject access when the revision column is unavailable. No RLS, grant, migration or authorization rule changed. See [DB_INCIDENT_720_USERS_20261123.md](DB_INCIDENT_720_USERS_20261123.md).
+
 ## Auth burst handling — 22 November 2026 (Staging only)
 
 The cookie-bound Supabase server/browser clients and session-refresh proxy retry only explicit HTTP 429 rejections

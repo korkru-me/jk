@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { ArrowRight, BookOpenCheck, Plus } from 'lucide-react'
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/auth/server'
 import { isPracticeLibraryEnabled } from '@/lib/practice-question'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -38,7 +39,7 @@ export default async function PracticeLandingPage() {
   if (!isPracticeLibraryEnabled(process.env)) notFound()
 
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser()
   if (!user) redirect('/login')
   const { data: profile, error: profileError } = await supabase
     .from('users')

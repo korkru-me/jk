@@ -7,7 +7,7 @@ import { GroupWorkTeacher } from '@/components/group-work/teacher-review'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/auth/server'
 import { readGroupWork } from '@/lib/actions/classroom-group-work'
 import { formatGroupWorkTime, groupWorkHref } from '@/lib/classroom-group-work'
 
@@ -18,8 +18,7 @@ export default async function ClassroomGroupWorkPage({ params, searchParams }: {
   searchParams: Promise<{ work?: string }>
 }) {
   const [{ id }, query] = await Promise.all([params, searchParams])
-  const client = await createClient()
-  const { data: { user } } = await client.auth.getUser()
+  const user = await getAuthUser()
   if (!user) redirect('/login')
   const result = await readGroupWork(id, query.work)
   if ('notFound' in result) notFound()

@@ -5,6 +5,7 @@ import sharp from 'sharp'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { getExamAccessSession } from '@/lib/exam-access-session'
+import { readWithSubmissionRevision } from '@/lib/submission-revision-compatibility'
 import {
   buildStudentWorkUploadPaths,
   buildTeachingBoardUploadPaths,
@@ -68,6 +69,43 @@ interface StoredWorkInspection {
   elementCount: number | null
 }
 
+interface StudentArtifactAssignmentRow {
+  id: string
+  org_id: string
+  mode: string | null
+  duration_minutes: number | null
+  end_at: string | null
+  require_work_image: boolean | null
+  scratchpad_enabled: boolean | null
+  secure_browser_mode: string | null
+  android_exam_mode: string | null
+}
+
+interface StudentArtifactSubmissionRow {
+  id: string
+  org_id: string
+  student_id: string
+  status: string
+  started_at: string
+  assignment_id: string
+  seb_config_revision?: number | null
+  exam_access_mode: string | null
+  assignments: StudentArtifactAssignmentRow | StudentArtifactAssignmentRow[] | null
+}
+
+interface StudentArtifactQuestionRow {
+  question_type: string | null
+  answer_parts: unknown
+}
+
+interface StudentArtifactAnswerRow {
+  id: string
+  org_id: string
+  submission_id: string
+  questions: StudentArtifactQuestionRow | StudentArtifactQuestionRow[] | null
+  submissions: StudentArtifactSubmissionRow | StudentArtifactSubmissionRow[] | null
+}
+
 type SceneValidator = (value: unknown) => DrawingSceneValidationResult
 
 const QUESTION_IMAGE_BUCKET = 'question-images'
@@ -113,13 +151,13 @@ async function loadWritableStudentArtifactContext(
   studentId: string,
   sourceType: WorkArtifactSource,
 ): Promise<{ context: StudentArtifactContext } | { error: string }> {
-  const { data: answer, error } = await admin
+  const { data: answer, error, revisionColumnAvailable } = await readWithSubmissionRevision<StudentArtifactAnswerRow>(includeRevision => admin
     .from('submission_answers')
     .select(`
       id, org_id, submission_id,
       questions(question_type, answer_parts),
       submissions(
-        id, org_id, student_id, status, started_at, assignment_id, seb_config_revision, exam_access_mode,
+        id, org_id, student_id, status, started_at, assignment_id, ${includeRevision ? 'seb_config_revision, ' : ''}exam_access_mode,
         assignments(
           id, org_id, mode, duration_minutes, end_at, require_work_image,
           scratchpad_enabled, secure_browser_mode, android_exam_mode
@@ -127,7 +165,7 @@ async function loadWritableStudentArtifactContext(
       )
     `)
     .eq('id', submissionAnswerId)
-    .maybeSingle()
+    .maybeSingle())
 
   if (error) return { error: 'ตรวจสอบสิทธิ์แนบวิธีทำไม่สำเร็จ กรุณาลองใหม่' }
   if (!answer) return { error: 'ไม่พบคำตอบ' }
@@ -142,6 +180,9 @@ async function loadWritableStudentArtifactContext(
   }
   if (submission.status !== 'in_progress') return { error: 'ส่งงานแล้ว จึงแก้ไขวิธีทำไม่ได้' }
   if (assignment.mode !== 'online') return { error: 'งานแบบพิมพ์ไม่รองรับการแนบวิธีทำออนไลน์' }
+  if (assignment.secure_browser_mode === 'seb_required' && !revisionColumnAvailable) {
+    return { error: 'ข้อสอบนี้ยังไม่พร้อมให้เข้า กรุณาแจ้งครูผู้สอน' }
+  }
 
   if (assignment.duration_minutes) {
     const deadline = new Date(submission.started_at).getTime() + assignment.duration_minutes * 60_000

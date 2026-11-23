@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { cookies } from 'next/headers'
 import { issueRecoveryGrant } from '@/lib/auth/recovery-grant.server'
 import { consumeRecoveryIntent, hasRecoveryIntentNonce } from '@/lib/auth/recovery-intent.server'
+import { isProfileRowMissing } from '@/lib/auth/profile-read'
 
 function recoveryRedirect(origin: string) {
   const response = NextResponse.redirect(`${origin}/reset-password`)
@@ -83,14 +84,14 @@ export async function GET(request: NextRequest) {
 
   // Ensure profile row exists (first Google login creates it)
   const admin = createAdminClient()
-  const { data: existing } = await admin
+  const { data: existing, error: existingError } = await admin
     .from('users')
     .select('id, role, survey_role, full_name')
     .eq('id', data.user.id)
     .maybeSingle()
 
   let profile = existing
-  if (!existing) {
+  if (!existing && isProfileRowMissing(existingError)) {
     const meta = data.user.user_metadata
     const fullName = meta?.full_name ?? meta?.name ?? data.user.email?.split('@')[0] ?? 'ผู้ใช้ KorKru'
     const { data: created } = await admin.from('users').insert({

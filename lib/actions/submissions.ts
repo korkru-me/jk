@@ -2,6 +2,8 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { isAuthRetryableFetchError } from '@supabase/supabase-js'
+import { AUTH_UNAVAILABLE_MESSAGE } from '@/lib/auth/profile-read'
 import { canManageAssignment, studentHasAssignment } from '@/lib/auth/assignment-access'
 import { revalidatePath } from 'next/cache'
 import { gradeAndFinalizeSubmission } from '@/lib/submission-finalization.server'
@@ -107,7 +109,8 @@ async function submissionEntry(
   waiting?: { readOnlyWaiting: true } | { previousSubmissionId: string | null; operation: 'start' | 'resume' | 'recover' },
 ) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (isAuthRetryableFetchError(authError)) return { error: AUTH_UNAVAILABLE_MESSAGE }
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ', unauthenticated: true }
   const admin = createAdminClient()
 

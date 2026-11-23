@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getAuthUser } from '@/lib/auth/server'
+import { isProfileRowMissing, PROFILE_READ_FAILED_MESSAGE } from '@/lib/auth/profile-read'
 import type { User } from '@/lib/types'
 import {
   TeacherDashboard, type DashboardClassroom,
@@ -37,12 +38,13 @@ export default async function DashboardPage({ searchParams }: {
   if (!authUser) redirect('/login')
 
   const admin = createAdminClient()
-  const { data: profile } = await admin
+  const { data: profile, error: profileError } = await admin
     .from('users')
     .select('id, full_name, role')
     .eq('id', authUser.id)
     .single()
 
+  if (!profile && !isProfileRowMissing(profileError)) throw new Error(PROFILE_READ_FAILED_MESSAGE)
   if (!profile) redirect('/login')
 
   const user = profile as Pick<User, 'id' | 'full_name' | 'role'>

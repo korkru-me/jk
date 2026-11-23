@@ -3,6 +3,8 @@
 import { cookies, headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { isAuthRetryableFetchError } from '@supabase/supabase-js'
+import { AUTH_UNAVAILABLE_MESSAGE } from '@/lib/auth/profile-read'
 import { studentHasAssignment } from '@/lib/auth/assignment-access'
 import {
   createSebSessionClaims,
@@ -176,7 +178,8 @@ export async function getSebSystemCheckData(
   sebChallenge?: string,
 ) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (isAuthRetryableFetchError(authError)) return { error: AUTH_UNAVAILABLE_MESSAGE }
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ', unauthenticated: true as const }
   if (!UUID_PATTERN.test(assignmentId)) return { error: 'ข้อมูลข้อสอบไม่ถูกต้อง' }
 
