@@ -19,4 +19,18 @@
 
 ## สถานะ
 
-Candidate ผ่าน TypeScript, token lint, production build และ 354 suites / 4,948 tests แล้ว กำลังเตรียม Staging ก่อน Production การตรวจ hosted จะใช้ fixture เท่านั้น ไม่มีการสร้าง/แก้/ลบข้อมูล Production เพื่อทดสอบ
+Candidate ผ่าน TypeScript, token lint, production build และ 354 suites / 4,948 tests แล้ว
+
+- Staging PR [#156](https://github.com/korkru-me/jk/pull/156) merge `5d6302f3563693ec7eae515c99eb4b20f83bdcf3`; Vercel `dpl_2hGdt96rMwA1REuNALeVWinh5ymf` READY และ canonical `staging.korkru.com` ใช้งานได้ผ่าน Vercel SSO ปกติใน Chrome เดิม ไม่เปลี่ยน protection หรือใช้ bypass token
+- ยืนยันป้าย STAGING ตรวจ fixture ครบทั้ง 5 ค่า exercise/exam/practice/file/all ได้ 3/1/2/0/6 งาน Trigger สูง 44px ตรวจชื่อใหม่ในตัวเลือก เมนู ชื่อหน้า หน้าสร้างครู และมุมนักเรียนแล้ว ไม่มี Auth/Storage/database writes
+- Production PR [#157](https://github.com/korkru-me/jk/pull/157) merge `83a358b00357e8215ca8a9f123fbfb759e611b15` หลัง Staging ผ่าน Vercel `dpl_9H17zVaLC9rzJqcHn91nFrQUNC1W` READY แล้ว
+- Primary ใช้ source dropdown/consumer ตรงกับ release ทั้งไฟล์ และมีชื่อใหม่ครบทุก application path ของ scope รักษาความสามารถข้อความ/ลิงก์ของงานไฟล์ซึ่งเป็นงาน local อื่นไว้ ทำให้ `lib/file-assignment.ts` และ helper text ของ form ต่างจาก release โดยเจตนา ไม่ blanket-copy ทับทั้งไฟล์
+- ก่อน release ตรวจ digest ของ modified tracked files 211 ไฟล์ใน primary แล้วไม่มีไฟล์เปลี่ยนจากการเตรียมชุดปล่อย ไม่มี migration และไม่มีการสร้าง/แก้/ลบข้อมูล Production เพื่อทดสอบ
+
+## ผลหลัง Production READY
+
+- เปิดห้องเรียนจริงที่ `www.korkru.com` ใน Chrome เดิมแบบอ่านอย่างเดียว พบดรอปดาวน์ครบ 5 ค่า มี “งานอัปโหลดไฟล์” และ trigger สูงประมาณ 44px เปิดหน้าสร้างงานจริงใหม่ยืนยันทั้ง document title และ h1 เป็น “มอบหมายงานอัปโหลดไฟล์” ไม่แตะร่างเดิม ไม่บันทึกหรืออัปโหลดข้อมูลใด
+- Primary process PID 33781 ให้บริการ `/Users/korkusonmasaen/Korkru/korkru` ที่ `127.0.0.1:3000` ตรวจ rendered fixture หลัง deploy แล้ว: desktop 1200px มีครบ 5 ค่า, mobile 390px scrollWidth 390px, trigger 44px และ Space/End/Enter เลือก “งานอัปโหลดไฟล์” แล้วปิดเมนูได้
+- Primary ผ่าน TypeScript, token lint และ targeted file-assignment tests 38 tests; Next.js MCP compilation issues, config errors และ session errors เป็นว่าง รูปหลักฐาน local อยู่ `/private/tmp/korkru-work-filter-released-primary-desktop.png` และ `/private/tmp/korkru-work-filter-released-primary-mobile.png`
+- เก็บงานอื่นใน primary และ environment เดิมทั้งหมด ไม่มี migration หรือ blocker ค้าง การทดสอบนี้ไม่ใช่การทดสอบ Auth/Storage/upload จริง เพราะชุดนี้เปลี่ยนเฉพาะตัวกรองกับถ้อยคำ
+- ผลหลังปล่อย push เป็น docs-only handoff บน release branch ไม่เปลี่ยน application source ของ Production commit `83a358b00357e8215ca8a9f123fbfb759e611b15`
