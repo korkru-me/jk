@@ -100,7 +100,18 @@ async function verify() {
     check(must(await c.from('submission_answers').select('id').eq('submission_id', canonical.id), 'Check answer isolation').length === 0, 'Shared answers escaped group')
     await c.auth.signOut({ scope: 'local' })
   }
+  const solo = works.find(w => w.submission_mode === 'solo')
+  check(solo && solo.group_min_members === null && solo.group_max_members === null, 'Solo defaults changed')
+  const soloRows = must(await admin.from('submissions').select('student_id,total_score,max_score,group_source_submission_id').eq('assignment_id', solo.id), 'Read solo regression')
+  check(soloRows.length === 1 && soloRows[0].student_id === actor('nonmember').id && soloRows[0].total_score === 10
+    && soloRows[0].max_score === 10 && !soloRows[0].group_source_submission_id, 'Solo submission was affected')
+  const reviewRows = must(await admin.from('submissions').select('total_score,max_score,status').eq('assignment_id', state.reviewAssignmentId), 'Read shared-review scores')
+  // The photo fixture deliberately has no teacher allocation/review. Its
+  // pending work status is expected; every receipt must match the source.
+  check(reviewRows.length === 3 && reviewRows.every(r => r.total_score === 10 && r.max_score === 10
+    && r.status === reviewRows[0].status && ['submitted', 'graded'].includes(r.status)), 'Shared-review scores or status diverged')
   note('All three independent members receive 18/20 and shared answers; nonmembers are denied')
+  note('Solo defaults and 10/10 submission preserved; shared review fixture is 10/10 for all members')
 }
 async function reviewSetup() {
   check(!state.reviewAssignmentId, 'Do not replace a review fixture')
@@ -112,23 +123,27 @@ async function reviewSetup() {
     submission_mode: 'group', group_min_members: 3, group_max_members: 5, max_attempts: 1, completion_rule: 'fixed', score_strategy: 'latest',
     question_ids: [q], question_points: { [q]: 10 }, require_work_image: false, duration_minutes: null, shuffle_questions: false,
     shuffle_options: false, fullscreen_required: false, proctoring_enabled: false, secure_browser_mode: 'browser', android_exam_mode: 'blocked',
-    show_results: 'immediate', show_solutions: true, instant_check: false }), 'Create isolated shared-review fixture')
+    show_results: 'immediate', show_solutions: true, instant_check: false, scratchpad_enabled: true }), 'Create isolated shared-review fixture')
   must(await admin.from('assignment_classrooms').insert({ assignment_id: state.reviewAssignmentId, classroom_id: state.rooms[0].id }), 'Attach review fixture')
   console.log(JSON.stringify({ reviewAssignmentId: state.reviewAssignmentId }))
   note('A separate group review fixture prepared without changing completed answers')
 }
 async function reviewArtifact() {
-  check(state.reviewAssignmentId && !state.uploads?.length, 'Review fixture missing or already enriched')
+  check(state.reviewAssignmentId && !state.reviewArtifactId, 'Review fixture missing or already enriched')
   const submission = must(await admin.from('submissions').select('id,status,closed_at').eq('assignment_id', state.reviewAssignmentId).eq('student_id', actor('sender').id).single(), 'Read open review attempt')
   check(submission.status === 'in_progress' && !submission.closed_at, 'Never modify completed student evidence')
   const answer = must(await admin.from('submission_answers').select('id').eq('submission_id', submission.id).single(), 'Read exact review answer')
-  const preview = `students/${actor('sender').id}/${submission.id}/${answer.id}/${randomUUID()}/preview.webp`
+  must(await admin.from('assignments').update({ scratchpad_enabled: true }).eq('id', state.reviewAssignmentId).eq('created_by', actor('admin').id), 'Enable working paper on synthetic review fixture')
+  const preview = state.uploads?.[0] ?? `students/${actor('sender').id}/${submission.id}/${answer.id}/${randomUUID()}/preview.webp`
   const bytes = await sharp({ create: { width: 120, height: 60, channels: 4, background: '#a83ac3' } }).webp().toBuffer()
+  const uploaded = state.uploads?.includes(preview)
   state.uploads = [preview]; save()
-  must(await admin.storage.from('math-work-artifacts').upload(preview, bytes, { contentType: 'image/webp', upsert: false }), 'Upload synthetic preview')
-  must(await admin.from('student_work_artifacts').insert({ org_id: actor('admin').org, student_id: actor('sender').id,
+  if (!uploaded) must(await admin.storage.from('math-work-artifacts').upload(preview, bytes, { contentType: 'image/webp', upsert: false }), 'Upload synthetic preview')
+  else check(must(await admin.storage.from('math-work-artifacts').download(preview), 'Verify existing synthetic preview').size === bytes.length, 'Synthetic preview did not match')
+  const artifact = must(await admin.from('student_work_artifacts').insert({ org_id: actor('admin').org, student_id: actor('sender').id,
     submission_answer_id: answer.id, part_key: 'answer', source_type: 'photo', preview_path: preview, preview_size_bytes: bytes.length,
-    scene_path: null, scene_size_bytes: null, element_count: null }), 'Attach synthetic evidence to open attempt')
+    scene_path: null, scene_size_bytes: null, element_count: null }).select('id').single(), 'Attach synthetic evidence to open attempt')
+  state.reviewArtifactId = artifact.id; save()
   note('Private synthetic preview attached while the attempt is open')
 }
 async function invalidGroups() {
@@ -167,6 +182,11 @@ async function cleanup() {
     if ((await admin.auth.admin.deleteUser(row.id)).error) failures.push('accounts')
   }
   check(failures.length === 0, 'Cleanup requires follow-up: ' + [...new Set(failures)].join(', '))
+  for (const table of ['users', 'organizations', 'classrooms', 'questions', 'assignments']) {
+    const ids = table === 'users' ? state.accounts.map(a => a.id) : table === 'organizations' ? state.accounts.map(a => a.org)
+      : table === 'classrooms' ? state.rooms.map(r => r.id) : table === 'questions' ? state.questions.map(q => q.id) : assignments.map(a => a.id)
+    check(must(await admin.from(table).select('id').in('id', ids), 'Verify cleanup ' + table).length === 0, 'Disposable rows remain in ' + table)
+  }
   state.cleaned = true; save(); note('All disposable Staging accounts, sessions and fixture data removed')
 }
 if (mode === 'setup') await setup()
