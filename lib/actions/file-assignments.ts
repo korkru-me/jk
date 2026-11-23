@@ -10,15 +10,16 @@ import { canManageAssignment, studentHasAssignment } from '@/lib/auth/assignment
 import { createInlineFileAssignment } from '@/lib/actions/assignments'
 import { startSubmission, submitSubmission } from '@/lib/actions/submissions'
 import { sanitizeRichTextForStorage } from '@/lib/rich-text-sanitize'
-import { parseSubmittedFiles } from '@/lib/exam-attachment'
 import { fileAssignmentInstructionStoragePath } from '@/lib/question-file-selection'
-import { fileAssignmentDescription, fileAssignmentQuestionOwner, fileAssignmentWithdrawalError, isFileAssignment, MAX_SUBMISSION_FILES, normalizeFileAssignmentLateSchedule, type FileAssignmentView } from '@/lib/file-assignment'
+import { fileAssignmentDescription, fileAssignmentGroupSettings, fileAssignmentQuestionOwner, fileAssignmentSubmitError, fileAssignmentWithdrawalError, isFileAssignment, normalizeFileAssignmentLateSchedule, parseFileAssignmentResponse, type FileAssignmentGroupInput, type FileAssignmentView } from '@/lib/file-assignment'
+import { exerciseGroupResultSource, readExerciseGroupContext } from '@/lib/exercise-group.server'
+import type { ExerciseGroupSelection } from '@/lib/exercise-group'
 
 function instructionStorageOrigin(): string | null {
   try { return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').origin } catch { return null }
 }
 
-export interface CreateFileAssignmentInput {
+export interface CreateFileAssignmentInput extends FileAssignmentGroupInput {
   classroom_ids: string[]
   title: string
   instructions: string
@@ -38,6 +39,8 @@ export async function createFileAssignment(input: CreateFileAssignmentInput) {
   if (!Number.isFinite(input.max_score) || input.max_score <= 0 || input.max_score > 1_000_000) return { error: 'คะแนนเต็มต้องมากกว่า 0 และไม่เกิน 1,000,000' }
   if (!Array.isArray(input.classroom_ids) || !input.classroom_ids.length || input.classroom_ids.length > 100) return { error: 'กรุณาเลือกห้องเรียน' }
   if (!['draft', 'published'].includes(input.status)) return { error: 'สถานะงานไม่ถูกต้อง' }
+  const groupSettings = fileAssignmentGroupSettings(input)
+  if ('error' in groupSettings) return groupSettings
   const classroomIds = [...new Set(input.classroom_ids)]
   const allowed = await manageableClassroomIds(createAdminClient(), user.id, classroomIds)
   if (classroomIds.some(id => !allowed.has(id))) return { error: 'คุณไม่มีสิทธิ์มอบหมายงานให้ห้องเรียนที่เลือก' }
@@ -72,6 +75,8 @@ export async function createFileAssignment(input: CreateFileAssignmentInput) {
   if (error || !question) return { error: 'สร้างคำสั่งของงานไม่สำเร็จ กรุณาลองใหม่' }
   try {
     return await createInlineFileAssignment({
+      submission_mode: groupSettings.submission_mode,
+      ...(groupSettings.submission_mode === 'group' ? { group_min_members: groupSettings.group_min_members, group_max_members: groupSettings.group_max_members } : {}),
       classroom_ids: classroomIds, title: input.title, description: instructions,
       question_ids: [question.id], question_points: { [question.id]: input.max_score },
       start_at: null, due_at: schedule.value.dueAt, late_bands: schedule.value.bands, end_at: null,
@@ -93,7 +98,7 @@ export async function readFileAssignmentEditor(assignmentId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user || !await canManageAssignment(assignmentId, user.id)) return { error: 'คุณไม่มีสิทธิ์แก้ไขงานนี้' } as const
   const admin = createAdminClient()
-  const { data: assignment } = await admin.from('assignments').select('id, title, description, question_ids, question_points, start_at, due_at, end_at, status')
+  const { data: assignment } = await admin.from('assignments').select('id, title, description, question_ids, question_points, start_at, due_at, end_at, status, submission_mode, group_min_members, group_max_members')
     .eq('id', assignmentId).maybeSingle()
   if (!assignment || !isFileAssignment(assignment) || assignment.question_ids.length !== 1) return { error: 'ไม่พบงานอัปโหลดไฟล์' } as const
   const { data: question } = await admin.from('questions').select('id, question_text, extra_data').eq('id', assignment.question_ids[0]).maybeSingle()
@@ -101,6 +106,7 @@ export async function readFileAssignmentEditor(assignmentId: string) {
   const links = await admin.from('assignment_classrooms').select('classroom_id').eq('assignment_id', assignmentId)
   if (links.error) return { error: 'โหลดห้องเรียนไม่สำเร็จ' } as const
   const input: CreateFileAssignmentInput = {
+    submission_mode: assignment.submission_mode ?? 'solo', group_min_members: assignment.group_min_members, group_max_members: assignment.group_max_members,
     classroom_ids: (links.data ?? []).map(row => row.classroom_id), title: assignment.title,
     instructions: question.question_text, attachment_urls: question.extra_data?.attachment_urls ?? [],
     max_score: assignment.question_points?.[question.id] ?? question.extra_data?.file_assignment_max_score ?? 10,
@@ -117,6 +123,11 @@ export async function updateFileAssignment(assignmentId: string, input: CreateFi
   if (!input || typeof input.title !== 'string' || !input.title.trim() || input.title.length > 200 || typeof input.instructions !== 'string'
     || !Number.isFinite(input.max_score) || input.max_score <= 0 || input.max_score > 1_000_000 || !Array.isArray(input.attachment_urls) || input.attachment_urls.length > 10) return { error: 'รายละเอียดงานไม่ถูกต้อง' }
   const old = existing.input
+  const groupSettings = fileAssignmentGroupSettings({ ...old, ...input })
+  if ('error' in groupSettings) return groupSettings
+  const oldSettings = fileAssignmentGroupSettings(old)
+  const groupChanged = JSON.stringify(groupSettings) !== JSON.stringify(oldSettings)
+  if (existing.contentLocked && groupChanged) return { error: 'งานที่เผยแพร่แล้วเปลี่ยนรูปแบบการส่งหรือจำนวนสมาชิกไม่ได้ เพื่อรักษางานและคะแนนของสมาชิก' }
   if (JSON.stringify([...input.classroom_ids].sort()) !== JSON.stringify([...old.classroom_ids].sort())) return { error: 'แก้ไขห้องเป้าหมายได้จากหน้าจัดการงาน' }
   const instructions = sanitizeRichTextForStorage(input.instructions)
   const contentChanged = instructions !== old.instructions || input.max_score !== old.max_score || JSON.stringify(input.attachment_urls) !== JSON.stringify(old.attachment_urls)
@@ -146,6 +157,7 @@ export async function updateFileAssignment(assignmentId: string, input: CreateFi
     if (question.error) return { error: 'บันทึกคำสั่งไม่สำเร็จ กรุณาลองใหม่' }
   }
   const saved = await supabase.from('assignments').update({ title: input.title.trim(), description: fileAssignmentDescription(assignmentId, instructions),
+    ...(!existing.contentLocked ? groupSettings : {}),
     question_points: { [existing.questionId]: input.max_score },
     ...(!existing.contentLocked ? { start_at: null, end_at: null } : {}),
     ...(schedule ? { due_at: schedule.value.dueAt, late_bands: schedule.value.bands } : {}),
@@ -167,7 +179,7 @@ async function ownFileAssignment(assignmentId: string) {
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' } as const
   const admin = createAdminClient()
   if (!await studentHasAssignment(admin, assignmentId, user.id)) return { error: 'คุณไม่มีสิทธิ์เข้าถึงงานนี้' } as const
-  const { data: assignment } = await admin.from('assignments').select('id, title, description, question_ids, classroom_id, status, start_at, due_at, end_at')
+  const { data: assignment } = await admin.from('assignments').select('id, title, description, question_ids, classroom_id, status, start_at, due_at, end_at, submission_mode')
     .eq('id', assignmentId).neq('status', 'draft').maybeSingle()
   if (!assignment || !isFileAssignment(assignment) || assignment.question_ids.length !== 1) return { error: 'ไม่พบงานอัปโหลดไฟล์' } as const
   const { data: question } = await admin.from('questions').select('id, question_text, extra_data')
@@ -184,20 +196,35 @@ export async function readFileAssignment(assignmentId: string): Promise<{ view: 
     .select('id, status, total_score, submitted_at').eq('assignment_id', assignmentId).eq('student_id', user.id)
     .order('attempt_number', { ascending: false }).limit(1).maybeSingle()
   if (error) return { error: 'โหลดงานที่ส่งไม่สำเร็จ กรุณาลองใหม่' }
+  // Resolve only the authenticated member's exact receipt. Other groups never
+  // gain an answer lookup through a browser-supplied source id.
+  const source = submission ? await exerciseGroupResultSource(submission.id, user.id) : null
   const answerResult = submission ? await admin.from('submission_answers').select('id, student_answer, is_correct, answer_reviewed_at, work_reviewed_at')
-    .eq('submission_id', submission.id).eq('question_id', question.id).single() : null
-  if (answerResult?.error) return { error: 'โหลดไฟล์คำตอบไม่สำเร็จ กรุณาลองใหม่' }
+    .eq('submission_id', source!.id).eq('question_id', question.id).single() : null
+  if (answerResult?.error) return { error: 'โหลดคำตอบไม่สำเร็จ กรุณาลองใหม่' }
   const answer = answerResult?.data
-  const files = parseSubmittedFiles(answer?.student_answer ?? '')
-  if (!files) return { error: 'อ่านรายการไฟล์ไม่สำเร็จ กรุณาแจ้งครูผู้สอน' }
+  const response = parseFileAssignmentResponse(answer?.student_answer)
+  if (!response) return { error: 'อ่านคำตอบไม่สำเร็จ กรุณาแจ้งครูผู้สอน' }
+  const groupWork = assignment.submission_mode === 'group' ? await readExerciseGroupContext(assignmentId, user.id) : undefined
+  const memberResult = groupWork && submission && submission.status !== 'in_progress'
+    ? await admin.from('exercise_group_members').select('users!exercise_group_members_student_id_fkey(full_name)')
+        .eq('assignment_id', assignmentId).eq('submission_id', source!.id)
+    : { data: [], error: null }
+  if (memberResult.error) return { error: 'โหลดสมาชิกกลุ่มไม่สำเร็จ กรุณาลองใหม่' }
+  const groupMembers = (memberResult.data ?? []).map(row => {
+    const profile = Array.isArray(row.users) ? row.users[0] : row.users
+    return profile?.full_name || 'นักเรียน'
+  })
   return { view: {
+    groupWork, groupMembers,
     id: assignment.id, title: assignment.title, classroomId: assignment.classroom_id,
     instructions: question.question_text, attachments: question.extra_data?.attachment_urls ?? [],
     maxScore: question.extra_data?.file_assignment_max_score ?? 10,
     startAt: assignment.start_at, dueAt: assignment.due_at, endAt: assignment.end_at, status: assignment.status,
     submission: submission && answer ? { id: submission.id, answerId: answer.id, status: submission.status,
-      files, score: submission.status === 'graded' ? submission.total_score : null, submittedAt: submission.submitted_at } : null,
+      response, score: submission.status === 'graded' ? submission.total_score : null, submittedAt: submission.submitted_at } : null,
     withdrawalError: submission ? fileAssignmentWithdrawalError({ assignmentStatus: assignment.status,
+      submissionMode: assignment.submission_mode,
       submissionStatus: submission.status, dueAt: assignment.due_at, endAt: assignment.end_at,
       reviewed: !answer || answer.is_correct !== null || Boolean(answer.answer_reviewed_at || answer.work_reviewed_at) }) : null,
   } }
@@ -212,17 +239,19 @@ export async function startFileAssignment(assignmentId: string) {
   return { success: true as const }
 }
 
-export async function submitFileAssignment(assignmentId: string, submissionId: string) {
+export async function submitFileAssignment(assignmentId: string, submissionId: string, group?: ExerciseGroupSelection) {
   const access = await ownFileAssignment(assignmentId)
   if ('error' in access) return access
+  if (access.assignment.submission_mode === 'group' && !group) return { error: 'กรุณาเลือกสมาชิกกลุ่มก่อนส่งงาน' }
   const { data: submission } = await access.admin.from('submissions').select('id, status')
     .eq('id', submissionId).eq('assignment_id', assignmentId).eq('student_id', access.user.id).maybeSingle()
   if (!submission || submission.status !== 'in_progress') return { error: 'งานนี้ไม่อยู่ในสถานะที่ส่งได้' }
-  const { data: answer } = await access.admin.from('submission_answers').select('student_answer')
+  const { data: answer, error } = await access.admin.from('submission_answers').select('student_answer')
     .eq('submission_id', submissionId).eq('question_id', access.question.id).single()
-  const files = parseSubmittedFiles(answer?.student_answer)
-  if (!files?.length || files.length > MAX_SUBMISSION_FILES) return { error: `กรุณาแนบคำตอบตั้งแต่ 1 ถึง ${MAX_SUBMISSION_FILES} ไฟล์` }
-  const result = await submitSubmission(submissionId)
+  if (error || !answer) return { error: 'โหลดคำตอบไม่สำเร็จ กรุณาลองใหม่' }
+  const responseError = fileAssignmentSubmitError(parseFileAssignmentResponse(answer.student_answer))
+  if (responseError) return { error: responseError }
+  const result = access.assignment.submission_mode === 'group' ? await submitSubmission(submissionId, group) : await submitSubmission(submissionId)
   revalidatePath(`/assignments/${assignmentId}/take`)
   revalidatePath(`/classrooms/${access.assignment.classroom_id}`)
   return result
@@ -232,6 +261,7 @@ export async function withdrawFileAssignment(assignmentId: string, submissionId:
   const access = await ownFileAssignment(assignmentId)
   if ('error' in access) return access
   const { admin, user, assignment } = access
+  if (assignment.submission_mode === 'group') return { error: 'งานกลุ่มส่งร่วมกันแล้ว หากต้องแก้ไขให้ติดต่อครูผู้สอน' }
   const { data: submission } = await admin.from('submissions').select('id, status, submitted_at')
     .eq('id', submissionId).eq('assignment_id', assignmentId).eq('student_id', user.id).maybeSingle()
   if (!submission) return { error: 'ไม่พบงานที่ส่ง' }
