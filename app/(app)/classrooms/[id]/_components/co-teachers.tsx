@@ -14,6 +14,13 @@ import type { CoTeacherPermission } from '@/lib/types'
 import { IconButton } from '@/components/ui/icon-button'
 import { Card } from '@/components/ui/card'
 import { NativeSelect } from '@/components/ui/native-select'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 const PERM_CFG: Record<CoTeacherPermission, { label: string; desc: string; icon: typeof Crown; color: string }> = {
   admin: { label: 'แอดมินเต็มตัว', desc: 'จัดการทุกอย่างได้', icon: Crown, color: 'text-warning' },
@@ -48,7 +55,6 @@ interface Props {
 }
 
 export function CoTeachers({ classroomId, ownerName, canManage, coTeachers, invites }: Props) {
-  const [openPerm, setOpenPerm] = useState<string | null>(null)
   const [showInvite, setShowInvite] = useState(false)
   const [invitePerm, setInvitePerm] = useState<CoTeacherPermission>('manage')
   const [pendingLink, setPendingLink] = useState<string | null>(null)
@@ -56,7 +62,6 @@ export function CoTeachers({ classroomId, ownerName, canManage, coTeachers, invi
   const [busy, setBusy] = useState(false)
 
   async function updatePerm(id: string, perm: CoTeacherPermission) {
-    setOpenPerm(null)
     const res = await updateCoTeacherPermission(id, perm, classroomId)
     if (res.error) toast.error(res.error)
     else toast.success('อัปเดตสิทธิ์แล้ว')
@@ -166,56 +171,54 @@ export function CoTeachers({ classroomId, ownerName, canManage, coTeachers, invi
               const perm = PERM_CFG[t.permission]
               const PermIcon = perm.icon
               return (
-                <div key={t.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors">
+                <div key={t.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 hover:bg-muted/50 transition-colors sm:flex-nowrap">
                   <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-100 to-blue-100 flex items-center justify-center text-xs font-bold text-tint-1 shrink-0">
                     {t.fullName.slice(0, 2)}
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div className="min-w-0 flex-1 basis-2/3 sm:basis-0">
                     <p className="text-sm font-medium text-foreground">{t.fullName}</p>
                     <p className="text-xs text-muted-foreground truncate">{t.email}</p>
                   </div>
                   {/* Permission dropdown */}
-                  <div className="relative">
-                    <button
-                      onClick={() => canManage && setOpenPerm(openPerm === t.id ? null : t.id)}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
                       disabled={!canManage}
-                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${perm.color} border-current/20 bg-current/5 ${canManage ? 'hover:bg-current/10' : 'opacity-70 cursor-default'}`}
+                      aria-label={`เปลี่ยนสิทธิ์ของ ${t.fullName} (ตอนนี้: ${perm.label})`}
+                      className={`ml-12 flex shrink-0 items-center gap-1.5 px-2.5 sm:ml-0 py-1.5 rounded-lg border text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${perm.color} border-current/20 bg-current/5 ${canManage ? 'hover:bg-current/10' : 'opacity-70 cursor-default'}`}
                     >
                       <PermIcon className="w-3 h-3" />
                       {perm.label}
                       {canManage && <ChevronDown className="w-3 h-3" />}
-                    </button>
-                    {openPerm === t.id && (
-                      <>
-                        <div className="fixed inset-0 z-10" onClick={() => setOpenPerm(null)} />
-                        <Card data-classroom-panel radius="md" edge="ring" elevation="lg" className="absolute right-0 top-9 z-20 py-1 min-w-[180px]">
-                          {(Object.keys(PERM_CFG) as CoTeacherPermission[]).map(p => {
-                            const cfg = PERM_CFG[p]
-                            const Icon = cfg.icon
-                            return (
-                              <button
-                                key={p}
-                                className={`w-full flex items-start gap-2.5 px-3 py-2 text-left hover:bg-accent transition-colors ${t.permission === p ? 'bg-muted' : ''}`}
-                                onClick={() => updatePerm(t.id, p)}
-                              >
-                                <Icon className={`w-3.5 h-3.5 mt-0.5 ${cfg.color}`} />
-                                <div>
-                                  <p className="text-sm font-medium text-foreground">{cfg.label}</p>
-                                  <p className="text-xs text-muted-foreground">{cfg.desc}</p>
-                                </div>
-                              </button>
-                            )
-                          })}
-                        </Card>
-                      </>
-                    )}
-                  </div>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-60">
+                      <DropdownMenuRadioGroup
+                        value={t.permission}
+                        onValueChange={value => {
+                          if (value !== t.permission) updatePerm(t.id, value as CoTeacherPermission)
+                        }}
+                      >
+                        {(Object.keys(PERM_CFG) as CoTeacherPermission[]).map(p => {
+                          const cfg = PERM_CFG[p]
+                          const Icon = cfg.icon
+                          return (
+                            <DropdownMenuRadioItem key={p} value={p} closeOnClick className="items-start gap-2.5 py-2 pl-2">
+                              <Icon className={`w-3.5 h-3.5 mt-0.5 ${cfg.color}`} />
+                              <span className="min-w-0">
+                                <span className="block text-sm font-medium text-foreground">{cfg.label}</span>
+                                <span className="block text-xs text-muted-foreground">{cfg.desc}</span>
+                              </span>
+                            </DropdownMenuRadioItem>
+                          )
+                        })}
+                      </DropdownMenuRadioGroup>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                   {canManage && (
                     <IconButton
                       onClick={() => removeTeacher(t.id)}
                       label="ลบครูผู้ช่วยสอน"
                       size="sm"
-                      className="hover:bg-destructive/10 hover:text-destructive"
+                      className="ml-auto hover:bg-destructive/10 hover:text-destructive sm:ml-0"
                     >
                       <Trash2 />
                     </IconButton>
