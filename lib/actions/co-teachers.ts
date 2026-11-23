@@ -18,7 +18,7 @@ export async function getClassroomCoTeachers(classroomId: string) {
 
   const { data: coTeachers } = await supabase
     .from('classroom_co_teachers')
-    .select('id, user_id, permission, created_at, users(id, full_name, email)')
+    .select('id, user_id, permission, created_at, users!classroom_co_teachers_user_id_fkey(id, full_name, email)')
     .eq('classroom_id', classroomId)
     .order('created_at', { ascending: true })
 
