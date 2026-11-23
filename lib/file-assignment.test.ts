@@ -9,7 +9,7 @@ describe('assignment-owned file instructions', () => {
     const description = fileAssignmentDescription(ID, '<p>ทำใบงานให้ครบ</p>')
     expect(isFileAssignment({ id: ID, description })).toBe(true)
     expect(isFileAssignment({ id: 'other', description })).toBe(false)
-    expect(isFileAssignment({ description: '<p>งานส่งไฟล์</p>' })).toBe(false)
+    expect(isFileAssignment({ description: '<p>งานอัปโหลดไฟล์</p>' })).toBe(false)
     expect(fileAssignmentQuestionOwner({ file_assignment_id: ID })).toBe(ID)
     expect(fileAssignmentQuestionOwner({ file_assignment_id: 'anything' })).toBeNull()
     expect(sanitizeRichTextForStorage(description)).not.toContain('korkru:file-assignment')

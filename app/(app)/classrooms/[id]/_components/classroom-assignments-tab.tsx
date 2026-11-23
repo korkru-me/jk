@@ -541,7 +541,7 @@ export function ClassroomAssignmentsTab({
       {recentWork && <ClassroomRecentWork result={recentWork} />}
 
       <div className="flex flex-wrap items-center gap-2" data-classroom-work-toolbar>
-        <AssignmentTypeFilter value={typeFilter} onValueChange={setTypeFilter} includePractice={!!practiceLibraries} />
+        <AssignmentTypeFilter value={typeFilter} onValueChange={setTypeFilter} includePractice={!!practiceLibraries} presentation="dropdown" />
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <AssignmentCategoryManager

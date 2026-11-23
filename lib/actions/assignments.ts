@@ -711,7 +711,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
     .eq('id', id)
     .maybeSingle()
   if (!existing) return { error: 'ไม่พบชุดข้อสอบ' }
-  if (isFileAssignment(existing)) return { error: 'กรุณาแก้ไขงานส่งไฟล์จากหน้าของงาน' }
+  if (isFileAssignment(existing)) return { error: 'กรุณาแก้ไขงานอัปโหลดไฟล์จากหน้าของงาน' }
   if (existing.submission_mode === 'group') {
     data = { ...data, max_attempts: 1, completion_rule: 'fixed', instant_check: false, instant_check_answer_key: false,
       passing_type: null, passing_value: null, score_strategy: 'latest', retry_scope: 'all', duration_minutes: null }
