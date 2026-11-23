@@ -35,6 +35,12 @@ const answer = (overrides: Row = {}): Row => ({ id: 'answer', submission_id: 'su
   score: 0, max_score: 1, score_edited_by: null, ...overrides })
 
 describe('authorized classroom score review metadata reader', () => {
+  it('projects a representative’s pending review onto the member score receipt', async () => {
+    const receipt = { ...submission, id: 'receipt', student_id: 'peer' }
+    const db = reader({ submissions: [{ id: 'receipt', group_source_submission_id: 'submission' }],
+      submission_answers: [answer({ grading_config: { question_type: 'essay', extra_data: {} } })] })
+    expect(await loadClassroomScoreReview(db.value, [assignment], [receipt], ['peer'])).toEqual({ assignment: { peer: true } })
+  })
   it('annotates every authorized attempt independently of lifecycle status and leaves raw scores intact', async () => {
     const rows = [
       { ...submission, id: 'automatic' }, { ...submission, id: 'pending' },
@@ -80,7 +86,7 @@ describe('authorized classroom score review metadata reader', () => {
     } })] })
     expect(await loadClassroomScoreReview(db.value, [assignment], [submission], ['student'])).toEqual({ assignment: { student: true } })
     expect(db.logs.every(log => !/student_answer|correct_answer|work_images|random_values|answer_parts/.test(log.columns))).toBe(true)
-    expect(new Set(db.logs.map(log => log.table))).toEqual(new Set(['questions', 'submission_answers', 'assignment_void_questions', 'assignment_question_grading_parts']))
+    expect(new Set(db.logs.map(log => log.table))).toEqual(new Set(['submissions', 'questions', 'submission_answers', 'assignment_void_questions', 'assignment_question_grading_parts']))
     expect(db.logs.find(log => log.table === 'submission_answers')?.filters).toEqual([['submission_id', ['submission']]])
   })
   it('paginates more than 1000 occurrences within a single submission', async () => {

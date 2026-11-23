@@ -11,6 +11,7 @@ import { SecureExamLaunchGate } from '@/components/exam/secure-exam-launch-gate'
 import { ExamWaitingClient } from '@/components/exam/exam-waiting-client'
 import { waitingResumeId } from '@/lib/exam-waiting-room'
 import { isAttemptExpired } from '@/lib/grading'
+import { readExerciseGroupContext } from '@/lib/exercise-group.server'
 
 export const metadata = { title: 'ทำข้อสอบ — KorKru' }
 
@@ -117,6 +118,7 @@ export default async function TakeExamPage({
   }
 
   const { assignment, submission, answers, artifacts } = exam
+  const groupWork = await readExerciseGroupContext(id, submission.student_id)
 
   // Nothing to show and nothing to draw: a คลัง emptied out after the attempt
   // opened. Better to say so than to render an exam page with no ข้อ on it.
@@ -153,6 +155,7 @@ export default async function TakeExamPage({
   return (
     <div className="h-full flex flex-col">
       <ExamClient
+        groupWork={groupWork}
         classroomCover={classroomCover}
         assignmentTitle={result.waitingRoom.title}
         exerciseInstructions={exercise ? summary.description : null}

@@ -60,6 +60,11 @@ function expectCode(run: () => unknown, code: string) {
 }
 
 describe('SEB teacher-owned quit password policy', () => {
+  it('allows an active admin owner under the same exact ownership and organization checks', () => {
+    expect(prepareSebQuitPasswordRevision(command(), context({
+      actor: { id: ACTOR_ID, role: 'admin', status: 'active' },
+    })).ownerId).toBe(ACTOR_ID)
+  })
   it('prepares an immutable exact-revision record with the standardized lower-case Base16 SHA-256 hash', () => {
     const prepared = prepareSebQuitPasswordRevision(command(), context())
 
@@ -137,7 +142,7 @@ describe('SEB teacher-owned quit password policy', () => {
 
   it.each([
     ['student', { actor: { id: ACTOR_ID, role: 'student', status: 'active' } }],
-    ['admin', { actor: { id: ACTOR_ID, role: 'admin', status: 'active' } }],
+    ['suspended admin', { actor: { id: ACTOR_ID, role: 'admin', status: 'suspended' } }],
     ['suspended teacher', { actor: { id: ACTOR_ID, role: 'teacher', status: 'suspended' } }],
     ['different owner', { assignment: { ...context().assignment, createdBy: OTHER_ID } }],
     ['missing organization membership', { memberOrgIds: [OTHER_ID] }],

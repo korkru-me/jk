@@ -26,6 +26,12 @@ async function loadSubmissionReviewIds(
   selected: SubmissionScoreReviewInput['submissions'],
 ): Promise<Set<string>> {
   if (selected.length === 0) return new Set()
+  const sources = await pagedChunks([...new Set(selected.map(row => row.id))],
+    (ids, from, to) => reader.from('submissions').select('id, group_source_submission_id')
+      .in('id', ids).order('id').range(from, to).returns<{ id: string; group_source_submission_id?: string | null }[]>())
+  if (sources.error) throw new Error('โหลดแหล่งคะแนนงานกลุ่มไม่สำเร็จ')
+  const sourceById = new Map(sources.rows.map(row => [row.id, row.group_source_submission_id ?? row.id]))
+  const canonical = selected.map(row => ({ ...row, id: sourceById.get(row.id) ?? row.id }))
   const relevantIds = new Set(selected.map(row => row.assignment_id))
   const relevant = assignments.filter(row => relevantIds.has(row.id))
   const assignmentIds = [...relevantIds]
@@ -49,13 +55,14 @@ async function loadSubmissionReviewIds(
   const columns = 'id, submission_id, question_id, is_correct, score, max_score, score_edited_by'
     + (voids.error ? '' : ', grading_config, is_void')
     + (policies.error ? '' : ', answer_score, answer_max_score, work_score, work_max_score, answer_reviewed_at, work_reviewed_at')
-  const answers = await pagedChunks([...new Set(selected.map(row => row.id))], (ids, from, to) => reader.from('submission_answers')
+  const answers = await pagedChunks([...new Set(canonical.map(row => row.id))], (ids, from, to) => reader.from('submission_answers')
     .select(columns).in('submission_id', ids).order('id').range(from, to).returns<ClassroomScoreReviewAnswer[]>())
   if (answers.error) throw new Error('โหลดสถานะรอตรวจคะแนนไม่สำเร็จ กรุณาลองใหม่')
-  return buildSubmissionScoreReview({ assignments: relevant, submissions: selected,
+  const pending = buildSubmissionScoreReview({ assignments: relevant, submissions: canonical,
     questions: questions.rows, answers: answers.rows,
     gradingParts: policies.rows, voidedQuestions: voids.rows,
   })
+  return new Set(selected.filter(row => pending.has(sourceById.get(row.id) ?? row.id)).map(row => row.id))
 }
 
 export async function loadClassroomScoreReview(

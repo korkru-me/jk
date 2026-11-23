@@ -1,6 +1,8 @@
 'use client'
 
 import { StatementImages } from '@/components/questions/statement-images'
+import { ExerciseGroupPicker } from '@/components/exam/exercise-group-picker'
+import { exerciseGroupSelectionError, type ExerciseGroupContext, type ExerciseGroupSelection } from '@/lib/exercise-group'
 
 import { lazy, Suspense, useState, useEffect, useCallback, useMemo, useRef, type ReactNode, type RefObject } from 'react'
 import { toast } from 'sonner'
@@ -210,6 +212,7 @@ interface ScratchpadTarget {
 
 interface Props {
   submissionId: string
+  groupWork?: ExerciseGroupContext
   /** Authenticated user id used only to namespace local IndexedDB data. */
   storageOwnerId: string
   answers: AnswerRow[]
@@ -311,8 +314,9 @@ function requiredWorkImageCount(a: AnswerRow, config: ExamConfig): number {
   return parts && parts.length > 0 ? parts.length : 1
 }
 
-export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkArtifacts = [], durationMinutes, startedAt, expiresAt, serverNow, config, questionsPerPage = 1, streak, previewMode = false, previewReturnHref, previewEditWarning, review, classroomCover, assignmentTitle, exerciseInstructions }: Props) {
+export function ExamClient({ submissionId, groupWork, storageOwnerId, answers, initialWorkArtifacts = [], durationMinutes, startedAt, expiresAt, serverNow, config, questionsPerPage = 1, streak, previewMode = false, previewReturnHref, previewEditWarning, review, classroomCover, assignmentTitle, exerciseInstructions }: Props) {
   const router = useRouter()
+  const [groupSelection, setGroupSelection] = useState<ExerciseGroupSelection>({ classroomId: groupWork?.rooms[0]?.id ?? '', peers: [] })
   const [expired, setExpired] = useState(false)
   // A teacher's preview opens the same read-only review from its own result
   // screen; a student's arrives already reviewing through `review`.
@@ -1110,6 +1114,10 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
 
   async function handleSubmit() {
     if (submitting) return
+    if (groupWork) {
+      const error = exerciseGroupSelectionError(groupWork, groupSelection)
+      if (error) { toast.error(error); return }
+    }
     setSubmitting(true)
     // Do not grade against stale DB values when the student confirms within
     // the debounce window or while an earlier save is still in flight.
@@ -1146,7 +1154,7 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
       return
     }
     let result: Awaited<ReturnType<typeof submitSubmission>>
-    try { result = await submitSubmission(submissionId) }
+    try { result = await submitSubmission(submissionId, groupWork ? groupSelection : undefined) }
     catch {
       toast.error('ยังยืนยันการส่งไม่ได้ กรุณาตรวจอินเทอร์เน็ตแล้วลองส่งอีกครั้ง ระบบจะใช้รอบเดิม')
       setSubmitting(false)
@@ -2169,7 +2177,8 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
               <div className="w-14 h-14 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-3">
                 <CheckCircle2 size={28} className="text-success" />
               </div>
-              <h3 id="submit-confirm-title" className="font-bold text-lg">ยืนยันการส่งข้อสอบ</h3>
+              <h3 id="submit-confirm-title" className="font-bold text-lg">{groupWork ? 'ยืนยันการส่งงานกลุ่ม' : 'ยืนยันการส่งข้อสอบ'}</h3>
+              {groupWork && <div className="mt-3"><ExerciseGroupPicker context={groupWork} value={groupSelection} onChange={setGroupSelection} /></div>}
 
               <div className="mt-4 space-y-2 text-sm text-left bg-muted/40 rounded-xl p-4">
                 <div className="flex justify-between">
@@ -2232,10 +2241,14 @@ export function ExamClient({ submissionId, storageOwnerId, answers, initialWorkA
                 className="min-h-10 flex-1 border-0 bg-success text-success-foreground transition-all hover:bg-success/90 aria-disabled:pointer-events-none aria-disabled:opacity-50 pointer-coarse:min-h-11"
                 onClick={() => {
                   if (submitting || submitCountdown > 0) return
+                  if (groupWork && exerciseGroupSelectionError(groupWork, groupSelection)) {
+                    toast.error(exerciseGroupSelectionError(groupWork, groupSelection)!)
+                    return
+                  }
                   setShowSubmitConfirm(false)
                   handleSubmit()
                 }}
-                aria-disabled={submitting || submitCountdown > 0}
+                aria-disabled={submitting || submitCountdown > 0 || Boolean(groupWork && exerciseGroupSelectionError(groupWork, groupSelection))}
               >
                 {submitCountdown > 0
                   ? `รอ ${submitCountdown} วินาที...`
