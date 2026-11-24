@@ -117,4 +117,4 @@ PR #165 merge เข้า `staging` เป็น `5ad6e37` Vercel deploy สำ
 
 - ลบใน transaction เดียวตามลำดับ notifications (1,240) → submissions (660) → assignments (2) → questions (30) → classrooms (1) → organizations ที่สมาชิกเป็นบัญชีทดสอบล้วน (621) → `auth.users` (621) แล้วนับซ้ำได้ **0** ทุกตาราง ผู้ใช้อื่น 207 คนไม่ถูกแตะ
 - ลบไฟล์คีย์ Deployment Protection และไฟล์รหัสทดสอบในเครื่องแล้ว
-- **Staging ยังเป็น Small** อยู่ ณ เวลาที่เขียน รอเจ้าของผลิตภัณฑ์ตัดสินใจว่าจะลดกลับเป็น Nano หรือไม่
+- หลังทดสอบ เจ้าของผลิตภัณฑ์ลด Staging เป็น **Micro** (1 GB, ราคาต่อชั่วโมงเท่า Nano) เพราะ dashboard ล็อกตัวเลือก Nano หลังอัปเกรดแล้ว ผลทดสอบบน Staging ครั้งต่อไปจึงไม่เท่ากับ Nano เดิมและไม่เท่ากับ Production (Small) ต้องเช็กขนาดก่อนเทียบผลทุกครั้ง
