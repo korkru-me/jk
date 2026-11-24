@@ -6,6 +6,7 @@ import { redirect, RedirectType } from 'next/navigation'
 import { isAuthRetryableFetchError } from '@supabase/supabase-js'
 import { reserveAuthEmail } from '@/lib/auth/email-request-limit.server'
 import { rememberSignupEmail } from '@/lib/auth/signup-email.server'
+import { isProfileRowMissing } from '@/lib/auth/profile-read'
 import { POLICY_VERSION } from '@/lib/legal'
 import { STUDENT_EDUCATION_FIELDS, studentEducationSchema } from '@/lib/student-education'
 import { clearRecoveryGrant, hasRecoveryGrant } from '@/lib/auth/recovery-grant.server'
@@ -73,13 +74,13 @@ export async function login(_prevState: unknown, formData: FormData) {
   // Recover orphaned auth users who have no profile row
   if (data.user) {
     const admin = createAdminClient()
-    const { data: profile } = await admin
+    const { data: profile, error: profileReadError } = await admin
       .from('users')
       .select('id')
       .eq('id', data.user.id)
       .single()
 
-    if (!profile) {
+    if (!profile && isProfileRowMissing(profileReadError)) {
       const meta = data.user.user_metadata
       const role: AccountRole = meta?.role === 'teacher' ? 'teacher' : 'student'
       const fullName = meta?.full_name ?? meta?.name ?? email.split('@')[0]

@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { getSessionUser } from '@/lib/auth/session-user'
 
 const updateSchema = z.object({
   standard_id: z.string().uuid(),
@@ -32,7 +33,7 @@ export async function updateLearningStandard(input: UpdateLearningStandardInput)
   if (!code && !description) return { error: 'ต้องมีรหัสหรือคำอธิบายอย่างน้อยอย่างหนึ่ง' }
 
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   const { error } = await supabase
@@ -57,7 +58,7 @@ export async function deleteLearningStandard(standardId: string) {
   if (!z.string().uuid().safeParse(standardId).success) return { error: 'ตัวชี้วัดไม่ถูกต้อง' }
 
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   const { error } = await supabase.from('learning_standards').delete().eq('id', standardId)

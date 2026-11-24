@@ -5,6 +5,25 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { normalizeProctorEvents } from '@/lib/exam-proctor'
 import { getExamAccessSession } from '@/lib/exam-access-session'
+import { readWithSubmissionRevision } from '@/lib/submission-revision-compatibility'
+import { getSessionUser } from '@/lib/auth/session-user'
+
+interface ProctorAssignmentRow {
+  proctoring_enabled: boolean | null
+  mode: string | null
+  secure_browser_mode: string | null
+  android_exam_mode: string | null
+}
+
+interface ProctorSubmissionRow {
+  id: string
+  student_id: string
+  status: string
+  assignment_id: string
+  exam_access_mode: string | null
+  seb_config_revision?: number | null
+  assignments: ProctorAssignmentRow | ProctorAssignmentRow[] | null
+}
 
 interface RecordProctorSignalInput {
   submissionId: string
@@ -25,7 +44,7 @@ interface ProctorEventAcknowledgementRow {
 
 export async function recordProctorSignal(input: RecordProctorSignalInput) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   if (!UUID_PATTERN.test(input.submissionId)) return { error: 'ข้อมูลการสอบไม่ถูกต้อง' }
@@ -41,12 +60,12 @@ export async function recordProctorSignal(input: RecordProctorSignalInput) {
   // and rejects attempts that are no longer in progress or not configured
   // for proctoring.
   const admin = createAdminClient()
-  const { data: submission } = await admin
+  const { data: submission, revisionColumnAvailable } = await readWithSubmissionRevision<ProctorSubmissionRow>(includeRevision => admin
     .from('submissions')
-    .select('id, student_id, status, assignment_id, exam_access_mode, seb_config_revision, assignments(proctoring_enabled, mode, secure_browser_mode, android_exam_mode)')
+    .select(`id, student_id, status, assignment_id, exam_access_mode, ${includeRevision ? 'seb_config_revision, ' : ''}assignments(proctoring_enabled, mode, secure_browser_mode, android_exam_mode)`)
     .eq('id', input.submissionId)
     .eq('student_id', user.id)
-    .maybeSingle()
+    .maybeSingle())
 
   const assignment = Array.isArray(submission?.assignments)
     ? submission.assignments[0]
@@ -59,6 +78,9 @@ export async function recordProctorSignal(input: RecordProctorSignalInput) {
     || assignment.mode !== 'online'
   ) {
     return { error: 'ไม่สามารถบันทึกสถานะคุมสอบนี้ได้' }
+  }
+  if (assignment.secure_browser_mode === 'seb_required' && !revisionColumnAvailable) {
+    return { error: 'ข้อสอบนี้ยังไม่พร้อมให้เข้า กรุณาแจ้งครูผู้สอน' }
   }
   if (
     assignment.secure_browser_mode === 'seb_required'
@@ -96,7 +118,7 @@ export async function recordProctorSignal(input: RecordProctorSignalInput) {
 
 export async function acknowledgeProctorEvents(assignmentId: string, eventIds: number[]) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   if (!UUID_PATTERN.test(assignmentId)) return { error: 'ข้อมูลชุดข้อสอบไม่ถูกต้อง' }
   if (!Array.isArray(eventIds) || eventIds.length < 1 || eventIds.length > 100) {

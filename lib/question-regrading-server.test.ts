@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   revalidatePath: vi.fn(), redirect: vi.fn(), rpc: vi.fn(),
   readerRpc: vi.fn(),
 }))
+vi.mock('@/lib/auth/session-user', () => import('@/lib/auth/session-user-test-double'))
 vi.mock('server-only', () => ({}))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: mocks.createAdminClient }))

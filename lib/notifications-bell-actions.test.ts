@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 const m = vi.hoisted(() => ({ session: vi.fn(), admin: vi.fn(), load: vi.fn(), save: vi.fn() }))
+vi.mock('@/lib/auth/session-user', () => import('@/lib/auth/session-user-test-double'))
 vi.mock('@/lib/supabase/server', () => ({ createClient: m.session }))
 vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: m.admin }))
 vi.mock('@/lib/student-bell.server', () => ({ loadStudentBell: m.load, saveDeadlineReadReceipts: m.save }))

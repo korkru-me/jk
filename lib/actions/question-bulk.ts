@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
 import { releaseQuestionFiles } from '@/lib/storage-release'
 import type { Question } from '@/lib/types'
+import { getSessionUser } from '@/lib/auth/session-user'
 
 const selection = z.array(z.uuid()).min(1).max(100)
 
@@ -15,7 +16,7 @@ export async function deleteSelectedQuestions(ids: string[]) {
   if (!parsed.success) return { error: 'กรุณาเลือกโจทย์ที่ถูกต้อง ครั้งละไม่เกิน 100 ข้อ' }
   const uniqueIds = [...new Set(parsed.data)]
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   const { data, error } = await supabase.from('questions').select('*')

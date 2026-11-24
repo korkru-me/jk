@@ -352,7 +352,7 @@ UI-034 เคยให้ browser อัปโหลดรูปหน้าป�
 
 ใช้ `lib/supabase/server.ts` เพื่อให้ query ทำงานภายใต้ session และ RLS ของผู้ใช้ นี่ควรเป็นค่าเริ่มต้น
 
-`lib/auth/server.ts` memoize ผล `auth.getUser()` ด้วย React `cache()` ภายใน server render request เดียว เพื่อให้ layout และ page ไม่ตรวจ session ซ้ำกัน ผลนี้ไม่ถูกเก็บข้าม request หรือข้ามผู้ใช้
+`lib/auth/server.ts` memoize ผลตรวจ session จาก access token ที่ยืนยันลายเซ็นในเครื่อง (`auth.getClaims()` ผ่าน `getSessionUser`) ด้วย React `cache()` ส่วน `getVerifiedAuthUser` ยังถาม Auth server ด้วย `auth.getUser()` สำหรับหน้าผู้ดูแล ภายใน server render request เดียว เพื่อให้ layout และ page ไม่ตรวจ session ซ้ำกัน ผลนี้ไม่ถูกเก็บข้าม request หรือข้ามผู้ใช้
 
 ### Privileged server
 

@@ -11,6 +11,7 @@ import {
   parseDescription,
 } from '@/app/(app)/classrooms/_components/classroom-meta'
 import { isClassroomCoverUrl } from '@/lib/classroom-cover'
+import { getSessionUser } from '@/lib/auth/session-user'
 
 function generateClassCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -21,7 +22,7 @@ function generateClassCode(): string {
 
 async function getAuthUser() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   return user
 }
 

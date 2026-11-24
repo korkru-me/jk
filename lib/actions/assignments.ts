@@ -39,6 +39,7 @@ import { sanitizeRichTextForStorage } from '@/lib/rich-text-sanitize'
 import { notifyAssignmentPublished } from '@/lib/assignment-publication-notifications'
 import { fileAssignmentDescription, isFileAssignment } from '@/lib/file-assignment'
 import { ASSIGNMENT_NOTIFICATION_WARNING, ASSIGNMENT_NOTIFICATION_WARNING_PARAM } from '@/lib/assignment-publication-feedback'
+import { getSessionUser } from '@/lib/auth/session-user'
 
 async function publicationNotificationWarning(assignmentId: string, actorId: string): Promise<string | undefined> {
   try {
@@ -210,7 +211,7 @@ export async function createAssignment(data: CreateAssignmentData) {
 // The trusted context is constructed only after creating an owned inline file prompt.
 export async function createInlineFileAssignment(data: CreateAssignmentData, assignmentId: string, questionId: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   const { data: question } = await supabase.from('questions').select('id, created_by, question_text, extra_data')
     .eq('id', questionId).eq('created_by', user.id).maybeSingle()
@@ -230,7 +231,7 @@ export async function createInlineFileAssignment(data: CreateAssignmentData, ass
 
 async function createQuestionAssignment(data: CreateAssignmentData, inline?: { assignmentId: string; questionId: string }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   if (data.classroom_ids.length === 0) return { error: 'กรุณาเลือกห้องเรียนอย่างน้อย 1 ห้อง' }
@@ -557,7 +558,7 @@ async function createQuestionAssignment(data: CreateAssignmentData, inline?: { a
 
 export async function updateAssignmentStatus(id: string, status: AssignmentStatus) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   let clearExpiredEndAt = false
@@ -692,7 +693,7 @@ interface UpdateAssignmentData {
 
 export async function updateAssignment(id: string, data: UpdateAssignmentData) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   if (!await canManageAssignment(id, user.id)) return { error: 'ไม่พบชุดข้อสอบ' }
   const admin = createAdminClient()
@@ -1111,7 +1112,7 @@ export async function updateAssignment(id: string, data: UpdateAssignmentData) {
 
 export async function deleteAssignment(id: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   // Fetch the home classroom before deleting so we have somewhere to send
@@ -1152,7 +1153,7 @@ export async function updateAssignmentGroupTargets(
   targets: Record<string, string[] | null>,
 ) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   if (!await canManageAssignment(assignmentId, user.id)) return { error: 'ไม่มีสิทธิ์แก้ไขงานนี้' }
   if (!targets || typeof targets !== 'object' || Array.isArray(targets)) return { error: 'ข้อมูลกลุ่มที่มอบหมายไม่ถูกต้อง' }
@@ -1206,7 +1207,7 @@ export async function updateAssignmentGroupTargets(
 
 export async function getMyAssignments() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return []
 
   const { data } = await supabase
