@@ -6,6 +6,7 @@ import { canManageAssignment } from '@/lib/auth/assignment-access'
 import { linkReachesGroup } from '@/lib/classroom-groups'
 import { fetchAllRows, SUPABASE_IN_FILTER_CHUNK_SIZE } from '@/lib/supabase/fetch-all-rows'
 import { isAssignmentReminderId, missingSubmissionStudentIds, reminderAssignmentIsPublished } from '@/lib/assignment-reminders'
+import { getSessionUser } from '@/lib/auth/session-user'
 
 const SEND_ERROR = 'เผยแพร่งานแล้ว แต่แจ้งนักเรียนไม่สำเร็จ กรุณาลองเผยแพร่หรือบันทึกการมอบหมายอีกครั้ง'
 type PublicationResult = { success: true; notified: number } | { error: string }
@@ -31,7 +32,7 @@ export async function notifyAssignmentPublished(assignmentId: string, actorId: s
   let notified = 0
   try {
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const { data: { user }, error: authError } = await getSessionUser(supabase)
     if (authError || !user || user.id !== actorId) return { error: SEND_ERROR }
     const { data: profile, error: profileError } = await supabase.from('users').select('role, status').eq('id', user.id).maybeSingle()
     if (profileError || !profile || profile.status !== 'active' || !['teacher', 'admin'].includes(profile.role)) return { error: SEND_ERROR }

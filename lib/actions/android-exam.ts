@@ -12,6 +12,7 @@ import {
   type AndroidApprovalStatus,
 } from '@/lib/android-exam'
 import { androidExamSessionCookieName } from '@/lib/android-exam-session'
+import { getSessionUser } from '@/lib/auth/session-user'
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const APPROVAL_LIFETIME_MS = 12 * 60 * 60_000
@@ -78,7 +79,7 @@ async function getStudentExamContext(
 
 export async function requestAndroidExamAccess(assignmentId: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'กรุณาเข้าสู่ระบบใหม่' }
   if (!UUID_PATTERN.test(assignmentId)) return { error: 'ข้อมูลข้อสอบไม่ถูกต้อง' }
   if (!androidRequest(await headers())) {
@@ -121,7 +122,7 @@ export async function requestAndroidExamAccess(assignmentId: string) {
 
 export async function getAndroidExamApprovalStatus(assignmentId: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'กรุณาเข้าสู่ระบบใหม่' }
   if (!UUID_PATTERN.test(assignmentId)) return { error: 'ข้อมูลข้อสอบไม่ถูกต้อง' }
 
@@ -144,7 +145,7 @@ export async function getAndroidExamApprovalStatus(assignmentId: string) {
 
 export async function activateAndroidExamSession(assignmentId: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'กรุณาเข้าสู่ระบบใหม่' }
   if (!UUID_PATTERN.test(assignmentId)) return { error: 'ข้อมูลข้อสอบไม่ถูกต้อง' }
   if (!androidRequest(await headers())) {
@@ -199,7 +200,7 @@ export async function reviewAndroidExamAccess(
   decision: 'approve' | 'deny',
 ) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   if (decision !== 'approve' && decision !== 'deny') return { error: 'คำสั่งอนุมัติไม่ถูกต้อง' }
   if (!UUID_PATTERN.test(assignmentId) || !UUID_PATTERN.test(studentId)) {

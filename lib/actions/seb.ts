@@ -26,6 +26,7 @@ import {
   sebSessionCookieName,
   validateSebChallenge,
 } from '@/lib/seb-session'
+import { getSessionUser } from '@/lib/auth/session-user'
 
 interface VerifySebInput {
   assignmentId: string
@@ -58,7 +59,7 @@ function requestOrigin(headerStore: Headers) {
 
 export async function verifySafeExamBrowser(input: VerifySebInput) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'กรุณาเข้าสู่ระบบใหม่' }
   if (!UUID_PATTERN.test(input.assignmentId)) return { error: 'ข้อมูลข้อสอบไม่ถูกต้อง' }
 
@@ -178,7 +179,7 @@ export async function getSebSystemCheckData(
   sebChallenge?: string,
 ) {
   const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  const { data: { user }, error: authError } = await getSessionUser(supabase)
   if (isAuthRetryableFetchError(authError)) return { error: AUTH_UNAVAILABLE_MESSAGE }
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ', unauthenticated: true as const }
   if (!UUID_PATTERN.test(assignmentId)) return { error: 'ข้อมูลข้อสอบไม่ถูกต้อง' }

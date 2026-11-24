@@ -24,6 +24,7 @@ import type {
   ClassroomCoTeacherPermission,
   PracticeClassroomOption,
 } from './teacher-contract'
+import { getSessionUser } from '@/lib/auth/session-user'
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
 
@@ -286,7 +287,7 @@ export async function authenticatePracticeTeacher(supabase: SupabaseServerClient
   | { ok: true; userId: string }
   | { ok: false; error: string; unauthenticated?: boolean }
 > {
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  const { data: { user }, error: authError } = await getSessionUser(supabase)
   if (isAuthRetryableFetchError(authError)) return { ok: false, error: AUTH_UNAVAILABLE_MESSAGE }
   if (!user) return { ok: false, error: 'ไม่ได้เข้าสู่ระบบ', unauthenticated: true }
 

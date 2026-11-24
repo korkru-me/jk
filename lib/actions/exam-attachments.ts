@@ -16,6 +16,7 @@ import {
 } from '@/lib/exam-attachment'
 import { inspectStoredExamAttachment } from '@/lib/exam-attachment-storage.server'
 import { parseFileAssignmentResponse } from '@/lib/file-assignment'
+import { getSessionUser } from '@/lib/auth/session-user'
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -65,7 +66,7 @@ export async function prepareExamAttachmentUpload(input: {
   size: number
 }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   if (!UUID_PATTERN.test(input.submissionAnswerId)) return { error: 'คำตอบไม่ถูกต้อง' }
   if (input.uploadId !== undefined && !UUID_PATTERN.test(input.uploadId)) {
@@ -148,7 +149,7 @@ export async function completeExamAttachmentUpload(input: {
   size: number
 }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   if (!UUID_PATTERN.test(input.submissionAnswerId) || !UUID_PATTERN.test(input.uploadId)) {
     return { error: 'ไฟล์อัปโหลดไม่ถูกต้อง' }
@@ -196,7 +197,7 @@ export async function deleteExamAttachment(input: {
   url: string
 }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   if (!UUID_PATTERN.test(input.submissionAnswerId)) return { error: 'คำตอบไม่ถูกต้อง' }
   if (!isExamAttachmentKind(input.kind)) return { error: 'ประเภทไฟล์ไม่ถูกต้อง' }

@@ -15,6 +15,7 @@ import type { Variable, LogicRule, MCQOption, AnswerPart, Question, QuestionType
 import { safeQuestionsRedirect } from '@/lib/question-return'
 import { questionSearchOrClauses } from '@/lib/question-search'
 import { planQuestionRegrading, commitQuestionRegrading } from '@/lib/question-regrading.server'
+import { getSessionUser } from '@/lib/auth/session-user'
 
 export interface QuestionFormData {
   title: string
@@ -100,7 +101,7 @@ export async function getQuestionClientDetail(questionId: string): Promise<
     .maybeSingle()
 
   const [{ data: { user } }, { data, error }] = await Promise.all([
-    supabase.auth.getUser(),
+    getSessionUser(supabase),
     questionQuery,
   ])
 
@@ -133,7 +134,7 @@ export async function resolveOrgId(visibility: Visibility, chosenOrgId?: string 
 
 export async function createQuestion(data: QuestionFormData) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   const orgResult = await resolveOrgId(data.visibility, data.org_id)
@@ -210,7 +211,7 @@ function resolveMcqOptions(data: QuestionFormData) {
 
 export async function updateQuestion(id: string, data: QuestionFormData) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   const { data: existing } = await supabase
@@ -319,7 +320,7 @@ export async function updateQuestion(id: string, data: QuestionFormData) {
  */
 export async function shareQuestionToOrg(questionId: string, orgId: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   const { error } = await supabase
@@ -345,7 +346,7 @@ export async function shareQuestionToOrg(questionId: string, orgId: string) {
  */
 export async function updateQuestionTags(id: string, tags: string[]) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   // Same normalization the tag input applies, so a tag added from the card and
@@ -371,7 +372,7 @@ export async function updateQuestionTags(id: string, tags: string[]) {
 
 export async function deleteQuestion(id: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   // Read before deleting: once the row is gone there is nothing left to say
@@ -444,7 +445,7 @@ export interface CreateFormulaPresetInput {
 
 export async function createFormulaPreset(input: CreateFormulaPresetInput) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   const { data, error } = await supabase
@@ -466,7 +467,7 @@ export async function createFormulaPreset(input: CreateFormulaPresetInput) {
 
 export async function searchQuestions(query: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return []
 
   const { data: tagRows } = await supabase

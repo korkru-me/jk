@@ -11,6 +11,7 @@ import { releaseQuestionFiles } from '@/lib/storage-release'
 import { sanitizeRichTextForStorage } from '@/lib/rich-text-sanitize'
 import type { Variable, Difficulty, Visibility } from '@/lib/types'
 import { RETURN_PARAM } from '@/lib/question-return'
+import { getSessionUser } from '@/lib/auth/session-user'
 
 export interface SubQuestionData {
   id?: string
@@ -67,7 +68,7 @@ async function syncGroupShares(
 
 export async function saveQuestionGroup(payload: QuestionGroupPayload) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   if (payload.subQuestions.length === 0) return { error: 'ต้องมีอย่างน้อย 1 ข้อย่อย' }
@@ -210,7 +211,7 @@ export async function saveQuestionGroup(payload: QuestionGroupPayload) {
 
 export async function deleteQuestionGroup(groupId: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   // Every row in the group, read before the delete — a group's pictures are

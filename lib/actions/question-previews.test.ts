@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({ createClient: vi.fn() }))
+vi.mock('@/lib/auth/session-user', () => import('@/lib/auth/session-user-test-double'))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 import { getQuestionPreviewDetails } from './question-previews'
 

@@ -11,6 +11,7 @@ import { normalizeQuestionText } from '@/lib/question-content-match'
 import { withContentFingerprint } from '@/lib/question-fingerprint'
 import { fileQuestionsIntoSets } from '@/lib/question-set-filing'
 import { z } from 'zod'
+import { getSessionUser } from '@/lib/auth/session-user'
 
 type QuestionRow = Question & { question_categories?: { name: string } | null }
 
@@ -24,7 +25,7 @@ export async function exportQuestions(ids: string[]) {
   const uniqueIds = [...new Set(parsed.data)]
 
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   const byId = new Map<string, QuestionRow>()
@@ -49,7 +50,7 @@ export async function exportQuestions(ids: string[]) {
 
 export async function exportQuestionSet(setId: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   const { data: set, error: setError } = await supabase
@@ -98,7 +99,7 @@ export async function checkImportDuplicates(raw: string): Promise<
   { error: string } | { duplicates: DuplicateHit[]; total: number }
 > {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   const parsed = parseExportFile(raw)
@@ -256,7 +257,7 @@ export async function importQuestionsFromFile(
   fileIntoSetIds: string[] = [],
 ) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   const orgId = await getMyOrgId()

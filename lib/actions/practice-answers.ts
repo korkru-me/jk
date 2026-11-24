@@ -30,6 +30,7 @@ import {
 } from '@/lib/practice-variant.server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { getSessionUser } from '@/lib/auth/session-user'
 
 const checkSchema = z.object({
   libraryId: z.string().uuid(),
@@ -69,7 +70,7 @@ export async function checkPracticeAnswer(input: unknown): Promise<PracticeAnswe
 
   try {
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const { data: { user }, error: authError } = await getSessionUser(supabase)
     if (authError || !user) return { ok: false, error: 'กรุณาเข้าสู่ระบบอีกครั้ง' }
 
     const secret = practiceVariantSecret(process.env)

@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   session: vi.fn(), admin: vi.fn(), manage: vi.fn(), writable: vi.fn(), saveReview: vi.fn(),
   studentAccess: vi.fn(), questions: vi.fn(), retry: vi.fn(), gradingState: vi.fn(),
 }))
+vi.mock('@/lib/auth/session-user', () => import('@/lib/auth/session-user-test-double'))
 vi.mock('server-only', () => ({}))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.session }))

@@ -16,6 +16,7 @@ import {
   composeQuestionSetDescription, isQuestionSetTheme, parseQuestionSetDescription,
   questionSetTheme, randomQuestionSetTheme,
 } from '@/lib/question-set-theme'
+import { getSessionUser } from '@/lib/auth/session-user'
 
 export interface QuestionSetData {
   title: string
@@ -71,7 +72,7 @@ export async function getQuestionSetShareOrgIds(setId: string): Promise<string[]
 export async function createQuestionSet(data: QuestionSetData) {
   if (data.theme !== undefined && data.theme !== '' && !isQuestionSetTheme(data.theme)) return { error: 'ธีมสีไม่ถูกต้อง' }
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   if (!data.title.trim()) return { error: 'กรุณาตั้งชื่อแฟ้มโจทย์' }
 
@@ -138,7 +139,7 @@ export async function updateQuestionSet(id: string, data: QuestionSetData) {
 async function writeQuestionSet(id: string, data: QuestionSetData) {
   if (data.theme !== undefined && data.theme !== '' && !isQuestionSetTheme(data.theme)) return { error: 'ธีมสีไม่ถูกต้อง' }
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   if (!data.title.trim()) return { error: 'กรุณาตั้งชื่อแฟ้มโจทย์' }
 
@@ -218,7 +219,7 @@ export async function addQuestionsToSets(
   questionIds: string[],
 ): Promise<AddQuestionsToSetsResult> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   const inline = await supabase.from('questions').select('id').in('id', questionIds).not('extra_data->file_assignment_id', 'is', null)
@@ -259,7 +260,7 @@ export async function removeQuestionsFromQuestionSet(
   questionIds: string[],
 ): Promise<RemoveQuestionsFromSetResult> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   const removing = [...new Set(questionIds)].filter(Boolean)
@@ -291,7 +292,7 @@ export async function removeQuestionsFromQuestionSet(
 
 export async function deleteQuestionSet(id: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   const { error } = await supabase
@@ -321,7 +322,7 @@ export interface QuestionSetOption {
  */
 export async function getMyQuestionSetOptions(): Promise<QuestionSetOption[]> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return []
 
   const { data } = await supabase
@@ -335,7 +336,7 @@ export async function getMyQuestionSetOptions(): Promise<QuestionSetOption[]> {
 
 export async function getMyQuestionSets(): Promise<QuestionSet[]> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return []
 
   const { data } = await supabase
@@ -350,7 +351,7 @@ export async function getMyQuestionSets(): Promise<QuestionSet[]> {
 /** Sets visible via a team — either its home org or an additional share. */
 export async function getTeamQuestionSets(): Promise<QuestionSetWithCreator[]> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return []
 
   const teamOrgIds = await getMyTeamOrgIds()

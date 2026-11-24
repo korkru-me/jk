@@ -11,6 +11,7 @@ import {
   type CreateEducationResearchProjectInput,
   type ResearchMeasurementDraft,
 } from '@/lib/education-research'
+import { getSessionUser } from '@/lib/auth/session-user'
 
 const sectionSchema = z.object({
   id: z.string().min(1).max(120),
@@ -146,7 +147,7 @@ export async function createEducationResearchProject(input: CreateEducationResea
   if (!parsed.success) return { error: firstValidationError(parsed.error) }
 
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).maybeSingle()
@@ -195,7 +196,7 @@ export async function updateEducationResearchSchedule(input: z.input<typeof sche
   if (!parsed.success) return { error: firstValidationError(parsed.error) }
 
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   const { data: measurement } = await supabase
@@ -266,7 +267,7 @@ export async function updateEducationResearchProjectDetails(input: z.input<typeo
   if (!parsed.success) return { error: firstValidationError(parsed.error) }
 
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   const { data: project } = await supabase
@@ -320,7 +321,7 @@ export async function saveManualResearchScoreDraft(input: z.input<typeof manualS
   if (!parsed.success) return { error: firstValidationError(parsed.error) }
 
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   const { data, error } = await supabase.rpc('save_education_research_manual_draft', {
@@ -338,7 +339,7 @@ export async function confirmManualResearchScores(input: z.input<typeof manualSc
   if (!parsed.success) return { error: firstValidationError(parsed.error) }
 
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   const { data, error } = await supabase.rpc('confirm_education_research_manual_scores', {
@@ -364,7 +365,7 @@ export async function confirmEducationResearchImportBatch(input: z.input<typeof 
   if (!parsed.success) return { error: firstValidationError(parsed.error) }
 
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   const { data: batch } = await supabase

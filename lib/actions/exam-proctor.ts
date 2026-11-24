@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import { normalizeProctorEvents } from '@/lib/exam-proctor'
 import { getExamAccessSession } from '@/lib/exam-access-session'
 import { readWithSubmissionRevision } from '@/lib/submission-revision-compatibility'
+import { getSessionUser } from '@/lib/auth/session-user'
 
 interface ProctorAssignmentRow {
   proctoring_enabled: boolean | null
@@ -43,7 +44,7 @@ interface ProctorEventAcknowledgementRow {
 
 export async function recordProctorSignal(input: RecordProctorSignalInput) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   if (!UUID_PATTERN.test(input.submissionId)) return { error: 'ข้อมูลการสอบไม่ถูกต้อง' }
@@ -117,7 +118,7 @@ export async function recordProctorSignal(input: RecordProctorSignalInput) {
 
 export async function acknowledgeProctorEvents(assignmentId: string, eventIds: number[]) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   if (!UUID_PATTERN.test(assignmentId)) return { error: 'ข้อมูลชุดข้อสอบไม่ถูกต้อง' }
   if (!Array.isArray(eventIds) || eventIds.length < 1 || eventIds.length > 100) {

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const m = vi.hoisted(() => ({ client: vi.fn(), admin: vi.fn(), membership: vi.fn(), pool: vi.fn(),
   access: vi.fn(), release: vi.fn(), revalidate: vi.fn() }))
+vi.mock('@/lib/auth/session-user', () => import('@/lib/auth/session-user-test-double'))
 vi.mock('server-only', () => ({}))
 vi.mock('next/cache', () => ({ revalidatePath: m.revalidate }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: m.client }))
