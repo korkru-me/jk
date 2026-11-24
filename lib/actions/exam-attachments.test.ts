@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   remove: vi.fn(),
 }))
 
+vi.mock('@/lib/auth/session-user', () => import('@/lib/auth/session-user-test-double'))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: mocks.createAdminClient }))
 vi.mock('@/lib/exam-write-access', () => ({

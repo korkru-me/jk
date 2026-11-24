@@ -49,6 +49,7 @@ import {
 } from '@/lib/drawing-board-svg.server'
 import { upgradeLegacyTeacherScene } from '@/lib/drawing-board-legacy.server'
 import type { ScratchpadScene } from '@/lib/scratchpad'
+import { getSessionUser } from '@/lib/auth/session-user'
 
 const SIGNED_READ_SECONDS = 5 * 60
 
@@ -503,7 +504,7 @@ export async function prepareTeachingQuestionImage(input: {
   sourceUrl: string
 }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   const claimSecret = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!claimSecret || claimSecret.length < 20) return { error: 'ระบบตรวจสอบรูปโจทย์ยังไม่พร้อมใช้งาน' }
@@ -583,7 +584,7 @@ export async function duplicateTeachingBoardScene(input: {
   scene: unknown
 }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   if (!isUuid(input.assignmentId) || !isUuid(input.questionId)) return { error: 'งานหรือโจทย์ไม่ถูกต้อง' }
   const managed = await loadManagedTeachingBoardContext(supabase, input.assignmentId, input.questionId)
@@ -690,7 +691,7 @@ export async function duplicateTeachingBoardScene(input: {
 export async function getTeachingBoardScene(boardId: string) {
   if (!isUuid(boardId)) return { error: 'กระดานสอนไม่ถูกต้อง' }
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   const { data: board, error } = await supabase
     .from('teaching_boards')
@@ -758,7 +759,7 @@ export async function prepareStudentWorkArtifactUpload(input: {
   scene?: unknown
 }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   if (!isUuid(input.submissionAnswerId)) return { error: 'คำตอบไม่ถูกต้อง' }
   if (!isWorkPartKey(input.partKey)) return { error: 'ตำแหน่งวิธีทำไม่ถูกต้อง' }
@@ -840,7 +841,7 @@ export async function saveStudentWorkArtifact(input: {
   previewFormat: string
 }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   if (!isUuid(input.submissionAnswerId) || !isUuid(input.uploadId)) return { error: 'ไฟล์วิธีทำไม่ถูกต้อง' }
   if (!isWorkPartKey(input.partKey)) return { error: 'ตำแหน่งวิธีทำไม่ถูกต้อง' }
@@ -938,7 +939,7 @@ export async function saveStudentWorkArtifact(input: {
 export async function getStudentWorkArtifacts(submissionAnswerId: string) {
   if (!isUuid(submissionAnswerId)) return { error: 'คำตอบไม่ถูกต้อง' }
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   const { data: rows, error } = await supabase
@@ -974,7 +975,7 @@ export async function getStudentWorkArtifacts(submissionAnswerId: string) {
 export async function deleteStudentWorkArtifact(artifactId: string) {
   if (!isUuid(artifactId)) return { error: 'วิธีทำไม่ถูกต้อง' }
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   const { data: artifact } = await supabase
@@ -1006,7 +1007,7 @@ export async function prepareTeachingBoardUpload(input: {
   scene: unknown
 }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   if (!isUuid(input.assignmentId) || !isUuid(input.questionId)) return { error: 'งานหรือโจทย์ไม่ถูกต้อง' }
   if (!isTeachingBoardSlot(input.slot)) return { error: `ช่องบันทึกต้องอยู่ระหว่าง 1–${TEACHING_BOARD_SLOT_COUNT}` }
@@ -1084,7 +1085,7 @@ export async function saveTeachingBoard(input: {
   previewFormat: string
 }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   if (!isUuid(input.assignmentId) || !isUuid(input.questionId) || !isUuid(input.uploadId)) {
     return { error: 'กระดานสอนไม่ถูกต้อง' }
@@ -1179,7 +1180,7 @@ export async function saveTeachingBoard(input: {
 export async function getTeachingBoards(assignmentId: string, questionId: string) {
   if (!isUuid(assignmentId) || !isUuid(questionId)) return { error: 'งานหรือโจทย์ไม่ถูกต้อง' }
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   const [{ data: rows, error }, { data: canManage }] = await Promise.all([
@@ -1225,7 +1226,7 @@ export async function getTeachingBoards(assignmentId: string, questionId: string
 export async function deleteTeachingBoard(boardId: string) {
   if (!isUuid(boardId)) return { error: 'กระดานสอนไม่ถูกต้อง' }
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   const { data: board } = await supabase

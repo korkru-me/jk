@@ -8,6 +8,7 @@ const state = vi.hoisted(() => ({
   writes: [] as Record<string, unknown>[],
   reads: [] as string[],
 }))
+vi.mock('@/lib/auth/session-user', () => import('@/lib/auth/session-user-test-double'))
 vi.mock('@/lib/supabase/server', () => ({ createClient: async () => ({
   auth: { getUser: async () => ({ data: { user: state.user ? { id: state.user } : null } }) },
   from: (table: string) => {

@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   buildFreshRandomQuestion: vi.fn(),
 }))
 
+vi.mock('@/lib/auth/session-user', () => import('@/lib/auth/session-user-test-double'))
 vi.mock('server-only', () => ({}))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))

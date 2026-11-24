@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({ session: vi.fn(), notify: vi.fn(), revalidate: vi.fn() }))
+vi.mock('@/lib/auth/session-user', () => import('@/lib/auth/session-user-test-double'))
 vi.mock('server-only', () => ({}))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.session }))
 vi.mock('@/lib/assignment-publication-notifications', () => ({ notifyAssignmentPublished: mocks.notify }))

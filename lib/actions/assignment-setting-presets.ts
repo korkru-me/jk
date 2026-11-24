@@ -8,6 +8,7 @@ import {
   type AssignmentPresetActionResult, type SaveAssignmentSettingPresetInput,
 } from '@/lib/assignment-setting-presets'
 import type { AssignmentType } from '@/lib/types'
+import { getSessionUser } from '@/lib/auth/session-user'
 
 const identitySchema = z.object({
   type: assignmentPresetTypeSchema,
@@ -25,7 +26,7 @@ const LOAD_ERROR = 'ยังโหลดชุดการตั้งค่า
 
 async function presetSession() {
   const supabase = await createClient()
-  const { data: { user }, error } = await supabase.auth.getUser()
+  const { data: { user }, error } = await getSessionUser(supabase)
   if (error || !user) return { error: 'กรุณาเข้าสู่ระบบก่อนใช้ชุดการตั้งค่า' } as const
   const { data: profile, error: profileError } = await supabase.from('users')
     .select('role, status').eq('id', user.id).maybeSingle()

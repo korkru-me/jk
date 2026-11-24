@@ -9,6 +9,7 @@ import { getExamAccessSession } from '@/lib/exam-access-session'
 import { MATH_WORK_BUCKET, type StudentWorkArtifactView } from '@/lib/math-work'
 import { loadStudentSolutionWatermark } from '@/lib/solution-watermark-server'
 import type { SolutionWatermarkData } from '@/lib/solution-watermark'
+import { getSessionUser } from '@/lib/auth/session-user'
 
 type TakingSubmissionRow = Pick<Submission, 'id' | 'started_at' | 'assignment_id' | 'student_id' | 'status' | 'exam_access_mode' | 'current_streak' | 'best_streak' | 'streak_reached'> & {
   seb_config_revision?: number | null
@@ -63,7 +64,7 @@ export interface ExamTakingData {
  */
 export async function getExamTakingData(submissionId: string): Promise<ExamTakingData | null> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return null
 
   const admin = createAdminClient()

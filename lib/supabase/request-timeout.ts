@@ -31,7 +31,12 @@ export function createSupabaseTimeoutFetch(
       ? null
       : url.pathname.startsWith('/rest/v1/')
         ? readTimeoutMs
-        : url.pathname === '/auth/v1/user' ? authUserTimeoutMs : null
+        // getClaims() fetches the public signing keys at most once per
+        // 10 minutes per server instance; a stalled fetch must not hold a
+        // request any longer than the user check it replaces.
+        : url.pathname === '/auth/v1/user' || url.pathname === '/auth/v1/.well-known/jwks.json'
+          ? authUserTimeoutMs
+          : null
     if (timeoutMs === null) return send(input, init)
 
     const timeoutSignal = AbortSignal.timeout(timeoutMs)

@@ -13,6 +13,7 @@ import {
 } from '@/lib/ioc-form'
 import { filterSectionsToQuestions, parseSections, type QuestionSetSection } from '@/lib/question-set-sections'
 import type { LearningStandard, MCQOption } from '@/lib/types'
+import { getSessionUser } from '@/lib/auth/session-user'
 
 const headerSchema = z.object({
   exam_title: z.string().max(300),
@@ -65,7 +66,7 @@ function headerErrorMessage(header: IocHeaderInput): string | null {
 
 async function requireTeacher() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' as const }
 
   const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).maybeSingle()

@@ -45,6 +45,7 @@ import { readWithSubmissionRevision } from '@/lib/submission-revision-compatibil
 import { parseRandomValues, sameRandomValues } from '@/lib/math/fresh-random-values'
 import { drawsRandomValues } from '@/lib/math/shared-random'
 import { saveGradingReview } from '@/lib/actions/grading-review'
+import { getSessionUser } from '@/lib/auth/session-user'
 
 type EntrySubmissionRow = Pick<Submission, 'id' | 'status' | 'attempt_number' | 'started_at' | 'exam_access_mode'> & { seb_config_revision?: number | null; closed_at?: string | null; close_reason?: 'manual' | 'time_limit' | 'close_time' | null }
 type StreakSubmissionRow = Pick<Submission, 'id' | 'student_id' | 'status' | 'started_at' | 'assignment_id' | 'exam_access_mode' | 'current_streak' | 'best_streak' | 'streak_reached'> & { seb_config_revision?: number | null; assignments: unknown }
@@ -109,7 +110,7 @@ async function submissionEntry(
   waiting?: { readOnlyWaiting: true } | { previousSubmissionId: string | null; operation: 'start' | 'resume' | 'recover' },
 ) {
   const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  const { data: { user }, error: authError } = await getSessionUser(supabase)
   if (isAuthRetryableFetchError(authError)) return { error: AUTH_UNAVAILABLE_MESSAGE }
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ', unauthenticated: true }
   const admin = createAdminClient()
@@ -635,7 +636,7 @@ export async function saveAnswer(
   expectedRandomValues?: unknown,
 ) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   if (typeof studentAnswer !== 'string') return { error: 'รูปแบบคำตอบไม่ถูกต้อง' }
   if (studentAnswer.length > 500_000) return { error: 'คำตอบมีขนาดใหญ่เกินไป' }
@@ -699,7 +700,7 @@ export async function saveAnswer(
 // by answer_parts[].id.
 export async function saveWorkImage(submissionAnswerId: string, partIndex: number, url: string | null) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   if (!Number.isInteger(partIndex) || partIndex < 0 || partIndex > 50) return { error: 'ตำแหน่งรูปไม่ถูกต้อง' }
   const admin = createAdminClient()
@@ -763,7 +764,7 @@ export async function saveWorkImage(submissionAnswerId: string, partIndex: numbe
  */
 export async function checkAnswer(submissionAnswerId: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   const admin = createAdminClient()
 
@@ -942,7 +943,7 @@ export async function checkAnswer(submissionAnswerId: string) {
 export async function rerollCheckedRandomAnswer(submissionAnswerId: string, reason: 'retry' | 'refresh' = 'retry', expectedRandomValues?: unknown) {
   if (reason !== 'retry' && reason !== 'refresh') return { error: 'คำสั่งสุ่มโจทย์ไม่ถูกต้อง' }
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   const admin = createAdminClient()
 
@@ -1036,7 +1037,7 @@ export async function drawNextStreakQuestion(
   },
 ) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   const admin = createAdminClient()
 
@@ -1230,7 +1231,7 @@ export async function drawNextStreakQuestion(
 // grading workspace; every accepted legacy save uses its same atomic RPC.
 export async function updateSubmissionAnswerScore(submissionAnswerId: string, newScore: number) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   if (!Number.isFinite(newScore) || newScore < 0) return { error: 'คะแนนไม่ถูกต้อง' }
 
@@ -1268,7 +1269,7 @@ export async function updateSubmissionAnswerScore(submissionAnswerId: string, ne
 
 export async function submitSubmission(submissionId: string, group?: { classroomId: string; peers: string[] }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   if (group && (typeof group.classroomId !== 'string' || !Array.isArray(group.peers)
     || group.peers.length > 299 || group.peers.some(id => typeof id !== 'string' || !/^[0-9a-f-]{36}$/i.test(id)))) {
@@ -1292,7 +1293,7 @@ export async function finalizeExpiredSubmission(submissionId: string) {
     return { error: 'คำขอยืนยันรอบทำงานไม่ถูกต้อง' }
   }
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ กรุณาเข้าสู่ระบบเพื่อยืนยันผลรอบเดิม' }
   const result = await gradeAndFinalizeSubmission(createAdminClient(), submissionId, user.id, {
     enforceWorkImage: false, enforceSecureBrowser: false, expiredOnly: true,

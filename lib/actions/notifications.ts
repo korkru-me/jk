@@ -14,9 +14,10 @@ import {
   type AssignmentNoticeKind, type AssignmentNoticeRecord, type PendingAssignmentNotice,
   type PendingAssignmentReminder, type ReminderSubmission,
 } from '@/lib/assignment-reminders'
+import { getSessionUser } from '@/lib/auth/session-user'
 
 async function getAuthUser(supabase: Awaited<ReturnType<typeof createClient>>) {
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   return user
 }
 
@@ -176,7 +177,7 @@ type ReminderSession = { supabase: Awaited<ReturnType<typeof createClient>>; use
 
 async function reminderSession(kind: 'sender' | 'student'): Promise<ReminderSession | { error: string }> {
   const supabase = await createClient()
-  const { data: { user }, error } = await supabase.auth.getUser()
+  const { data: { user }, error } = await getSessionUser(supabase)
   if (error || !user) return { error: 'กรุณาเข้าสู่ระบบใหม่' }
   const { data: profile, error: profileError } = await supabase.from('users').select('role, status').eq('id', user.id).maybeSingle()
   if (profileError || !profile || profile.status !== 'active'

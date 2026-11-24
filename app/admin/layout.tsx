@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { getAuthUser } from '@/lib/auth/server'
+import { getVerifiedAuthUser as getAuthUser } from '@/lib/auth/server'
 import { isProfileRowMissing, PROFILE_READ_FAILED_MESSAGE } from '@/lib/auth/profile-read'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { AdminSidebar } from '@/components/admin/admin-sidebar'

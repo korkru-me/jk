@@ -3,6 +3,7 @@ import { fileAssignmentDescription, serializeFileAssignmentResponse } from '@/li
 import { gradeAndFinalizeSubmission } from '@/lib/submission-finalization.server'
 
 const m = vi.hoisted(() => ({ client: vi.fn(), admin: vi.fn(), access: vi.fn(), manage: vi.fn(), inline: vi.fn(), start: vi.fn(), submit: vi.fn(), org: vi.fn(), rooms: vi.fn(), source: vi.fn(), context: vi.fn() }))
+vi.mock('@/lib/auth/session-user', () => import('@/lib/auth/session-user-test-double'))
 vi.mock('server-only', () => ({}))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('next/navigation', () => ({ redirect: vi.fn() }))
