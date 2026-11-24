@@ -11,6 +11,7 @@ import {
   IOC_MAX_LINK_DAYS,
   iocLinkExpiry,
 } from '@/lib/ioc-token'
+import { getSessionUser } from '@/lib/auth/session-user'
 
 const issueSchema = z.object({
   form_id: z.string().uuid(),
@@ -33,7 +34,7 @@ function firstValidationError(error: z.ZodError): string {
 
 async function requireFormManager(formId: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' as const }
 
   const { data: form } = await supabase

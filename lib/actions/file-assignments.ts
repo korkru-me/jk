@@ -14,6 +14,7 @@ import { fileAssignmentInstructionStoragePath } from '@/lib/question-file-select
 import { fileAssignmentDescription, fileAssignmentGroupSettings, fileAssignmentQuestionOwner, fileAssignmentSubmitError, fileAssignmentWithdrawalError, isFileAssignment, normalizeFileAssignmentLateSchedule, parseFileAssignmentResponse, type FileAssignmentGroupInput, type FileAssignmentView } from '@/lib/file-assignment'
 import { exerciseGroupResultSource, readExerciseGroupContext } from '@/lib/exercise-group.server'
 import type { ExerciseGroupSelection } from '@/lib/exercise-group'
+import { getSessionUser } from '@/lib/auth/session-user'
 
 function instructionStorageOrigin(): string | null {
   try { return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').origin } catch { return null }
@@ -32,7 +33,7 @@ export interface CreateFileAssignmentInput extends FileAssignmentGroupInput {
 
 export async function createFileAssignment(input: CreateFileAssignmentInput) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   if (!input || typeof input.title !== 'string' || !input.title.trim() || input.title.length > 200) return { error: 'กรุณาระบุชื่องานไม่เกิน 200 ตัวอักษร' }
   if (typeof input.instructions !== 'string' || input.instructions.length > 100_000) return { error: 'คำสั่งของงานไม่ถูกต้อง' }
@@ -95,7 +96,7 @@ export async function createFileAssignment(input: CreateFileAssignmentInput) {
 /** Manager DTO contains only the fields the file-work editor needs. */
 export async function readFileAssignmentEditor(assignmentId: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user || !await canManageAssignment(assignmentId, user.id)) return { error: 'คุณไม่มีสิทธิ์แก้ไขงานนี้' } as const
   const admin = createAdminClient()
   const { data: assignment } = await admin.from('assignments').select('id, title, description, question_ids, question_points, start_at, due_at, end_at, status, submission_mode, group_min_members, group_max_members')
@@ -143,7 +144,7 @@ export async function updateFileAssignment(assignmentId: string, input: CreateFi
   )
   if (schedule && 'error' in schedule) return schedule
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   const storageOrigin = instructionStorageOrigin()
   if (input.attachment_urls.some(url => {
@@ -175,7 +176,7 @@ export async function updateFileAssignment(assignmentId: string, input: CreateFi
 
 async function ownFileAssignment(assignmentId: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' } as const
   const admin = createAdminClient()
   if (!await studentHasAssignment(admin, assignmentId, user.id)) return { error: 'คุณไม่มีสิทธิ์เข้าถึงงานนี้' } as const

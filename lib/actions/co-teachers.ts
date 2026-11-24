@@ -4,10 +4,11 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { isInviteToken } from '@/lib/invite-token'
 import type { CoTeacherPermission } from '@/lib/types'
+import { getSessionUser } from '@/lib/auth/session-user'
 
 async function getAuthUser() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   return user
 }
 

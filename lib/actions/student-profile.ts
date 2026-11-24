@@ -5,10 +5,11 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import type { StudentProfile, StudentGuardian } from '@/lib/types'
 import { buildFullName } from '@/lib/utils'
+import { getSessionUser } from '@/lib/auth/session-user'
 
 async function getAuthUser() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   return user
 }
 

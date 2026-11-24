@@ -9,6 +9,7 @@ import {
   attachmentPaths, sanitizeAttachments, POST_FILE_PREFIX,
   type PostAttachment,
 } from '@/lib/attachment-display'
+import { getSessionUser } from '@/lib/auth/session-user'
 
 /** The Storage host attachments must come from, checked on every write. */
 const STORAGE_BASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -22,7 +23,7 @@ export interface ReusableAnnouncement {
 
 async function getAuthUser() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   return user
 }
 

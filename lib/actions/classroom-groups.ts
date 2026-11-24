@@ -9,6 +9,7 @@ import {
   normalizeGroupName,
   type ClassroomGroup,
 } from '@/lib/classroom-groups'
+import { getSessionUser } from '@/lib/auth/session-user'
 
 // กลุ่มย่อยของห้องเรียน. Every action authorizes the exact classroom first
 // (owner, or co-teacher admin/manage — the same rule as the tab's other
@@ -25,7 +26,7 @@ type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string }
 async function authorize(classroomId: string): Promise<{ userId: string } | { error: string }> {
   if (!UUID.test(classroomId)) return { error: STALE }
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   const admin = createAdminClient()

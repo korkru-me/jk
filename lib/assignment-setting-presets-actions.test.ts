@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { assignmentPresetDefaults } from './assignment-setting-presets'
 
 const mocks = vi.hoisted(() => ({ createClient: vi.fn(), rpc: vi.fn(), from: vi.fn(), getUser: vi.fn() }))
+vi.mock('@/lib/auth/session-user', () => import('@/lib/auth/session-user-test-double'))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 import {
   loadAssignmentSettingPresets, saveAssignmentSettingPreset,

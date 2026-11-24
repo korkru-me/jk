@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import type { Question } from '@/lib/types'
+import { getSessionUser } from '@/lib/auth/session-user'
 
 export type QuestionPreviewDetail = Pick<Question,
   'id' | 'title' | 'question_text' | 'question_type' | 'is_random' | 'variables'
@@ -18,7 +19,7 @@ export async function getQuestionPreviewDetails(ids: readonly string[]): Promise
     return { error: 'รายการโจทย์ไม่ถูกต้อง' }
   }
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   if (ids.length === 0) return { data: [] }
   const { data, error } = await supabase.from('questions')

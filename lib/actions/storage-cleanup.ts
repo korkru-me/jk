@@ -10,6 +10,7 @@ import {
   type CleanableBucket,
   type StoredFile,
 } from '@/lib/storage-orphans'
+import { getSessionUser } from '@/lib/auth/session-user'
 
 /**
  * Sweeping files nothing points at any more, out of a teacher's own folder.
@@ -161,7 +162,7 @@ async function stillReferenced(
 
 export async function findOrphanFiles(): Promise<FindOrphansResult> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   const admin = createAdminClient()
 
@@ -208,7 +209,7 @@ export async function deleteOrphanFiles(
   paths: string[],
 ): Promise<DeleteOrphansResult> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   if (!(bucket in BUCKET_LABELS)) return { error: 'ไม่รู้จักที่เก็บไฟล์นี้' }
   const admin = createAdminClient()

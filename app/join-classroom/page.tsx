@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/auth/server'
 import { getClassroomInviteInfo } from '@/lib/actions/co-teachers'
 import { JoinClassroomClient } from './_client'
 import { Card } from '@/components/ui/card'
@@ -15,8 +15,7 @@ export default async function JoinClassroomPage({ searchParams }: Props) {
 
   // The invite can only be looked up by a signed-in user, so a visitor who
   // is not signed in yet is told that instead of "invalid link".
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser()
   const info = user ? await getClassroomInviteInfo(token) : null
 
   return (

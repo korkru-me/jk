@@ -5,6 +5,7 @@ import sharp from 'sharp'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { getExamAccessSession } from '@/lib/exam-access-session'
+import { readWithSubmissionRevision } from '@/lib/submission-revision-compatibility'
 import {
   buildStudentWorkUploadPaths,
   buildTeachingBoardUploadPaths,
@@ -48,6 +49,7 @@ import {
 } from '@/lib/drawing-board-svg.server'
 import { upgradeLegacyTeacherScene } from '@/lib/drawing-board-legacy.server'
 import type { ScratchpadScene } from '@/lib/scratchpad'
+import { getSessionUser } from '@/lib/auth/session-user'
 
 const SIGNED_READ_SECONDS = 5 * 60
 
@@ -66,6 +68,43 @@ interface StoredWorkInspection {
   previewSize: number
   sceneSize: number | null
   elementCount: number | null
+}
+
+interface StudentArtifactAssignmentRow {
+  id: string
+  org_id: string
+  mode: string | null
+  duration_minutes: number | null
+  end_at: string | null
+  require_work_image: boolean | null
+  scratchpad_enabled: boolean | null
+  secure_browser_mode: string | null
+  android_exam_mode: string | null
+}
+
+interface StudentArtifactSubmissionRow {
+  id: string
+  org_id: string
+  student_id: string
+  status: string
+  started_at: string
+  assignment_id: string
+  seb_config_revision?: number | null
+  exam_access_mode: string | null
+  assignments: StudentArtifactAssignmentRow | StudentArtifactAssignmentRow[] | null
+}
+
+interface StudentArtifactQuestionRow {
+  question_type: string | null
+  answer_parts: unknown
+}
+
+interface StudentArtifactAnswerRow {
+  id: string
+  org_id: string
+  submission_id: string
+  questions: StudentArtifactQuestionRow | StudentArtifactQuestionRow[] | null
+  submissions: StudentArtifactSubmissionRow | StudentArtifactSubmissionRow[] | null
 }
 
 type SceneValidator = (value: unknown) => DrawingSceneValidationResult
@@ -113,13 +152,13 @@ async function loadWritableStudentArtifactContext(
   studentId: string,
   sourceType: WorkArtifactSource,
 ): Promise<{ context: StudentArtifactContext } | { error: string }> {
-  const { data: answer, error } = await admin
+  const { data: answer, error, revisionColumnAvailable } = await readWithSubmissionRevision<StudentArtifactAnswerRow>(includeRevision => admin
     .from('submission_answers')
     .select(`
       id, org_id, submission_id,
       questions(question_type, answer_parts),
       submissions(
-        id, org_id, student_id, status, started_at, assignment_id, seb_config_revision, exam_access_mode,
+        id, org_id, student_id, status, started_at, assignment_id, ${includeRevision ? 'seb_config_revision, ' : ''}exam_access_mode,
         assignments(
           id, org_id, mode, duration_minutes, end_at, require_work_image,
           scratchpad_enabled, secure_browser_mode, android_exam_mode
@@ -127,7 +166,7 @@ async function loadWritableStudentArtifactContext(
       )
     `)
     .eq('id', submissionAnswerId)
-    .maybeSingle()
+    .maybeSingle())
 
   if (error) return { error: 'ตรวจสอบสิทธิ์แนบวิธีทำไม่สำเร็จ กรุณาลองใหม่' }
   if (!answer) return { error: 'ไม่พบคำตอบ' }
@@ -142,6 +181,9 @@ async function loadWritableStudentArtifactContext(
   }
   if (submission.status !== 'in_progress') return { error: 'ส่งงานแล้ว จึงแก้ไขวิธีทำไม่ได้' }
   if (assignment.mode !== 'online') return { error: 'งานแบบพิมพ์ไม่รองรับการแนบวิธีทำออนไลน์' }
+  if (assignment.secure_browser_mode === 'seb_required' && !revisionColumnAvailable) {
+    return { error: 'ข้อสอบนี้ยังไม่พร้อมให้เข้า กรุณาแจ้งครูผู้สอน' }
+  }
 
   if (assignment.duration_minutes) {
     const deadline = new Date(submission.started_at).getTime() + assignment.duration_minutes * 60_000
@@ -462,7 +504,7 @@ export async function prepareTeachingQuestionImage(input: {
   sourceUrl: string
 }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   const claimSecret = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!claimSecret || claimSecret.length < 20) return { error: 'ระบบตรวจสอบรูปโจทย์ยังไม่พร้อมใช้งาน' }
@@ -542,7 +584,7 @@ export async function duplicateTeachingBoardScene(input: {
   scene: unknown
 }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   if (!isUuid(input.assignmentId) || !isUuid(input.questionId)) return { error: 'งานหรือโจทย์ไม่ถูกต้อง' }
   const managed = await loadManagedTeachingBoardContext(supabase, input.assignmentId, input.questionId)
@@ -649,7 +691,7 @@ export async function duplicateTeachingBoardScene(input: {
 export async function getTeachingBoardScene(boardId: string) {
   if (!isUuid(boardId)) return { error: 'กระดานสอนไม่ถูกต้อง' }
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   const { data: board, error } = await supabase
     .from('teaching_boards')
@@ -717,7 +759,7 @@ export async function prepareStudentWorkArtifactUpload(input: {
   scene?: unknown
 }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   if (!isUuid(input.submissionAnswerId)) return { error: 'คำตอบไม่ถูกต้อง' }
   if (!isWorkPartKey(input.partKey)) return { error: 'ตำแหน่งวิธีทำไม่ถูกต้อง' }
@@ -799,7 +841,7 @@ export async function saveStudentWorkArtifact(input: {
   previewFormat: string
 }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   if (!isUuid(input.submissionAnswerId) || !isUuid(input.uploadId)) return { error: 'ไฟล์วิธีทำไม่ถูกต้อง' }
   if (!isWorkPartKey(input.partKey)) return { error: 'ตำแหน่งวิธีทำไม่ถูกต้อง' }
@@ -897,7 +939,7 @@ export async function saveStudentWorkArtifact(input: {
 export async function getStudentWorkArtifacts(submissionAnswerId: string) {
   if (!isUuid(submissionAnswerId)) return { error: 'คำตอบไม่ถูกต้อง' }
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   const { data: rows, error } = await supabase
@@ -933,7 +975,7 @@ export async function getStudentWorkArtifacts(submissionAnswerId: string) {
 export async function deleteStudentWorkArtifact(artifactId: string) {
   if (!isUuid(artifactId)) return { error: 'วิธีทำไม่ถูกต้อง' }
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   const { data: artifact } = await supabase
@@ -965,7 +1007,7 @@ export async function prepareTeachingBoardUpload(input: {
   scene: unknown
 }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   if (!isUuid(input.assignmentId) || !isUuid(input.questionId)) return { error: 'งานหรือโจทย์ไม่ถูกต้อง' }
   if (!isTeachingBoardSlot(input.slot)) return { error: `ช่องบันทึกต้องอยู่ระหว่าง 1–${TEACHING_BOARD_SLOT_COUNT}` }
@@ -1043,7 +1085,7 @@ export async function saveTeachingBoard(input: {
   previewFormat: string
 }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
   if (!isUuid(input.assignmentId) || !isUuid(input.questionId) || !isUuid(input.uploadId)) {
     return { error: 'กระดานสอนไม่ถูกต้อง' }
@@ -1138,7 +1180,7 @@ export async function saveTeachingBoard(input: {
 export async function getTeachingBoards(assignmentId: string, questionId: string) {
   if (!isUuid(assignmentId) || !isUuid(questionId)) return { error: 'งานหรือโจทย์ไม่ถูกต้อง' }
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   const [{ data: rows, error }, { data: canManage }] = await Promise.all([
@@ -1184,7 +1226,7 @@ export async function getTeachingBoards(assignmentId: string, questionId: string
 export async function deleteTeachingBoard(boardId: string) {
   if (!isUuid(boardId)) return { error: 'กระดานสอนไม่ถูกต้อง' }
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   const { data: board } = await supabase

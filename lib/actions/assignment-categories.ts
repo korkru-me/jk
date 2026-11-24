@@ -9,6 +9,7 @@ import {
   normalizeAssignmentCategoryName,
   type AssignmentCategory,
 } from '@/lib/assignment-categories'
+import { getSessionUser } from '@/lib/auth/session-user'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const CATEGORY_COLUMNS = 'id, classroom_id, name, color, position'
@@ -20,7 +21,7 @@ type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string }
 async function authorize(classroomId: string): Promise<{ userId: string } | { error: string }> {
   if (!UUID.test(classroomId)) return { error: STALE }
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getSessionUser(supabase)
   if (!user) return { error: 'ไม่ได้เข้าสู่ระบบ' }
 
   const admin = createAdminClient()

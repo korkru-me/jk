@@ -14,6 +14,7 @@ import {
   type AssignmentDeadlineExtensionSnapshot,
   type ExtendAssignmentDeadlineInput,
 } from '@/lib/assignment-deadline-extension'
+import { getSessionUser } from '@/lib/auth/session-user'
 
 const READ_ERROR = 'โหลดเวลาปิดรับไม่สำเร็จ กรุณาลองใหม่'
 const SAVE_ERROR = 'ขยายเวลาไม่สำเร็จ กรุณาลองใหม่'
@@ -23,7 +24,7 @@ const ROW_FIELDS = 'id, title, classroom_id, type, mode, status, start_at, due_a
 
 async function extensionSession(assignmentId: string) {
   const supabase = await createClient()
-  const { data: { user }, error } = await supabase.auth.getUser()
+  const { data: { user }, error } = await getSessionUser(supabase)
   if (error || !user) return { error: 'กรุณาเข้าสู่ระบบก่อนขยายเวลา' } as const
   const { data: profile, error: profileError } = await supabase.from('users')
     .select('status, role').eq('id', user.id).maybeSingle()
