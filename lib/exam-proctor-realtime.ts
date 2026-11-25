@@ -53,6 +53,15 @@ export type ProctorDashboardConnectionMode = 'connecting' | 'live' | 'fallback'
 
 export const PROCTOR_FALLBACK_POLL_MS = 15_000
 export const PROCTOR_LIVE_RECONCILE_MS = 60_000
+/**
+ * Every online student heartbeats every 15 s, so a live channel with anyone
+ * online should deliver a session change well inside this window. Longer
+ * silence means the subscription went quiet without reporting an error (seen
+ * under load): the dashboard then re-reads the snapshot instead of letting
+ * students drift past the 45 s "active" window and show as offline.
+ */
+export const PROCTOR_LIVE_SILENCE_MS = 20_000
+export const PROCTOR_SILENCE_CHECK_MS = 5_000
 
 const PROCTOR_SIGNAL_RETRY_DELAYS_MS = [1_000, 3_000, 10_000, 30_000] as const
 
@@ -90,6 +99,17 @@ export function applyProctorEventChanges(
   return [...byId.values()]
     .sort((a, b) => time(b.created_at) - time(a.created_at))
     .slice(0, Math.max(0, limit))
+}
+
+export function shouldReconcileQuietProctorFeed({ mode, expectingHeartbeats, lastChangeAt, lastSnapshotAt, now }: {
+  mode: ProctorDashboardConnectionMode
+  expectingHeartbeats: boolean
+  lastChangeAt: number
+  lastSnapshotAt: number
+  now: number
+}): boolean {
+  if (mode !== 'live' || !expectingHeartbeats) return false
+  return now - Math.max(lastChangeAt, lastSnapshotAt) >= PROCTOR_LIVE_SILENCE_MS
 }
 
 export function proctorDashboardConnectionMode(status: string): ProctorDashboardConnectionMode {
