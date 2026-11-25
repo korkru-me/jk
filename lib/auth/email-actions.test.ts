@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   hasGrant: vi.fn(), clearGrant: vi.fn(),
   issueIntent: vi.fn(), clearIntent: vi.fn(),
   redirect: vi.fn(), redirectSignal: new Error('synthetic redirect signal'),
+  signInWithPassword: vi.fn(), loginKeys: vi.fn(), loginCheck: vi.fn(), loginFail: vi.fn(), loginClear: vi.fn(),
 }))
 vi.mock('next/navigation', async (importOriginal) => ({
   ...await importOriginal<typeof import('next/navigation')>(),
@@ -17,10 +18,14 @@ vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: vi.fn(() => ({ from:
   select: () => ({ eq: () => ({ maybeSingle: mocks.profileRead }) }),
 }), rpc: mocks.completeOnboarding })) }))
 vi.mock('@/lib/auth/email-request-limit.server', () => ({ reserveAuthEmail: mocks.reserve }))
+vi.mock('@/lib/auth/login-attempt-limit.server', () => ({
+  currentLoginKeys: mocks.loginKeys, checkLoginAttempt: mocks.loginCheck, recordLoginFailure: mocks.loginFail,
+  clearLoginFailures: mocks.loginClear, loginLockedMessage: (s: number) => `locked ${s}`,
+}))
 vi.mock('@/lib/auth/signup-email.server', () => ({ rememberSignupEmail: mocks.remember }))
 vi.mock('@/lib/auth/recovery-grant.server', () => ({ hasRecoveryGrant: mocks.hasGrant, clearRecoveryGrant: mocks.clearGrant }))
 vi.mock('@/lib/auth/recovery-intent.server', () => ({ issueRecoveryIntent: mocks.issueIntent, clearRecoveryIntent: mocks.clearIntent }))
-import { completeProfile, forgotPassword, loginWithGoogle, register, resendSignupConfirmation, resetPassword, sendMagicLink } from '../actions/auth'
+import { completeProfile, forgotPassword, login, loginWithGoogle, register, resendSignupConfirmation, resetPassword, sendMagicLink } from '../actions/auth'
 import { RedirectType } from 'next/navigation'
 
 function signup(accept = true) {
@@ -273,5 +278,48 @@ describe('public email actions', () => {
     expect(mocks.clearGrant).not.toHaveBeenCalled()
     expect(mocks.signOut).not.toHaveBeenCalled()
     expect(mocks.redirect).not.toHaveBeenCalled()
+  })
+})
+
+describe('password login with the per-account limiter', () => {
+  const keys = { account: 'a'.repeat(64), pair: null, ip: null }
+  function loginForm() {
+    const form = new FormData()
+    form.set('email', 'student@example.com')
+    form.set('password', 'password1')
+    return form
+  }
+  beforeEach(() => {
+    mocks.loginKeys.mockResolvedValue(keys)
+    mocks.loginCheck.mockResolvedValue({ allowed: true, hasFailures: false })
+    mocks.loginFail.mockResolvedValue(null)
+  })
+
+  it('stops a locked account before the password reaches Auth', async () => {
+    mocks.loginCheck.mockResolvedValue({ allowed: false, retryAfterSeconds: 240 })
+    expect(await login(null, loginForm())).toEqual({ error: 'locked 240', retryAfterSeconds: 240 })
+    expect(mocks.signInWithPassword).not.toHaveBeenCalled()
+  })
+  it('counts only a wrong password, and reports the wait once it locks', async () => {
+    mocks.signInWithPassword.mockResolvedValue({ data: { user: null }, error: { status: 400, code: 'invalid_credentials', message: 'Invalid login credentials' } })
+    expect(await login(null, loginForm())).toEqual({ error: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' })
+    mocks.loginFail.mockResolvedValueOnce(300)
+    expect(await login(null, loginForm())).toEqual({ error: 'locked 300', retryAfterSeconds: 300 })
+    expect(mocks.loginFail).toHaveBeenCalledTimes(2)
+    expect(mocks.loginFail).toHaveBeenCalledWith(keys)
+  })
+  it('marks hosted Auth 429 as busy for the queue without counting it as a failure', async () => {
+    mocks.signInWithPassword.mockResolvedValue({ data: { user: null }, error: { status: 429, code: 'over_request_rate_limit', message: 'Request rate limit reached' } })
+    expect(await login(null, loginForm())).toMatchObject({ busy: true })
+    expect(mocks.loginFail).not.toHaveBeenCalled()
+  })
+  it('clears earlier typos after a correct password, and skips the write when there were none', async () => {
+    mocks.signInWithPassword.mockResolvedValue({ data: { user: null }, error: null })
+    await expect(login(null, loginForm())).rejects.toBe(mocks.redirectSignal)
+    expect(mocks.loginClear).not.toHaveBeenCalled()
+    mocks.loginCheck.mockResolvedValue({ allowed: true, hasFailures: true })
+    await expect(login(null, loginForm())).rejects.toBe(mocks.redirectSignal)
+    expect(mocks.loginClear).toHaveBeenCalledWith(keys)
+    expect(mocks.redirect).toHaveBeenCalledWith('/dashboard')
   })
 })

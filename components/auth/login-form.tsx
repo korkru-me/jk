@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { unstable_rethrow } from 'next/navigation'
 import { useForm } from 'react-hook-form'
@@ -10,6 +10,7 @@ import { Loader2, Eye, EyeOff } from 'lucide-react'
 
 import { login, loginWithGoogle } from '@/lib/actions/auth'
 import { loginSchema } from '@/lib/auth/validation'
+import { canRetryLogin, nextLoginRetryDelayMs } from '@/lib/auth/login-queue'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
@@ -35,7 +36,25 @@ export function LoginForm() {
   const [googleLoading, setGoogleLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  // Set while hosted Auth is busy and the form is waiting to retry on its own.
+  const [retryAt, setRetryAt] = useState<number | null>(null)
+  const [now, setNow] = useState(() => Date.now())
+  const cancelQueue = useRef<(() => void) | null>(null)
   const busy = loading || googleLoading
+
+  useEffect(() => {
+    if (retryAt === null) return
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [retryAt])
+  useEffect(() => () => cancelQueue.current?.(), [])
+
+  function waitForRetry(ms: number) {
+    return new Promise<boolean>((resolve) => {
+      const timer = setTimeout(() => { cancelQueue.current = null; resolve(true) }, ms)
+      cancelQueue.current = () => { clearTimeout(timer); cancelQueue.current = null; resolve(false) }
+    })
+  }
 
   const {
     register,
@@ -52,13 +71,32 @@ export function LoginForm() {
     const formData = new FormData()
     formData.set('email', values.email)
     formData.set('password', values.password)
+    const startedAt = Date.now()
     try {
-      const result = await login(null, formData)
-      if (result?.error) setSubmitError(result.error)
+      // A busy answer is not the student's mistake: keep them in a short queue
+      // and retry on their behalf instead of asking them to press again.
+      for (let attempt = 0; ; attempt += 1) {
+        const result = await login(null, formData)
+        if (!result || !('busy' in result)) {
+          if (result?.error) setSubmitError(result.error)
+          return
+        }
+        const delay = nextLoginRetryDelayMs(attempt)
+        if (!canRetryLogin(startedAt, Date.now(), delay)) {
+          setSubmitError('ตอนนี้ยังมีผู้ใช้งานพร้อมกันจำนวนมาก ระบบพยายามให้แล้ว 3 นาที กรุณากดเข้าสู่ระบบอีกครั้ง')
+          return
+        }
+        setNow(Date.now())
+        setRetryAt(Date.now() + delay)
+        const keepGoing = await waitForRetry(delay)
+        setRetryAt(null)
+        if (!keepGoing) return
+      }
     } catch (error) {
       unstable_rethrow(error)
       setSubmitError('เชื่อมต่อไม่สำเร็จ กรุณาลองเข้าสู่ระบบอีกครั้ง')
     } finally {
+      setRetryAt(null)
       setLoading(false)
     }
   }
@@ -159,9 +197,23 @@ export function LoginForm() {
         </Alert>
       )}
 
+      {retryAt !== null && (
+        <Alert role="status" aria-live="polite">
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+            <span>
+              มีคนเข้าสู่ระบบพร้อมกันมาก กำลังพาคุณเข้าอัตโนมัติ ไม่ต้องกดซ้ำ
+              <span className="text-muted-foreground"> · ลองอีกครั้งใน {Math.max(1, Math.ceil((retryAt - now) / 1000))} วินาที</span>
+            </span>
+            <Button type="button" variant="ghost" size="sm" className="min-h-[44px]" onClick={() => cancelQueue.current?.()}>
+              ยกเลิก
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Button type="submit" className="min-h-[44px] w-full" disabled={busy}>
         {loading && <Loader2 data-icon="inline-start" className="motion-safe:animate-spin" />}
-        {loading ? 'กำลังเข้าสู่ระบบ…' : 'เข้าสู่ระบบ'}
+        {retryAt !== null ? 'กำลังรอคิวเข้าสู่ระบบ…' : loading ? 'กำลังเข้าสู่ระบบ…' : 'เข้าสู่ระบบ'}
       </Button>
 
       <p className="flex flex-wrap items-center justify-center gap-1 text-sm text-muted-foreground">
