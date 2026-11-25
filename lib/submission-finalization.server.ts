@@ -6,7 +6,6 @@ import { gradeAnswer } from '@/lib/assignment-attempt'
 import { hasCompleteWorkEvidence } from '@/lib/math-work'
 import { parseSubmittedFiles } from '@/lib/exam-attachment'
 import { validateStoredExamAttachmentUrl } from '@/lib/exam-attachment-access.server'
-import { revalidatePath } from 'next/cache'
 import type { ExerciseGroupSelection } from '@/lib/exercise-group'
 
 // Shared by submitSubmission (student-initiated) and startSubmission's
@@ -222,6 +221,12 @@ export async function gradeAndFinalizeSubmission(
       .eq('submission_id', submissionId),
   ])
 
-  revalidatePath(`/submissions/${submissionId}`)
+  // No revalidatePath here. Called from a Server Action it re-renders the
+  // *current* route (the 40-question take page plus the app layout) into the
+  // action response, which every caller then discards: the exam and the
+  // expired-attempt screen hard-load /submissions/<id>, the solutions page and
+  // file assignments refresh or revalidate on their own, and the result page
+  // is dynamic, so nothing cached needs purging. At a shared deadline that
+  // discarded render ran once per student in the same few seconds.
   return { success: true, totalScore }
 }

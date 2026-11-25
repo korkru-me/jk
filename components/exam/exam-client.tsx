@@ -30,6 +30,8 @@ import { useTabSwitchGuard } from '@/hooks/use-tab-switch-guard'
 import { useFullscreenGuard } from '@/hooks/use-fullscreen-guard'
 import { useAttemptClock } from '@/hooks/use-attempt-clock'
 import { attemptExpiresAt } from '@/lib/attempt-expiry'
+import { jitterDelayMs } from '@/lib/attempt-clock'
+import { readAttemptClock } from '@/lib/actions/attempt-clock'
 import { ExpiredAttemptStatus } from '@/components/exam/expired-attempt-status'
 import { useOnlineStatus } from '@/hooks/use-online-status'
 import { useExamProctor } from '@/hooks/use-exam-proctor'
@@ -103,6 +105,9 @@ import { shouldDetectTabSwitch } from '@/lib/exam-tab-switch'
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 const CHOICE_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ']
+/** Rapid tab flips within this gap share one clock check. */
+const CLOCK_CHECK_MIN_GAP_MS = 5_000
+const CLOCK_CHECK_ONLINE_JITTER_MS = 3_000
 const ScientificCalculator = lazy(() => import('./scientific-calculator'))
 const Scratchpad = lazy(() => import('./scratchpad'))
 
@@ -556,19 +561,64 @@ export function ExamClient({ submissionId, groupWork, storageOwnerId, answers, i
   })
 
   // ── Countdown timer ─────────────────────────────────────────────────────────
-  const clockSeconds = useAttemptClock(expiresAt ?? attemptExpiresAt(startedAt, durationMinutes, null), serverNow,
+  // A light clock check can move the close time (a teacher's extension) and
+  // re-anchor server time without re-rendering the paper. It applies only on
+  // top of the props it was read against; a full refresh brings new props
+  // and supersedes it.
+  const [clockOverride, setClockOverride] = useState<{ base: string | undefined; expiresAt: string | null; serverNow: string } | null>(null)
+  const liveClock = clockOverride && clockOverride.base === serverNow ? clockOverride : null
+  const effectiveExpiresAt = liveClock ? liveClock.expiresAt : expiresAt
+  const effectiveServerNow = liveClock ? liveClock.serverNow : serverNow
+  const clockSeconds = useAttemptClock(effectiveExpiresAt ?? attemptExpiresAt(startedAt, durationMinutes, null), effectiveServerNow,
     () => { if (previewMode) void handleSubmit(); else setExpired(true) })
   // Nothing is timed once the paper is only being read back.
   const secondsLeft = reviewing ? null : clockSeconds
   useEffect(() => {
-    if (expiresAt && serverNow && Date.parse(expiresAt) > Date.parse(serverNow)) setExpired(false)
-  }, [expiresAt, serverNow])
+    if (effectiveExpiresAt && effectiveServerNow && Date.parse(effectiveExpiresAt) > Date.parse(effectiveServerNow)) setExpired(false)
+  }, [effectiveExpiresAt, effectiveServerNow])
+  // Coming back to the tab (screen unlock, app switch, network back) used to
+  // re-render the whole route: every question, saved answer and the app
+  // layout, 10–15 database reads per return, for every student, many times an
+  // exam. Ask only whether the round is still open and when it closes; only a
+  // round that is no longer open needs the full page. The proctor signals for
+  // the teacher's live room are separate (useExamProctor) and unaffected.
   useEffect(() => {
     if (previewMode || review || expired) return
-    const refreshClock = () => { if (navigator.onLine && document.visibilityState === 'visible') router.refresh() }
-    window.addEventListener('online', refreshClock); document.addEventListener('visibilitychange', refreshClock)
-    return () => { window.removeEventListener('online', refreshClock); document.removeEventListener('visibilitychange', refreshClock) }
-  }, [previewMode, review, expired, router])
+    let disposed = false
+    let inFlight = false
+    let lastCheckedAt = 0
+    let onlineTimer: ReturnType<typeof setTimeout> | undefined
+    const base = serverNow
+    const check = async () => {
+      if (disposed || inFlight || !navigator.onLine || document.visibilityState !== 'visible') return
+      if (Date.now() - lastCheckedAt < CLOCK_CHECK_MIN_GAP_MS) return
+      inFlight = true
+      lastCheckedAt = Date.now()
+      try {
+        const reading = await readAttemptClock(submissionId)
+        if (disposed || 'error' in reading) return
+        if (!reading.open) { router.refresh(); return }
+        setClockOverride({ base, expiresAt: reading.expiresAt, serverNow: reading.serverNow })
+      } catch {
+        // Unknown: the local countdown keeps running and the server still
+        // closes the round on time.
+      } finally {
+        inFlight = false
+      }
+    }
+    const onVisibility = () => { if (document.visibilityState === 'visible') void check() }
+    // A classroom's Wi-Fi returns for every device at once; spread the checks.
+    const onOnline = () => {
+      clearTimeout(onlineTimer)
+      onlineTimer = setTimeout(() => void check(), jitterDelayMs(CLOCK_CHECK_ONLINE_JITTER_MS))
+    }
+    window.addEventListener('online', onOnline); document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      disposed = true
+      clearTimeout(onlineTimer)
+      window.removeEventListener('online', onOnline); document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [previewMode, review, expired, router, submissionId, serverNow])
 
   // ── Teacher preview: warm the grading module ────────────────────────────────
   // previewMode grades in the browser through gradeAnswer and lays the ตรวจ
