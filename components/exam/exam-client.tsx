@@ -1,6 +1,7 @@
 'use client'
 
 import { StatementImages } from '@/components/questions/statement-images'
+import { ZoomableImage } from '@/components/questions/zoomable-image'
 import { ExerciseGroupPicker } from '@/components/exam/exercise-group-picker'
 import { exerciseGroupSelectionError, type ExerciseGroupContext, type ExerciseGroupSelection } from '@/lib/exercise-group'
 
@@ -1564,8 +1565,7 @@ export function ExamClient({ submissionId, groupWork, storageOwnerId, answers, i
                   {(current.questions.image_urls ?? []).length > 0 && (
                     <div className="flex flex-wrap gap-2">
                       {(current.questions.image_urls ?? []).map(url => (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img key={url} src={url} alt="รูปประกอบ" className="max-h-44 max-w-full rounded-md object-contain sm:max-h-48" />
+                        <ZoomableImage key={url} src={url} alt="รูปประกอบ" className="max-h-44 max-w-full rounded-md object-contain sm:max-h-48" />
                       ))}
                     </div>
                   )}
@@ -1577,8 +1577,7 @@ export function ExamClient({ submissionId, groupWork, storageOwnerId, answers, i
                           isPdfAttachmentUrl(url) ? (
                             <QuestionPdfAttachment key={url} url={url} localOnly={previewMode} />
                           ) : (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img key={url} src={url} alt="ไฟล์อ้างอิงโจทย์" className="max-h-44 max-w-full rounded-md object-contain sm:max-h-48" />
+                            <ZoomableImage key={url} src={url} alt="ไฟล์อ้างอิงโจทย์" className="max-h-44 max-w-full rounded-md object-contain sm:max-h-48" />
                           )
                         ))}
                       </div>
@@ -2424,8 +2423,7 @@ function InstantCheckPanel({
                 {choice.label}
               </span>
               {choice.imageUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={choice.imageUrl} alt="" loading="lazy" decoding="async" className="max-h-20 w-auto object-contain rounded border shrink-0" />
+                <ZoomableImage src={choice.imageUrl} alt={`รูปตัวเลือก ${choice.label}`} loading="lazy" decoding="async" className="max-h-20 w-auto object-contain rounded border shrink-0" />
               )}
               <span className="text-sm flex-1 min-w-0">{choice.text}</span>
               {choice.correct && (
@@ -2543,8 +2541,7 @@ function ReviewChoiceList({ choices }: { choices: NonNullable<ExamReviewFeedback
           <div key={choice.label} className={cn('flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2', tone?.wrap ?? 'border-border bg-background')}>
             <span className={cn('w-5 shrink-0 text-sm font-bold', tone?.text ?? 'text-muted-foreground')}>{choice.label}</span>
             {choice.imageUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={choice.imageUrl} alt="" loading="lazy" decoding="async" className="max-h-24 w-auto shrink-0 rounded border object-contain" />
+              <ZoomableImage src={choice.imageUrl} alt={`รูปตัวเลือก ${choice.label}`} loading="lazy" decoding="async" className="max-h-24 w-auto shrink-0 rounded border object-contain" />
             )}
             {hasText(choice) && (
               <span className={cn('min-w-0 flex-1 break-words text-sm', tone ? `font-medium ${tone.text}` : 'text-foreground')}>{choice.text}</span>
@@ -2909,8 +2906,10 @@ function MCQInput({
               <span className="font-bold text-sm text-muted-foreground shrink-0 w-5">{CHOICE_LABELS[i]}</span>
               <div className={`flex-1 min-w-0 flex flex-wrap items-center gap-2 ${isEliminated ? 'line-through text-muted-foreground' : ''}`}>
                 {opt.image_url && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={opt.image_url} alt="" loading="lazy" decoding="async" className="max-h-20 max-w-full w-auto object-contain rounded border shrink-0" />
+                  <ZoomableImage src={opt.image_url} alt={`รูปตัวเลือก ${CHOICE_LABELS[i]}`} loading="lazy" decoding="async" className="max-h-20 max-w-full w-auto object-contain rounded border shrink-0"
+                    insideChoice
+                    selectAction={{ label: `เลือกข้อ ${CHOICE_LABELS[i]}`, onSelect: () => onSelect(value), disabled: isEliminated }}
+                  />
                 )}
                 {/* A picture-only option carries the choice letter as its text
                     (the answer's identity is opt.text, so it can't be blank) —
@@ -3664,8 +3663,7 @@ function PartImages({ urls }: { urls?: string[] }) {
   return (
     <div className="flex flex-wrap gap-2">
       {urls.map(url => (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img key={url} src={url} alt="รูปประกอบข้อย่อย" className="max-h-40 rounded-xl border object-contain" />
+        <ZoomableImage key={url} src={url} alt="รูปประกอบข้อย่อย" className="max-h-40 rounded-xl border object-contain" />
       ))}
     </div>
   )
@@ -3911,8 +3909,7 @@ function ClassifyAnswerInput({ config, rawValue, onChange }: {
               {(row.image_urls ?? []).length > 0 && (
                 <span className="mt-2 flex flex-wrap gap-2">
                   {(row.image_urls ?? []).map(url => (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img key={url} src={url} alt="รูปประกอบรายการ" className="max-h-28 rounded-lg border object-contain" />
+                    <ZoomableImage key={url} src={url} alt="รูปประกอบรายการ" className="max-h-28 rounded-lg border object-contain" />
                   ))}
                 </span>
               )}
