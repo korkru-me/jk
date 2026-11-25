@@ -28,6 +28,7 @@ import type { MathInputModes } from '@/lib/math/input-mode'
 import type { MathInputMode } from '@/lib/types'
 import { DEFAULT_FINGER_INPUT_MODE, type FingerInputMode } from '@/lib/drawing-board-input'
 import { cn } from '@/lib/utils'
+import { ZoomableImage } from '@/components/questions/zoomable-image'
 import { hasStudentAnswer } from '@/lib/student-answer-state'
 
 export interface PracticeQuestionHandle {
@@ -147,10 +148,9 @@ function FeedbackPanel({ feedback }: { feedback: PracticeFeedback }) {
                 <span className="font-medium">{choice.label}</span>
                 <span className="flex min-w-0 flex-1 items-center gap-2">
                   {choice.imageUrl && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
+                    <ZoomableImage
                       src={choice.imageUrl}
-                      alt="รูปตัวเลือก"
+                      alt={`รูปตัวเลือก ${choice.label}`}
                       className="max-h-16 max-w-24 shrink-0 rounded-md border border-border object-contain"
                     />
                   )}

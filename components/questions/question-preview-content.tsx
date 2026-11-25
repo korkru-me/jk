@@ -1,6 +1,7 @@
 'use client'
 
 import { StatementImages } from '@/components/questions/statement-images'
+import { ZoomableImage } from '@/components/questions/zoomable-image'
 
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -113,8 +114,7 @@ function PartImages({ urls }: { urls?: string[] }) {
   return (
     <div className="flex flex-wrap gap-3">
       {urls.map((url) => (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img key={url} src={url} alt="รูปประกอบข้อย่อย"
+        <ZoomableImage key={url} src={url} alt="รูปประกอบข้อย่อย"
           className="max-h-40 rounded-lg border border-border object-contain" />
       ))}
     </div>
@@ -740,8 +740,7 @@ export function QuestionPreviewContent({
       {imageUrls.length > 0 && (
         <div className="flex flex-wrap gap-3">
           {imageUrls.map((url) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img key={url} src={url} alt="รูปประกอบโจทย์"
+            <ZoomableImage key={url} src={url} alt="รูปประกอบโจทย์"
               className="max-h-48 rounded-lg border border-border object-contain" />
           ))}
         </div>
@@ -790,10 +789,13 @@ export function QuestionPreviewContent({
                     {PART_LABELS[i]}. {opt.text || <span className="text-muted-foreground italic">ยังไม่มีข้อความ</span>}
                   </span>
                   {opt.image_url && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={opt.image_url} alt={`ตัวเลือก ${PART_LABELS[i]}`}
-                      loading="lazy" decoding="async"
-                      className="max-h-32 rounded border border-border object-contain" />
+                    <span className="block">
+                      <ZoomableImage src={opt.image_url} alt={`ตัวเลือก ${PART_LABELS[i]}`}
+                        loading="lazy" decoding="async"
+                        className="max-h-32 rounded border border-border object-contain"
+                        insideChoice
+                        selectAction={{ label: `เลือกข้อ ${PART_LABELS[i]}`, onSelect: () => setSelectedMcq(i), disabled: mcqChecked }} />
+                    </span>
                   )}
                   {mcqChecked && isCorrect && (
                     <span className="text-xs text-success font-medium block">✓ ถูกต้อง</span>
