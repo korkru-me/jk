@@ -5,6 +5,14 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect, RedirectType } from 'next/navigation'
 import { isAuthRetryableFetchError } from '@supabase/supabase-js'
 import { reserveAuthEmail } from '@/lib/auth/email-request-limit.server'
+import {
+  checkLoginAttempt,
+  clearLoginFailures,
+  currentLoginKeys,
+  loginLockedMessage,
+  recordLoginFailure,
+} from '@/lib/auth/login-attempt-limit.server'
+import { LOGIN_BUSY_MESSAGE, isInvalidCredentials } from '@/lib/auth/login-queue'
 import { rememberSignupEmail } from '@/lib/auth/signup-email.server'
 import { isProfileRowMissing } from '@/lib/auth/profile-read'
 import { POLICY_VERSION } from '@/lib/legal'
@@ -58,18 +66,31 @@ export async function login(_prevState: unknown, formData: FormData) {
 
   const { email, password } = parsed.data
 
+  // Guessing is stopped per account here, before the password is checked, so
+  // the hosted Auth per-IP limit does not have to be the thing keeping a whole
+  // school out at the start of an exam.
+  const limitKeys = await currentLoginKeys(email)
+  const gate = await checkLoginAttempt(limitKeys)
+  if (!gate.allowed) {
+    return { error: loginLockedMessage(gate.retryAfterSeconds), retryAfterSeconds: gate.retryAfterSeconds }
+  }
+
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
   if (error) {
     const connectionError = authConnectionError(error)
     if (connectionError) return { error: connectionError }
-    if (error.status === 429) return { error: 'มีผู้ใช้งานพร้อมกันจำนวนมาก กรุณารอสักครู่แล้วลองเข้าสู่ระบบใหม่' }
-    return {
-      error: error.message === 'Invalid login credentials'
-        ? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง'
-        : error.message,
+    // Busy, not wrong: the form keeps the student in a queue and retries.
+    if (error.status === 429) return { error: LOGIN_BUSY_MESSAGE, busy: true as const }
+    if (isInvalidCredentials(error)) {
+      const lockedFor = await recordLoginFailure(limitKeys)
+      if (lockedFor) return { error: loginLockedMessage(lockedFor), retryAfterSeconds: lockedFor }
+      return { error: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' }
     }
+    return { error: error.message }
   }
+
+  if (gate.hasFailures) await clearLoginFailures(limitKeys)
 
   // Recover orphaned auth users who have no profile row
   if (data.user) {
