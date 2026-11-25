@@ -47,6 +47,8 @@ import {
   proctorDashboardConnectionMode,
   PROCTOR_FALLBACK_POLL_MS,
   PROCTOR_LIVE_RECONCILE_MS,
+  PROCTOR_SILENCE_CHECK_MS,
+  shouldReconcileQuietProctorFeed,
   type ProctorDashboardConnectionMode,
   type ProctorEventChange,
   type ProctorEventRow,
@@ -193,6 +195,10 @@ export function ProctorDashboard({
   const [showOnlyUnacknowledged, setShowOnlyUnacknowledged] = useState(false)
   const [confirm, confirmDialog] = useConfirm()
   const snapshotInFlightRef = useRef(false)
+  // Last moment the session feed was known fresh: a Realtime session change
+  // or a completed snapshot. Read by the quiet-feed watchdog below.
+  const lastSessionChangeAtRef = useRef(0)
+  const lastSnapshotAtRef = useRef(0)
   const snapshotRefreshQueuedRef = useRef(false)
   const pendingSessionChangesRef = useRef<ProctorSessionChange[]>([])
   const pendingEventChangesRef = useRef<ProctorEventChange[]>([])
@@ -253,6 +259,9 @@ export function ProctorDashboard({
     }
     snapshotRefreshQueuedRef.current = false
     snapshotInFlightRef.current = true
+    // Counted from the attempt, so a failing read is retried at the watchdog
+    // pace rather than every check.
+    lastSnapshotAtRef.current = Date.now()
     pendingSessionChangesRef.current = []
     pendingEventChangesRef.current = []
     pendingApprovalChangesRef.current = []
@@ -380,6 +389,7 @@ export function ProctorDashboard({
             if (next?.submission_id) change = { type: 'upsert', row: next }
           }
           if (!change) return
+          lastSessionChangeAtRef.current = Date.now()
           if (snapshotInFlightRef.current) pendingSessionChangesRef.current.push(change)
           setSessions(current => applyProctorSessionChanges(current, [change]))
         },
@@ -526,6 +536,29 @@ export function ProctorDashboard({
       document.removeEventListener('visibilitychange', refreshWhenNeeded)
     }
   }, [assignment.enabled, connectionMode, refreshSnapshot])
+
+  // Quiet-feed watchdog: a channel can stay SUBSCRIBED while changes stop
+  // arriving. With students online that silence is itself the signal, so
+  // re-read the snapshot (about every 20 s while it lasts) rather than wait
+  // for the 60 s reconcile and show heartbeating students as offline.
+  const expectingHeartbeats = useMemo(
+    () => sessions.some(session => session.is_online && !session.completed_at),
+    [sessions],
+  )
+  useEffect(() => {
+    if (!assignment.enabled || connectionMode !== 'live' || !expectingHeartbeats) return
+    const timer = setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      if (shouldReconcileQuietProctorFeed({
+        mode: connectionMode,
+        expectingHeartbeats,
+        lastChangeAt: lastSessionChangeAtRef.current,
+        lastSnapshotAt: lastSnapshotAtRef.current,
+        now: Date.now(),
+      })) void refreshSnapshot()
+    }, PROCTOR_SILENCE_CHECK_MS)
+    return () => clearInterval(timer)
+  }, [assignment.enabled, connectionMode, expectingHeartbeats, refreshSnapshot])
 
   const participantByStudent = useMemo(
     () => new Map(initialParticipants.map(participant => [participant.studentId, participant])),
