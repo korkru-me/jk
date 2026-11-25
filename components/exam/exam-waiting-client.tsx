@@ -6,6 +6,7 @@ import { startAssignmentFromWaiting } from '@/lib/actions/submissions'
 import { ExamWaitingRoom } from '@/components/exam/exam-waiting-room'
 import type { ExamWaitingSummary } from '@/lib/exam-waiting-room'
 import { attemptExpiresAt } from '@/lib/attempt-expiry'
+import { jitterDelayMs } from '@/lib/attempt-clock'
 import { useAttemptClock } from '@/hooks/use-attempt-clock'
 import { ExpiredAttemptStatus } from '@/components/exam/expired-attempt-status'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -36,6 +37,12 @@ export function ExamWaitingClient({ assignmentId, summary, sebChallenge, autoEnt
     }} onReload={() => router.refresh()} />
 }
 
+/** Every waiting device reaches the opening second together. Spreading the
+ * reload over a few seconds keeps that one second from becoming hundreds of
+ * simultaneous page renders; the student still presses เริ่ม afterwards. */
+const OPEN_RELOAD_JITTER_MS = 5_000
+const ONLINE_RELOAD_JITTER_MS = 3_000
+
 interface StartResult { submissionId?: string; alreadySubmitted?: boolean; error?: string }
 
 /** Shared controller. Production always supplies the authenticated server
@@ -58,14 +65,22 @@ export function ExamWaitingFlow({ summary, requestStart, onEntered, onReload, co
   const secondsLeft = useAttemptClock(summary.expiresAt ?? (summary.startedAt
     ? attemptExpiresAt(summary.startedAt, summary.durationMinutes, summary.endAt) : null),
   summary.serverNow, () => setClockExpired(true))
-  const secondsUntilOpen = useAttemptClock(summary.opensAt, summary.serverNow, onReload)
+  const reloadTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const reloadSoon = useEffectEvent((maxDelayMs: number) => {
+    clearTimeout(reloadTimer.current)
+    reloadTimer.current = setTimeout(onReload, jitterDelayMs(maxDelayMs))
+  })
+  useEffect(() => () => clearTimeout(reloadTimer.current), [])
+  const secondsUntilOpen = useAttemptClock(summary.opensAt, summary.serverNow, () => reloadSoon(OPEN_RELOAD_JITTER_MS))
   useEffect(() => {
     if (!summary.expired && summary.expiresAt && summary.serverNow && Date.parse(summary.expiresAt) > Date.parse(summary.serverNow)) setClockExpired(false)
   }, [summary.expired, summary.expiresAt, summary.serverNow])
   useEffect(() => {
     const refresh = () => { if (document.visibilityState === 'visible') onReload() }
-    window.addEventListener('online', refresh); document.addEventListener('visibilitychange', refresh)
-    return () => { window.removeEventListener('online', refresh); document.removeEventListener('visibilitychange', refresh) }
+    // A classroom's Wi-Fi returns for every device at once; spread the reloads.
+    const online = () => reloadSoon(ONLINE_RELOAD_JITTER_MS)
+    window.addEventListener('online', online); document.addEventListener('visibilitychange', refresh)
+    return () => { window.removeEventListener('online', online); document.removeEventListener('visibilitychange', refresh) }
   }, [onReload])
   function start() {
     if (starting.current || clockExpired || summary.expired || summary.blockedReason || summary.completedSubmissionId
