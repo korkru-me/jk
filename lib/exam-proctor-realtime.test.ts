@@ -6,6 +6,9 @@ import {
   proctorDashboardConnectionMode,
   proctorSignalRetryDelay,
   shouldFlushQueuedProctorSignals,
+  shouldReconcileQuietProctorFeed,
+  PROCTOR_LIVE_SILENCE_MS,
+  PROCTOR_SILENCE_CHECK_MS,
   type ProctorEventRow,
   type ProctorSessionRow,
 } from './exam-proctor-realtime'
@@ -119,5 +122,33 @@ describe('exam proctor realtime reconciliation', () => {
     expect(shouldFlushQueuedProctorSignals(0, true, false)).toBe(false)
     expect(shouldFlushQueuedProctorSignals(1, false, false)).toBe(false)
     expect(shouldFlushQueuedProctorSignals(1, true, true)).toBe(false)
+  })
+})
+
+describe('shouldReconcileQuietProctorFeed', () => {
+  const base = { mode: 'live' as const, expectingHeartbeats: true, lastChangeAt: 100_000, lastSnapshotAt: 90_000 }
+
+  it('stays quiet while session changes keep arriving', () => {
+    expect(shouldReconcileQuietProctorFeed({ ...base, now: 100_000 + PROCTOR_LIVE_SILENCE_MS - 1 })).toBe(false)
+  })
+
+  it('re-reads once a live feed with online students has been silent too long', () => {
+    expect(shouldReconcileQuietProctorFeed({ ...base, now: 100_000 + PROCTOR_LIVE_SILENCE_MS })).toBe(true)
+  })
+
+  it('counts a recent snapshot as fresh, so silence re-reads at most once per window', () => {
+    expect(shouldReconcileQuietProctorFeed({ ...base, lastSnapshotAt: 115_000, now: 125_000 })).toBe(false)
+  })
+
+  it('never fires without online students or outside live mode', () => {
+    expect(shouldReconcileQuietProctorFeed({ ...base, expectingHeartbeats: false, now: 1_000_000 })).toBe(false)
+    expect(shouldReconcileQuietProctorFeed({ ...base, mode: 'fallback', now: 1_000_000 })).toBe(false)
+    expect(shouldReconcileQuietProctorFeed({ ...base, mode: 'connecting', now: 1_000_000 })).toBe(false)
+  })
+
+  it('keeps a heartbeating student inside the 45 s active window', () => {
+    // Worst case: last heartbeat landed just before the silence began; the
+    // watchdog runs every PROCTOR_SILENCE_CHECK_MS.
+    expect(PROCTOR_LIVE_SILENCE_MS + PROCTOR_SILENCE_CHECK_MS + 15_000).toBeLessThanOrEqual(45_000)
   })
 })
