@@ -1,6 +1,7 @@
 'use client'
 
 import { StatementImages } from '@/components/questions/statement-images'
+import { ZoomableImage } from '@/components/questions/zoomable-image'
 
 import { useState } from 'react'
 
@@ -84,8 +85,7 @@ function QuestionImages({ urls, label = 'รูปประกอบโจทย
   return (
     <div className="flex flex-wrap gap-2">
       {urls.map(url => (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img key={url} src={url} alt={label} className="max-h-48 max-w-full rounded-xl border border-border object-contain" />
+        <ZoomableImage key={url} src={url} alt={label} className="max-h-48 max-w-full rounded-xl border border-border object-contain" />
       ))}
     </div>
   )
@@ -209,8 +209,13 @@ function McqInput({ question, value, onChange, disabled }: PracticeAnswerInputPr
             </span>
             <span className="min-w-0 flex-1"><RichText text={option.text ?? ''} /></span>
             {option.image_url && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={option.image_url} alt="รูปตัวเลือก" className="max-h-20 max-w-28 rounded-lg border border-border object-contain" />
+              <ZoomableImage
+                src={option.image_url}
+                alt={`รูปตัวเลือก ${CHOICE_LABELS[index] ?? index + 1}`}
+                className="max-h-20 max-w-28 rounded-lg border border-border object-contain"
+                insideChoice
+                selectAction={{ label: `เลือกข้อ ${CHOICE_LABELS[index] ?? index + 1}`, onSelect: () => onChange(answer), disabled }}
+              />
             )}
           </label>
         )

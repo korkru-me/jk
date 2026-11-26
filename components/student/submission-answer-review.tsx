@@ -10,6 +10,7 @@ import { renderRichTextHtml } from '@/lib/rich-text-html'
 import { choiceLabel, studentChoicePosition } from '@/lib/submission-choice-review'
 import { buildAnswerFeedback } from '@/lib/answer-feedback'
 import { FileAssignmentTextAndLink } from '@/components/assignments/file-assignment-text-and-link'
+import { ZoomableImage } from '@/components/questions/zoomable-image'
 import { fileAssignmentQuestionOwner, hasFileAssignmentResponse, parseFileAssignmentResponse } from '@/lib/file-assignment'
 
 const PART_LABELS = ['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ', 'ช', 'ซ']
@@ -80,8 +81,7 @@ export function SubmissionAnswerReview({
               }`}
             >
               {pair?.left_image && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={pair.left_image} alt="" loading="lazy" decoding="async" className="w-10 h-10 object-contain rounded border shrink-0" />
+                <ZoomableImage src={pair.left_image} alt={`รูปข้อ ${i + 1}`} loading="lazy" decoding="async" className="w-10 h-10 object-contain rounded border shrink-0" />
               )}
               <span className="text-sm flex-1 min-w-0">{pair?.left_text ?? `ข้อ ${i + 1}`}</span>
               <span className={`text-sm font-medium shrink-0 ${ok ? 'text-[color-mix(in_oklab,var(--success)_60%,var(--foreground))]' : 'text-[color-mix(in_oklab,var(--destructive)_75%,var(--foreground))]'}`}>
@@ -146,8 +146,7 @@ export function SubmissionAnswerReview({
             <div key={i} className={`flex flex-wrap items-center gap-2 px-3 py-2 rounded-xl border ${wrapClass}`}>
               <span className={`text-sm font-bold shrink-0 w-5 ${labelClass}`}>{choiceLabel(i)}</span>
               {opt.image_url && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={opt.image_url} alt="" loading="lazy" decoding="async" className="max-h-24 w-auto object-contain rounded border shrink-0" />
+                <ZoomableImage src={opt.image_url} alt={`รูปตัวเลือก ${choiceLabel(i)}`} loading="lazy" decoding="async" className="max-h-24 w-auto object-contain rounded border shrink-0" />
               )}
               {opt.text !== CHOICE_LABELS[i] && (
                 <span className={`text-sm flex-1 ${isCorrectOpt || (isStudentChoice && !isCorrectOpt) ? 'font-medium ' + labelClass : 'text-foreground'}`}>
